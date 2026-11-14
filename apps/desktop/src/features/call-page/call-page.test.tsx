@@ -14,7 +14,7 @@ import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
-import { CallToolbar, moreItems, watchNativeMenuContext } from "./CallToolbar";
+import { CallToolbar, moreItems, nativeItemReviewMenuState, runNativeReviewMenuAction, watchNativeMenuContext } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -125,6 +125,34 @@ describe("CallToolbar", () => {
     expect(toggled).toBe(1);
   });
 
+  it("enables native item review only for a focused suggested row, and Accept All only when suggestions remain", () => {
+    expect(nativeItemReviewMenuState(false, true, 3)).toEqual({ acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
+    expect(nativeItemReviewMenuState(true, false, 3)).toEqual({ acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: true });
+    expect(nativeItemReviewMenuState(true, true, 0)).toEqual({ acceptItemEnabled: true, rejectItemEnabled: true, acceptAllSuggestionsEnabled: false });
+  });
+
+  it("routes native menu Accept/Reject to the focused suggested item and Accept All to every kind in that call", async () => {
+    await ready();
+    const selected = fake.world.items.find((item) => item.id === "itm_replay")!;
+    const selectedRev = selected.rev;
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [selected.id]: selected } } }));
+    const row = { dataset: { callId: selected.call.id, itemId: selected.id, review: "suggested" } };
+    vi.stubGlobal("document", { activeElement: { closest: () => row }, querySelectorAll: () => [] });
+    const reviewCall = vi.spyOn(bridge.core, "itemReview");
+    expect(runNativeReviewMenuAction("menu.accept_item", bridge, selected.call.id, 1)).toBe(true);
+    await settle();
+    expect(reviewCall).toHaveBeenCalledTimes(1);
+    expect(reviewCall).toHaveBeenCalledWith({ item_id: selected.id, rev: selectedRev, decision: "accept" });
+    expect(runNativeReviewMenuAction("menu.reject_item", bridge, selected.call.id, 1)).toBe(false);
+    expect(runNativeReviewMenuAction("menu.accept_all_suggestions", bridge, selected.call.id, 0)).toBe(false);
+
+    const batchCall = vi.spyOn(bridge.core, "itemsReviewAll");
+    expect(runNativeReviewMenuAction("menu.accept_all_suggestions", bridge, selected.call.id, 2)).toBe(true);
+    await settle();
+    expect(batchCall).toHaveBeenCalledTimes(1);
+    expect(batchCall).toHaveBeenCalledWith({ call_id: selected.call.id, kinds: [] });
+  });
+
   it("keeps native context commands enabled only for a focused, ready call page and clears them on cleanup", async () => {
     await ready();
     const call = bridge.store.getState().entities.call[id]!;
@@ -135,14 +163,14 @@ describe("CallToolbar", () => {
     send.mockClear();
 
     const stop = watchNativeMenuContext(call, { status: "writing", sensitive: false } as CallOutputs);
-    expect(send).toHaveBeenLastCalledWith({ focused: true, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true });
+    expect(send).toHaveBeenLastCalledWith({ focused: true, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
     browserWindow.dispatchEvent(new Event("blur"));
-    expect(send).toHaveBeenLastCalledWith({ focused: false, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true });
+    expect(send).toHaveBeenLastCalledWith({ focused: false, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
     browserWindow.dispatchEvent(new Event("focus"));
     stop();
     const callsAfterCleanup = send.mock.calls.length;
     browserWindow.dispatchEvent(new Event("blur"));
-    expect(send).toHaveBeenCalledWith({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false });
+    expect(send).toHaveBeenCalledWith({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false, acceptItemEnabled: false, rejectItemEnabled: false, acceptAllSuggestionsEnabled: false });
     expect(send).toHaveBeenCalledTimes(callsAfterCleanup);
   });
 

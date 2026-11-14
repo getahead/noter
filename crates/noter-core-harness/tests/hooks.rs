@@ -6,11 +6,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use noter_core::{CoreDeps, EventEmitter};
-use noter_core_harness::boot::{Harness, Options};
+use noter_core_harness::boot::{scenario, Harness, Options};
 use noter_core_harness::Controls;
+use noter_protocol::fixtures::world;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx};
 use noter_protocol::model::{CallLayout, DisplayInfo, WindowLabel};
+use noter_protocol::model::{ItemKind, ReviewState, SectionKind};
 use noter_protocol::DisplayId;
+use noter_protocol::TimestampMs;
 use serde_json::{json, Value};
 
 fn env(pairs: &[(&str, &str)]) -> impl Fn(&str) -> Option<String> {
@@ -72,6 +75,39 @@ fn a_bad_value_is_refused() {
     ];
     for vars in bad {
         assert!(Options::from_env(env(vars)).is_err(), "{vars:?}");
+    }
+}
+
+#[test]
+fn menu_review_scenario_seeds_suggested_items_for_every_m2_kind() {
+    let mut fixture = world();
+    scenario("menu-review", TimestampMs(0), &mut fixture).unwrap();
+    let call = fixture
+        .calls
+        .iter()
+        .find(|call| call.id.as_str() == "call_backend")
+        .unwrap();
+    assert_eq!(call.review_waiting, 3);
+    let outputs = fixture
+        .outputs
+        .iter()
+        .find(|outputs| outputs.call_id.as_str() == "call_backend")
+        .unwrap();
+    assert_eq!(outputs.review_waiting, 3);
+    for (section, kind) in [
+        (SectionKind::ActionItems, ItemKind::ActionItem),
+        (SectionKind::Decisions, ItemKind::Decision),
+        (SectionKind::OpenQuestions, ItemKind::OpenQuestion),
+    ] {
+        let items = &outputs
+            .sections
+            .iter()
+            .find(|candidate| candidate.kind == section)
+            .unwrap()
+            .items;
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].kind, kind);
+        assert_eq!(items[0].review, ReviewState::Suggested);
     }
 }
 

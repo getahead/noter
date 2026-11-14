@@ -1,9 +1,10 @@
 // One action item, wherever it is listed: the Call page's output section (full), compact lists, Today's Done list
 // and read-only views. Review, tick, edit and handoff answer all go through `actions.ts`; the row only draws what the
 // core and `local.ts` say. Registers itself in the outputs section's seam (`register.tsx`).
-import { useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { applyRecord } from "../../app/store/window-store";
 import { elementId } from "../../app/element-id";
 import { isTyping } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -169,6 +170,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
+  useEffect(() => bridge.store.setState((s) => applyRecord(s, "item", it)), [bridge, it]);
   // @cpt-state:cpt-noter-state-ui-core-bridge-command:p1
   const completing = useWindow(bridge, (s) => s.commands["item:done:".concat(it.id)]?.state === "WAITING");
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
@@ -203,6 +205,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     "data-variant": variant,
     "data-state": state === "SUGGESTED" ? "suggested" : (local.outcome ? "outcome" : state.toLowerCase()),
     "data-item-id": it.id,
+    "data-call-id": it.call.id,
     "data-review": it.review,
     lang: langOf(it.lang),
     id: rowId,

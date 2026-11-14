@@ -296,6 +296,12 @@ impl<R: Runtime> TauriSurfaces<R> {
             action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
         let app = self.app.clone();
         let main_was_hidden = self.main_hidden.load(Ordering::Relaxed);
+        if main_was_hidden && action == TrayAction::OpenCallScreen {
+            // A status-item command must not reactivate the closed Main window while showing its panel.
+            // Reassert the policy before AppKit processes the panel show; the post-command hide below
+            // is only a final guard and cannot prevent a transient restoration.
+            super::update_activation_for_visible_windows(&app);
+        }
         let Some(core) = self.core.get().and_then(Weak::upgrade) else {
             return;
         };

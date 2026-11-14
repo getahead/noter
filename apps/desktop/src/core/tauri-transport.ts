@@ -37,7 +37,7 @@ export async function listenNativeMenuAction(handler: (key: string) => void): Pr
 }
 
 /** Calls page availability for context-sensitive native app menu items. */
-export async function updateNativeMenuContext(context: Partial<{ focused: boolean; exportEnabled: boolean; copySlackEnabled: boolean; copyJiraEnabled: boolean; copyMarkdownEnabled: boolean; deleteEnabled: boolean; sidebarVisible: boolean }>): Promise<void> {
+export async function updateNativeMenuContext(context: Partial<{ focused: boolean; exportEnabled: boolean; copySlackEnabled: boolean; copyJiraEnabled: boolean; copyMarkdownEnabled: boolean; deleteEnabled: boolean; acceptItemEnabled: boolean; acceptAllSuggestionsEnabled: boolean; rejectItemEnabled: boolean; sidebarVisible: boolean }>): Promise<void> {
   if (typeof window === "undefined" || typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== "object") return;
   await emit("shell:menu-context", context);
 }

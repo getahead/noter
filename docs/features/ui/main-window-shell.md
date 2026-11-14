@@ -14,6 +14,7 @@ milestone: M0
 
 - 2026-11-14: The native main window overlays its title bar; the sidebar header supplies the drag region and traffic lights remain visible.
 - 2026-11-14: The host builds the native app menu from this feature's shared label and shortcut model; shell actions use the same handlers as their keyboard shortcuts.
+- 2026-11-14: DESIGN-listed New Question (Ask, M3) and Copilot actions (M4 behind the feature flag) remain visible but disabled until those features are available; M2 Accept/Reject/Accept All menu actions follow focused suggested-item state and reuse the item review handlers.
 
 
 <!-- toc -->

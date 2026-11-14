@@ -193,7 +193,11 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertFalse(main.isHittable, "opening the status menu does not restore the main window")
         item("Open Call Screen", in: statusMenu).click()
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "opening the call panel does not restore the main window")
+        XCTAssertFalse(main.isHittable, "opening the call panel leaves the hidden main window hidden immediately")
+        let mainWasRestored = expectation(for: NSPredicate(format: "isHittable == true"), evaluatedWith: main)
+        mainWasRestored.isInverted = true
+        wait(for: [mainWasRestored], timeout: 1.0)
+        XCTAssertFalse(main.isHittable, "the main window stays hidden throughout the settled observation interval")
         let menu = openMenu()
         XCTAssertFalse(main.isHittable, "opening the menu does not itself restore the main window")
         let openNoter = item("Open Noter", in: menu)

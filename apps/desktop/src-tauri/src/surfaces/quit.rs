@@ -310,6 +310,9 @@ pub fn update_context_menu<R: Runtime>(app: &AppHandle<R>, payload: &str) {
                 ("copyJiraEnabled", "menu.copy_for_jira"),
                 ("copyMarkdownEnabled", "menu.copy_as_markdown"),
                 ("deleteEnabled", "menu.delete"),
+                ("acceptItemEnabled", "menu.accept_item"),
+                ("acceptAllSuggestionsEnabled", "menu.accept_all_suggestions"),
+                ("rejectItemEnabled", "menu.reject_item"),
             ] {
                 if let Some(enabled) = state[field].as_bool() {
                     set_enabled_by_id(&menu, id, focused && enabled);

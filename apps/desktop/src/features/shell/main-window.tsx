@@ -153,7 +153,9 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     void listenNativeMenuAction((key) => {
       const action = shellActionForMenuItem(key);
       if (action) act(action);
-      else dispatchNativeMenuShortcut(key);
+      else if (["menu.accept_item", "menu.accept_all_suggestions", "menu.reject_item"].includes(key)) {
+        window.dispatchEvent(new CustomEvent("shell:native-item-review", { detail: key }));
+      } else dispatchNativeMenuShortcut(key);
     }).then((stop) => active ? unlisten = stop : stop());
     return () => {
       active = false;
