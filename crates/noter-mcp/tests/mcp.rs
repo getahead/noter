@@ -107,13 +107,15 @@ async fn rig_all(
 ) -> Rig {
     let dir = tempfile::tempdir().unwrap();
     let scripted = Scripted::parse(script).unwrap();
-    let mut deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
-        .with_llm(Adapters::scripted(&scripted))
-        .with_mcp_source(mcp(dir.path()))
-        .with_mcp_binary(env!("CARGO_BIN_EXE_noter-mcp").into());
+    let mut deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        mcp_source: mcp(dir.path()),
+        mcp_binary: Some(env!("CARGO_BIN_EXE_noter-mcp").into()),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
+    };
     if engine {
         let launcher = ScriptedEngine::new().with_container(dir.path());
-        deps = deps.with_engine(Arc::new(launcher));
+        deps.engine = Arc::new(launcher);
     }
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
@@ -1194,8 +1196,10 @@ async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_e
 
     let dir = tempfile::tempdir().unwrap();
     let scripted = Scripted::new();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
-        .with_llm(Adapters::scripted(&scripted));
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
+    };
     let bare = Arc::new(Core::open(dir.path(), deps).unwrap());
     noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
         .unwrap()

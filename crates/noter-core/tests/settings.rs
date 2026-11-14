@@ -330,22 +330,6 @@ async fn the_core_owns_the_audio_deletion_count() {
 }
 
 #[tokio::test]
-async fn other_features_hear_about_a_changed_section() {
-    let dir = tempfile::tempdir().unwrap();
-    let (core, _) = open(dir.path());
-    let heard = Arc::new(Mutex::new(vec![]));
-    let sink = heard.clone();
-    core.on_settings_changed(move |section| sink.lock().unwrap().push(section.clone()));
-    let mut general = noter_core::default_settings().general;
-    general.offer_to_record = false;
-    let section = SettingsSection::General(general);
-    core.settings_update(&settings_window(), update(1, section.clone()))
-        .await
-        .unwrap();
-    assert_eq!(*heard.lock().unwrap(), [section]);
-}
-
-#[tokio::test]
 async fn an_ignored_app_can_be_offered_again() {
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());
@@ -437,10 +421,6 @@ async fn glossary_terms_are_added_edited_with_rev_and_removed() {
         .unwrap()
         .terms
         .is_empty());
-    let heard = Arc::new(Mutex::new(0));
-    let sink = heard.clone();
-    core.on_glossary_changed(move |_| *sink.lock().unwrap() += 1);
-
     let list = core.glossary_upsert(&w, term("VSTOR")).await.unwrap();
     let added = list.terms[0].clone();
     assert!(added.id.as_str().starts_with("gls_"));
@@ -486,7 +466,6 @@ async fn glossary_terms_are_added_edited_with_rev_and_removed() {
         .await
         .unwrap_err();
     assert_eq!(gone.code, ErrorCode::NotFound);
-    assert_eq!(*heard.lock().unwrap(), 3);
 }
 
 #[tokio::test]

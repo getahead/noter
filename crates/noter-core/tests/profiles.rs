@@ -68,19 +68,23 @@ impl SecretStore for CountingSecrets {
 
 fn open_counting(dir: &Path) -> (Core, Arc<CountingSecrets>) {
     let secrets = Arc::new(CountingSecrets::default());
-    let deps = CoreDeps::new(
-        Arc::new(Moving(AtomicI64::new(NOW))),
-        Arc::new(Events::default()),
-    )
-    .with_secrets(secrets.clone());
+    let deps = CoreDeps {
+        secrets: secrets.clone(),
+        ..CoreDeps::new(
+            Arc::new(Moving(AtomicI64::new(NOW))),
+            Arc::new(Events::default()),
+        )
+    };
     (Core::open(dir, deps).expect("core opens"), secrets)
 }
 
 fn open(dir: &Path) -> Rig {
     let clock = Arc::new(Moving(AtomicI64::new(NOW)));
     let secrets = Arc::new(MemorySecrets::default());
-    let deps =
-        CoreDeps::new(clock.clone(), Arc::new(Events::default())).with_secrets(secrets.clone());
+    let deps = CoreDeps {
+        secrets: secrets.clone(),
+        ..CoreDeps::new(clock.clone(), Arc::new(Events::default()))
+    };
     Rig {
         core: Core::open(dir, deps).expect("core opens"),
         clock,

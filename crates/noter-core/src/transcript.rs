@@ -133,19 +133,6 @@ impl Core {
     /// Starts listening to the engine's events; the host calls it once, after `start_first_run`
     /// has set the core's handle.
     pub(crate) fn start_transcript(self: &Arc<Self>) {
-        // The session writes marks and gaps and ends the stream: it tells the transcript after
-        // its commit.
-        let session = Arc::downgrade(self);
-        self.on_capture_event(move |event| {
-            let Some(core) = session.upgrade() else {
-                return;
-            };
-            match event.clone() {
-                CaptureEvent::Mark(mark) => core.publish_mark(mark),
-                CaptureEvent::Gap(gap) => core.publish_gap(gap),
-                CaptureEvent::Stopped { call_id, reason } => core.call_ended(&call_id, reason),
-            }
-        });
         let mut events = self.engine.events();
         let weak = Arc::downgrade(self);
         self.spawn(async move {
@@ -160,6 +147,14 @@ impl Core {
                 core.on_engine_event(line);
             }
         });
+    }
+
+    pub(crate) fn transcript_capture_event(&self, event: CaptureEvent) {
+        match event {
+            CaptureEvent::Mark(mark) => self.publish_mark(mark),
+            CaptureEvent::Gap(gap) => self.publish_gap(gap),
+            CaptureEvent::Stopped { call_id, reason } => self.call_ended(&call_id, reason),
+        }
     }
 
     fn on_engine_event(&self, line: EngineEventLine) {

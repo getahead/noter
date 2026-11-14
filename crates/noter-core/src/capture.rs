@@ -278,32 +278,31 @@ impl Core {
             let core = self.clone();
             self.spawn(async move { core.send_detection(true).await });
         }
-        let weak = Arc::downgrade(self);
-        self.on_glossary_changed(move |list| {
-            let Some(core) = weak.upgrade() else { return };
-            // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-live-glossary
-            let phase = core.capture_now().phase;
-            if matches!(phase, CapturePhase::Recording | CapturePhase::Paused) {
-                let set = EngineCommand::SetGlossary {
-                    entries: entries(list),
-                };
-                let engine = core.engine.clone();
-                core.spawn(async move {
-                    let _ = engine.command(set).await;
-                });
-            }
-            // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-live-glossary
-        });
     }
 
-    /// Hears marks, gaps and stream ends as capture stores them (the live transcript).
-    pub fn on_capture_event(&self, hook: impl Fn(&CaptureEvent) + Send + Sync + 'static) {
-        lock(&self.capture_hooks).push(Box::new(hook));
+    pub(crate) fn glossary_changed(&self, list: &GlossaryList) {
+        if self.this().is_none() {
+            return;
+        }
+        // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-live-glossary
+        if matches!(
+            self.capture_now().phase,
+            CapturePhase::Recording | CapturePhase::Paused
+        ) {
+            let set = EngineCommand::SetGlossary {
+                entries: entries(list),
+            };
+            let engine = self.engine.clone();
+            self.spawn(async move {
+                let _ = engine.command(set).await;
+            });
+        }
+        // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-live-glossary
     }
 
     pub(crate) fn capture_event(&self, event: CaptureEvent) {
-        for hook in lock(&self.capture_hooks).iter() {
-            hook(&event);
+        if self.this().is_some() {
+            self.transcript_capture_event(event);
         }
     }
 

@@ -306,13 +306,6 @@ pub(crate) fn put(
 }
 
 impl Core {
-    /// Hears every section a write changed, after it committed (first run applies the login
-    /// item and the detection rule from it; settings never calls into other features). Hooks run
-    /// under the settings lock, before `settings:changed`: they must not call back into settings.
-    pub fn on_settings_changed(&self, hook: impl Fn(&SettingsSection) + Send + Sync + 'static) {
-        lock(&self.settings_hooks).push(Box::new(hook));
-    }
-
     // @cpt-flow:cpt-noter-flow-core-settings-update:p1
     // @cpt-dod:cpt-noter-dod-core-settings-sections:p1
     pub(crate) fn update_settings(
@@ -406,7 +399,7 @@ impl Core {
         Ok(written.value)
     }
 
-    /// After a committed section write: the new state, the hooks, `settings:changed`.
+    /// After a committed section write: the first-run side effects and `settings:changed`.
     pub(crate) fn settings_written(
         &self,
         settings: &mut Settings,
@@ -419,8 +412,8 @@ impl Core {
             self.refresh_run_privacy(settings.privacy.mode);
         }
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-side-effects
-        for hook in lock(&self.settings_hooks).iter() {
-            hook(&section);
+        if self.this().is_some() {
+            self.settings_section_changed(&section);
         }
         // @cpt-end:cpt-noter-flow-core-settings-update:p1:inst-side-effects
         // @cpt-begin:cpt-noter-flow-core-settings-update:p1:inst-emit-settings

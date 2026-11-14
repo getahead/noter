@@ -103,16 +103,18 @@ async fn open_with_offline_script(
     let events = Arc::new(Events::default());
     let posted = Arc::new(Posted::default());
     let scripted = Scripted::parse(script).unwrap();
-    let mut deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_llm(Adapters::scripted(&scripted))
-        .with_surfaces(posted.clone());
+    let mut deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        surfaces: posted.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let mut engine = ScriptedEngine::new();
     if let Some(offline_script) = offline_script {
         engine = engine.with_script(offline_script);
     }
     if engine_enabled {
         engine = engine.with_container(dir.path());
-        deps = deps.with_engine(Arc::new(engine.clone()));
+        deps.engine = Arc::new(engine.clone());
     }
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
@@ -870,7 +872,9 @@ async fn the_builtin_archive_installs_live_segments_through_the_core() {
     assert_eq!(
         rows(
             &r.core,
-            &format!("SELECT text FROM segments WHERE call_id = '{CALL}' AND pass = 'archive' ORDER BY t0_ms")
+            &format!(
+                "SELECT text FROM segments WHERE call_id = '{CALL}' AND pass = 'archive' ORDER BY t0_ms"
+            )
         ),
         vec![
             vec![json!("We agree on step 0.")],

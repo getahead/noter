@@ -984,8 +984,10 @@ async fn delete_removes_call_audio_from_the_configured_models_container() {
     let data = tempfile::tempdir().unwrap();
     let container = tempfile::tempdir().unwrap();
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events)
-        .with_models_dir(container.path().join("models"));
+    let deps = CoreDeps {
+        models_dir: Some(container.path().join("models")),
+        ..CoreDeps::new(Arc::new(FixedClock), events)
+    };
     let core = Core::open(data.path(), deps).unwrap();
     core.store()
         .insert_batch(vec![call(

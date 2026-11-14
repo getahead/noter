@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use noter_core::EventEmitter;
+use noter_core::{CoreDeps, EventEmitter};
 use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::Controls;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx};
@@ -91,9 +91,12 @@ async fn boot(scenario: Option<&str>) -> (Arc<Harness>, Arc<Seen>) {
         scenario: scenario.map(Into::into),
         ..Options::default()
     };
-    let harness = Harness::start_with(options, seen.clone(), |deps| deps.with_app_version("9.9.9"))
-        .await
-        .expect("the hooks boot");
+    let harness = Harness::start_with(options, seen.clone(), |deps| CoreDeps {
+        app_version: "9.9.9".into(),
+        ..deps
+    })
+    .await
+    .expect("the hooks boot");
     (harness, seen)
 }
 

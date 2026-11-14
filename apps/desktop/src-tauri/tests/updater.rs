@@ -13,8 +13,8 @@ use noter_desktop::updater::TauriUpdater;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::{UpdateInfo, WindowLabel};
 use noter_protocol::{ErrorCode, NoArgs};
-use serde_json::{json, Value};
-use tauri::test::{mock_builder, mock_context, noop_assets, MockRuntime};
+use serde_json::{Value, json};
+use tauri::test::{MockRuntime, mock_builder, mock_context, noop_assets};
 
 const BUNDLE: &[u8] = b"Noter.app.tar.gz of the next version";
 
@@ -141,7 +141,10 @@ fn with_the_shipped_config_nothing_is_ready_and_update_install_answers_not_found
     let dir = tempfile::tempdir().unwrap();
     let core = Core::open(
         dir.path(),
-        CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)).with_updater(updater),
+        CoreDeps {
+            updater,
+            ..CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents))
+        },
     )
     .unwrap();
     let settings = CommandCtx {

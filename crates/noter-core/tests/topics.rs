@@ -64,9 +64,11 @@ fn main_window() -> CommandCtx {
 /// embeds with the scripted engine.
 async fn open(dir: &std::path::Path) -> (Arc<Core>, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_llm(Adapters::scripted(&Scripted::new()))
-        .with_engine(Arc::new(ScriptedEngine::new().with_container(dir)));
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&Scripted::new()),
+        engine: Arc::new(ScriptedEngine::new().with_container(dir)),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).unwrap());
     core.start_first_run();
     tokio::time::sleep(Duration::from_millis(10)).await;

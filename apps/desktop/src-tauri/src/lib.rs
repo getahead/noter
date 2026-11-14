@@ -25,7 +25,7 @@ use noter_core::{
     PinnedModels, ShortcutRegistrar, ShortcutTaken, Surfaces, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
-use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
+use noter_protocol::ipc::{Caller, CommandCtx, Sink, dispatch_json};
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
 use serde_json::Value;
@@ -137,7 +137,13 @@ pub fn run() {
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
             app.manage(webview_watch::start(app.handle()));
-            app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces, group));
+            app.manage(boot(
+                events.clone(),
+                shortcuts,
+                updater.clone(),
+                surfaces,
+                group,
+            ));
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
             #[cfg(all(debug_assertions, feature = "test-hooks", target_os = "macos"))]
@@ -186,21 +192,23 @@ fn boot<R: Runtime>(
         .unwrap_or_else(|| "noter-engine".into());
     let engine = ProcessLauncher::from_env(bundled).app_group(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
-    let deps = CoreDeps::new(Arc::new(SystemClock), events)
-        .with_power(Arc::new(native::MacPower))
-        .with_app_version(env!("CARGO_PKG_VERSION"))
-        .with_shortcuts(shortcuts)
-        .with_engine(Arc::new(engine))
-        .with_native(Arc::new(Mac::new(&group)))
-        .with_native_ops(Arc::new(MacOps::new(surfaces.clone())))
-        .with_models_dir(group.join("models"))
-        .with_models(Arc::new(PinnedModels::new()))
-        .with_updater(updater)
-        .with_surfaces(surfaces.clone())
-        .with_llm(runtimes(&dir))
-        .with_secrets(Arc::new(keychain::Keychain))
-        .with_account_cli(account_cli())
-        .with_mcp_source(Arc::new(HttpMcp::new(browser(surfaces.clone()))));
+    let deps = CoreDeps {
+        power: Arc::new(native::MacPower),
+        app_version: env!("CARGO_PKG_VERSION").into(),
+        shortcuts,
+        engine: Arc::new(engine),
+        native: Arc::new(Mac::new(&group)),
+        native_ops: Arc::new(MacOps::new(surfaces.clone())),
+        models_dir: Some(group.join("models")),
+        models: Arc::new(PinnedModels::new()),
+        updater,
+        surfaces: surfaces.clone(),
+        llm: runtimes(&dir),
+        secrets: Arc::new(keychain::Keychain),
+        account_cli: account_cli(),
+        mcp_source: Arc::new(HttpMcp::new(browser(surfaces.clone()))),
+        ..CoreDeps::new(Arc::new(SystemClock), events)
+    };
     match Core::open(&dir, deps) {
         Ok(core) => {
             let core = Arc::new(core);
@@ -456,9 +464,9 @@ impl EventEmitter for TauriEvents {
 mod tests {
     use super::*;
     use noter_core::{StreamMsg, SystemClock};
+    use noter_protocol::Seq;
     use noter_protocol::ipc::Sink;
     use noter_protocol::model::{StreamEndReason, WindowLabel};
-    use noter_protocol::Seq;
     use std::sync::Mutex;
 
     struct NoEvents;

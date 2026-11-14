@@ -45,7 +45,10 @@ fn open(dir: &Path) -> Run {
     let engine = ScriptedEngine::new();
     let clock = Arc::new(Moving::default());
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let deps = CoreDeps::new(clock.clone(), Arc::new(NoEvents)).with_engine(launcher);
+    let deps = CoreDeps {
+        engine: launcher,
+        ..CoreDeps::new(clock.clone(), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Run {

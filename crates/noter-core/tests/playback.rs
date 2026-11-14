@@ -99,9 +99,11 @@ fn open(dir: &Path, route: OutputRoute) -> Run {
     mac.reading.lock().unwrap().output_route = route;
     let events = Arc::new(Events::default());
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_native(Arc::new(SharedMac(mac.clone())))
-        .with_engine(launcher);
+    let deps = CoreDeps {
+        native: Arc::new(SharedMac(mac.clone())),
+        engine: launcher,
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Run {

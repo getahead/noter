@@ -81,7 +81,10 @@ impl Shortcuts {
 
 fn open_with(dir: &Path, shortcuts: Arc<Shortcuts>) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone()).with_shortcuts(shortcuts);
+    let deps = CoreDeps {
+        shortcuts,
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     (Core::open(dir, deps).expect("core opens"), events)
 }
 

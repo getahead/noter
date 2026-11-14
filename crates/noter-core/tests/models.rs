@@ -173,9 +173,11 @@ struct Setup {
 fn open(dir: &Path, source: Bundles, disk_free_mb: u32) -> Setup {
     let events = Arc::new(Events::default());
     let source = Arc::new(source);
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_native(Arc::new(Disk(disk_free_mb)))
-        .with_models(source.clone());
+    let deps = CoreDeps {
+        native: Arc::new(Disk(disk_free_mb)),
+        models: source.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Setup {
@@ -723,9 +725,11 @@ async fn starting_while_offline_answers_offline_at_once_and_works_once_online() 
         true,
     ));
     let network = Arc::new(Network(false.into(), Mutex::new(None)));
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-        .with_native(network.clone())
-        .with_models(source.clone());
+    let deps = CoreDeps {
+        native: network.clone(),
+        models: source.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+    };
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     core.start_first_run();
     for action in [
@@ -748,9 +752,11 @@ async fn starting_while_offline_answers_offline_at_once_and_works_once_online() 
 }
 
 fn open_on(dir: &Path, source: Arc<Bundles>, network: Arc<Network>) -> Arc<Core> {
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-        .with_native(network)
-        .with_models(source);
+    let deps = CoreDeps {
+        native: network,
+        models: source,
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     core

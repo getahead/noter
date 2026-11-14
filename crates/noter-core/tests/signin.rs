@@ -119,10 +119,12 @@ fn open(dir: &Path, script: Option<&str>) -> World {
     });
     let clock = Arc::new(TickClock(AtomicI64::new(T0)));
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
-    let deps = CoreDeps::new(clock, events.clone())
-        .with_llm(Adapters::scripted(&scripted))
-        .with_secrets(Arc::new(MemorySecrets::default()))
-        .with_account_cli(gated_cli.clone());
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        secrets: Arc::new(MemorySecrets::default()),
+        account_cli: gated_cli.clone(),
+        ..CoreDeps::new(clock, events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     World {

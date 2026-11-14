@@ -685,8 +685,10 @@ fn open_with_panel(dir: &Path, answer: Option<std::path::PathBuf>) -> (Core, Arc
         answer,
         asked: Mutex::default(),
     });
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
-        .with_native_ops(panel.clone());
+    let deps = CoreDeps {
+        native_ops: panel.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+    };
     (Core::open(dir, deps).expect("core opens"), panel)
 }
 

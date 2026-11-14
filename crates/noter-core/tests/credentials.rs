@@ -90,11 +90,13 @@ fn open(dir: &Path, script: Option<&str>) -> World {
     let clock = Arc::new(TickClock(AtomicI64::new(1_790_000_000_000)));
     let panel = Arc::new(Panel(Mutex::new(None)));
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
-    let deps = CoreDeps::new(clock.clone(), events.clone())
-        .with_llm(Adapters::scripted(&scripted))
-        .with_secrets(secrets.clone())
-        .with_account_cli(Arc::new(cli.clone()))
-        .with_native_ops(panel.clone());
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&scripted),
+        secrets: secrets.clone(),
+        account_cli: Arc::new(cli.clone()),
+        native_ops: panel.clone(),
+        ..CoreDeps::new(clock.clone(), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     World {

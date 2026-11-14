@@ -67,7 +67,10 @@ impl NativeOps for Ops {
 }
 
 fn open(dir: &std::path::Path, ops: Arc<Ops>) -> Core {
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents)).with_native_ops(ops);
+    let deps = CoreDeps {
+        native_ops: ops,
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     Core::open(dir, deps).expect("core opens")
 }
 

@@ -132,10 +132,12 @@ fn open(
         .unwrap()
         .insert(PermissionKind::Microphone, mic);
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
-        .with_native(Arc::new(mac))
-        .with_engine(launcher)
-        .with_models(models.unwrap_or_else(|| live_model(dir)));
+    let deps = CoreDeps {
+        native: Arc::new(mac),
+        engine: launcher,
+        models: models.unwrap_or_else(|| live_model(dir)),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Run { core, engine }
@@ -351,15 +353,17 @@ async fn an_engine_that_never_answers_times_out() {
         .unwrap()
         .insert(PermissionKind::Microphone, PermissionState::Granted);
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
-        .with_native(Arc::new(mac))
-        .with_engine(launcher)
-        .with_models(live_model(dir.path()))
-        .with_engine_config(noter_engine_client::Config {
+    let deps = CoreDeps {
+        native: Arc::new(mac),
+        engine: launcher,
+        models: live_model(dir.path()),
+        engine_config: noter_engine_client::Config {
             command_timeout: Duration::from_millis(200),
             ping_timeout: Duration::from_millis(100),
             ..noter_engine_client::Config::default()
-        });
+        },
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     let r = Run { core, engine };
@@ -470,10 +474,12 @@ fn open_probing(dir: &Path, engine: ScriptedEngine) -> Probing {
         .insert(PermissionKind::Microphone, PermissionState::Granted);
     let events = Arc::new(Events::default());
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_native(mac.clone())
-        .with_engine(launcher)
-        .with_models(live_model(dir));
+    let deps = CoreDeps {
+        native: mac.clone(),
+        engine: launcher,
+        models: live_model(dir),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     Probing {

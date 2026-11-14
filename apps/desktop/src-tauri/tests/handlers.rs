@@ -6,14 +6,14 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use noter_core::{Core, CoreDeps, EventEmitter, SystemClock};
-use noter_desktop::{builder, hotkey_pressed, Booted};
+use noter_desktop::{Booted, builder, hotkey_pressed};
 use noter_protocol::ipc::COMMANDS;
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tauri::ipc::{CallbackFn, InvokeBody};
 use tauri::test::{
-    get_ipc_response, mock_builder, mock_context, noop_assets, MockRuntime, INVOKE_KEY,
+    INVOKE_KEY, MockRuntime, get_ipc_response, mock_builder, mock_context, noop_assets,
 };
 use tauri::webview::InvokeRequest;
 use tauri::{WebviewUrl, WebviewWindow, WebviewWindowBuilder};
@@ -254,8 +254,10 @@ impl noter_desktop::Windows for NoWindows {
 fn the_share_test_runs_through_the_mac_from_settings_only() {
     let dir = tempfile::tempdir().unwrap();
     let ops = noter_desktop::MacOps::new(Arc::new(NoWindows));
-    let deps =
-        CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)).with_native_ops(Arc::new(ops));
+    let deps = CoreDeps {
+        native_ops: Arc::new(ops),
+        ..CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents))
+    };
     let core = Core::open(dir.path(), deps).unwrap();
     let app = builder(mock_builder())
         .manage(Booted(Ok(Arc::new(core))))

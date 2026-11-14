@@ -217,8 +217,10 @@ async fn audio_delete_uses_the_engine_container_as_its_call_folder_root() {
     let data = tempfile::tempdir().unwrap();
     let container = tempfile::tempdir().unwrap();
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events)
-        .with_models_dir(container.path().join("models"));
+    let deps = CoreDeps {
+        models_dir: Some(container.path().join("models")),
+        ..CoreDeps::new(Arc::new(FixedClock), events)
+    };
     let core = Core::open(data.path(), deps).unwrap();
     core.store()
         .insert_batch(vec![call("external", 40, "ready", false)])

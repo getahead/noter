@@ -132,11 +132,13 @@ async fn open_over(transport: Option<Arc<dyn McpSource>>) -> Rig {
     let now = clock.clone();
     let mcp = Arc::new(ScriptedMcp::new(Arc::new(move || now.now())));
     let secrets = Arc::new(MemorySecrets::default());
-    let deps = CoreDeps::new(clock.clone(), events.clone())
-        .with_engine(Arc::new(ScriptedEngine::new().with_container(&data)))
-        .with_native_ops(panel.clone())
-        .with_mcp_source(transport.unwrap_or_else(|| mcp.clone()))
-        .with_secrets(secrets.clone());
+    let deps = CoreDeps {
+        engine: Arc::new(ScriptedEngine::new().with_container(&data)),
+        native_ops: panel.clone(),
+        mcp_source: transport.unwrap_or_else(|| mcp.clone()),
+        secrets: secrets.clone(),
+        ..CoreDeps::new(clock.clone(), events.clone())
+    };
     let core = Arc::new(Core::open(&data, deps).unwrap());
     core.start_first_run();
     Rig {
@@ -479,9 +481,11 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
     );
     let progress = rig.events.named("jobs:progress");
     assert!(progress.iter().any(|p| p["run"]["status"] == "succeeded"
-        && p["run"]["counts"].as_array().is_some_and(|counts| counts
-            .iter()
-            .any(|c| c["label"] == "skipped" && c["n"].as_u64().is_some_and(|n| n >= 4)))));
+        && p["run"]["counts"].as_array().is_some_and(|counts| {
+            counts
+                .iter()
+                .any(|c| c["label"] == "skipped" && c["n"].as_u64().is_some_and(|n| n >= 4))
+        })));
     assert!(!format!("{progress:?}").contains("Word lock file"));
 
     // A skipped file is retried after repair; failure never stores a successful hash.

@@ -145,7 +145,10 @@ async fn the_cores_power_source_holds_archive_work_on_battery_until_mains_return
     let core = Arc::new(
         Core::open(
             dir.path(),
-            CoreDeps::new(Arc::new(FixedClock), events.clone()).with_power(power.clone()),
+            CoreDeps {
+                power: power.clone(),
+                ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+            },
         )
         .unwrap(),
     );

@@ -161,9 +161,11 @@ fn world(script: &str) -> World {
     let events = Arc::new(Events::default());
     let ops = Arc::new(Ops::default());
     let llm = Scripted::parse(script).unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone())
-        .with_llm(Adapters::scripted(&llm))
-        .with_native_ops(ops.clone());
+    let deps = CoreDeps {
+        llm: Adapters::scripted(&llm),
+        native_ops: ops.clone(),
+        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     core.store()

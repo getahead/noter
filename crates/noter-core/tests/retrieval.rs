@@ -40,8 +40,10 @@ fn main_window() -> CommandCtx {
 
 /// A started core on `dir` with the scripted engine (its App Group container is `dir`).
 async fn open(dir: &std::path::Path) -> Arc<Core> {
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
-        .with_engine(Arc::new(ScriptedEngine::new().with_container(dir)));
+    let deps = CoreDeps {
+        engine: Arc::new(ScriptedEngine::new().with_container(dir)),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir, deps).unwrap());
     core.start_first_run();
     core
@@ -302,8 +304,10 @@ async fn a_failed_query_embedding_reports_keyword_only() {
     let engine = ScriptedEngine::new()
         .with_container(dir.path())
         .with_default(down);
-    let deps =
-        CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents)).with_engine(Arc::new(engine));
+    let deps = CoreDeps {
+        engine: Arc::new(engine),
+        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+    };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     seed(&core);

@@ -82,7 +82,9 @@ impl Options {
         while let Some(flag) = rest.next() {
             match (flag.as_str(), rest.next().map(String::as_str)) {
                 ("--fixture", Some("world")) => options.fixture = true,
-                ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
+                ("--fixture", name) => {
+                    return Err(format!("unknown fixture {name:?}; known: world"));
+                }
                 ("--clock", Some("fixed")) => options.fixed_clock = true,
                 ("--hotkey-conflict", Some(value)) => {
                     let (shortcut, owner) = value
@@ -108,7 +110,11 @@ impl Options {
                         Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
                     options.engine_script = Some(script);
                 }
-                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--hotkey-conflict <shortcut>=<owner>] [--engine-script <file>] [--llm-script <file>]")),
+                _ => {
+                    return Err(format!(
+                        "unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--hotkey-conflict <shortcut>=<owner>] [--engine-script <file>] [--llm-script <file>]"
+                    ));
+                }
             }
         }
         Ok(options)
@@ -201,11 +207,20 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
         "handoff" => {
             w.app.capture = idle;
             // Put the engineering item on the saved call's page, where native tests can open it.
-            let outputs = w.outputs.iter_mut().find(|o| o.call_id.as_str() == "call_backend")
+            let outputs = w
+                .outputs
+                .iter_mut()
+                .find(|o| o.call_id.as_str() == "call_backend")
                 .ok_or("handoff scenario: missing saved-call outputs")?;
-            let actions = outputs.sections.iter_mut().find(|s| s.kind == SectionKind::ActionItems)
+            let actions = outputs
+                .sections
+                .iter_mut()
+                .find(|s| s.kind == SectionKind::ActionItems)
                 .ok_or("handoff scenario: missing action items")?;
-            let item = w.items.iter_mut().find(|i| i.id.as_str() == "itm_replay")
+            let item = w
+                .items
+                .iter_mut()
+                .find(|i| i.id.as_str() == "itm_replay")
                 .ok_or("handoff scenario: missing engineering item")?;
             item.call.id = outputs.call_id.clone();
             item.call.title = "Backend sync".into();
@@ -259,7 +274,11 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
             w.call_details.retain(|d| first(&d.call.id));
             w.transcripts.retain(|t| first(&t.call_id));
         }
-        _ => return Err(format!("unknown scenario {name}; known: idle, paused-5-min, handoff, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call")),
+        _ => {
+            return Err(format!(
+                "unknown scenario {name}; known: idle, paused-5-min, handoff, low-disk, detected, new-meeting, call-seems-ended, switched-to-local, first-call"
+            ));
+        }
     }
     Ok(())
 }
@@ -369,20 +388,25 @@ impl Harness {
             log: Mutex::new(json!({ "launches": [], "clipboard": [] })),
             probe_fails: Mutex::new(None),
         });
-        let deps = CoreDeps::new(clock.clone(), Arc::new(EventLines(events, seeding.clone())))
-            .with_shortcuts(Arc::new(ScriptedShortcuts(options.hotkey_conflict.clone())))
-            .with_native(native.clone())
-            .with_models(models.clone())
-            .with_engine(Arc::new(engine.clone()))
-            .with_updater(updater.clone())
-            .with_surfaces(surfaces.clone())
-            .with_llm(llm)
-            .with_secrets(secrets.clone())
-            .with_account_cli(Arc::new(account_cli.clone()))
-            .with_native_ops(panel.clone())
-            .with_mcp_source(mcp.clone());
+        let deps = CoreDeps {
+            shortcuts: Arc::new(ScriptedShortcuts(options.hotkey_conflict.clone())),
+            native: native.clone(),
+            models: models.clone(),
+            engine: Arc::new(engine.clone()),
+            updater: updater.clone(),
+            surfaces: surfaces.clone(),
+            llm,
+            secrets: secrets.clone(),
+            account_cli: Arc::new(account_cli.clone()),
+            native_ops: panel.clone(),
+            mcp_source: mcp.clone(),
+            ..CoreDeps::new(clock.clone(), Arc::new(EventLines(events, seeding.clone())))
+        };
         let deps = if options.battery {
-            deps.with_power(Arc::new(OnBattery))
+            CoreDeps {
+                power: Arc::new(OnBattery),
+                ..deps
+            }
         } else {
             deps
         };
@@ -538,10 +562,12 @@ impl Harness {
                     noter_core::testing::capture_event(&self.core, CaptureEvent::Mark(mark));
                     return Ok(Value::Null);
                 }
-                _ => return Err(CoreError::new(
-                    ErrorCode::NotImplemented,
-                    "harness.push: transcript_subscribe plays hypothesis, confirmed, gap, mark and ended",
-                )),
+                _ => {
+                    return Err(CoreError::new(
+                        ErrorCode::NotImplemented,
+                        "harness.push: transcript_subscribe plays hypothesis, confirmed, gap, mark and ended",
+                    ));
+                }
             };
             self.inject(vec![EngineEvent::Segment { segment }]).await?;
             return Ok(Value::Null);
@@ -1152,7 +1178,9 @@ impl Controls for Harness {
                     let usage = |e: String| {
                         CoreError::new(
                             ErrorCode::InvalidInput,
-                            format!("harness.llm_next needs {{ skill, output? | fail?, after_ms? }}: {e}"),
+                            format!(
+                                "harness.llm_next needs {{ skill, output? | fail?, after_ms? }}: {e}"
+                            ),
                         )
                     };
                     let skill = skill.ok_or_else(|| usage("no skill".into()))?;

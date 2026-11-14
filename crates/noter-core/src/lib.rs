@@ -125,7 +125,7 @@ pub struct CoreDeps {
     pub events: Arc<dyn EventEmitter>,
     /// The app's version as the host knows it (`app_snapshot.app_version`); `dev` until set.
     pub app_version: String,
-    /// Global shortcuts; accepts every chord until the host sets its own (`with_shortcuts`).
+    /// Global shortcuts; accepts every chord until the host sets its own.
     pub shortcuts: Arc<dyn ShortcutRegistrar>,
     /// Permissions, environment and the login item (`noter-native` in the app).
     pub native: Arc<dyn NativeServices>,
@@ -184,86 +184,6 @@ impl CoreDeps {
             mcp_binary: None,
         }
     }
-
-    pub fn with_mcp_source(mut self, mcp: Arc<dyn noter_knowledge::McpSource>) -> Self {
-        self.mcp_source = mcp;
-        self
-    }
-
-    pub fn with_mcp_binary(mut self, binary: std::path::PathBuf) -> Self {
-        self.mcp_binary = Some(binary);
-        self
-    }
-
-    pub fn with_power(mut self, power: Arc<dyn noter_jobs::PowerSource>) -> Self {
-        self.power = power;
-        self
-    }
-
-    pub fn with_llm(mut self, adapters: Adapters) -> Self {
-        self.llm = adapters;
-        self
-    }
-
-    pub fn with_secrets(mut self, secrets: Arc<dyn SecretStore>) -> Self {
-        self.secrets = secrets;
-        self
-    }
-
-    pub fn with_account_cli(mut self, cli: Arc<dyn AccountCli>) -> Self {
-        self.account_cli = cli;
-        self
-    }
-
-    pub fn with_native_ops(mut self, ops: Arc<dyn NativeOps>) -> Self {
-        self.native_ops = ops;
-        self
-    }
-
-    pub fn with_surfaces(mut self, surfaces: Arc<dyn Surfaces>) -> Self {
-        self.surfaces = surfaces;
-        self
-    }
-
-    pub fn with_engine(mut self, engine: Arc<dyn noter_engine_client::EngineLauncher>) -> Self {
-        self.engine = engine;
-        self
-    }
-
-    pub fn with_engine_config(mut self, config: noter_engine_client::Config) -> Self {
-        self.engine_config = config;
-        self
-    }
-
-    pub fn with_app_version(mut self, version: impl Into<String>) -> Self {
-        self.app_version = version.into();
-        self
-    }
-
-    pub fn with_shortcuts(mut self, shortcuts: Arc<dyn ShortcutRegistrar>) -> Self {
-        self.shortcuts = shortcuts;
-        self
-    }
-
-    pub fn with_models_dir(mut self, dir: std::path::PathBuf) -> Self {
-        self.models_dir = Some(dir);
-        self
-    }
-
-    pub fn with_native(mut self, native: Arc<dyn NativeServices>) -> Self {
-        self.native = native;
-        self
-    }
-
-    pub fn with_models(mut self, models: Arc<dyn ModelSource>) -> Self {
-        self.models = models;
-        self
-    }
-
-    pub fn with_updater(mut self, updater: Arc<dyn Updater>) -> Self {
-        self.updater = updater;
-        self
-    }
 }
 
 /// Why the core did not start.
@@ -313,8 +233,6 @@ pub struct Core {
     privacy_watches: Mutex<Vec<privacy::Watch>>,
     /// App hotkeys and their registration status; writes hold this lock, then `settings`.
     hotkeys: Mutex<HotkeyList>,
-    settings_hooks: Hooks<SettingsSection>,
-    glossary_hooks: Hooks<GlossaryList>,
     /// First run's stored setup state and the settings values it follows.
     first_run: Mutex<first_run::State>,
     /// Model downloads, shown in the setup status.
@@ -330,7 +248,6 @@ pub struct Core {
     self_test_hub: std::sync::OnceLock<Arc<StreamHub<SelfTestMsg>>>,
     /// The capture machine's bookkeeping; held by each capture command while it applies.
     capture: tokio::sync::Mutex<capture::Session>,
-    capture_hooks: Hooks<CaptureEvent>,
     /// The call window's state, the presenting memory and the tray the native layer shows.
     windows: Mutex<surfaces::Windows>,
     /// Serializes hide/restore transitions without blocking native focus callbacks on `windows`.
@@ -362,9 +279,6 @@ pub struct Core {
     ask: ask::Turns,
     ask_hub: std::sync::OnceLock<Arc<StreamHub<AskMsg>>>,
 }
-
-/// Other features' callbacks for a change, run after it committed.
-type Hooks<T> = Mutex<Vec<Box<dyn Fn(&T) + Send + Sync>>>;
 
 /// noter-core's own tables: settings and the glossary, calls and their capture data.
 // @cpt-dbtable:cpt-noter-dbtable-settings:p1
@@ -518,8 +432,6 @@ impl Core {
             settings: Mutex::new(settings),
             privacy_watches: Mutex::new(vec![]),
             hotkeys: Mutex::new(hotkeys::fresh_list()),
-            settings_hooks: Mutex::new(vec![]),
-            glossary_hooks: Mutex::new(vec![]),
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
             this: std::sync::OnceLock::new(),
@@ -527,7 +439,6 @@ impl Core {
             engine,
             self_test_hub: std::sync::OnceLock::new(),
             capture: tokio::sync::Mutex::new(capture::Session::default()),
-            capture_hooks: Mutex::new(vec![]),
             windows: Mutex::new(surfaces::Windows::default()),
             presenting_transition: Mutex::new(()),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
