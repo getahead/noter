@@ -81,6 +81,17 @@ describe("Default", () => {
     expect(seen).toContainEqual(["window_announce", { text: "Noter: Record this call? Press Control-Option-Command-R to record.", politeness: "polite" }]);
   });
 
+  it("gives button guidance when the record shortcut is cleared", async () => {
+    await ready();
+    fake.world.hotkeys.bindings.find((binding) => binding.action === "start_stop")!.shortcut = null;
+    bridge.store.setState((state) => ({ ...state, whole: { ...state.whole, hotkeys: fake.world.hotkeys } }));
+    const seen = sent();
+    html();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "Noter: Record this call? Use the Record button to start recording.", politeness: "polite" }]);
+  });
+
   it("× closes it with reason closed", async () => {
     await ready();
     const seen = sent();
@@ -172,6 +183,17 @@ describe("the notice variants", () => {
       { call_id: "call_live", choice: "stop_now" },
       { call_id: "call_live", choice: "keep_recording" },
     ]);
+  });
+
+  it("gives button guidance when the Keep Recording shortcut is cleared", async () => {
+    await ready(live({ type: "call_ended", stops_at: Date.now() + 10_000 }), null);
+    fake.world.hotkeys.bindings.find((binding) => binding.action === "open_call_screen")!.shortcut = null;
+    bridge.store.setState((state) => ({ ...state, whole: { ...state.whole, hotkeys: fake.world.hotkeys } }));
+    const seen = sent();
+    html();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "The call seems to have ended. Noter stops recording in 10 seconds. Use the Keep Recording button to continue.", politeness: "assertive" }]);
   });
 
   it("call-ended while the core holds the countdown reads Paused while you're here", async () => {

@@ -91,10 +91,10 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
     const announcement = promptAnnouncement(previous, key, variant);
     if (!announcement) return;
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-render-notice
-    if (announcement === "notice" && variant === "call-ended") void announce(bridge, t("prompt.announce_ended", { key: spokenChord(keepChord) }), "assertive");
+    if (announcement === "notice" && variant === "call-ended") void announce(bridge, keepChord ? t("prompt.announce_ended", { key: spokenChord(keepChord) }) : t("prompt.announce_ended_unbound"), "assertive");
     else if (announcement === "notice" && variant === "new-meeting") void announce(bridge, t("prompt.announce_meeting", { title: meetingTitle(notice) }), "assertive");
     // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-render-notice
-    else if (announcement === "appearance") void announce(bridge, t("prompt.announce_appears", { key: spokenChord(recordChord) }), "polite");
+    else if (announcement === "appearance") void announce(bridge, recordChord ? t("prompt.announce_appears", { key: spokenChord(recordChord) }) : t("prompt.announce_appears_unbound"), "polite");
   }, [announce, bridge, key, keepChord, notice, recordChord, shown, variant]);
   // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-render
 

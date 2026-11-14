@@ -38,7 +38,7 @@ export function TodayToolbar({ bridge, base }: PageToolbarProps) {
         label={t("today.record")}
         icon="record"
         cls="td-recbtn"
-        help={block ? t(block === "model_missing" ? "today.record_model_missing" : "today.record_disk_full") : t("today.record_help", { key: recordKey })}
+        help={block ? t(block === "model_missing" ? "today.record_model_missing" : "today.record_disk_full") : recordKey ? t("today.record_help", { key: recordKey }) : t("today.record_help_unbound")}
         disabled={block !== null}
         loading={recording?.state === "WAITING"}
         onAction={() => void record(bridge)}

@@ -250,7 +250,7 @@ export function captureAnnouncements(was: Seen | null, c: CaptureState, notice: 
   const key = `${c.call_id}:${c.version}`;
   // a notice is news even when the window opens with it; the capture state it opened on is not
   if (notice && notice.type !== was?.notice) {
-    if (notice.type === "call_ended" || notice.type === "call_seems_ended") out.push({ kind: "call_ended", text: t("prompt.announce_ended", { key: keepKey }), key });
+    if (notice.type === "call_ended" || notice.type === "call_seems_ended") out.push({ kind: "call_ended", text: keepKey ? t("prompt.announce_ended", { key: keepKey }) : t("prompt.announce_ended_unbound"), key });
     if (notice.type === "new_meeting") out.push({ kind: "new_meeting", text: notice.event ? t("cw.notice.new_meeting", { title: notice.event.title }) : t("cw.notice.new_meeting_untitled"), key });
   }
   if (!was) return out;
