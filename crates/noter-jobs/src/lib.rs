@@ -22,6 +22,25 @@ use tokio::sync::watch;
 pub use rows::Trigger;
 use rows::{Def, Stored};
 
+/// Display name for a durable job id in History and run rows.
+pub fn name_for_id(id: &str) -> Option<String> {
+    let kind = id.strip_prefix("job_")?;
+    let kind = serde_json::from_value(serde_json::Value::String(kind.to_owned())).ok()?;
+    Some(rows::name_of(kind))
+}
+
+#[cfg(test)]
+mod history_names_test {
+    #[test]
+    fn resolves_job_ids_and_rejects_unknown_ids() {
+        assert_eq!(
+            super::name_for_id("job_post_call").as_deref(),
+            Some("Post-call analysis")
+        );
+        assert_eq!(super::name_for_id("job_unknown"), None);
+    }
+}
+
 /// The most target rows one logged batch changes.
 pub const BATCH_MAX: usize = 200;
 

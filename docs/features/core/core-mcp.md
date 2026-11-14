@@ -219,7 +219,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 
 **Steps**:
 1. [x] - `p1` - Recheck target existence, allowed field and current before value inside the writer boundary - `inst-staging-recheck`
-2. [x] - `p1` - Record the proposed pin or correction through the owning item/change service with actor llm_run, reason, evidence ids and a stable reference; retain proposed state - `inst-staging-write`
+2. [x] - `p1` - Record the proposed pin or correction through the owning item/change service with the run's runtime and model, actor llm_run, reason, evidence ids and a stable reference; retain proposed state - `inst-staging-write`
 3. [x] - `p1` - Commit staging and its change record together; rollback means no staged success result - `inst-staging-commit`
 4. [x] - `p1` - Publish only the owning service's staging notification after commit, never an applied primary edit - `inst-staging-publish`
 5. [x] - `p1` - **RETURN** staged true and reference; later user action must revalidate target state before applying - `inst-staging-return`

@@ -10,6 +10,28 @@ const targetKey = (t: HistoryTarget) => (t.type === "all" ? "all" : `${t.type}:$
 /** The bridge command key of a read: one per target, actor and job, so a superseded read is told apart. */
 export const historyKey = (target: HistoryTarget, actor: ActorFilter, jobId: string | null) => `history:${targetKey(target)}:${actor}:${jobId ?? ""}`;
 
+// @cpt-flow:cpt-noter-flow-ui-history-undo-read:p1
+/** Read pages for one filter and stop as soon as another read supersedes this one. */
+export async function readHistoryPages<T extends { status: "ok"; data: { rows: ChangeRow[]; next_cursor: string | null } } | { status: "error" }>(
+  read: (cursor?: string) => Promise<T>,
+  current: () => boolean,
+): Promise<{ rows: ChangeRow[]; failed: boolean } | null> {
+  const rows: ChangeRow[] = [];
+  let cursor: string | undefined;
+  // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-read
+  do {
+    const page = await read(cursor);
+    // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-filter
+    if (!current()) return null;
+    // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-filter
+    if (page.status !== "ok") return { rows: [], failed: true };
+    rows.push(...page.data.rows);
+    cursor = page.data.next_cursor ?? undefined;
+  } while (cursor);
+  // @cpt-end:cpt-noter-flow-ui-history-undo-read:p1:inst-read
+  return { rows, failed: false };
+}
+
 // @cpt-begin:cpt-noter-flow-ui-history-undo-read:p1:inst-render
 /** Newest first, grouped as Today, Yesterday, then dates. */
 export function groupByDay(rows: ChangeRow[], now: number, prefs: UiPrefs): { day: string; rows: ChangeRow[] }[] {

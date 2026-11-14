@@ -78,7 +78,10 @@ fn fresh_start_creates_private_file_at_newest_schema() {
     let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
     assert_eq!(mode(&path), 0o600);
     assert_eq!(mode(path.parent().unwrap()), 0o700);
-    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 4);
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM schema_migrations"),
+        (MIGRATIONS.len() + NOTES.len()) as i64
+    );
     let pragmas = store
         .read_snapshot(|c| {
             let wal: String = c.query_row("PRAGMA journal_mode", [], |r| r.get(0))?;
@@ -100,7 +103,10 @@ fn second_start_runs_no_migration() {
     let path = db_path(&dir);
     open(&path).close();
     let store = open(&path); // NOTES would fail if it ran again
-    assert_eq!(count(&store, "SELECT count(*) FROM schema_migrations"), 4);
+    assert_eq!(
+        count(&store, "SELECT count(*) FROM schema_migrations"),
+        (MIGRATIONS.len() + NOTES.len()) as i64
+    );
 }
 
 #[test]

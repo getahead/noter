@@ -5,7 +5,7 @@
 
 use std::path::PathBuf;
 
-use noter_protocol::{CallId, LlmRunId};
+use noter_protocol::{CallId, LlmRunId, RuntimeChoice};
 
 use crate::secrets::Secret;
 
@@ -42,6 +42,14 @@ impl std::fmt::Debug for ToolLaunch {
 /// revokes it. The router calls `stop` on every outcome (done, failed, cancelled, timed out).
 pub trait ToolHost: Send + Sync {
     fn start(&self, run: ToolStart) -> Result<ToolLaunch, String>;
+    fn start_with_runtime(
+        &self,
+        run: ToolStart,
+        _runtime: RuntimeChoice,
+        _model: String,
+    ) -> Result<ToolLaunch, String> {
+        self.start(run)
+    }
     fn stop(&self, run: &LlmRunId);
 }
 

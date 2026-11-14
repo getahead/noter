@@ -45,8 +45,7 @@ describe("history_list", () => {
     for (const actor of ["jobs", "models"] as const) expect(ok(await list({ actor })).rows.some((r) => r.id === id)).toBe(false);
   });
 
-  it("pages newest first with a cursor (real core)", async () => {
-    if (s.target === "fake") return; // the fake has no paging
+  it("pages newest first with a cursor", async () => {
     const a = await rename("First");
     const b = await rename("Second");
     const one = ok(await list({ page: { limit: 1 } }));

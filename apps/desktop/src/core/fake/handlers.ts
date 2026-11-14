@@ -37,6 +37,14 @@ const now = (): TimestampMs => Date.now();
 const ack = {};
 const MIN = 60_000;
 
+function pageRows<T>(page: { cursor?: string | null; limit?: number | null } | undefined, rows: T[]) {
+  const limit = Math.min(500, Math.max(1, page?.limit ?? 100));
+  const start = page?.cursor == null ? 0 : Number(page.cursor);
+  if (!Number.isSafeInteger(start) || start < 0) return { rows: [], next_cursor: null, total: rows.length };
+  const slice = rows.slice(start, start + limit);
+  return { rows: slice, next_cursor: start + limit < rows.length ? String(start + limit) : null, total: rows.length };
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────
 
 const speakerName = (label: SpeakerLabel): string => label.type === "person" ? label.person.display_name : label.type === "you" ? "You" : label.type === "unnamed" ? `Speaker ${label.n}` : "Guest";
@@ -881,7 +889,7 @@ export const defaultHandlers: Handlers = {
         (!f.topic_id || i.topic?.id === f.topic_id) &&
         (!f.due_before || (i.due !== null && i.due < f.due_before)),
     );
-    return { rows, next_cursor: null, total: rows.length };
+    return pageRows(a.page, rows);
   },
   item_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
@@ -1162,7 +1170,7 @@ export const defaultHandlers: Handlers = {
         (f.has_open_items == null || f.has_open_items === c.open_items > 0),
     );
     rows = [...rows].sort((x, y) => (a.sort === "oldest" ? x.started_at - y.started_at : a.sort === "longest" ? y.duration_ms - x.duration_ms : a.sort === "title" ? x.title.localeCompare(y.title) : y.started_at - x.started_at));
-    return { rows, next_cursor: null, total: rows.length };
+    return pageRows(a.page, rows);
   },
   call_get: (a, { world }) => {
     // The calls row is the live one (call_update writes it): the detail answers it, as the real core does.
@@ -1372,7 +1380,7 @@ export const defaultHandlers: Handlers = {
         (a.actor === "all" || (a.actor === "you" && c.actor.type === "you") || (a.actor === "jobs" && c.actor.type === "job") || (a.actor === "models" && c.actor.type === "model")) &&
         (!a.job_id || (c.actor.type === "job" && c.actor.job_id === a.job_id)),
     );
-    return { rows: historyRows(world, rows), next_cursor: null, total: rows.length };
+    return pageRows(a.page, historyRows(world, rows));
   },
   change_undo: (a, { world, emit, fake }) => {
     const target = a.target;
@@ -1406,7 +1414,7 @@ export const defaultHandlers: Handlers = {
   },
   proposals_list: (a, { world }) => {
     const rows = world.proposals.filter((p) => !a.kinds.length || a.kinds.includes(p.kind));
-    return { rows, next_cursor: null, total: rows.length };
+    return pageRows(a.page, rows);
   },
   proposal_decide: (a, { world, publish }) => {
     const p = world.proposals.find((x) => x.id === a.proposal_id);
@@ -1683,7 +1691,7 @@ export const defaultHandlers: Handlers = {
   },
   audit_list: (a, { world }) => {
     const rows = world.audit.filter((r) => (a.from == null || r.at >= a.from) && (a.to == null || r.at <= a.to));
-    return { rows, next_cursor: null, total: rows.length };
+    return pageRows(a.page, rows);
   },
   audit_export: (a) => ({ path: `~/Downloads/Noter privacy log.${a.format === "json" ? "json" : "md"}`, files: 1 }),
   share_test_run: (a, { world }) => ({
