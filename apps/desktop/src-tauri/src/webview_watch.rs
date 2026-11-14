@@ -18,7 +18,7 @@ pub const ATTEMPTS: u32 = 3;
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum Load {
     Loading { since: Instant, restarts: u32 },
-    Loaded,
+    Loaded { since: Instant, restarts: u32 },
 }
 
 /// The page loads of the app's webviews, by label.
@@ -49,8 +49,18 @@ impl Loads {
         );
     }
 
-    pub fn finished(&mut self, label: &str) {
-        self.0.insert(label.into(), Load::Loaded);
+    pub fn finished(&mut self, label: &str, now: Instant) {
+        let restarts = match self.0.get(label) {
+            Some(Load::Loading { restarts, .. }) | Some(Load::Loaded { restarts, .. }) => *restarts,
+            None => 0,
+        };
+        self.0.insert(
+            label.into(),
+            Load::Loaded {
+                since: now,
+                restarts,
+            },
+        );
     }
 
     pub fn closed(&mut self, label: &str) {
@@ -62,15 +72,19 @@ impl Loads {
     pub fn due(&mut self, now: Instant) -> Vec<String> {
         let mut due = Vec::new();
         for (label, load) in self.0.iter_mut() {
-            let Load::Loading { since, restarts } = *load else {
-                continue;
+            let (since, restarts) = match *load {
+                Load::Loading { since, restarts } => (since, restarts),
+                Load::Loaded { .. } => continue,
             };
             if now.duration_since(since) < BOUND {
                 continue;
             }
             if restarts >= ATTEMPTS {
                 eprintln!("noter: the {label} page still does not load; it is left as it is");
-                *load = Load::Loaded;
+                *load = Load::Loaded {
+                    since: now,
+                    restarts,
+                };
             } else {
                 *load = Load::Loading {
                     since: now,
@@ -80,6 +94,37 @@ impl Loads {
             }
         }
         due
+    }
+
+    /// A loaded webview's content process exited; reload it within the same retry budget.
+    pub fn process_terminated(&mut self, label: &str, now: Instant) -> bool {
+        let Some(Load::Loaded { since, restarts }) = self.0.get(label).copied() else {
+            return false;
+        };
+        let restarts = if now.duration_since(since) >= BOUND {
+            0
+        } else {
+            restarts
+        };
+        if restarts >= ATTEMPTS {
+            eprintln!("noter: the {label} page keeps losing its web process; it is left as it is");
+            return false;
+        }
+        self.0.insert(
+            label.into(),
+            Load::Loading {
+                since: now,
+                restarts: restarts + 1,
+            },
+        );
+        true
+    }
+
+    fn loaded_labels(&self) -> Vec<String> {
+        self.0
+            .iter()
+            .filter_map(|(label, load)| matches!(load, Load::Loaded { .. }).then(|| label.clone()))
+            .collect()
     }
 }
 
@@ -100,12 +145,37 @@ pub fn start<R: Runtime>(app: &AppHandle<R>) -> Watch {
     let (app, polled) = (app.clone(), watch.clone());
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(1));
-        let due = lock(&polled).due(Instant::now());
+        let (due, loaded) = {
+            let mut loads = lock(&polled);
+            (loads.due(Instant::now()), loads.loaded_labels())
+        };
         for label in due {
             restart(&app, &label);
         }
+        for label in loaded {
+            recover_terminated(&app, &polled, &label);
+        }
     });
     watch
+}
+
+/// Checks loaded pages on the WebView's main thread and reloads one whose content process exited.
+// @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
+fn recover_terminated<R: Runtime>(app: &AppHandle<R>, watch: &Watch, label: &str) {
+    let Some(webview) = app.get_webview_window(label) else {
+        return;
+    };
+    let reload = webview.clone();
+    let watch = watch.clone();
+    let label = label.to_string();
+    let _ = webview.with_webview(move |platform| {
+        if web_process_id(platform.inner()) == Some(0)
+            && lock(&watch).process_terminated(&label, Instant::now())
+        {
+            eprintln!("noter: the {label} page's web process exited; reloading it");
+            let _ = reload.reload();
+        }
+    });
 }
 
 /// Ends the webview's content process and reloads its page in a new one.
@@ -125,6 +195,21 @@ fn restart<R: Runtime>(app: &AppHandle<R>, label: &str) {
 /// `_killWebContentProcessAndResetState`, each checked with respondsToSelector:): WebKit has no
 /// public call that ends a web view's content process; switch when one appears. WebKit only
 /// detaches the process, which a hung one never notices, so it is also killed.
+pub(crate) fn web_process_id(webview: *mut std::ffi::c_void) -> Option<i32> {
+    use objc2::runtime::AnyObject;
+    use objc2::{msg_send, sel};
+    // SAFETY: `webview` is the WKWebView Tauri hands to `with_webview`, used on the main thread.
+    let webview = unsafe { (webview as *const AnyObject).as_ref()? };
+    // SAFETY: respondsToSelector: is NSObject API; `_webProcessIdentifier` returns a pid_t.
+    unsafe {
+        if msg_send![webview, respondsToSelector: sel!(_webProcessIdentifier)] {
+            Some(msg_send![webview, _webProcessIdentifier])
+        } else {
+            None
+        }
+    }
+}
+
 fn end_content_process(webview: *mut std::ffi::c_void) {
     use objc2::runtime::AnyObject;
     use objc2::{msg_send, sel};
@@ -139,11 +224,8 @@ fn end_content_process(webview: *mut std::ffi::c_void) {
     // SAFETY: respondsToSelector: is NSObject API; `_webProcessIdentifier` returns a pid_t and
     // `_killWebContentProcessAndResetState` takes and returns nothing; kill(2) takes a pid.
     unsafe {
-        let pid: i32 = if msg_send![webview, respondsToSelector: sel!(_webProcessIdentifier)] {
-            msg_send![webview, _webProcessIdentifier]
-        } else {
-            0
-        };
+        let pid = web_process_id(webview as *const AnyObject as *mut std::ffi::c_void)
+            .unwrap_or_default();
         if msg_send![webview, respondsToSelector: sel!(_killWebContentProcessAndResetState)] {
             let _: () = msg_send![webview, _killWebContentProcessAndResetState];
         }
@@ -162,19 +244,40 @@ mod tests {
     }
 
     #[test]
+    fn a_loaded_page_with_a_terminated_process_is_reloaded_with_bounded_attempts() {
+        let (mut loads, t) = (Loads::default(), Instant::now());
+        loads.created("call-screen", t);
+        loads.finished("call-screen", t);
+        assert!(loads.process_terminated("call-screen", at(t, 1)));
+        loads.started("call-screen", at(t, 1));
+        loads.finished("call-screen", at(t, 2));
+        assert!(loads.process_terminated("call-screen", at(t, 3)));
+        loads.started("call-screen", at(t, 3));
+        loads.finished("call-screen", at(t, 4));
+        assert!(loads.process_terminated("call-screen", at(t, 5)));
+        loads.started("call-screen", at(t, 5));
+        loads.finished("call-screen", at(t, 6));
+        assert!(!loads.process_terminated("call-screen", at(t, 7)));
+        assert!(
+            loads.process_terminated("call-screen", at(t, 17)),
+            "a healthy page gets a fresh retry budget"
+        );
+    }
+
+    #[test]
     fn a_page_that_loads_in_time_is_never_restarted() {
         let (mut loads, t) = (Loads::default(), Instant::now());
         loads.created("main", t);
         loads.started("main", at(t, 1));
         assert!(loads.due(at(t, 5)).is_empty());
-        loads.finished("main");
+        loads.finished("main", at(t, 2));
         assert!(loads.due(at(t, 60)).is_empty());
     }
 
     #[test]
     fn a_window_created_after_its_page_loaded_stays_loaded() {
         let (mut loads, t) = (Loads::default(), Instant::now());
-        loads.finished("main");
+        loads.finished("main", t);
         loads.created("main", t);
         assert!(loads.due(at(t, 60)).is_empty());
     }
@@ -203,7 +306,7 @@ mod tests {
         let (mut loads, t) = (Loads::default(), Instant::now());
         loads.created("main", t);
         assert_eq!(loads.due(at(t, 10)), vec!["main".to_string()]);
-        loads.finished("main");
+        loads.finished("main", at(t, 11));
         loads.started("main", at(t, 20));
         for s in [30, 40, 50] {
             assert_eq!(

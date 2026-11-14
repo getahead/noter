@@ -560,7 +560,11 @@ pub fn running_call(c: &CaptureState) -> Option<(CallId, String)> {
 // @cpt-flow:cpt-noter-flow-ui-dialogs-host-quit:p1
 pub fn quit<R: Runtime>(app: &AppHandle<R>) {
     // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-user-quit
+    if QUIT_ALERT_PENDING.swap(true, Ordering::AcqRel) {
+        return;
+    }
     let Some(core) = core_of(app) else {
+        QUIT_ALERT_PENDING.store(false, Ordering::Release);
         app.exit(0);
         return;
     };
@@ -571,6 +575,7 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
         let capture = core.app_snapshot(&ctx, NoArgs {}).await.map(|s| s.capture);
         // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-idle
         let Some((call_id, title)) = capture.ok().as_ref().and_then(running_call) else {
+            QUIT_ALERT_PENDING.store(false, Ordering::Release);
             // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
             app.exit(0);
             return;
@@ -600,6 +605,7 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
         dialog.show_with_result(move |answer| {
             // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-stop-quit
             if answer != stop {
+                QUIT_ALERT_PENDING.store(false, Ordering::Release);
                 return;
             }
             // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-stop-quit
@@ -612,6 +618,7 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
                 {
                     crate::e2e_log::record("capture_stop");
                 }
+                QUIT_ALERT_PENDING.store(false, Ordering::Release);
                 app.exit(0);
             });
             // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-stop-quit
@@ -624,6 +631,7 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
 
 /// The app menu's id for **Quit Noter** ⌘Q.
 pub const APP_QUIT: &str = "AppQuit";
+static QUIT_ALERT_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// The default app menu with Noter's own **Quit Noter** ⌘Q in place of the predefined one, which
 /// ends the app with no event to stop it (the quit alert could not ask).
@@ -765,6 +773,9 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     // Without a size AppKit opens 800×600 pixels: 400×300 pt on Retina, too small for Settings.
     // @cpt-topology:cpt-noter-topology-ui-windows:p1
     let builder = match label {
+        WindowLabel::Main => builder
+            .inner_size(1280.0, 820.0)
+            .min_inner_size(900.0, 600.0),
         WindowLabel::Settings => builder
             .inner_size(820.0, 620.0)
             .min_inner_size(700.0, 480.0)

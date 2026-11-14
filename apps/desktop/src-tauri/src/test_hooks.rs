@@ -79,6 +79,36 @@ pub fn watch_hotkey_trigger<R: Runtime>(app: AppHandle<R>) {
 /// How long a debug app waits for a test to ask for the stall.
 const STALL_ASK_WINDOW: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// With `NOTER_TEST_TERMINATE_APP_FILE`, asks AppKit to terminate once the test creates the file.
+#[cfg(target_os = "macos")]
+pub fn watch_termination_trigger<R: Runtime>(app: AppHandle<R>) {
+    let Some(file) = std::env::var_os("NOTER_TEST_TERMINATE_APP_FILE").map(PathBuf::from) else {
+        return;
+    };
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + STALL_ASK_WINDOW;
+        while !file.exists() {
+            if std::time::Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        if let Err(error) = std::fs::remove_file(&file) {
+            eprintln!("noter: test hook could not consume AppKit termination trigger: {error}");
+            return;
+        }
+        if let Err(error) = app.run_on_main_thread(|| {
+            use objc2::MainThreadMarker;
+            use objc2_app_kit::NSApplication;
+            if let Some(mtm) = MainThreadMarker::new() {
+                NSApplication::sharedApplication(mtm).terminate(None);
+            }
+        }) {
+            eprintln!("noter: test hook could not request AppKit termination: {error}");
+        }
+    });
+}
+
 /// With `NOTER_TEST_STALL_FILE`, stalls the main window's page once, when the test creates that
 /// file (after it has seen the page; a timer was too short on a slow runner, #578): its web process
 /// is stopped and the page reloaded, so the load hangs like the CI runner's (#521) until the watch
@@ -111,6 +141,42 @@ pub fn stall_after_load<R: Runtime>(webview: &Webview<R>) {
             stop_content_process(platform.inner());
             let _ = reload.reload();
             let _ = std::fs::write(&file, "stalled");
+        });
+    });
+}
+
+/// With `NOTER_TEST_TERMINATE_WEB_PROCESS_FILE`, terminates the loaded call page when the test
+/// creates the file. The watcher must then reload the page and restore its snapshot and stream.
+// @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
+pub fn terminate_after_load<R: Runtime>(webview: &Webview<R>) {
+    static WAITING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let Some(file) = std::env::var_os("NOTER_TEST_TERMINATE_WEB_PROCESS_FILE").map(PathBuf::from)
+    else {
+        return;
+    };
+    if webview.label() != "call-screen" || WAITING.swap(true, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    let webview = webview.clone();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + STALL_ASK_WINDOW;
+        while !file.exists() {
+            if std::time::Instant::now() >= deadline {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        let result = file.clone();
+        let _ = webview.with_webview(move |platform| {
+            let pid = crate::webview_watch::web_process_id(platform.inner()).unwrap_or_default();
+            let killed = pid > 0
+                && std::process::Command::new("kill")
+                    .args(["-KILL", &pid.to_string()])
+                    .status()
+                    .is_ok_and(|status| status.success());
+            if killed {
+                let _ = std::fs::write(result, "terminated");
+            }
         });
     });
 }

@@ -3,6 +3,21 @@ import XCTest
 
 // @cpt-dod:cpt-noter-dod-ui-menu-bar-native-tests:p2
 final class MenuBarTests: NoterTestCase {
+    func test_cpt_noter_seq_menu_bar_control_recording__main_window_close_reopen_keeps_running_and_size() {
+        launch("idle")
+        let main = window("Noter")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        let originalFrame = main.frame
+        app.typeKey("w", modifierFlags: .command)
+        XCTAssertTrue(waitUntil(5) { app.state == .runningForeground }, "closing the main window must leave the app running")
+        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing the main window should hide it")
+        let menu = openMenu()
+        item("Open Noter", in: menu).click()
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "Open Noter did not restore the main window")
+        XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Noter should make the main window visible again")
+        XCTAssertEqual(main.frame, originalFrame, "reopening should preserve the window frame")
+    }
+
     func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {
         launch("idle")
         startRecording()
