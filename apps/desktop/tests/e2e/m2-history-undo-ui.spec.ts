@@ -86,7 +86,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
 
   test("UI — Other — Return while the export runs does not start a second one", async ({ page }) => {
     const real = process.env.NOTER_CORE === "stdio"; // only the fake can park one command; the real core answers after a latency
-    await openCall(page, "history", real ? { latency: 5_000, latencyFor: "history_export" } : {});
+    await openCall(page, "history", real ? { latency: 8_000, latencyFor: "history_export" } : {});
     const release = real ? undefined : await hold(page, "history_export");
     await page.getByRole("button", { name: "Export Log…" }).click();
     const sheet = page.getByRole("dialog", { name: /Export Log/ });
@@ -94,7 +94,7 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect(sheet).toHaveAttribute("data-state", "busy");
     await page.keyboard.press("Enter");
     await release?.();
-    await expect(page.getByText(/Exported log to /)).toBeVisible();
+    await expect(page.getByText(/Exported log to /)).toBeVisible({ timeout: 15_000 });
     const sent = (await calls(page)).filter((c) => c.kind === "invoke" && c.name === "history_export");
     expect(sent).toHaveLength(1);
   });
