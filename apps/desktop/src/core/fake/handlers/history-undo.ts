@@ -41,7 +41,15 @@ export function historyHandlers(fake: Core.FakeCore): Core.Handlers {
     const redoable = undone.filter((r) => r.redoable && (!shared.isSpeakerChange(r) ||
       JSON.stringify(shared.namingState(world, (JSON.parse(r.before!) as ReturnType<typeof shared.namingState>).callId)) === r.before));
     if (!redoable.length) {
-      if (undone.every(shared.isSpeakerChange)) return { undone: 0, skipped_edited_later: undone.length };
+      if (undone.every(shared.isSpeakerChange)) {
+        const partial = undone.length === 1 ? shared.replaySpeakerChangeAroundEditedSections(world, undone[0]!, emit) : null;
+        if (partial) {
+          undone.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
+          undone.forEach((r) => shared.logChange(fake, world, { entity: r.entity, summary: `Redid: ${r.summary}`, field: r.field, before: r.before, after: r.after }));
+          return { undone: partial.undone, skipped_edited_later: partial.skipped };
+        }
+        return { undone: 0, skipped_edited_later: undone.length };
+      }
       throw coreError("edited_later");
     }
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));

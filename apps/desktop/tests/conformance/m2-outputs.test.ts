@@ -187,7 +187,8 @@ it("redoing a speaker name never overwrites an output edited after Undo", async 
   const undone = summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections);
   ok(await main.outputEdit({ call_id: CALL, summary_id: SUMMARY, rev: undone.rev!, body_md: "My later edit must survive." }));
   const redo = await main.changeRedo({ target });
-  expect(redo).toEqual({ status: "ok", data: { undone: 0, skipped_edited_later: 1 } });
+  expect(redo).toEqual({ status: "ok", data: { undone: 2, skipped_edited_later: 2 } });
+  expect(ok(await main.callGet({ call_id: CALL })).speakers.find((x) => x.id === speaker.id)?.label).toMatchObject({ type: "person", person: { display_name: "Renamed Person" } });
   expect(summaryOf(ok(await main.outputsGet({ call_id: CALL })).sections).body_md).toBe("My later edit must survive.");
 });
 

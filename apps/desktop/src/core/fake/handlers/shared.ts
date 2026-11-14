@@ -221,6 +221,61 @@ export function replayChanges(world: World, rows: ChangeRow[], value: "before" |
   });
 }
 
+/** Redo speaker identity rows while leaving output sections edited since undo untouched. */
+export function replaySpeakerChangeAroundEditedSections(
+  world: World,
+  row: ChangeRow,
+  emit: HandlerCtx<"change_redo">["emit"],
+): { undone: number; skipped: number } | null {
+  if (!isSpeakerChange(row) || !row.before || !row.after) return null;
+  const before = JSON.parse(row.before) as ReturnType<typeof namingState>;
+  const after = JSON.parse(row.after) as ReturnType<typeof namingState>;
+  const current = namingState(world, before.callId);
+  if (JSON.stringify(current.speakers) !== JSON.stringify(before.speakers) ||
+      JSON.stringify(current.segments) !== JSON.stringify(before.segments)) return null;
+
+  const editedSections = new Set<string>();
+  for (const previous of before.sections) {
+    const live = current.sections.find((section) => section.section.summary_id === previous.section.summary_id);
+    if (previous.section.summary_id && live?.section.user_edited && live.section.body_md !== previous.section.body_md) {
+      editedSections.add(previous.section.summary_id);
+    }
+  }
+  if (!editedSections.size) return null;
+
+  for (const speakers of speakerLists(world, before.callId)) {
+    for (const restored of after.speakers) {
+      const speaker = speakers.find((candidate) => candidate.id === restored.id);
+      if (speaker) Object.assign(speaker, restored);
+      else speakers.push(structuredClone(restored));
+    }
+  }
+  const transcript = world.transcripts.find((item) => item.call_id === before.callId);
+  for (const restored of after.segments) {
+    const segment = transcript?.segments.find((item) => item.id === restored.id);
+    if (segment) segment.speaker = restored.speaker;
+  }
+  emit("entity:changed", { type: "speakers", call_id: before.callId, speakers: after.speakers });
+
+  for (const restored of after.sections) {
+    if (!restored.section.summary_id) continue;
+    if (editedSections.has(restored.section.summary_id)) continue;
+    const section = world.outputs.find((output) => output.call_id === before.callId)?.sections.find((item) => item.summary_id === restored.section.summary_id);
+    if (!section) continue;
+    Object.assign(section, restored.section, { rev: section.rev === null ? null : section.rev + 1 });
+    sectionVersions.set(section, restored.versions);
+    emit("entity:changed", { type: "section", call_id: before.callId, section });
+  }
+
+  const beforeSpeakers = new Map(before.speakers.map((speaker) => [speaker.id, JSON.stringify(speaker)]));
+  const changedSpeakers = after.speakers.filter((speaker) => beforeSpeakers.get(speaker.id) !== JSON.stringify(speaker));
+  const beforePeople = new Set(before.speakers.flatMap((speaker) => speaker.label.type === "person" ? [speaker.label.person.id] : []));
+  const createdPeople = new Set(after.speakers.flatMap((speaker) => speaker.label.type === "person" && !beforePeople.has(speaker.label.person.id) ? [speaker.label.person.id] : []));
+  // The real action batch has a separate speaker/person association row beside each
+  // speaker row; keep its skipped count visible even though the fake stores one snapshot.
+  return { undone: changedSpeakers.length + createdPeople.size, skipped: editedSections.size + changedSpeakers.length };
+}
+
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 export function editedLater(world: World, r: ChangeRow): boolean {
   if (isSpeakerChange(r) && r.after) {

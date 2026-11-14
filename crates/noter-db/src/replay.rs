@@ -236,6 +236,7 @@ fn reverse_tx(
     }
     let mut done = 0;
     let mut skipped = 0;
+    let mut conflict_skipped = false;
     let mut touched = BTreeSet::new();
     let mut settings_moved = false;
     for latest in &chosen {
@@ -253,10 +254,26 @@ fn reverse_tx(
             Act::Setting { key, .. } => (latest.entity_type.clone(), key.clone()),
             _ => (latest.entity_type.clone(), latest.entity_id.clone()),
         };
-        settings_moved |= matches!(act, Act::Setting { .. });
         // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-before
         // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-after
-        act.run(tx)?;
+        tx.execute_batch("SAVEPOINT replay_action")
+            .map_err(internal)?;
+        match act.run(tx) {
+            Ok(()) => tx
+                .execute_batch("RELEASE SAVEPOINT replay_action")
+                .map_err(internal)?,
+            Err(error) if dir == Direction::Redo && error.code == ErrorCode::Conflict => {
+                tx.execute_batch(
+                    "ROLLBACK TO SAVEPOINT replay_action; RELEASE SAVEPOINT replay_action",
+                )
+                .map_err(internal)?;
+                skipped += 1;
+                conflict_skipped = true;
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
+        settings_moved |= matches!(act, Act::Setting { .. });
         match dir {
             Direction::Undo => {
                 // @cpt-begin:cpt-noter-state-core-history-undo-change:p1:inst-st-undo
@@ -279,7 +296,7 @@ fn reverse_tx(
         done += 1;
     }
     // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-all-skipped
-    if done == 0 {
+    if done == 0 && !conflict_skipped {
         return Err(CoreError::new(
             ErrorCode::EditedLater,
             "every change was edited later",
