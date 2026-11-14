@@ -10,9 +10,11 @@ final class MenuBarTests: NoterTestCase {
         let originalFrame = main.frame
         app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(waitUntil(5) { app.state == .runningForeground }, "closing the main window must leave the app running")
+        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing the main window should hide it")
         let menu = openMenu()
         item("Open Noter", in: menu).click()
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "Open Noter did not restore the main window")
+        XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Noter should make the main window visible again")
         XCTAssertEqual(main.frame, originalFrame, "reopening should preserve the window frame")
     }
 
