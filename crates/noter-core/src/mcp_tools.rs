@@ -9,6 +9,19 @@ use noter_protocol::mcp::*;
 use noter_protocol::{CallId, LocalDate, PersonId};
 use serde_json::Value;
 
+#[cfg(test)]
+static PERF_EVIDENCE_LOADS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+#[cfg(test)]
+pub(super) fn reset_perf_evidence_loads() {
+    PERF_EVIDENCE_LOADS.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
+#[cfg(test)]
+pub(super) fn perf_evidence_loads() -> usize {
+    PERF_EVIDENCE_LOADS.load(std::sync::atomic::Ordering::SeqCst)
+}
+
 /// An open item: not a decision, not finished, not rejected.
 const OPEN: &str =
     "i.kind != 'decision' AND i.status IN ('open', 'carried') AND i.review_state != 'rejected'";
@@ -66,7 +79,7 @@ impl Core {
                 }
                 owners_in(&mut clause, &mut args, &a.people);
                 read(&|c| {
-                    let items = items_of(c, &clause, args.clone(), t.cloud, |_| true)?;
+                    let items = items_of(c, &clause, args.clone(), t.cloud, None)?;
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
@@ -85,14 +98,8 @@ impl Core {
                     args.push(Sql::Text(since.0.clone()));
                 }
                 owners_in(&mut clause, &mut args, &a.people);
-                let query = a.query.as_deref().map(str::to_lowercase);
                 read(&|c| {
-                    let keep = |i: &McpItem| {
-                        query
-                            .as_ref()
-                            .map_or(true, |q| i.text.to_lowercase().contains(q))
-                    };
-                    let items = items_of(c, &clause, args.clone(), t.cloud, keep)?;
+                    let items = items_of(c, &clause, args.clone(), t.cloud, a.query.as_deref())?;
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
@@ -119,14 +126,14 @@ fn owners_in(clause: &mut String, args: &mut Vec<Sql>, people: &[PersonId]) {
     args.extend(people.iter().map(|p| Sql::Text(p.as_str().into())));
 }
 
-/// The newest [`super::MAX_ITEMS`] items of `clause` (over `i` and `c`), without a cloud run's
-/// sensitive calls, that `keep` accepts, with the segments their spans cover as evidence.
+/// The newest matching items of `clause` (over `i` and `c`), without a cloud run's sensitive
+/// calls, with the segments their spans cover as evidence.
 fn items_of(
     c: &Connection,
     clause: &str,
     args: Vec<Sql>,
     cloud: bool,
-    keep: impl Fn(&McpItem) -> bool,
+    text_query: Option<&str>,
 ) -> noter_db::rusqlite::Result<Vec<McpItem>> {
     let clause = if cloud {
         format!("{clause} AND c.privacy_class = 'normal'")
@@ -134,12 +141,13 @@ fn items_of(
         clause.to_owned()
     };
     let mut items = vec![];
-    for v in crate::items::items_where(c, &clause, args)?
-        .into_iter()
-        .rev()
-    {
+    for v in crate::items::items_where_newest(c, &clause, args, text_query, MAX_ITEMS)? {
         let mut evidence = vec![];
         for span in &v.spans {
+            #[cfg(test)]
+            if span.call_id.as_str() == "c_perf" {
+                PERF_EVIDENCE_LOADS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
             let lines = crate::transcript::segments_of(
                 c,
                 &span.call_id,
@@ -162,12 +170,7 @@ fn items_of(
             call_date: LocalDate(crate::history::date_of(v.call.started_at.0)),
             evidence_segment_ids: evidence,
         };
-        if keep(&item) {
-            items.push(item);
-            if items.len() == MAX_ITEMS {
-                break;
-            }
-        }
+        items.push(item);
     }
     Ok(items)
 }
@@ -233,7 +236,7 @@ fn person_of(
         &format!("i.owner_person_id = ? AND {OPEN}"),
         vec![Sql::Text(id.clone())],
         cloud,
-        |_| true,
+        None,
     )?;
     Ok(Ok(to_json(&GetPersonOutput {
         person_id: PersonId::new(id),

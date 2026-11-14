@@ -3,6 +3,7 @@
 
 use std::collections::{BTreeSet, HashMap};
 
+use noter_db::rusqlite::functions::FunctionFlags;
 use noter_db::rusqlite::types::Value as Sql;
 use noter_db::rusqlite::{params_from_iter, Connection, OptionalExtension, Row};
 use noter_db::{Logged, Mutation};
@@ -326,6 +327,41 @@ pub(crate) fn items_where(c: &Connection, clause: &str, args: Vec<Sql>) -> Db<Ve
         .prepare(&format!(
             "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
              WHERE {clause} ORDER BY i.rowid"
+        ))?
+        .query_map(params_from_iter(args), stored)?
+        .collect::<Result<Vec<_>, _>>()?;
+    assemble_many(c, rows)
+}
+
+/// Query the newest matching items before loading their spans and evidence.
+// @cpt-algo:cpt-noter-algo-core-mcp-bounded-item-read:p1
+pub(crate) fn items_where_newest(
+    c: &Connection,
+    clause: &str,
+    mut args: Vec<Sql>,
+    text_query: Option<&str>,
+    limit: usize,
+) -> Db<Vec<ItemView>> {
+    let text_clause = if let Some(query) = text_query {
+        c.create_scalar_function(
+            "noter_unicode_lower",
+            1,
+            FunctionFlags::SQLITE_DETERMINISTIC,
+            |ctx| {
+                let value: String = ctx.get(0)?;
+                Ok(value.to_lowercase())
+            },
+        )?;
+        args.push(Sql::Text(query.to_owned()));
+        " AND instr(noter_unicode_lower(i.text), noter_unicode_lower(?)) > 0"
+    } else {
+        ""
+    };
+    args.push(Sql::Integer(limit.min(i64::MAX as usize) as i64));
+    let rows = c
+        .prepare(&format!(
+            "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
+             WHERE {clause}{text_clause} ORDER BY i.rowid DESC LIMIT ?"
         ))?
         .query_map(params_from_iter(args), stored)?
         .collect::<Result<Vec<_>, _>>()?;
