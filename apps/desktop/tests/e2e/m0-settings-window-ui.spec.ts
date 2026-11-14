@@ -137,6 +137,7 @@ test.describe("cpt-noter-seq-settings-check-privacy", () => {
     const info = page.getByRole("dialog", { name: "Cloud, redacted" });
     await expect(mode).toHaveAttribute("aria-expanded", "true");
     await expect(info).toContainText("names and PII are replaced before anything leaves this Mac.");
+    await expect(info.getByRole("button", { name: "Open Privacy Settings" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(info).toHaveCount(0);
     await expect(mode).toHaveAttribute("aria-expanded", "false");
