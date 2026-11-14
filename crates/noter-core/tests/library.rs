@@ -1,13 +1,16 @@
 //! FEATURE cpt-noter-feature-core-library-calls: the Library list, the call record, edits with a
 //! revision, call types and deleting calls for good, over rows written the way capture writes them.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use test_support::FixedClock;
 
-use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices};
+use common_events::Events;
+use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, NativeServices};
 use noter_db::rusqlite::Connection;
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -41,25 +44,13 @@ impl NativeServices for CalendarEventNative {
     }
 }
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn entity(&self) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let taken = std::mem::take(&mut *all);
-        taken
-            .into_iter()
-            .filter(|(e, _)| *e == event_names::ENTITY_CHANGED)
-            .map(|(_, p)| p)
-            .collect()
-    }
+fn entity(events: &Events) -> Vec<Value> {
+    events
+        .take()
+        .into_iter()
+        .filter(|(e, _)| *e == event_names::ENTITY_CHANGED)
+        .map(|(_, p)| p)
+        .collect()
 }
 
 fn open(dir: &Path) -> (Core, Arc<Events>) {
@@ -760,7 +751,7 @@ async fn call_update_renames_with_the_rev_guard_and_broadcasts() {
         ),
         ("Renamed", "retro", Rev(2))
     );
-    let sent = events.entity();
+    let sent = entity(&events);
     assert_eq!(sent.len(), 1);
     assert_eq!(
         (sent[0]["type"].as_str(), sent[0]["call"]["title"].as_str()),
@@ -779,7 +770,7 @@ async fn call_update_renames_with_the_rev_guard_and_broadcasts() {
             current_rev: Rev(2)
         })
     );
-    assert!(events.entity().is_empty());
+    assert!(entity(&events).is_empty());
 
     for bad in [
         update(2, Some("  "), None),
@@ -1015,7 +1006,7 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
     assert!(log
         .iter()
         .all(|(kind, _, undoable, field)| kind == "call" && !undoable && field.is_none()));
-    let removed = events.entity();
+    let removed = entity(&events);
     assert_eq!(removed.len(), 2);
     assert!(removed
         .iter()
@@ -1123,7 +1114,7 @@ async fn the_call_being_recorded_is_not_deleted() {
             .len(),
         3
     );
-    assert!(events.entity().is_empty());
+    assert!(entity(&events).is_empty());
 }
 
 #[tokio::test]

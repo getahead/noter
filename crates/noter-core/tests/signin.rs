@@ -6,17 +6,19 @@ use std::future::Future;
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 
+#[path = "common/events.rs"]
+mod common_events;
+use common_events::Events;
 use noter_core::{
-    AccountCli, Adapters, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted,
-    ScriptedAccountCli, ToolScript,
+    AccountCli, Adapters, Clock, Core, CoreDeps, MemorySecrets, Scripted, ScriptedAccountCli,
+    ToolScript,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::Value;
 
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -31,19 +33,10 @@ impl Clock for TickClock {
     }
 }
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
     /// `step`, or `error` once it ended in one, of each progress event of `provider`.
     fn progress(&self, provider: &str) -> Vec<String> {
-        let all = self.0.lock().unwrap();
+        let all = self.snapshot();
         all.iter()
             .filter(|(e, p)| *e == event_names::SIGNIN_PROGRESS && p["provider"] == provider)
             .map(|(_, p)| match p["error"].as_str() {
@@ -54,7 +47,7 @@ impl Events {
     }
 
     fn dump(&self) -> String {
-        format!("{:?}", self.0.lock().unwrap())
+        format!("{:?}", self.snapshot())
     }
 }
 

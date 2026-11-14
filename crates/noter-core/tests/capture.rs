@@ -5,10 +5,12 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[path = "common/events.rs"]
+mod common_events;
+use common_events::Events;
 use noter_core::{
     BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
-    EventEmitter, FetchError, ModelSource, NativeServices, Notification, NotificationKind,
-    Surfaces,
+    FetchError, ModelSource, NativeServices, Notification, NotificationKind, Surfaces,
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
@@ -26,15 +28,6 @@ struct TestClock(AtomicI64);
 impl Clock for TestClock {
     fn now(&self) -> TimestampMs {
         TimestampMs(self.0.load(Ordering::SeqCst))
-    }
-}
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
     }
 }
 
@@ -379,12 +372,10 @@ impl Rig {
 
     fn capture_events(&self) -> Vec<CaptureState> {
         self.events
-            .0
-            .lock()
-            .unwrap()
-            .iter()
+            .snapshot()
+            .into_iter()
             .filter(|(name, _)| *name == event_names::CAPTURE_STATE)
-            .map(|(_, v)| serde_json::from_value(v.clone()).unwrap())
+            .map(|(_, v)| serde_json::from_value(v).unwrap())
             .collect()
     }
 }
@@ -1050,12 +1041,10 @@ async fn a_live_call_can_be_made_sensitive_but_not_turned_back() {
     // Windows that show the call replace it from entity:changed.
     let changed: Vec<Value> = r
         .events
-        .0
-        .lock()
-        .unwrap()
-        .iter()
+        .snapshot()
+        .into_iter()
         .filter(|(name, _)| *name == event_names::ENTITY_CHANGED)
-        .map(|(_, v)| v.clone())
+        .map(|(_, v)| v)
         .collect();
     let call = changed.last().expect("entity:changed for the call");
     assert_eq!(call["type"], "call");
@@ -1428,11 +1417,9 @@ async fn a_detected_call_shows_the_prompt_for_fifteen_seconds_only_when_detectio
     assert!(r.shown.0.lock().unwrap().contains(&"show_record_prompt"));
     assert!(r
         .events
-        .0
-        .lock()
-        .unwrap()
-        .iter()
-        .any(|(name, _)| *name == event_names::CAPTURE_DETECTED));
+        .snapshot()
+        .into_iter()
+        .any(|(name, _)| name == event_names::CAPTURE_DETECTED));
 
     // The meeting app lets go of the audio before anyone recorded: the detection goes.
     r.fact(EngineEvent::CallAudioReleased {
@@ -3245,12 +3232,10 @@ async fn stop_queues_post_call_then_archive_and_the_guard_follows_the_call() {
     assert_eq!(archive[0].status, JobRunStatus::Succeeded);
     let first_running_event = |id: &JobRunId| {
         r.events
-            .0
-            .lock()
-            .unwrap()
-            .iter()
+            .snapshot()
+            .into_iter()
             .filter(|(event, _)| *event == event_names::JOBS_PROGRESS)
-            .filter_map(|(_, payload)| serde_json::from_value::<JobProgress>(payload.clone()).ok())
+            .filter_map(|(_, payload)| serde_json::from_value::<JobProgress>(payload).ok())
             .position(|progress| {
                 progress.run.id == *id && progress.run.status == JobRunStatus::Running
             })
