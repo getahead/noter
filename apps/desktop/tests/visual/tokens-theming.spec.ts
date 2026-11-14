@@ -8,6 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 const read = (path: string) => readFileSync(fileURLToPath(new URL(path, import.meta.url)), "utf8");
 const css = read("../../src/styles/tokens.css");
+const productionComponents = read("../../src/styles/components/01-macos27.css");
 // The prototype of record, with its own appearance blocks (docs/prototype/clickable/src/css).
 const proto = (f: string) => read(`../../../../docs/prototype/clickable/src/css/${f}.css`);
 const prototype = ["00-base", "01-macos27", "02-contrast"].map(proto).join("\n");
@@ -31,7 +32,7 @@ const colours = [
 const radii = ["window", "panel", "sheet", "popover", "card", "menu", "row", "control", "tag", "key", "capsule"];
 const type = ["large", "title1", "title2", "title3", "headline", "body", "callout", "sub", "foot", "call-transcript", "call-card", "call-card-floating"];
 
-const sheet = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}
+const sheet = `<!doctype html><html lang="en"><head><meta charset="utf-8"><style>${css}\n${productionComponents}
   * { box-sizing: border-box; }
   body { margin: 0; padding: 24px; background: var(--win-bg); color: var(--label); font: 400 13px/18px var(--font); }
   .grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 16px; }
