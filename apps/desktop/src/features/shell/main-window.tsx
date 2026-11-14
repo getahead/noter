@@ -7,7 +7,7 @@ import { useAnnounce } from "../../app/a11y/announce";
 import { useWindowShortcuts } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import { listenNativeMenuAction } from "../../core/native-menu";
+import { listenNativeMenuAction, updateNativeMenuContext } from "../../core/native-menu";
 import type { BannerKind, CommandName, NavTarget, Result } from "../../core/bindings";
 import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
@@ -23,7 +23,7 @@ import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
 import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
-import { shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
+import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
@@ -88,6 +88,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
 
   const shellRef = useRef(shell);
   shellRef.current = shell;
+  useEffect(() => void updateNativeMenuContext({ sidebarVisible: shell.sidebar }), [shell.sidebar]);
   const route = currentRoute(shell.history);
   const page = pageFor(route.section, route);
   const routeId = `${route.section}/${route.key}`;
@@ -152,6 +153,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     void listenNativeMenuAction((key) => {
       const action = shellActionForMenuItem(key);
       if (action) act(action);
+      else dispatchNativeMenuShortcut(key);
     }).then((stop) => active ? unlisten = stop : stop());
     return () => {
       active = false;

@@ -34,6 +34,7 @@ vi.mock("react", async (importOriginal) => {
 vi.mock("../../core/tauri-transport", () => ({
   nativeAsk: vi.fn().mockResolvedValue(true),
   listenNativeMenuAction: vi.fn().mockResolvedValue(() => {}),
+  updateNativeMenuContext: vi.fn().mockResolvedValue(undefined),
 }));
 
 let bridge: Bridge | null = null;
@@ -179,6 +180,22 @@ describe("MainWindow controls", () => {
     const handler = vi.mocked(listenNativeMenuAction).mock.calls[0]?.[0];
     expect(handler).toBeDefined();
     handler!("menu.settings");
+    class TestKeyboardEvent extends Event {
+      readonly code: string;
+      readonly key: string;
+      constructor(type: string, init: KeyboardEventInit & { code?: string; key?: string }) {
+        super(type, init);
+        this.code = init.code ?? "";
+        this.key = init.key ?? "";
+      }
+    }
+    const dispatched: Event[] = [];
+    vi.stubGlobal("document", { activeElement: { dispatchEvent: (event: Event) => (dispatched.push(event), event.preventDefault(), true) } });
+    vi.stubGlobal("KeyboardEvent", TestKeyboardEvent);
+    handler!("menu.export");
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]).toMatchObject({ type: "keydown", code: "KeyE", key: "e" });
+    vi.unstubAllGlobals();
     cleanup?.();
 
     expect(acts).toContain("window_navigate");

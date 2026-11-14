@@ -1,1 +1,1 @@
-export { listenNativeMenuAction } from "./tauri-transport";
+export { listenNativeMenuAction, updateNativeMenuContext } from "./tauri-transport";

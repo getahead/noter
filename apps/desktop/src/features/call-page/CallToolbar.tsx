@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { updateNativeMenuContext } from "../../core/native-menu";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
@@ -21,11 +22,37 @@ import { useExport } from "./ExportSheet";
 import { deleteAudio, revealExport } from "./share-actions";
 import { ShareMenu } from "./ShareMenu";
 import { exportOpener } from "./share-run";
+import { useOutputs } from "./outputs-cache";
+import { shareState } from "./share-logic";
 import { useTypes } from "./cache";
 import { useRegenerate } from "./RegenerateSheet";
 import { registeredViews } from "./views";
 import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
 
+// @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
+export function watchNativeMenuContext(call: CallRow | undefined, outputs: ReturnType<typeof useOutputs>): () => void {
+  const copyReady = outputs !== undefined && shareState(outputs, call?.privacy).ready;
+  const update = (focused: boolean) => void updateNativeMenuContext({
+    focused,
+    exportEnabled: !!call,
+    copySlackEnabled: copyReady,
+    copyJiraEnabled: copyReady,
+    copyMarkdownEnabled: copyReady,
+    deleteEnabled: !!call,
+  });
+  const onFocus = () => update(true);
+  const onBlur = () => update(false);
+  // Mounting the focused main-window page is the initial active state; native window blur events
+  // take it back to false. document.hasFocus() can still be false during the first WebKit frame.
+  update(true);
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("blur", onBlur);
+  return () => {
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("blur", onBlur);
+    void updateNativeMenuContext({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false });
+  };
+}
 
 /** The ⋯ menu's items for a call (the later items join with their features). */
 export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; deleteAudio?: (() => void) | null; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
@@ -48,6 +75,7 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
 export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspector }: PageToolbarProps) {
   const at = parseCallKey(route.key)!;
   const call = useWindow(bridge, (s) => s.entities.call[at.callId]);
+  const outputs = useOutputs(at.callId);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const types = useTypes();
   const openRegenerate = useRegenerate(bridge, at.callId);
@@ -64,6 +92,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   }, [exported]);
   // ⌘E reaches the sheet through the page key
   useEffect(() => ((exportOpener.open = openExport), () => void (exportOpener.open = null)), [openExport]);
+  useEffect(() => watchNativeMenuContext(call, outputs), [call, outputs]);
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const { segments, view } = callViews(registeredViews(), at.tab);
   const views = segments.map((v) => ({ value: v, label: t(VIEW_LABEL[v]) }));

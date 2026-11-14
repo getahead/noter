@@ -1,11 +1,11 @@
 // Responsibilities from the core native surfaces feature.
 use super::*;
+use noter_core::{TrayAction, TrayModel};
 use noter_protocol::ipc::event_names;
 use noter_protocol::model::{CaptureState, NavTarget};
 use noter_protocol::CallId;
 use serde_json::{json, Value};
-use tauri::menu::{MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
-
+use tauri::menu::{CheckMenuItem, MenuItem, MenuItemKind, PredefinedMenuItem, Submenu};
 
 /// The UI string catalogue the quit alert's words come from (`apps/desktop/src/i18n/en.ts`).
 const CATALOGUE: &str = include_str!("../../../src/i18n/en.ts");
@@ -117,14 +117,16 @@ pub const APP_QUIT: &str = "AppQuit";
 pub const APP_SETTINGS: &str = "AppSettings";
 pub const APP_SETUP: &str = "AppSetup";
 pub const APP_MENU_ACTION: &str = "shell:menu-action";
+pub const APP_MENU_CONTEXT: &str = "shell:menu-context";
 static QUIT_ALERT_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// The default app menu with Noter's own **Quit Noter** ⌘Q in place of the predefined one, which
 /// ends the app with no event to stop it (the quit alert could not ask).
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
 pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let model: Value = serde_json::from_str(include_str!("../../../src/features/shell/menu-model.json"))
-        .expect("the shared shell menu model is valid JSON");
+    let model: Value =
+        serde_json::from_str(include_str!("../../../src/features/shell/menu-model.json"))
+            .expect("the shared shell menu model is valid JSON");
     let menu = Menu::default(app)?;
     if let Some(MenuItemKind::Submenu(first)) = menu.items()?.into_iter().next() {
         for item in first.items()?.into_iter().rev() {
@@ -147,13 +149,20 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     append_model_items(app, &file, &model, "menu.title.file", 0)?;
     let edit = submenu(&menu, "Edit");
     for item in edit.items()? {
-        if matches!(&item, MenuItemKind::Predefined(p) if p.text().unwrap_or_default() == "Select All") {
+        if matches!(&item, MenuItemKind::Predefined(p) if p.text().unwrap_or_default() == "Select All")
+        {
             edit.remove(&item)?;
         }
     }
     append_model_items(app, &edit, &model, "menu.title.edit", 6)?;
     edit.append(&PredefinedMenuItem::separator(app)?)?;
-    edit.append(&MenuItem::with_id(app, APP_FIX_TERM, "Fix Term…", false, None::<&str>)?)?;
+    edit.append(&MenuItem::with_id(
+        app,
+        APP_FIX_TERM,
+        "Fix Term…",
+        false,
+        None::<&str>,
+    )?)?;
     let view = submenu(&menu, "View");
     clear_submenu(&view)?;
     append_model_items(app, &view, &model, "menu.title.view", 0)?;
@@ -192,14 +201,27 @@ fn append_model_items<R: Runtime>(
 ) -> tauri::Result<()> {
     let item_keys = model
         .as_array()
-        .and_then(|groups| groups.iter().find(|g| g["title"] == title_key)?.get("items")?.as_array())
+        .and_then(|groups| {
+            groups
+                .iter()
+                .find(|g| g["title"] == title_key)?
+                .get("items")?
+                .as_array()
+        })
         .expect("the shared menu model has this group");
     for entry in item_keys.iter().skip(skip) {
         if entry.is_null() {
             menu.append(&PredefinedMenuItem::separator(app)?)?;
         } else {
             let key = entry["key"].as_str().expect("menu entries have a key");
-            append_model_entry(app, menu, key, key, entry["accelerator"].as_str())?;
+            append_model_entry(
+                app,
+                menu,
+                key,
+                key,
+                entry["accelerator"].as_str(),
+                initially_enabled(key),
+            )?;
         }
     }
     Ok(())
@@ -219,7 +241,7 @@ fn append_model_item<R: Runtime>(
         .flat_map(|group| group["items"].as_array().into_iter().flatten())
         .find(|entry| entry["key"] == key)
         .and_then(|entry| entry["accelerator"].as_str());
-    append_model_entry(app, menu, key, id, accelerator)
+    append_model_entry(app, menu, key, id, accelerator, true)
 }
 
 fn append_model_entry<R: Runtime>(
@@ -228,9 +250,178 @@ fn append_model_entry<R: Runtime>(
     key: &str,
     id: &str,
     accelerator: Option<&str>,
+    enabled: bool,
 ) -> tauri::Result<()> {
-    menu.append(&MenuItem::with_id(app, id, catalogue(key), true, accelerator)?)?;
+    if key == "menu.use_floating_panel" {
+        menu.append(&CheckMenuItem::with_id(
+            app,
+            id,
+            catalogue(key),
+            enabled,
+            false,
+            accelerator,
+        )?)?;
+    } else {
+        menu.append(&MenuItem::with_id(
+            app,
+            id,
+            catalogue(key),
+            enabled,
+            accelerator,
+        )?)?;
+    }
     Ok(())
+}
+
+fn initially_enabled(key: &str) -> bool {
+    matches!(
+        key,
+        "menu.find"
+            | "menu.hide_sidebar"
+            | "menu.show_inspector"
+            | "menu.back"
+            | "menu.forward"
+            | "menu.actual_size"
+            | "menu.zoom_in"
+            | "menu.zoom_out"
+            | "section.today"
+            | "section.ask"
+            | "section.library"
+            | "section.people"
+            | "section.topics"
+            | "section.activity"
+            | "section.agents"
+            | "section.performance"
+    )
+}
+
+/// Enables contextual share commands only while a ready call page is the key window.
+pub fn update_context_menu<R: Runtime>(app: &AppHandle<R>, payload: &str) {
+    let Ok(state) = serde_json::from_str::<Value>(payload) else {
+        return;
+    };
+    let focused = state["focused"].as_bool().unwrap_or(false);
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || {
+        if let Some(menu) = handle.menu() {
+            for (field, id) in [
+                ("exportEnabled", "menu.export"),
+                ("copySlackEnabled", "menu.copy_for_slack"),
+                ("copyJiraEnabled", "menu.copy_for_jira"),
+                ("copyMarkdownEnabled", "menu.copy_as_markdown"),
+                ("deleteEnabled", "menu.delete"),
+            ] {
+                if let Some(enabled) = state[field].as_bool() {
+                    set_enabled_by_id(&menu, id, focused && enabled);
+                }
+            }
+            if let Some(visible) = state["sidebarVisible"].as_bool() {
+                set_text_enabled_by_id(
+                    &handle,
+                    "menu.hide_sidebar",
+                    if visible {
+                        "Hide Sidebar"
+                    } else {
+                        "Show Sidebar"
+                    },
+                    true,
+                );
+            }
+        }
+    });
+}
+
+/// Mirror the core's recording and presenting state in the app-owned Call menu.
+pub fn update_app_menu_from_tray<R: Runtime>(app: &AppHandle<R>, model: &TrayModel) {
+    let start = model
+        .item(TrayAction::StopRecording)
+        .filter(|item| item.enabled)
+        .or_else(|| model.item(TrayAction::StartRecording));
+    if let Some(item) = start {
+        set_text_enabled_by_id(app, "menu.start_recording", &item.label, item.enabled);
+    }
+    let pause = model
+        .item(TrayAction::Pause)
+        .filter(|item| item.enabled)
+        .or_else(|| model.item(TrayAction::Resume));
+    if let Some(item) = pause {
+        set_text_enabled_by_id(app, "menu.pause", &item.label, item.enabled);
+    }
+    let presenting = model
+        .item(TrayAction::HideForPresenting)
+        .filter(|item| item.enabled)
+        .or_else(|| model.item(TrayAction::ShowAfterPresenting));
+    if let Some(item) = presenting {
+        set_text_enabled_by_id(app, "menu.hide_for_presenting", &item.label, item.enabled);
+    }
+    for (id, action) in [
+        ("menu.mark_moment", TrayAction::MarkMoment),
+        ("menu.open_call_screen", TrayAction::OpenCallScreen),
+        ("menu.use_floating_panel", TrayAction::UseFloatingPanel),
+    ] {
+        if let Some(item) = model.item(action) {
+            set_text_enabled_by_id(app, id, &item.label, item.enabled);
+            if action == TrayAction::UseFloatingPanel {
+                set_checked_by_id(app, id, item.checked == Some(true));
+            }
+        }
+    }
+}
+
+fn set_enabled_by_id<R: Runtime>(menu: &Menu<R>, id: &str, enabled: bool) {
+    let mut update = |item: &MenuItemKind<R>| match item {
+        MenuItemKind::MenuItem(item) => {
+            let _ = item.set_enabled(enabled);
+        }
+        MenuItemKind::Check(item) => {
+            let _ = item.set_enabled(enabled);
+        }
+        _ => {}
+    };
+    update_items(menu.items().unwrap_or_default(), id, &mut update);
+}
+
+fn set_text_enabled_by_id<R: Runtime>(app: &AppHandle<R>, id: &str, label: &str, enabled: bool) {
+    if let Some(menu) = app.menu() {
+        let mut update = |item: &MenuItemKind<R>| match item {
+            MenuItemKind::MenuItem(item) => {
+                let _ = item.set_text(label);
+                let _ = item.set_enabled(enabled);
+            }
+            MenuItemKind::Check(item) => {
+                let _ = item.set_text(label);
+                let _ = item.set_enabled(enabled);
+            }
+            _ => {}
+        };
+        update_items(menu.items().unwrap_or_default(), id, &mut update);
+    }
+}
+
+fn set_checked_by_id<R: Runtime>(app: &AppHandle<R>, id: &str, checked: bool) {
+    if let Some(menu) = app.menu() {
+        let mut update = |item: &MenuItemKind<R>| {
+            if let MenuItemKind::Check(item) = item {
+                let _ = item.set_checked(checked);
+            }
+        };
+        update_items(menu.items().unwrap_or_default(), id, &mut update);
+    }
+}
+
+fn update_items<R: Runtime>(
+    items: Vec<MenuItemKind<R>>,
+    id: &str,
+    update: &mut dyn FnMut(&MenuItemKind<R>),
+) {
+    for item in &items {
+        if item.id().as_ref() == id {
+            update(item);
+        }
+        if let MenuItemKind::Submenu(submenu) = item {
+            update_items(submenu.items().unwrap_or_default(), id, update);
+        }
+    }
 }
 
 /// The Edit menu's id for **Fix Term…**.
@@ -258,12 +449,18 @@ mod menu_tests {
     #[test]
     fn native_menu_labels_come_from_the_shared_model() {
         let model: Value =
-            serde_json::from_str(include_str!("../../../src/features/shell/menu-model.json")).unwrap();
+            serde_json::from_str(include_str!("../../../src/features/shell/menu-model.json"))
+                .unwrap();
         let groups = model.as_array().unwrap();
         assert_eq!(groups.len(), 7);
         for group in groups {
             assert!(!catalogue(group["title"].as_str().unwrap()).is_empty());
-            for item in group["items"].as_array().unwrap().iter().filter(|item| !item.is_null()) {
+            for item in group["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|item| !item.is_null())
+            {
                 let key = item["key"].as_str().unwrap();
                 assert!(!catalogue(key).is_empty(), "missing menu label: {key}");
             }

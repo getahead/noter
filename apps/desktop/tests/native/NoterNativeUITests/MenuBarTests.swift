@@ -6,16 +6,53 @@ final class MenuBarTests: NoterTestCase {
     func test_cpt_noter_seq_menu_bar_control_recording__main_window_close_reopen_keeps_running_and_size() {
         launch("idle")
         let main = window("Noter")
-        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        let sidebar = app.groups["Sidebar"]
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 10), "the main window did not load")
+        let close = app.buttons["_XCUI:CloseWindow"]
+        let minimize = app.buttons["_XCUI:MinimizeWindow"]
+        let fullScreen = app.buttons["_XCUI:FullScreenWindow"]
+        XCTAssertTrue(close.exists && minimize.exists && fullScreen.exists, "the three native traffic light hit targets exist")
+        let sidebarToggle = app.buttons["Hide Sidebar"]
+        XCTAssertTrue(sidebarToggle.waitForExistence(timeout: 5), "the sidebar toggle is exposed to accessibility")
+        XCTAssertEqual(sidebarToggle.label, "Hide Sidebar", "VoiceOver receives the action name")
+        func assertHeaderHitTargetsClear() {
+            for trafficLight in [close, minimize, fullScreen] {
+                XCTAssertFalse(sidebarToggle.frame.intersects(trafficLight.frame), "the sidebar toggle hit target clears the native traffic lights")
+            }
+        }
+        assertHeaderHitTargetsClear()
+        sidebarToggle.click()
+        XCTAssertTrue(app.buttons["Show Sidebar"].waitForExistence(timeout: 5), "the sidebar toggle hides the sidebar")
+        app.buttons["Show Sidebar"].click()
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "the sidebar toggle restores the sidebar")
+        let divider = app.descendants(matching: .any).matching(identifier: "Resize Sidebar").firstMatch
+        XCTAssertTrue(divider.waitForExistence(timeout: 5), "the sidebar divider is accessible to the keyboard")
+        divider.click()
+        for _ in 0..<4 { app.typeKey(.leftArrow, modifierFlags: []) }
+        XCTAssertEqual(sidebar.frame.width, 180, "keyboard resizing reaches the narrow sidebar width")
+        assertHeaderHitTargetsClear()
+        app.typeKey("s", modifierFlags: [.control, .command])
+        XCTAssertTrue(app.buttons["Show Sidebar"].waitForExistence(timeout: 5), "the Hide Sidebar shortcut works at narrow width")
+        app.typeKey("s", modifierFlags: [.control, .command])
+        XCTAssertTrue(sidebar.waitForExistence(timeout: 5), "the shortcut restores the narrow sidebar")
+        XCTAssertEqual(app.buttons["Hide Sidebar"].label, "Hide Sidebar", "the restored control remains VoiceOver named")
+        divider.click()
+        for _ in 0..<4 { app.typeKey(.rightArrow, modifierFlags: []) }
+        XCTAssertEqual(sidebar.frame.width, 220, "keyboard resizing restores the default sidebar width")
+        assertHeaderHitTargetsClear()
         let originalFrame = main.frame
-        app.typeKey("w", modifierFlags: .command)
+        close.click()
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5), "closing the main window leaves the menu bar extra available")
-        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing the main window should hide it")
+        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "the native close traffic light hides the main window")
         let menu = openMenu()
         item("Open Noter", in: menu).click()
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "Open Noter did not restore the main window")
         XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Noter should make the main window visible again")
         XCTAssertEqual(main.frame, originalFrame, "reopening should preserve the window frame")
+        minimize.click()
+        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "the native minimize traffic light hides the main window")
+        item("Open Noter", in: openMenu()).click()
+        XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Noter restores the minimized main window")
     }
 
     func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {

@@ -44,6 +44,27 @@ const actionFor = (key: string): Pick<MenuItem, "action" | "chords"> => {
 
 export const shellActionForMenuItem = (key: string): ShellAction | undefined => actionFor(key).action;
 
+/** Runs a page's existing keyboard handler for a native command, preserving its focused selection/context. */
+export function nativeMenuShortcut(key: string): KeyboardEventInit | null {
+  const item = model.flatMap((menu) => menu.items).find((entry) => entry?.key === key);
+  if (!item?.shortcut) return null;
+  const label = item.shortcut;
+  const modifiers = { ctrlKey: label.includes("⌃"), altKey: label.includes("⌥"), shiftKey: label.includes("⇧"), metaKey: label.includes("⌘") };
+  const keyName = label.replace(/[⌃⌥⇧⌘]/g, "");
+  const code = keyName === "⌫" ? "Backspace" : keyName === "+" ? "Equal" : keyName === "−" ? "Minus" : keyName === "," ? "Comma" : /^[A-Z]$/.test(keyName) ? `Key${keyName}` : /^\d$/.test(keyName) ? `Digit${keyName}` : null;
+  if (!code) return null;
+  const keyValue = code === "Backspace" ? "Backspace" : code === "Comma" ? "," : code === "Equal" ? "+" : code === "Minus" ? "-" : code.startsWith("Key") ? code.slice(3).toLowerCase() : code.slice(5);
+  return { ...modifiers, code, key: keyValue, bubbles: true, cancelable: true };
+}
+
+export function dispatchNativeMenuShortcut(key: string): boolean {
+  const init = nativeMenuShortcut(key);
+  if (!init || typeof document === "undefined") return false;
+  const event = new KeyboardEvent("keydown", init);
+  (document.activeElement ?? window).dispatchEvent(event);
+  return event.defaultPrevented;
+}
+
 export const APP_MENU: readonly Menu[] = model.map(({ title, items }) => ({
   title: t(title as MsgKey),
   items: items.map((entry) => entry ? { label: t(entry.key as MsgKey), accel: entry.shortcut, ...actionFor(entry.key) } : "separator"),

@@ -175,6 +175,9 @@ fn each_window_capability_allows_only_listening_dialogs_and_its_commands() {
             "core:event:allow-listen".to_string(),
             "core:event:allow-unlisten".to_string(),
         ]);
+        if w == WindowLabel::Main {
+            expected.insert("core:event:allow-emit".to_string());
+        }
         if matches!(
             w,
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun

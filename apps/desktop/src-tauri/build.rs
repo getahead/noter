@@ -26,9 +26,12 @@ fn main() {
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
         )
         .then(|| "core:window:allow-start-dragging".to_string());
+        // Only Main emits its focused-page availability to update the native application menu.
+        let menu_context = (w == WindowLabel::Main).then(|| "core:event:allow-emit".to_string());
         let permissions: Vec<String> = ["core:event:allow-listen", "core:event:allow-unlisten"]
             .into_iter()
             .map(str::to_string)
+            .chain(menu_context)
             .chain(dialogs)
             .chain(dragging)
             .chain(

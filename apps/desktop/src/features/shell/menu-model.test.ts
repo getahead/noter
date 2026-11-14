@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { APP_MENU, shellActionForMenuItem, shellShortcuts, type MenuItem } from "./menu-model";
+import { APP_MENU, dispatchNativeMenuShortcut, nativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type MenuItem } from "./menu-model";
 
 const items = APP_MENU.flatMap((m) => m.items).filter((e): e is MenuItem => e !== "separator");
 
@@ -45,5 +45,38 @@ describe("app menu model", () => {
     expect(shellActionForMenuItem("menu.back")).toEqual({ type: "back" });
     expect(shellActionForMenuItem("menu.settings")).toEqual({ type: "open-settings" });
     expect(shellActionForMenuItem("menu.export")).toBeUndefined();
+  });
+
+  it("routes page menu commands through the focused page's existing keyboard handler", () => {
+    expect(nativeMenuShortcut("menu.export")).toMatchObject({ code: "KeyE", key: "e", metaKey: true, shiftKey: false });
+    expect(nativeMenuShortcut("menu.copy_for_slack")).toMatchObject({ code: "KeyC", key: "c", metaKey: true, shiftKey: true });
+    expect(nativeMenuShortcut("menu.copy_for_jira")).toMatchObject({ code: "KeyC", altKey: true, metaKey: true });
+    expect(nativeMenuShortcut("menu.delete")).toMatchObject({ code: "Backspace", metaKey: true });
+    expect(nativeMenuShortcut("menu.about_noter")).toBeNull();
+  });
+
+  it("dispatches a native menu shortcut to the focused element and reports whether it was handled", () => {
+    class TestKeyboardEvent extends Event {
+      readonly code: string;
+      readonly key: string;
+      readonly metaKey: boolean;
+      constructor(type: string, init: KeyboardEventInit & { code?: string; key?: string }) {
+        super(type, init);
+        this.code = init.code ?? "";
+        this.key = init.key ?? "";
+        this.metaKey = init.metaKey ?? false;
+      }
+    }
+    const dispatchEvent = vi.fn((event: Event) => {
+      event.preventDefault();
+      return true;
+    });
+    vi.stubGlobal("document", { activeElement: { dispatchEvent } });
+    vi.stubGlobal("KeyboardEvent", TestKeyboardEvent);
+    expect(dispatchNativeMenuShortcut("menu.export")).toBe(true);
+    const event = dispatchEvent.mock.calls[0]![0] as KeyboardEvent;
+    expect(event).toMatchObject({ type: "keydown", code: "KeyE", key: "e", metaKey: true, bubbles: true });
+    expect(dispatchNativeMenuShortcut("menu.about_noter")).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

@@ -1,11 +1,10 @@
 // Responsibilities from the core native surfaces feature.
 use super::*;
+use noter_core::{TrayAction, TrayEntry, TrayGlyph, TrayModel};
 use noter_protocol::model::NavTarget;
 use noter_protocol::PermissionKind;
-use noter_core::{TrayAction, TrayEntry, TrayGlyph, TrayModel};
 use tauri::image::Image;
 use tauri::menu::{CheckMenuItem, MenuItem, MenuItemKind, PredefinedMenuItem};
-
 
 /// The core command a menu bar item runs, with its arguments from the current snapshot; `None`
 /// when the item needs a call that is gone, or is the host's own (Quit Noter). `checked` is the
@@ -219,6 +218,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             return;
         };
         let model = &model;
+        super::quit::update_app_menu_from_tray(&self.app, model);
         let mut shown = lock(&self.menu);
         let glyph = (model.glyph, model.hidden);
         let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
@@ -339,6 +339,51 @@ impl<R: Runtime> TauriSurfaces<R> {
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
     }
 
+    /// App-menu Call commands follow the same context and state model as the menu-bar extra.
+    pub(super) fn app_menu_clicked(&self, id: &str) -> bool {
+        let shown = lock(&self.menu);
+        let model = shown.as_ref().map(|(model, _)| model);
+        let action = match id {
+            "menu.start_recording" => {
+                if model
+                    .and_then(|m| m.item(TrayAction::StopRecording))
+                    .is_some_and(|i| i.enabled)
+                {
+                    TrayAction::StopRecording
+                } else {
+                    TrayAction::StartRecording
+                }
+            }
+            "menu.pause" => {
+                if model
+                    .and_then(|m| m.item(TrayAction::Resume))
+                    .is_some_and(|i| i.enabled)
+                {
+                    TrayAction::Resume
+                } else {
+                    TrayAction::Pause
+                }
+            }
+            "menu.mark_moment" => TrayAction::MarkMoment,
+            "menu.open_call_screen" => TrayAction::OpenCallScreen,
+            "menu.use_floating_panel" => TrayAction::UseFloatingPanel,
+            "menu.hide_for_presenting" => {
+                if model
+                    .and_then(|m| m.item(TrayAction::ShowAfterPresenting))
+                    .is_some_and(|i| i.enabled)
+                {
+                    TrayAction::ShowAfterPresenting
+                } else {
+                    TrayAction::HideForPresenting
+                }
+            }
+            _ => return false,
+        };
+        drop(shown);
+        self.menu_clicked(action);
+        true
+    }
+
     pub(super) fn menu(&self, tray: &TrayModel) -> tauri::Result<Menu<R>> {
         let app = &self.app;
         let menu = Menu::new(app)?;
@@ -350,7 +395,10 @@ impl<R: Runtime> TauriSurfaces<R> {
                 TrayEntry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
                 TrayEntry::Item(item) => {
                     let id = format!("{:?}", item.action);
-                    debug_assert!(action_of(&id).is_some(), "tray action {id} has no click handler");
+                    debug_assert!(
+                        action_of(&id).is_some(),
+                        "tray action {id} has no click handler"
+                    );
                     let (label, key) = (&item.label, item.key.as_deref());
                     match item.checked {
                         Some(checked) => menu.append(&CheckMenuItem::with_id(

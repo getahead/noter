@@ -173,10 +173,14 @@ fn set_regular_activation<R: Runtime>(app: &AppHandle<R>) {
 pub(super) fn update_activation_for_visible_windows<R: Runtime>(app: &AppHandle<R>) {
     #[cfg(target_os = "macos")]
     {
-        let ordinary_window_visible = [WindowLabel::Main, WindowLabel::Settings, WindowLabel::FirstRun]
-            .into_iter()
-            .filter_map(|label| app.get_webview_window(label.as_str()))
-            .any(|window| window.is_visible().unwrap_or(false));
+        let ordinary_window_visible = [
+            WindowLabel::Main,
+            WindowLabel::Settings,
+            WindowLabel::FirstRun,
+        ]
+        .into_iter()
+        .filter_map(|label| app.get_webview_window(label.as_str()))
+        .any(|window| window.is_visible().unwrap_or(false));
         let policy = if ordinary_window_visible {
             tauri::ActivationPolicy::Regular
         } else {
@@ -186,6 +190,17 @@ pub(super) fn update_activation_for_visible_windows<R: Runtime>(app: &AppHandle<
     }
     #[cfg(not(target_os = "macos"))]
     let _ = app;
+}
+
+/// Dispatches a core-backed Call menu action through the same native surface as the status menu.
+pub fn app_menu_action<R: Runtime>(app: &AppHandle<R>, id: &str) -> bool {
+    app.try_state::<Arc<TauriSurfaces<R>>>()
+        .is_some_and(|surfaces| surfaces.app_menu_clicked(id))
+}
+
+/// Updates context-sensitive app-menu availability from the focused main-window page.
+pub fn update_app_menu_context<R: Runtime>(app: &AppHandle<R>, payload: &str) {
+    quit::update_context_menu(app, payload);
 }
 
 pub(super) fn main_window_will_hide<R: Runtime>(app: &AppHandle<R>) {
@@ -381,8 +396,6 @@ impl<R: Runtime> TauriSurfaces<R> {
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
         window(&self.app, label)
     }
-
-
 }
 
 impl<R: Runtime> Surfaces for TauriSurfaces<R> {
@@ -444,7 +457,9 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
         drop(hidden);
         #[cfg(target_os = "macos")]
-        let _ = self.app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+        let _ = self
+            .app
+            .set_activation_policy(tauri::ActivationPolicy::Accessory);
     }
 
     fn restore_all(&self) {

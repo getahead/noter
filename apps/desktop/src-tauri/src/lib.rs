@@ -27,13 +27,13 @@ use noter_core::{
     PinnedModels, ShortcutRegistrar, ShortcutTaken, Surfaces, SystemClock,
 };
 use noter_engine_client::ProcessLauncher;
-use noter_protocol::ipc::{Caller, CommandCtx, Sink, dispatch_json};
+use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, Sink};
 use noter_protocol::model::WindowLabel;
 use noter_protocol::{CoreError, ErrorCode};
 use serde_json::Value;
 use tauri::ipc::{Channel, Invoke, InvokeBody, InvokeError, JavaScriptChannelId};
 use tauri::webview::PageLoadEvent;
-use tauri::{AppHandle, Emitter, Manager, RunEvent, Runtime, Webview, WindowEvent};
+use tauri::{AppHandle, Emitter, Listener, Manager, RunEvent, Runtime, Webview, WindowEvent};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 pub use native::{Mac, MacOps, Windows};
@@ -145,10 +145,24 @@ pub fn run() {
                     app,
                     noter_protocol::model::NavTarget::FirstRun { step: None },
                 );
+            } else if surfaces::app_menu_action(app, event.id().as_ref()) {
+                // Core-backed Call items keep their own native context and focus policy.
             } else if let Some(main) = app.get_webview_window(WindowLabel::Main.as_str()) {
-                let _ = main.show();
-                let _ = main.set_focus();
-                let _ = main.emit(surfaces::APP_MENU_ACTION, event.id().as_ref());
+                let context_command = matches!(
+                    event.id().as_ref(),
+                    "menu.export"
+                        | "menu.delete"
+                        | "menu.copy_for_slack"
+                        | "menu.copy_for_jira"
+                        | "menu.copy_as_markdown"
+                );
+                if !context_command || main.is_focused().unwrap_or(false) {
+                    if !context_command {
+                        let _ = main.show();
+                        let _ = main.set_focus();
+                    }
+                    let _ = main.emit(surfaces::APP_MENU_ACTION, event.id().as_ref());
+                }
             }
         })
         .setup(move |app| {
@@ -169,6 +183,10 @@ pub fn run() {
                 .unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
+            let menu_context_app = app.handle().clone();
+            app.listen(surfaces::APP_MENU_CONTEXT, move |event| {
+                surfaces::update_app_menu_context(&menu_context_app, event.payload());
+            });
             app.manage(webview_watch::start(app.handle()));
             app.manage(boot(
                 events.clone(),
@@ -589,9 +607,9 @@ impl EventEmitter for TauriEvents {
 mod tests {
     use super::*;
     use noter_core::{StreamMsg, SystemClock};
-    use noter_protocol::Seq;
     use noter_protocol::ipc::Sink;
     use noter_protocol::model::{StreamEndReason, WindowLabel};
+    use noter_protocol::Seq;
     use std::sync::Mutex;
 
     #[test]
@@ -646,7 +664,10 @@ mod tests {
             .unwrap();
         app.manage(PendingNavigation::default());
 
-        crate::surfaces::notification_clicked(app.handle(), noter_protocol::model::NavTarget::Today);
+        crate::surfaces::notification_clicked(
+            app.handle(),
+            noter_protocol::model::NavTarget::Today,
+        );
 
         let pending = app.state::<PendingNavigation>();
         let state = pending.state.lock().unwrap_or_else(|e| e.into_inner());

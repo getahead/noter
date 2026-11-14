@@ -33,7 +33,7 @@ h1, h2, h3, h4, p { margin: 0; }
 /* ---------------- Shell — Main window ---------------- */
 .np-win--main { flex-direction: row; width: 100%; min-width: 900px; max-width: 1600px; height: calc(100vh - 120px); min-height: 600px; }
 .np-sidebar { width: 220px; flex: none; background: var(--side-bg); border-right: 1px solid var(--sep); display: flex; flex-direction: column; min-height: 0; }
-.np-sidebar__top { height: 52px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 14px; }
+.np-sidebar__top { height: 52px; flex: none; display: flex; align-items: center; justify-content: flex-end; padding: 0 10px 0 14px; }
 .np-srclist { flex: 1 1 auto; overflow: auto; padding: 4px 10px 10px; display: flex; flex-direction: column; gap: 1px; }
 .np-srclist__live { margin: 0 0 8px; }
 .np-srclist__group { font: 600 11px/14px var(--font); color: var(--label-3); padding: 12px 8px 4px; }

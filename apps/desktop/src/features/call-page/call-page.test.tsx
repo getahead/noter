@@ -2,7 +2,7 @@
 // its controls send.
 import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallOutputs } from "../../core/bindings";
@@ -14,7 +14,7 @@ import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
-import { CallToolbar, moreItems } from "./CallToolbar";
+import { CallToolbar, moreItems, watchNativeMenuContext } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -23,12 +23,16 @@ import { slots } from "./slots";
 import { StoredTranscript } from "../transcript/hosts";
 import "./register";
 
+vi.mock("../../core/native-menu", () => ({ updateNativeMenuContext: vi.fn() }));
+import { updateNativeMenuContext } from "../../core/native-menu";
+
 let bridge: Bridge;
 let fake: FakeCore;
 let id: string;
 beforeEach(() => (resetCache(), resetOutputsCache()));
 afterEach(() => {
   slots.deleteCall = null;
+  vi.unstubAllGlobals();
   return bridge.close();
 });
 
@@ -119,6 +123,27 @@ describe("CallToolbar", () => {
     const tree = rendered(CallToolbar, { route: route(), bridge, base, inspectorOpen: false, onToggleInspector: () => void toggled++ });
     (find(tree.props.trailing as ReactNode, (p) => p.label === "Show Inspector").props.onAction as () => void)();
     expect(toggled).toBe(1);
+  });
+
+  it("keeps native context commands enabled only for a focused, ready call page and clears them on cleanup", async () => {
+    await ready();
+    const call = bridge.store.getState().entities.call[id]!;
+    const browserWindow = new EventTarget();
+    vi.stubGlobal("window", browserWindow);
+    vi.stubGlobal("document", { hasFocus: () => true });
+    const send = vi.mocked(updateNativeMenuContext);
+    send.mockClear();
+
+    const stop = watchNativeMenuContext(call, { status: "writing", sensitive: false } as CallOutputs);
+    expect(send).toHaveBeenLastCalledWith({ focused: true, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true });
+    browserWindow.dispatchEvent(new Event("blur"));
+    expect(send).toHaveBeenLastCalledWith({ focused: false, exportEnabled: true, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: true });
+    browserWindow.dispatchEvent(new Event("focus"));
+    stop();
+    const callsAfterCleanup = send.mock.calls.length;
+    browserWindow.dispatchEvent(new Event("blur"));
+    expect(send).toHaveBeenCalledWith({ focused: false, exportEnabled: false, copySlackEnabled: false, copyJiraEnabled: false, copyMarkdownEnabled: false, deleteEnabled: false });
+    expect(send).toHaveBeenCalledTimes(callsAfterCleanup);
   });
 
   it("the ⋯ menu offers the M1 items, Delete Call… disabled until the dialogs host registers", async () => {

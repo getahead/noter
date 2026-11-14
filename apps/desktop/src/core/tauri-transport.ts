@@ -9,7 +9,7 @@
 // until the subscribing `invoke` resolves and sends `stream_ack`.
 
 import { Channel, invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 
 import type { CommandName, EventName, Transport } from "./bindings";
 
@@ -34,6 +34,12 @@ export async function listenNativeMenuAction(handler: (key: string) => void): Pr
     return () => {};
   }
   return listen<string>("shell:menu-action", (event) => handler(event.payload));
+}
+
+/** Calls page availability for context-sensitive native app menu items. */
+export async function updateNativeMenuContext(context: Partial<{ focused: boolean; exportEnabled: boolean; copySlackEnabled: boolean; copyJiraEnabled: boolean; copyMarkdownEnabled: boolean; deleteEnabled: boolean; sidebarVisible: boolean }>): Promise<void> {
+  if (typeof window === "undefined" || typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== "object") return;
+  await emit("shell:menu-context", context);
 }
 
 /** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. The plugin has no
