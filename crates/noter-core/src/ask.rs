@@ -412,7 +412,11 @@ impl Core {
             items.push(PacketItem {
                 id: noter_retrieval::evidence_id(hit).to_owned(),
                 source: class(sensitive),
-                text: format!("{}: {}", hit.title, hit.text),
+                text: if hit.title == hit.text {
+                    hit.text.clone()
+                } else {
+                    format!("{}: {}", hit.title, hit.text)
+                },
             });
         }
         let prior = self

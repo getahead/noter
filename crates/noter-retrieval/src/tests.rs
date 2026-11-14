@@ -777,6 +777,168 @@ fn vectors_add_weak_cross_language_hits_and_keyword_only_has_none() {
     assert_eq!(ranked[0], "Подготовить план миграции на вебсокеты");
 }
 
+#[test]
+fn ranked_keeps_call_evidence_when_many_items_match_common_words() {
+    let lib = library();
+    for i in 0..35 {
+        lib.item(
+            &format!("itm_common_{i}"),
+            "call_a",
+            "decision",
+            &format!("we decided common item {i}"),
+            "en",
+            "open",
+            "accepted",
+            None,
+        );
+    }
+    lib.segment(
+        "seg_common_answer",
+        "call_b",
+        "spk_ivan",
+        20_000,
+        "We decided the pricing page will show monthly prices.",
+        "en",
+    );
+
+    let found = lib.find(query("we"));
+    let ranked = found.ranked(30);
+
+    assert!(ranked.iter().any(|hit| hit.text.contains("pricing page")));
+    assert!(
+        ranked
+            .iter()
+            .filter(|hit| matches!(hit.evidence, Evidence::Item(_)))
+            .count()
+            <= 10
+    );
+}
+
+#[test]
+fn vector_call_scope_is_applied_before_the_nearest_neighbor_limit() {
+    let lib = library();
+    let query_vector = vector(991);
+    let target = query_vector.iter().map(|x| x + 0.001).collect::<Vec<_>>();
+    for i in 0..100 {
+        let id = format!("chk_decoy_{i}");
+        lib.chunk(&id, "call_a", 20_000, 23_000, "unrelated decoy", None);
+        lib.db
+            .execute(
+                "INSERT INTO chunk_vec (chunk_id, embedding, call_id, started_at)
+                 VALUES (?1, ?2, 'call_a', ?3)",
+                params![id, blob(&query_vector), OCT_1],
+            )
+            .unwrap();
+    }
+    lib.chunk(
+        "chk_scoped_target",
+        "call_b",
+        20_000,
+        23_000,
+        "scoped answer",
+        None,
+    );
+    lib.db
+        .execute(
+            "INSERT INTO chunk_vec (chunk_id, embedding, call_id, started_at)
+             VALUES ('chk_scoped_target', ?1, 'call_b', ?2)",
+            params![blob(&target), OCT_1 + 9 * DAY],
+        )
+        .unwrap();
+
+    let found = lib.find(Query {
+        vector: Some(target),
+        wanted: 1,
+        scope: Scope {
+            call_id: Some(CallId::new("call_b")),
+            ..Scope::default()
+        },
+        ..query("semantic answer")
+    });
+
+    assert!(ids(&found.calls).contains(&"chk_scoped_target".to_owned()));
+}
+
+#[test]
+fn archiving_a_call_removes_live_segments_from_the_keyword_index() {
+    let lib = library();
+    lib.call("call_live_only", "Live only", "planning", "normal", OCT_1);
+    lib.speaker("spk_live_only", "call_live_only", None, "Speaker 1");
+    let existing = lib.count("SELECT count(*) FROM segments_fts");
+    lib.db
+        .execute(
+            "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text,
+                               text_norm, lang, pass)
+         VALUES ('seg_live_only', 'call_live_only', 'spk_live_only', 'sys', 30_000, 33_000,
+                 'transientphrase live', 'transientphrase live', 'en', 'live')",
+            [],
+        )
+        .unwrap();
+    assert_eq!(lib.count("SELECT count(*) FROM segments_fts"), existing + 1);
+
+    lib.segment(
+        "seg_archive_switch",
+        "call_live_only",
+        "spk_live_only",
+        30_000,
+        "archived replacement",
+        "en",
+    );
+
+    assert_eq!(lib.count("SELECT count(*) FROM segments_fts"), existing + 1);
+    assert!(!ids(&lib.find(query("transientphrase")).calls).contains(&"seg_live_only".to_owned()));
+}
+
+#[test]
+fn active_transcript_migration_rebuilds_existing_keyword_rows() {
+    let lib = library_with_migrations(&crate::MIGRATIONS[..4]);
+    lib.call("call_upgrade", "Upgrade", "planning", "normal", OCT_1);
+    lib.speaker("spk_upgrade", "call_upgrade", None, "Speaker 1");
+    lib.db
+        .execute_batch(
+            "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text,
+                               text_norm, lang, pass)
+         VALUES ('seg_old_live', 'call_upgrade', 'spk_upgrade', 'sys', 1, 2,
+                 'oldtranscript live', 'oldtranscript live', 'en', 'live');
+         INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text,
+                               text_norm, lang, pass)
+         VALUES ('seg_new_archive', 'call_upgrade', 'spk_upgrade', 'sys', 1, 2,
+                 'newtranscript archive', 'newtranscript archive', 'en', 'archive');",
+        )
+        .unwrap();
+    assert_eq!(
+        lib.count(
+            "SELECT count(*) FROM segments_fts WHERE segments_fts MATCH '\" oldtranscript\"'"
+        ),
+        1
+    );
+
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+    let store = Store::open(
+        &path,
+        &[
+            noter_db::MIGRATIONS,
+            noter_core::MIGRATIONS,
+            crate::MIGRATIONS,
+        ],
+    )
+    .unwrap();
+    let lib = Library {
+        dir,
+        store: Arc::new(store),
+        db: Connection::open(path).unwrap(),
+    };
+
+    assert!(ids(&lib.find(query("oldtranscript")).calls).is_empty());
+    assert_eq!(
+        ids(&lib.find(query("newtranscript")).calls),
+        ["seg_new_archive"]
+    );
+}
+
 fn args(query: &str, limit: Option<u32>) -> SearchArgs {
     SearchArgs {
         query: query.into(),
@@ -1737,6 +1899,47 @@ fn topics_read_counts_aliases_threads_and_merge_suggestions() {
         ErrorCode::NotFound
     );
     assert_eq!(lib.count("SELECT count(*) FROM changes"), changes);
+}
+
+#[test]
+fn topic_suggestion_migration_caches_existing_neighbours() {
+    let lib = library_with_migrations(&MIGRATIONS[..5]);
+    let ws = noise(71);
+    let twin = plus(&ws, 72, 0.2);
+    lib.topic("top_ws", "Drawer notifications", Some(&ws), 0, 1);
+    lib.topic("top_notif", "Notification service", Some(&twin), 0, 1);
+    lib.topic("top_empty", "No centroid", None, 0, 1);
+
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+    let store = Store::open(
+        &path,
+        &[noter_db::MIGRATIONS, noter_core::MIGRATIONS, MIGRATIONS],
+    )
+    .unwrap();
+    let db = Connection::open(&path).unwrap();
+    let lib = Library {
+        dir,
+        store: Arc::new(store),
+        db,
+    };
+
+    assert_eq!(
+        topic_row(&lib.db, "top_ws")
+            .unwrap()
+            .unwrap()
+            .merge_suggestion
+            .unwrap()
+            .id
+            .as_str(),
+        "top_notif"
+    );
+    assert_eq!(
+        lib.count("SELECT count(*) FROM topic_suggestions"),
+        lib.count("SELECT count(*) FROM topics")
+    );
 }
 
 #[test]

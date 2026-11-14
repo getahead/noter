@@ -291,6 +291,62 @@ fn a_privacy_edit_moves_the_vectors_and_applies_to_old_chunks_at_once() {
 }
 
 #[test]
+fn cloud_vector_search_applies_privacy_before_the_nearest_neighbor_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(dir.path());
+    let private = folder(
+        &store,
+        dir.path(),
+        "Private",
+        PrivacyClass::Sensitive,
+        SourceScope::AllCalls,
+    );
+    let public = folder(
+        &store,
+        dir.path(),
+        "Public",
+        PrivacyClass::Normal,
+        SourceScope::AllCalls,
+    );
+    let c = raw(dir.path());
+    let private_chunks: Vec<(String, String)> = (0..100)
+        .map(|i| (format!("private_{i}"), format!("Private chunk {i}")))
+        .collect();
+    let private_refs: Vec<(&str, &str)> = private_chunks
+        .iter()
+        .map(|(id, text)| (id.as_str(), text.as_str()))
+        .collect();
+    seed(&c, &private.id, "private_doc", &private_refs);
+    seed(
+        &c,
+        &public.id,
+        "public_doc",
+        &[("public_target", "Public target")],
+    );
+
+    let query: Vec<f32> = (0..1024).map(|i| (i % 7) as f32 + 1.0).collect();
+    let nearby: Vec<f32> = query.iter().map(|x| x + 0.01).collect();
+    c.execute("DELETE FROM doc_vec WHERE chunk_id = 'public_target'", [])
+        .unwrap();
+    c.execute(
+        "INSERT INTO doc_vec (chunk_id, privacy_class, embedding) VALUES ('public_target', 'normal', ?1)",
+        [nearby.iter().flat_map(|x| x.to_le_bytes()).collect::<Vec<_>>()],
+    )
+    .unwrap();
+
+    let found =
+        noter_knowledge::nearest_chunks(&c, &query, 4, 1.0, Some(PrivacyClass::Normal)).unwrap();
+
+    assert_eq!(found, [ChunkId::new("public_target")]);
+    let sensitive =
+        noter_knowledge::nearest_chunks(&c, &query, 4, 1.0, Some(PrivacyClass::Sensitive)).unwrap();
+    assert_eq!(sensitive.len(), 4);
+    assert!(sensitive
+        .iter()
+        .all(|id| id.as_str().starts_with("private_")));
+}
+
+#[test]
 fn scope_rules_follow_the_request_and_the_call_it_names() {
     let dir = tempfile::tempdir().unwrap();
     let store = open(dir.path());
