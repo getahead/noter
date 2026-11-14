@@ -137,6 +137,10 @@ function namingState(world: World, callId: string) {
   return { callId, speakers, segments, sections };
 }
 
+function isSpeakerChange(row: ChangeRow): boolean {
+  return row.entity.kind === "speaker" || row.field === "speakers" || (row.entity.kind === "call" && row.summary.startsWith("Named "));
+}
+
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
 function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"], fake: FakeCore): void {
   rows.forEach((r) => {
@@ -155,7 +159,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
       if (summary.rev !== null) summary.rev += 1;
       emit("entity:changed", { type: "section", call_id: output!.call_id, section: summary });
     }
-    if ((r.entity.kind === "speaker" || r.field === "speakers" || (r.entity.kind === "call" && r.summary.startsWith("Named "))) && r[value]) {
+    if (isSpeakerChange(r) && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
       for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
         if (!speakers) continue;
@@ -204,7 +208,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
 
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 function editedLater(world: World, r: ChangeRow): boolean {
-  if ((r.entity.kind === "speaker" || r.field === "speakers" || (r.entity.kind === "call" && r.summary.startsWith("Named "))) && r.after) {
+  if (isSpeakerChange(r) && r.after) {
     const state = JSON.parse(r.after) as ReturnType<typeof namingState>;
     return JSON.stringify(namingState(world, state.callId)) !== r.after;
   }
@@ -1484,7 +1488,7 @@ export const defaultHandlers: Handlers = {
     // After a partial undo the rows edited later are still applied: redo the undone ones.
     const undone = rows.filter((r) => r.status === "undone");
     if (!undone.length) throw coreError("not_undone");
-    const redoable = undone.filter((r) => r.redoable && (r.field !== "speakers" ||
+    const redoable = undone.filter((r) => r.redoable && (!isSpeakerChange(r) ||
       JSON.stringify(namingState(world, (JSON.parse(r.before!) as ReturnType<typeof namingState>).callId)) === r.before));
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
