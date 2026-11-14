@@ -144,6 +144,8 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     await list.sort("title");
     list.merge({ other: row("other") }, new Set());
     expect(list.get().rows.map((r) => r.id)).toEqual(["a"]);
+  });
+
   it("drops a next page superseded by a sort change", async () => {
     let release: (value: unknown) => void = () => {};
     const callsList = vi.fn()
