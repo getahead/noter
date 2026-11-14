@@ -75,9 +75,4 @@ describe("ModeIndicator (cpt-noter-dod-ui-main-window-shell-mode-indicator)", ()
     expect(renderToString(rendered(ModeInfo, { ...base, variant: "settings" }))).not.toContain("Open Privacy Settings");
   });
 
-  it("opens the popover on press: the indicator's click toggles it", () => {
-    const tree = rendered(ModeIndicator, { view: view("CLOUD_REDACTED") });
-    const button = find(tree, (p) => p["aria-haspopup"] === "dialog");
-    (button.props.onClick as (e: unknown) => void)({ currentTarget: {} });
-  });
 });

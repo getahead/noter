@@ -8,13 +8,12 @@ import type { Locator, Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const CARD = '[data-component="cpt-noter-component-ui-upcoming-call-card"]';
 const cards = (page: Page) => page.locator(CARD);
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
-const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
 const calendar = (state: "not_asked" | "denied") => (w: Parameters<typeof W.idle>[0]) => {
   W.idle(w);
   // today_get reads live calls from call records, independently of the capture toolbar state.

@@ -6,8 +6,9 @@ import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { hold } from "../visual/hold";
-import { calls, coreReady, openWindow, type CorePlan } from "./support/app";
+import { calls, openWindow, type CorePlan } from "./support/app";
 import * as O from "./support/outputs-world";
+import { navigate as navigateCall, sent as sentCommands } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const TIMELINE = '[data-component="cpt-noter-component-ui-history-timeline"]';
@@ -22,6 +23,10 @@ async function openCall(page: Page, tab: "summary" | "history", plan: Pick<CoreP
     ...plan,
     world: (w) => {
       O.written(w);
+      w.changes.push(
+        { id: "chg_history_you", batch_id: null, batch_size: 1, at: Date.now(), actor: { type: "you" }, entity: { id: W.PAST_CALL, kind: "call", label: O.TITLE }, field: "title", before: "Old title", after: "Backend sync", summary: "Renamed the call", reason: null, evidence: [], confidence: null, status: "applied", undoable: true, redoable: false },
+        { id: "chg_history_job", batch_id: null, batch_size: 1, at: Date.now(), actor: { type: "job", job_id: "job_evidence", name: "Evidence" }, entity: { id: W.PAST_CALL, kind: "call", label: O.TITLE }, field: "title", before: "Earlier title", after: "Backend sync", summary: "Updated the call", reason: null, evidence: [], confidence: null, status: "applied", undoable: true, redoable: false },
+      );
       for (const i of O.outputsOf(w).sections.flatMap((s) => s.items)) if (i.id === "itm_d1") Object.assign(i, { review: "suggested", created_by: "llm" });
       O.outputsOf(w).review_waiting = 1;
     },
@@ -30,22 +35,22 @@ async function openCall(page: Page, tab: "summary" | "history", plan: Pick<CoreP
     await page.keyboard.press("Meta+Digit3");
     await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
-  await navigate(page, tab);
+  await navigateCall(page, tab);
   await expect(toolbar(page)).toContainText(O.TITLE);
-}
-async function navigate(page: Page, tab: "summary" | "history") {
-  await coreReady(page);
-  await page.evaluate(
-    async ([id, view]) => {
-      const args = { target: { type: "call_page", call_id: id, tab: view } };
-      const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
-      await (g.__noterFake ? g.__noterFake.invoke("window_navigate", args) : g.__TAURI_INTERNALS__!.invoke("window_navigate", { args }));
-    },
-    [W.PAST_CALL, tab],
-  );
 }
 
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
+  test("cpt-noter-seq-call-page-review-outputs — actor and job filters reload history with the selected values", async ({ page }) => {
+    await openCall(page, "history");
+    const history = page.locator(TIMELINE);
+    await history.getByRole("radio", { name: "You", exact: true }).click();
+    await expect.poll(async () => (await sentCommands(page, "history_list")).at(-1)?.actor).toBe("you");
+    await history.getByRole("radio", { name: "Jobs", exact: true }).click();
+    await expect.poll(async () => (await sentCommands(page, "history_list")).at(-1)?.actor).toBe("jobs");
+    await history.getByRole("combobox", { name: "Job" }).selectOption("job_evidence");
+    await expect.poll(async () => (await sentCommands(page, "history_list")).at(-1)?.job_id).toBe("job_evidence");
+  });
+
   test("UI — paging and refresh — History reads older pages and call changes while it is open", async ({ page }) => {
     await openCall(page, "history");
     await page.evaluate(async (callId) => {

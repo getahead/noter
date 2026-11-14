@@ -7,13 +7,13 @@ import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const keyRow = (page: Page, name: string) => pane(page).locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: name });
 const sheet = (page: Page) => page.getByRole("dialog", { name: /Anthropic API Key/i });
-const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 // a stand-in the fake accepts (8+ characters, not containing "bad"); never a key shape, never asserted by value
 const GOOD = "test-stand-in-value-0001";
 /** The window sent `api_key_set` for the provider with a non-empty key, without the value reaching an assertion. */

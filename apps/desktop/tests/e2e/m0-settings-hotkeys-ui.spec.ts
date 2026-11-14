@@ -12,6 +12,7 @@ import type { Page } from "@playwright/test";
 import type { CoreError } from "../../src/core/bindings";
 import { isLaterMilestone } from "../support/milestones";
 import { calls, openWindow, type Steer } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 // D-2: "zoom calls" matches no pane name or keyword (plain "zoom" finds Privacy and Call Screen & Menu Bar).
@@ -20,8 +21,6 @@ const NO_MATCH = "zoom calls";
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const field = (page: Page, row: string) => pane(page).getByRole("button", { name: new RegExp(`^${row}: `) });
-const sent = async (page: Page, name: string): Promise<unknown[]> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 async function openHotkeys(page: Page): Promise<void> {
   await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();

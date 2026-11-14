@@ -215,7 +215,7 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     fake.failNext("capture_mark_moment", "internal");
     strip().onMark();
     await settle();
-    expect(strip().keys).toEqual({ mark: "⌃⌥⌘M", pause: "⌃⌥⌘P", stop: "⌃⌥⌘R" });
+    expect(bridge!.store.getState().commands.capture_mark_moment).toMatchObject({ state: "ERROR", error: { code: "internal", tryAgain: true } });
   });
 
   it("offers the header controls: sensitive, Open in Noter, layout, presenting", async () => {
@@ -311,6 +311,7 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     c.onContinue();
     await settle();
     expect(args("capture_continue")).toEqual([live]);
+    expect(bridge!.store.getState().commands.capture_continue).toMatchObject({ state: "ERROR", error: { code: "continue_window_closed", tryAgain: false } });
     expect(args("window_hide_call")).toEqual([{}]);
   });
 

@@ -19,16 +19,13 @@ import {
   watchAlerts,
 } from "./support/native-alert";
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const ROW =
   '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const rowOf = (page: Page, title: string) =>
   page.locator(ROW).filter({ hasText: title });
-const sent = async (page: Page, name: string): Promise<unknown[]> =>
-  (await calls(page))
-    .filter((c) => c.kind === "invoke" && c.name === name)
-    .map((c) => c.args);
 
 const TITLE = "Backend sync";
 const MANY =

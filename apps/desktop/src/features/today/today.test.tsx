@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
 import type { World } from "../../../tests/support/scenario";
 import { openReview } from "../items/review-banner";
@@ -29,12 +30,7 @@ async function open(mutate: (w: World["app"]) => void = () => {}) {
   bridge = createBridge("main", fake);
   await bridge.open();
 }
-const seen = () => {
-  const out: Array<[string, unknown]> = [];
-  const invoke = fake.invoke.bind(fake);
-  fake.invoke = ((cmd: string, args: unknown) => (out.push([cmd, args]), (invoke as (...a: unknown[]) => unknown)(cmd, args))) as typeof fake.invoke;
-  return out;
-};
+const seen = () => sentCommands(fake);
 const setCalendar = (c: string) => () => {
   (fake.world as unknown as { today: { calendar: string } }).today.calendar = c;
 };

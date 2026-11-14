@@ -20,7 +20,7 @@ import { COMMANDS, type CommandName, type WindowLabel } from "../../src/core/bin
 import { target } from "../support/core";
 import { openScenario } from "../support/scenario";
 import { EXAMPLE_ARGS } from "./example-args";
-import { CURRENT, isLater, milestoneOf, ORDER, summary } from "./milestones";
+import { CURRENT, isLater, milestoneOf, ORDER, summary } from "../support/milestones";
 
 const names = Object.keys(COMMANDS) as CommandName[];
 const pending = new Map<string, CommandName[]>();

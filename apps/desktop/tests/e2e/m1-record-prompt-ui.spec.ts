@@ -13,6 +13,7 @@ import type { CaptureNotice } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const panel = (page: Page) => page.locator('[data-component="cpt-noter-component-ui-record-prompt"]');
@@ -38,9 +39,6 @@ const moveOutsidePanel = async (page: Page) => {
   await page.mouse.move(outside!.x, outside!.y);
   await expect.poll(() => panel(page).evaluate((element) => element.matches(":hover"))).toBe(false);
 };
-/** Arguments of every `name` command the window sent, in order. */
-const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => (c.args ?? {}) as Record<string, unknown>);
 /** The window has read its first snapshot, so an absent panel is an answer and not a slow start. */
 const settled = (page: Page) => expect.poll(async () => (await calls(page)).some((c) => c.name === "app_snapshot")).toBe(true);
 

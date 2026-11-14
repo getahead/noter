@@ -247,11 +247,11 @@ describe("HistoryTimeline container (cpt-noter-component-ui-history-timeline)", 
     expect(bridge.store.getState().commands["undo:chg_2"]).toBeUndefined();
   });
 
-  it("filters are component state and Try Again reads the history again", async () => {
+  it("Try Again rereads the same history target and filters", async () => {
     const tree = mount();
-    (tree.props.onActor as (a: string) => void)("you");
-    (tree.props.onJob as (id: string) => void)("job_1");
+    const read = vi.spyOn(bridge.core, "historyList");
     (tree.props.onRetry as () => void)();
-    await vi.waitFor(() => expect(bridge.store.getState().commands[`history:call:${fake.world.calls[0]!.id}:all:`]?.state).toBe("DONE"));
+    await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
+    expect(read).toHaveBeenCalledWith({ target: { type: "call", call_id: fake.world.calls[0]!.id }, actor: "all", job_id: null, page: {} });
   });
 });

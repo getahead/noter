@@ -3,11 +3,11 @@
 import type { Page } from "@playwright/test";
 
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
-const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 test.describe("cpt-noter-flow-ui-settings-change-setting (glossary)", () => {
   test("UI — other path: the Glossary table is one Tab stop (the selected term, else the first)", async ({ page }) => {

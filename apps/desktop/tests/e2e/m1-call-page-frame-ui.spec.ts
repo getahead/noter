@@ -12,8 +12,8 @@ import type { Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, coreReady, openWindow } from "./support/app";
-import { windowReady } from "./support/call-page";
+import { calls, openWindow } from "./support/app";
+import { navigate, sent, windowReady } from "./support/call-page";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
@@ -23,7 +23,6 @@ const banner = (page: Page) => page.locator('[data-region="PC-R2"], [data-region
 const info = (page: Page) => page.locator('[data-region="PC-R4"], [data-region="MW-R4"]').filter({ hasText: "Call info" });
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 const menuItem = (page: Page, name: string | RegExp) => page.getByRole("menuitem", { name }).or(page.getByRole("menuitemcheckbox", { name }));
-const sent = async (page: Page, name: string) => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 const pane = (page: Page) => page.locator('[data-region="PC-R5"]');
 const head = (page: Page) => pane(page).locator(".pc-tr__head");
 const storedRows = (page: Page) => pane(page).getByRole("log", { name: "Transcript" }).locator('[data-component="cpt-noter-component-ui-transcript-segment-row"]');
@@ -64,12 +63,7 @@ async function openCall(page: Page, title = TITLE) {
     await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
   const id = title === TITLE ? W.PAST_CALL : W.LIVE_CALL;
-  await coreReady(page);
-  await page.evaluate(async (callId) => {
-    const args = { target: { type: "call_page", call_id: callId, tab: "transcript" } };
-    const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
-    await (g.__noterFake ? g.__noterFake.invoke("window_navigate", args) : g.__TAURI_INTERNALS__!.invoke("window_navigate", { args }));
-  }, id);
+  await navigate(page, "transcript", id);
   await expect(toolbar(page)).toContainText(title);
 }
 const openMore = async (page: Page) => {

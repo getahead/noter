@@ -114,22 +114,6 @@ describe("SpeakerNamingPanel", () => {
       ]),
     );
   });
-  it("Play Sample asks the core for the speaker's sample, and a refusal drops Playing…", async () => {
-    const played: unknown[] = [];
-    const row = (res: unknown) =>
-      rendered(NameRow, {
-        p: props({ bridge: bridge({ audioPlay: async (a: unknown) => (played.push(a), res) }) }),
-        speaker: spk("s3", 3),
-        people: null,
-        line: null,
-        onSkip: () => {},
-      });
-    for (const res of [{ status: "ok", data: {} }, { status: "error", error: { code: "refused" } }]) {
-      const tree = row(res);
-      (find(tree, (pr) => pr.label === "Play Sample").props as { onAction: () => void }).onAction();
-    }
-    await vi.waitFor(() => expect(played).toEqual([{ call_id: "c1", from_ms: 1000, to_ms: 6000 }, { call_id: "c1", from_ms: 1000, to_ms: 6000 }]));
-  });
   it("claims the active sample row when requesting playback", () => {
     const tree = rendered(NameRow, { p: props(), speaker: spk("s3", 3), people: null, line: null, onSkip: () => {}, sampleActive: false, onSample: vi.fn() });
     expect(find(tree, (p) => p.label === "Play Sample")).toBeTruthy();

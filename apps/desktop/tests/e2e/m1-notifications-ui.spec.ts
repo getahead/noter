@@ -8,13 +8,12 @@ import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { calls, coreReady, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const PAST_TITLE = "Backend sync";
 
 const banner = (page: Page) => page.locator('[data-region="PC-R2"]');
-const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => (c.args ?? {}) as Record<string, unknown>);
 
 /** Calls (⌘3), then the recorded call's page the way the core opens it (`window_navigate` → `nav:request`); the Calls list is 2.13's. */
 async function openCallPage(page: Page) {

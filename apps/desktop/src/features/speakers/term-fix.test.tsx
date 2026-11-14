@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { find, rendered } from "../../ui/testing";
 
@@ -35,12 +35,13 @@ describe("TermFixPopover", () => {
     expect(popup.value).toBe("fr");
     expect(popup.options).toContainEqual({ value: "fr", label: "French" });
   });
-  it("the controls take input; Fix stays inert with nothing typed", () => {
-    const tree = rendered(TermFixPopover, { bridge, segment, range: { start: 0, end: 0 }, anchor: null, onClose: () => {}, onFixed: () => {} });
-    (find(tree, (pr) => "onEnter" in pr).props as { onChange: (v: string) => void; onEnter: () => void }).onChange("notifier");
+  it("an empty correction disables Fix and ignores Return", () => {
+    const act = vi.fn();
+    const tree = rendered(TermFixPopover, { bridge: { ...bridge, act } as Bridge, segment, range: { start: 0, end: 0 }, anchor: null, onClose: () => {}, onFixed: () => {} });
+    const fix = find(tree, (pr) => pr.label === "Fix").props;
+    expect(fix.disabled).toBe(true);
     (find(tree, (pr) => "onEnter" in pr).props as { onEnter: () => void }).onEnter();
-    (find(tree, (pr) => pr.label === "Add to glossary").props as { onAction: (v: boolean) => void }).onAction(false);
-    (find(tree, (pr) => pr.label === "Fix").props as { onAction: () => void }).onAction();
+    expect(act).not.toHaveBeenCalled();
   });
   it("rereadSegment puts the core's span lines into the transcript Channel, and ignores a refused read", async () => {
     const writes: unknown[] = [];

@@ -88,13 +88,16 @@ describe("ItemInspector", () => {
 
   it("an unreadable item offers Try Again", async () => {
     const setLoadError = vi.fn();
+    const itemGet = vi.spyOn(bridge.core, "itemGet");
     queue.push(["details", vi.fn()], [null, vi.fn()], [true, setLoadError], [null, vi.fn()], ["idle", vi.fn()]);
     const tree = rendered(ItemInspector, { bridge, itemId: "itm_none" });
     effects.forEach((e) => e());
     await settle();
+    expect(itemGet).toHaveBeenCalledOnce();
     expect(setLoadError).toHaveBeenCalledWith(true);
     (find(tree, (p) => p.label === "Try Again" && typeof p.onAction === "function").props.onAction as () => void)();
     await settle();
+    expect(itemGet).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -3,11 +3,10 @@
 // Baselines come from the update-screenshots workflow only.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openWindow } from "../e2e/support/app";
+import { coreReady, openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { settled } from "./freeze";
-import { fakeReady } from "./hold";
 
 const WIDTHS = { wide: 1400, medium: 1000, narrow: 700 } as const;
 const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
@@ -73,7 +72,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       // Let the shell finish its startup timers, then hold the delayed Calls read pending.
       await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
       // only the Calls read is slow, so the rest of the window is as in the other states
-      await fakeReady(page);
+      await coreReady(page);
       await page.evaluate(() => ((globalThis as unknown as { __noterFake: { latency: number } }).__noterFake.latency = 8000));
       await expect(async () => {
         await page.keyboard.press("Meta+Digit3");

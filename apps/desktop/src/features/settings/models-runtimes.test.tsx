@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { sentCommands as recordCommands } from "../../../tests/support/fake-core";
 import { installCli, loadAccounts, removeKey, setKey } from "./accounts";
 import { loadSettings } from "./actions";
 import { KeyRow } from "./CredentialRow";
@@ -32,10 +33,7 @@ const keyOf = (provider: "anthropic" | "codex") => accounts().keys.find((k) => k
 type Tree = ReturnType<typeof rendered>;
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => unknown;
 const sentCommands = () => {
-  const seen: string[] = [];
-  const invoke = fake.invoke.bind(fake);
-  fake.invoke = ((cmd: string, ...rest: unknown[]) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, ...rest))) as typeof fake.invoke;
-  return seen;
+  return recordCommands(fake);
 };
 
 describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
@@ -94,7 +92,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
     const props = await ready();
     const seen = sentCommands();
     on(rendered(ModelsRuntimesPane, props), "Post-call analysis")("local");
-    await vi.waitFor(() => expect(seen).toContain("settings_update"));
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("settings_update"));
     expect(bridge.store.getState().whole.settings!.runtimes.post_call).toBe("local");
   });
 
@@ -105,7 +103,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
     });
     const seen = sentCommands();
     on(rendered(ModelsRuntimesPane, props), "Install Ollama…")();
-    await vi.waitFor(() => expect(seen).toContain("cli_install"));
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("cli_install"));
   });
 });
 
@@ -135,7 +133,7 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
     expect(await d.verify()).toBe(false); // already verifying
     expect(await first).toBe(true);
     expect(keyOf("codex").status.type).toBe("configured");
-    expect(seen.filter((c) => c === "api_key_set")).toHaveLength(1);
+    expect(seen.filter(([cmd]) => cmd === "api_key_set")).toHaveLength(1);
   });
 
   it("a rejected key keeps the draft for correction, and a locked Keychain tells the pane", async () => {
@@ -179,7 +177,7 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
     await setKey(bridge, "anthropic", "sk-ant-secret");
     await bridge.retry("key:set:anthropic");
 
-    expect(seen.filter((cmd) => cmd === "api_key_set")).toHaveLength(1);
+    expect(seen.filter(([cmd]) => cmd === "api_key_set")).toHaveLength(1);
   });
 
   it("Remove… takes the key out; accounts_get and cli_install answer", async () => {

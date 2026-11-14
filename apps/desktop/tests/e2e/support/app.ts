@@ -83,7 +83,6 @@ const HOOK = `
         if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
         if (plan.latency && !plan.latencyFor) this.latency = plan.latency;
         if (plan.corruptNextDownload) {
-          if (!this.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
           this.corruptNextDownload();
         }
       })();
