@@ -79,8 +79,14 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
     await shot(page, "item-inspector-evidence-audio-deleted");
   });
 
-  test("archive pending: evidence remains on the live transcript", async ({ page }) => {
+  test("archive pending: the inspector keeps live evidence while the archive is pending", async ({ page }) => {
     await openInspector(page, (w) => archiveWorld("pending")(w));
+    const inspector = page.locator(INSPECTOR);
+    await expect(inspector).toContainText("ship it friday");
+    await expect(inspector).not.toContainText("ship it on Friday");
+    await expect(inspector.getByText("ship it friday")).toBeInViewport();
+    await shot(page, "item-inspector-archive-pending");
+
     await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
     const tab = page.getByRole("tab", { name: "Transcript", selected: true });
     await expect(tab).toBeVisible();
@@ -88,11 +94,18 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
     await expect(page.getByText("Words changed by the archive pass")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Show Archive Changes" })).toHaveCount(0);
     await expect(page.getByText("ship it friday")).toBeInViewport();
-    await shot(page, "item-inspector-archive-pending");
+    await shot(page, "item-archive-pending-source");
   });
 
-  test("archive upgraded: evidence shows the changed words", async ({ page }) => {
+  test("archive upgraded: the inspector follows the current archive evidence", async ({ page }) => {
     await openInspector(page, (w) => archiveWorld("done")(w));
+    const inspector = page.locator(INSPECTOR);
+    await expect(inspector).toContainText("ship it on Friday");
+    await expect(inspector).not.toContainText("ship it friday");
+    await expect(inspector).toBeInViewport();
+    await expect(inspector.getByText("ship it on Friday")).toBeInViewport();
+    await shot(page, "item-inspector-archive-upgraded");
+
     await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
     await expect(page.getByText("Words changed by the archive pass")).toBeVisible();
     await page.getByRole("button", { name: "Show Archive Changes" }).click();
@@ -101,6 +114,6 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
     await expect(diff).toContainText("on Friday");
     await expect(diff).toBeInViewport();
     await expect(diff.getByText("on Friday")).toBeInViewport();
-    await shot(page, "item-inspector-archive-upgraded");
+    await shot(page, "item-archive-upgraded-source");
   });
 });

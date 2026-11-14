@@ -24,7 +24,8 @@ export function itemsHandlers(fake: Core.FakeCore): Core.Handlers {
   item_get: (a, { world }) => {
     const item = shared.findItem(world, a.item_id);
     const evidence = item.spans.map((span) => {
-      const segments = world.transcripts.find((t) => t.call_id === span.call_id)?.segments ?? [];
+      const transcript = world.transcripts.find((t) => t.call_id === span.call_id);
+      const segments = transcript?.segments.filter((segment) => !segment.pass || segment.pass === transcript.pass) ?? [];
       const minutes = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1_000) % 60).padStart(2, "0")}`;
       const at = item.call.started_at + span.t0_ms;
       return {

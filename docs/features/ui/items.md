@@ -2,7 +2,7 @@
 title: "Feature — Items, review and evidence"
 description: "Review suggested items, edit their details, tick or reopen them, and check their evidence."
 status: DRAFT
-version: "1.1"
+version: "1.2"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-items
 milestone: M2
@@ -248,7 +248,7 @@ The system **MUST** show Details and History, persist fields at the designed poi
 
 **Touches**:
 - Commands: `item_get`, `item_edit`, `transcript_span`, `audio_play`, `audio_stop`; History commands through its feature
-- Tests: unit kind-specific fields, focus return and stale span resolution; conformance audio-deleted and transcript-upgraded errors; real-core E2E `cpt-noter-seq-call-page-check-evidence` (every path); screenshots of Details, History, deleted-audio evidence, and archive-pending and archive-upgraded evidence
+- Tests: unit kind-specific fields, focus return and stale span resolution; conformance audio-deleted and transcript-upgraded errors; real-core E2E `cpt-noter-seq-call-page-check-evidence` (every path); screenshots of Details, History, deleted-audio evidence, archive-pending and archive-upgraded evidence in the open inspector, and their source transcript destinations
 
 **Completion gate.** Write failing tests first; unit and changed-line coverage meet 80% per side. Real-core E2E counts successful frozen commands and named stories toward the 60% bar; fake-only tests do not count. Screenshots meet 98%, due performance coverage meets 60% and scenarios stay within 10% of base instruction counts; trace coverage never falls. `just gate-fast` stays green; `just gate` passes.
 
@@ -274,3 +274,5 @@ The system **MUST** show Details and History, persist fields at the designed poi
 **Not applicable.** No new schema, network client, evidence job, credential, migration or deployment is introduced. Activity proposal decisions ship in M5. Logging uses the bridge's ids and error codes, never item or quote text.
 
 **Changelog.** v1.1 (14 Nov 2026): name the row statuses and variants covered by visual regression and distinguish the pending and upgraded archive evidence screenshots.
+
+v1.2 (14 Nov 2026): distinguish archive evidence shown in the open inspector from the transcript destination after following its source link.

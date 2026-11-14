@@ -2,7 +2,7 @@
 title: "Feature — Call page outputs and sharing"
 description: "Read outputs as they arrive, preserve edits across regeneration, compare versions and share a visible scope."
 status: DRAFT
-version: "1.3"
+version: "1.4"
 date: "2026-11-07"
 feature: cpt-noter-feature-ui-call-page-outputs
 milestone: M2
@@ -127,7 +127,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 5. [x] - `p1` - Core keeps user prose edits and accepted/edited items, replaces only remaining suggestions and preserves rejected suppression; UI renders the returned notices and counts - `inst-preserve`
 6. [x] - `p1` - User opens the version menu; `output_versions` lists generated and user versions with writer/time; hide the switcher with only one version - `inst-versions`
 7. [x] - `p1` - User selects a version; `output_version_get` returns its body for read-only inspection; selecting it never writes it over the current edit - `inst-version`
-8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, fold long unchanged stretches - `inst-diff`
+8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, keep adjacent replacement words visibly separated without losing the before/after text or its marks, fold long unchanged stretches - `inst-diff`
 9. [x] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
 10. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
 
@@ -256,7 +256,7 @@ Owner decision (6 Nov): M2 selection means one row. Row-scope Share is delivered
 
 - [x] `p3` - **ID**: `cpt-noter-dod-ui-call-page-outputs-content`
 
-The system **MUST** render ordered sections and output rows from typed core views, preserve independent section failures and readable old content, save drafts with revision checks and compare versions without overwriting edits. Shared diff rendering handles no differences, folded unchanged stretches, transcript marks and before/after sheets.
+The system **MUST** render ordered sections and output rows from typed core views, preserve independent section failures and readable old content, save drafts with revision checks and compare versions without overwriting edits. Shared diff rendering handles no differences, folded unchanged stretches, transcript marks and before/after sheets; adjacent removed and inserted words remain separated while each marked text stays intact.
 
 **Implements**:
 - `cpt-noter-flow-ui-call-page-outputs-read-edit`
@@ -268,7 +268,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 **Touches**:
 - Commands: `outputs_get`, `output_edit`, `outputs_regenerate`, `output_versions`, `output_version_get`
-- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison
+- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison with adjacent replacement text separated
 
 ### Sharing, tags, audio and notification routing
 
@@ -317,3 +317,5 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 v1.2 (14 Nov 2026): enumerate the seven output section and interaction states in the screenshot checks so each state named by this DoD has a visual regression case.
 
 v1.3 (14 Nov 2026): distinguish the pre-submit regeneration sheet from the accepted in-progress state, which keeps prior prose visible with regeneration progress.
+
+v1.4 (14 Nov 2026): require readable boundaries between adjacent removed and inserted text while preserving both marked texts.

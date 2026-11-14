@@ -116,6 +116,7 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await expect(outputBody(page)).toContainText("Edited summary copy.");
     await expect(outputBody(page)).toContainText("Edited");
     await expect(outputBody(page).locator(".pc-sec").first().getByText("Edited summary copy.")).toBeInViewport();
+    await expect(outputBody(page).locator(".pc-sec__meta")).toContainText("1 min 40 s after the call");
     await shot(page, "outputs-edited");
   });
 
