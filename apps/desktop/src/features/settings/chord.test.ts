@@ -8,7 +8,6 @@ const ev = (over: Partial<ChordInput> = {}): ChordInput => ({
   code: "KeyU",
   modifiers: { ...none, control: true, option: true, command: true },
   variant: "single",
-  voiceOver: false,
   ...over,
 });
 
@@ -30,11 +29,8 @@ describe("checkChord", () => {
     expect(checkChord(ev({ modifiers: { ...none, [m]: true } })).type).toBe("accept");
   });
 
-  it("refuses ⌃⌥ chords while VoiceOver runs, and only then", () => {
-    expect(checkChord(ev({ voiceOver: true }))).toEqual({ type: "keep", reason: "voiceover", message: "Used by VoiceOver" });
-    expect(checkChord(ev({ voiceOver: true, modifiers: { ...none, control: true, option: true } })).type).toBe("keep");
-    expect(checkChord(ev({ voiceOver: true, modifiers: { ...none, control: true } })).type).toBe("accept");
-    expect(checkChord(ev({ voiceOver: false })).type).toBe("accept");
+  it("accepts a chord locally; the core reports reserved chords during registration", () => {
+    expect(checkChord(ev({ modifiers: { ...none, control: true, option: true } })).type).toBe("accept");
   });
 
   it("accepts with the physical code and the modifiers for the caller to send", () => {

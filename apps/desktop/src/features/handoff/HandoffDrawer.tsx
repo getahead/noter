@@ -4,6 +4,7 @@
 import { useEffect, useRef } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { elementId } from "../../app/element-id";
 import { useWindow } from "../../app/use-window";
 import type { HandoffTarget, HandoffView, ItemView, LaunchPath, UiPrefs } from "../../core/bindings";
 import { clock, shortDay, t } from "../../i18n/format";
@@ -23,7 +24,6 @@ import { useRepos } from "./mappings";
 import { PromptEditor } from "./PromptEditor";
 import "./handoff.css";
 
-const elementId = (kind: string, id: string) => [kind, id].join("-");
 const TARGETS: HandoffTarget[] = ["claude_code", "codex"];
 const TERMINAL_APP: Partial<Record<LaunchPath, string>> = { iterm: "iTerm", terminal: "Terminal" };
 

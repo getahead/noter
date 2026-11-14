@@ -38,7 +38,7 @@ export interface MenuProps {
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function Menu({ items, variant = "item-menu", label, onClose }: MenuProps) {
   const ref = useRef<HTMLDivElement>(null);
-  useFocusInside(ref); // the first enabled item; focus goes back to the opener when the menu closes
+  useFocusInside(ref, ITEM); // the first enabled item; focus goes back to the opener when the menu closes
   return (
     <div ref={ref} className="np-menu" role="menu" {...base("menu", { variant })} aria-label={label} onKeyDown={(e) => menuKey(e, onClose)}>
       {items.map((it, i) => {
@@ -94,7 +94,7 @@ function SubItem({ it, onClose }: { it: Leaf; onClose?: () => void }) {
 
 function SubPanel({ it, onClose, onBack }: { it: Leaf; onClose?: () => void; onBack: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
-  useFocusInside(ref); // its first item, so the keyboard can choose; focus goes back to the parent item when it closes
+  useFocusInside(ref, ITEM); // its first item, so the keyboard can choose; focus goes back to the parent item when it closes
   return (
     <div
       ref={ref}

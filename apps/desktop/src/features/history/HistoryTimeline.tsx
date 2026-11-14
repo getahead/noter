@@ -12,7 +12,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { moveFocus } from "../../ui/primitives/roving";
-import { afterTimer } from "../call-page/logic";
+import { afterTimer } from "../../app/use-after";
 import { ChangeRow } from "./ChangeRow";
 import { groupByDay, historyKey, historyState, jobsOf, readHistoryPages, sameTarget, undoTarget, type HistoryState } from "./history";
 import { holdUndo, runUndo, undoWorking, useUndo } from "./undo";

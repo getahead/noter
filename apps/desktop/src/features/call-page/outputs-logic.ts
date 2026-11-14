@@ -48,14 +48,6 @@ export const currentItems = (items: ItemView[], records: Record<string, ItemView
   items.map((item) => (records[item.id]?.rev >= item.rev ? records[item.id]! : item));
 // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-count
 
-/** `outputs:progress` for this call and section: its state changes and the text it already had stays. Another call's event returns the same array. */
-export function applyProgress(sections: OutputSection[], callId: string, e: OutputsProgress): OutputSection[] {
-  // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-progress
-  if (e.call_id !== callId || !sections.some((s) => s.kind === e.section)) return sections;
-  return sections.map((s) => (s.kind === e.section ? { ...s, state: e.state } : s));
-  // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-progress
-}
-
 /** The section the page draws: the whole one the core sent last, else the read one, with the state progress reported since. */
 export function mergeSection(read: OutputSection | undefined, sent: OutputSection | undefined, progress: OutputsProgress | undefined): OutputSection | undefined {
   // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-start

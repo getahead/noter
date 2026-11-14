@@ -52,4 +52,4 @@ export function searchPanes(text: string): SearchResult {
 export const paneLabel = (id: SettingsPane): string => t(`settings.pane.${id}` satisfies MsgKey);
 
 /** What a pane that a later feature fills says instead of a blank area. */
-export const laterNote = (id: "models_and_runtimes" | "repositories" | "knowledge_sources" | "maintenance"): string => t(`settings.later.${id}` satisfies MsgKey);
+export const laterNote = (id: Extract<SettingsPane, "knowledge_sources" | "maintenance">): string => t(`settings.later.${id}` satisfies MsgKey);

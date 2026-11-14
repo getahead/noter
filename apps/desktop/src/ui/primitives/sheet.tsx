@@ -2,9 +2,8 @@
 // Esc cancels; Return runs the default button (⌘Return in a multi-line field); focus stays inside and goes back
 // to where it was when the sheet closes.
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
+import { FOCUSABLE, focusAndReturn, type FocusTarget } from "../../app/a11y/focus";
 import { base } from "./attrs";
-
-const FOCUSABLE = 'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
 
 /** Keys of a modal surface: Esc and Return to the default button. Tab is kept inside by the window's handler (`aria-modal`). */
 export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, onDefault?: () => void) {
@@ -20,13 +19,12 @@ export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, on
 
 /** Focuses the first control of `root` (or root itself); the returned cleanup gives focus back to the element
  *  focused before. */
-export function focusInside(root: HTMLElement | null) {
-  const before = document.activeElement as HTMLElement | null;
-  (root?.querySelector<HTMLElement>(FOCUSABLE) ?? root)?.focus();
-  return () => before?.focus?.();
+export function focusInside(root: HTMLElement | null, selector = FOCUSABLE) {
+  const first = root?.querySelector<HTMLElement>(selector) ?? root;
+  return focusAndReturn(first, () => document.activeElement as FocusTarget | null);
 }
 
-export const useFocusInside = (root: { current: HTMLElement | null }) => useEffect(() => focusInside(root.current), [root]);
+export const useFocusInside = (root: { current: HTMLElement | null }, selector = FOCUSABLE) => useEffect(() => focusInside(root.current, selector), [root, selector]);
 
 export interface SheetProps {
   /** VoiceOver name of the dialog. */

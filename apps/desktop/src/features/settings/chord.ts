@@ -17,10 +17,9 @@ export interface ChordInput {
   modifiers: ChordModifiers;
   /** `single`: one chord; `modifier-set`: card keys, where only the modifiers are recorded. */
   variant: "single" | "modifier-set";
-  voiceOver: boolean;
 }
 
-export type KeepReason = "no_modifier" | "voiceover";
+export type KeepReason = "no_modifier";
 
 export type ChordResult =
   | { type: "accept"; code: string; modifiers: ChordModifiers }
@@ -34,7 +33,7 @@ export type ChordResult =
 const MODIFIER_CODES = new Set([...["Control", "Alt", "Meta", "Shift"].flatMap((m) => [`${m}Left`, `${m}Right`]), "Fn", "CapsLock"]);
 
 // @cpt-algo:cpt-noter-algo-ui-settings-check-chord:p1
-export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInput): ChordResult {
+export function checkChord({ code, modifiers: m, variant }: ChordInput): ChordResult {
   // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-esc
   // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-cancel
   if (code === "Escape") return { type: "cancel" };
@@ -54,11 +53,6 @@ export function checkChord({ code, modifiers: m, variant, voiceOver }: ChordInpu
   if (!hasModifier || code === "Backspace") return { type: "keep", reason: "no_modifier", message: t("settings.hotkeys.no_modifier") };
   // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-nomod
   // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-nomod
-  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
-  // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
-  if (voiceOver && m.control && m.option) return { type: "keep", reason: "voiceover", message: t("settings.hotkeys.used_by", { owner: "VoiceOver" }) };
-  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-vo
-  // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-if-vo
   // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
   // @cpt-begin:cpt-noter-algo-ui-settings-check-chord:p1:inst-return-accept
   return { type: "accept", code, modifiers: m }; // `code` is the physical KeyboardEvent.code, not the layout's character

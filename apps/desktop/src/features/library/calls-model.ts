@@ -1,6 +1,5 @@
-import type { CallRow, CallSort, OutputsProgress, OutputsStatus } from "../../core/bindings";
-import { t } from "../../i18n/format";
-import { shortDay } from "./status-cell";
+import type { CallRow, CallSort, OutputsProgress, OutputsStatus, UiPrefs } from "../../core/bindings";
+import { locale, shortDay, t, zoned } from "../../i18n/format";
 
 export type Column = "when" | "call" | "length";
 const HOUR = 3_600_000;
@@ -36,17 +35,11 @@ export interface MonthGroup {
 /** Month groups in the order given (the sticky headers of the table). */
 export function groupByMonth(
   rows: CallRow[],
-  locale = "en-GB",
-  tz?: string,
+  prefs?: UiPrefs,
 ): MonthGroup[] {
-  const fmt = new Intl.DateTimeFormat(locale, {
-    month: "long",
-    year: "numeric",
-    timeZone: tz,
-  });
   const groups: MonthGroup[] = [];
   for (const r of rows) {
-    const label = fmt.format(r.started_at);
+    const label = zoned(r.started_at, { month: "long", year: "numeric" }, prefs, locale());
     if (groups.at(-1)?.label === label) groups.at(-1)!.rows.push(r);
     else groups.push({ label, rows: [r] });
   }
@@ -59,7 +52,7 @@ export function subtitle(
   rows: CallRow[],
   total: number,
   selected: number,
-  tz?: string,
+  prefs?: UiPrefs,
 ): string {
   const hours = Math.round(
     rows.reduce((sum, r) => sum + r.duration_ms, 0) / HOUR,
@@ -70,7 +63,7 @@ export function subtitle(
   const loaded = rows.length >= total;
   if (loaded) parts.push(t("library.calls.hours", { count: hours }));
   if (loaded && since !== null)
-    parts.push(t("library.calls.since", { date: shortDay(since, tz) }));
+    parts.push(t("library.calls.since", { date: shortDay(since, prefs) }));
   if (selected > 1)
     parts.push(t("library.calls.selected", { count: selected }));
   return parts.join(" · ");

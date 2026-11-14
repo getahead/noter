@@ -6,14 +6,15 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { Icon } from "../../ui/icons";
 import { Link } from "../../ui/primitives/link";
 import { Progress } from "../../ui/primitives/progress";
-import { shortDay, audioDeletedHelp, statusOf } from "./status-cell";
+import { shortDay } from "../../i18n/format";
+import { audioDeletedHelp, statusOf } from "./status-cell";
 
 const ROOT = "cpt-noter-component-ui-call-row";
 
 /** "Today 14:30", or "2 Oct 14:30", in the zone and 12/24-hour setting the core passes. */
 export function whenOf(ms: number, now = Date.now(), prefs?: UiPrefs): string {
   const same = dayOf(ms, prefs) === dayOf(now, prefs);
-  return `${same ? t("section.today") : shortDay(ms, prefs?.time_zone || undefined)} ${clock(ms, prefs)}`;
+  return `${same ? t("section.today") : shortDay(ms, prefs)} ${clock(ms, prefs)}`;
 }
 
 /** The call's people as "Anna, Boris +2", the user last as "You". */

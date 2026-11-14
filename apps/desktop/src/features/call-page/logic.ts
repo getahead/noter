@@ -5,9 +5,6 @@ import type { CallPageTab, CallRow, TimeSpan, UiPrefs } from "../../core/binding
 import { clock, dayOf, duration, formatDateTime, shortDay, t } from "../../i18n/format";
 import type { MsgKey } from "../../i18n/en";
 
-/** The page's route key in the Library section, as `navRoute` builds it for a `call_page` target. */
-export const callKey = (callId: string, tab: CallPageTab): string => ["call", callId, tab].join(":");
-
 /** `call:<id>:<tab>`, plus `:<t0>:<t1>` when evidence opened it on a span (the Transcript highlights it). */
 export function parseCallKey(key: string): { callId: string; tab: CallPageTab; span?: TimeSpan } | null {
   const [kind, callId, tab, t0, t1] = key.split(":");
@@ -110,11 +107,4 @@ export function callInfo(c: CallRow, extra: { audio_not_stored: boolean }, now: 
     audioKept: kept,
     processing: t(STATUS[c.status]),
   };
-}
-
-/** Calls `set(true)` once `active` has held for `ms` (and `set(false)` while it does not); returns the cleanup. */
-export function afterTimer(ms: number, active: boolean, set: (late: boolean) => void): (() => void) | undefined {
-  if (!active) return void set(false);
-  const id = setTimeout(() => set(true), ms);
-  return () => clearTimeout(id);
 }

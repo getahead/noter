@@ -21,8 +21,14 @@ export async function resolveSpan(bridge: Bridge, span: TimeSpan): Promise<Resol
 /** Resolve the span, then open the Transcript on it (the page focuses the first resolved line and highlights it). */
 export async function openEvidence(bridge: Bridge, span: TimeSpan): Promise<Resolved> {
   const r = await resolveSpan(bridge, span);
-  if (r.status === "ok" || r.status === "upgraded") await bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }));
+  if (r.status === "ok" || r.status === "upgraded") await openSpan(bridge, span);
   return r;
+}
+
+/** Navigate to a span in the Transcript. */
+// @cpt-flow:cpt-noter-flow-ui-items-evidence:p1
+export function openSpan(bridge: Bridge, span: TimeSpan, screen?: string) {
+  return bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen });
 }
 
 export const spanTime = (s: TimeSpan) => clock(s.t0_ms);

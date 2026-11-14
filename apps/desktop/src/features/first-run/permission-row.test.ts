@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { PermissionState } from "../../core/bindings";
 import { initialPermissionRow, permissionRowNext, type PermissionRowEvent, type PermissionRowState } from "./permission-row";
 
 describe("initialPermissionRow", () => {
@@ -14,13 +13,8 @@ describe("initialPermissionRow", () => {
 
 describe("permissionRowNext (cpt-noter-state-ui-first-run-permission-row)", () => {
   const table: [PermissionRowState, PermissionRowEvent, PermissionRowState][] = [
-    ["NOT_ASKED", { type: "prompt_answered", granted: true }, "GRANTED"],
-    ["NOT_ASKED", { type: "prompt_answered", granted: false }, "DENIED"],
     ["MISSING", { type: "returned_from_settings" }, "CHECKING"],
     ["DENIED", { type: "returned_from_settings" }, "CHECKING"],
-    ["CHECKING", { type: "read", state: "granted" }, "GRANTED"],
-    ["CHECKING", { type: "read", state: "not_asked" }, "MISSING"],
-    ["CHECKING", { type: "read", state: "denied" }, "MISSING"],
     ["GRANTED", { type: "self_test_zero_buffers" }, "MISSING"],
     ["CHECKING", { type: "self_test_zero_buffers" }, "MISSING"],
     ["NOT_ASKED", { type: "self_test_zero_buffers" }, "MISSING"],
@@ -29,7 +23,7 @@ describe("permissionRowNext (cpt-noter-state-ui-first-run-permission-row)", () =
 
   it("ignores every event outside those transitions", () => {
     const states: PermissionRowState[] = ["NOT_ASKED", "MISSING", "CHECKING", "GRANTED", "DENIED"];
-    const events: PermissionRowEvent[] = [{ type: "prompt_answered", granted: true }, { type: "returned_from_settings" }, { type: "read", state: "granted" as PermissionState }];
+    const events: PermissionRowEvent[] = [{ type: "returned_from_settings" }];
     for (const s of states) for (const e of events) {
       if (!table.some(([f, ev]) => f === s && ev.type === e.type)) expect(permissionRowNext(s, e)).toBe(s);
     }

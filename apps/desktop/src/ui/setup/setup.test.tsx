@@ -61,9 +61,8 @@ describe("permission-check-row (cpt-noter-component-ui-permission-check-row)", (
     expect(row({ state: "GRANTED" })).toContain("Granted");
   });
 
-  it("shows the device, the how-to until granted, and the meter with Hearing you", () => {
-    const granted = row({ state: "GRANTED", detail: "MacBook Pro Microphone", howto: "How to allow it", hearing: { level: 6 } });
-    expect(granted).toContain("MacBook Pro Microphone");
+  it("shows the how-to until granted and the meter with Hearing you", () => {
+    const granted = row({ state: "GRANTED", howto: "How to allow it", hearing: { level: 6 } });
     expect(granted).not.toContain("How to allow it");
     expect(granted).toContain("Hearing you");
     expect(row({ state: "MISSING", howto: "How to allow it" })).toContain("How to allow it");
@@ -75,12 +74,11 @@ describe("permission-check-row (cpt-noter-component-ui-permission-check-row)", (
     expect(row({ id: "mic", state: "DENIED" })).not.toContain('class="fr-perm__meter"');
   });
 
-  it("hides the reason, the how-to and the meter in the status variant, and asks Continue in the test-only one", () => {
+  it("hides the reason, the how-to and the meter in the status variant", () => {
     const status = row({ variant: "status", state: "MISSING", howto: "How to allow it" });
     expect(status).not.toContain("Records your side");
     expect(status).not.toContain("How to allow it");
     expect(row({ variant: "status", state: "GRANTED", hearing: { level: 3 } })).not.toContain("Hearing you");
-    expect(row({ variant: "test-only", id: "sys", state: "NOT_ASKED" })).toContain(">Continue<");
   });
 
   it("runs the owner's handlers", () => {

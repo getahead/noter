@@ -8,7 +8,7 @@ import type { HotkeyAnswer } from "./actions";
 import type { ChordModifiers } from "./chord";
 import { spokenChord } from "./accelerator";
 import { IDLE_RECORDER, recorderReduce, type RecorderState } from "./recorder";
-import { handleKeyDown, handleKeyUp } from "./recorder-key";
+import { clearRecorder, handleKeyDown, handleKeyUp } from "./recorder-key";
 
 export interface HotkeyRecorderProps {
   id: string;
@@ -94,7 +94,7 @@ export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, 
           </button>
         )}
         {variant === "modifier-set" && <span className="np-dim">{t("settings.hotkeys.pin_suffix")}</span>}
-        {variant === "single" && caps && !disabled && <IconButton icon="x" label={t("settings.hotkeys.clear")} size="inline" onAction={() => void settle(onClear?.())} />}
+        {variant === "single" && caps && !disabled && <IconButton icon="x" label={t("settings.hotkeys.clear")} size="inline" onAction={() => clearRecorder(ctx)} />}
       </span>
       <div className="hk-live" aria-live="polite">
         {message && !recording && (

@@ -2,6 +2,7 @@
 // monospace area (DESIGN › Prompt editor). The editor saves nothing; the drawer's actions do.
 import { useState } from "react";
 
+import { elementId } from "../../app/element-id";
 import type { UiPrefs, VersionMeta } from "../../core/bindings";
 import { clock, t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
@@ -26,7 +27,6 @@ export interface PromptEditorProps {
   onChange: (value: string) => void;
 }
 
-const elementId = (kind: string, id: string) => [kind, id].join("-");
 
 /** The versions the core lists, then **Your Edit** while one is held and the core has not listed it. */
 export function versionEntries(versions: VersionMeta[], edited: boolean, prefs: UiPrefs): Array<{ label: string; checked: boolean }> {

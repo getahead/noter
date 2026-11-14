@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  createFocusReturn,
+  focusAndReturn,
   focusFirstAvailable,
   FOCUSABLE,
   installTabNavigation,
@@ -10,33 +10,25 @@ import {
   unobscuredScrollTop,
 } from "./focus";
 
-describe("createFocusReturn", () => {
-  it("goes IN_PAGE → IN_OVERLAY → RETURNED → IN_PAGE and refocuses the opener", () => {
+describe("focusAndReturn", () => {
+  it("focuses the overlay control and returns focus to the opener exactly once", () => {
     const opener = { focus: vi.fn(), isConnected: true };
     const first = { focus: vi.fn() };
-    const fr = createFocusReturn(() => opener);
-    expect(fr.state()).toBe("IN_PAGE");
-    fr.close();
-    expect(fr.state()).toBe("IN_PAGE");
-    fr.open(first);
-    expect(fr.state()).toBe("IN_OVERLAY");
+    const restore = focusAndReturn(first, () => opener);
     expect(first.focus).toHaveBeenCalled();
-    fr.close();
+    expect(opener.focus).not.toHaveBeenCalled();
+    restore();
     expect(opener.focus).toHaveBeenCalled();
-    expect(fr.state()).toBe("RETURNED");
-    fr.moveOn();
-    expect(fr.state()).toBe("IN_PAGE");
-    fr.moveOn();
-    expect(fr.state()).toBe("IN_PAGE");
+    restore();
+    expect(opener.focus).toHaveBeenCalledOnce();
   });
 
   it("does not focus an opener that left the document, and tolerates no first control", () => {
     const opener = { focus: vi.fn(), isConnected: false };
-    const fr = createFocusReturn(() => opener);
-    fr.open();
-    fr.close();
+    const restore = focusAndReturn(null, () => opener);
+    restore();
     expect(opener.focus).not.toHaveBeenCalled();
-    createFocusReturn(() => null).open();
+    focusAndReturn(null, () => null);
   });
 });
 

@@ -2,8 +2,8 @@
 title: "Feature — Notifications"
 description: "Native Noter notifications without buttons: Summary ready, Couldn't write the summary and capture problems while no Noter surface is visible, with titles and counts only, held during a recording and while hidden for presenting, allowed from a call's page."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-14"
 feature: cpt-noter-feature-ui-notifications
 milestone: M1
 ---
@@ -44,7 +44,7 @@ milestone: M1
 
 Noter sends three native notifications: NT-1 **Summary ready**, NT-2 **Couldn't write the summary** and NT-3 for a capture problem while no Noter surface is visible (**System audio silent**, **Microphone off**, **Not recording · engine stopped**). They carry titles and counts only, no buttons and no sound, one thread per call. They start only after the user allowed them from a call's page; they wait while a call is being recorded and while Noter is hidden for presenting, and arrive one per call afterwards; NT-3 is never held and never sent while hidden. Noter works fully with notifications denied.
 
-**Native parts.** macOS draws the notifications; the core decides when to send each one and posts it through the Tauri notification plugin (core lane). This feature owns their content and send rules, the permission request on a call's page, the notifications-off line in Settings, what each click opens, and the native tests.
+**Native parts.** The core capture-session feature decides when to send, hold or drop each notification. The UI native host maps a delivered notification kind to a macOS notification and routes its click; macOS draws it. This feature owns the content and send-rule contract, the permission request on a call's page, the notifications-off line in Settings, what each click opens, and the native tests.
 
 ### 1.2 Purpose
 
@@ -59,7 +59,7 @@ It implements `cpt-noter-component-screen-notifications`.
 | Actor | Role in Feature |
 |-------|-----------------|
 | Primary user | Allows or denies notifications, clicks a notification |
-| Noter core (system) | Decides, holds, combines and posts notifications; opens the page a click asks for |
+| Noter core (system) | Decides, holds and combines notifications; asks the UI native host to deliver them and opens the page a click asks for |
 | macOS (system) | Shows the permission prompt and draws notifications in Notification Centre |
 
 ### 1.4 References
@@ -71,7 +71,7 @@ It implements `cpt-noter-component-screen-notifications`.
 - **Frozen commands it calls**: `permission_request` (notifications), `window_report_view`; `open_external` (Settings › General **Open System Settings…**)
 - **Events**: `env:changed` (notifications off for Noter), `nav:request` (a click)
 - **Prototype modules**: `src/js/10-a-surfaces.js` (`surface('notifications')`, `NT_STATES`) — source of truth only; the banner on the Call page in `src/js/30-c-callpage.js`
-- **Dependencies**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-settings`
+- **Dependencies**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-settings`, `cpt-noter-feature-core-capture-session`
 
 ## 2. Actor Flows (CDSL)
 
@@ -113,7 +113,7 @@ It implements `cpt-noter-component-screen-notifications`.
 **Steps**:
 1. [x] - `p1` - Core: capture has a problem (the outputs written or failed trigger of NT-1 and NT-2 is the post-call pipeline's, M2, `cpt-noter-feature-ui-call-page-outputs`) - `inst-core-trigger`
 2. [x] - `p1` - Algorithm: decide with `cpt-noter-algo-ui-notifications-send-rule` - `inst-send-rule`
-3. [x] - `p1` - Core: posts the notification with its title and one-line body, in the call's thread, without sound or buttons - `inst-post`
+3. [x] - `p1` - UI native host: maps the delivered kind to its title and one-line body, and posts in the call's thread without sound or buttons - `inst-post`
 4. [x] - `p1` - User clicks it - `inst-user-click`
 5. [x] - `p1` - **MATCH** the notification - `inst-match-click`
    NT-1 and NT-2 clicks (`nav:request` to the call's **Summary**) are M2: `cpt-noter-flow-ui-call-page-outputs-read-edit`, `inst-nt-click`.
@@ -176,7 +176,7 @@ It implements `cpt-noter-component-screen-notifications`.
 
 - [x] `p2` - **ID**: `cpt-noter-dod-ui-notifications-content`
 
-The system **MUST** supply the titles and bodies of NT-1, NT-2 and NT-3 from the string catalogue with plural rules (**1 action item**, **4 action items**), report the shown call page through `window_report_view`, and route a click to the call's page or the call window; the core applies the send rule and posts them natively.
+The system **MUST** supply the titles and bodies of NT-1, NT-2 and NT-3 from the string catalogue with plural rules (**1 action item**, **4 action items**), report the shown call page through `window_report_view`, and route a click to the call's page or the call window; the core applies the send rule and asks the UI native host to post them natively.
 
 **Implements**:
 - `cpt-noter-flow-ui-notifications-receive`
@@ -188,7 +188,7 @@ The system **MUST** supply the titles and bodies of NT-1, NT-2 and NT-3 from the
 **Touches**:
 - Commands: `window_report_view`
 - Events: `nav:request`
-- Tests: XCUITest `test_cpt_noter_seq_floating_panel_hide_and_reopen__capture_problem_while_hidden` (NT-3 and its click); the NT-1 click is proven in M2
+- Tests: UI unit `apps/desktop/src/features/notifications/notifications.test.ts`; core unit `crates/noter-core/tests/capture.rs`; conformance `apps/desktop/tests/conformance/m2-stories-postcall.test.ts` (`cpt-noter-seq-notifications-open-outputs`); E2E `apps/desktop/tests/e2e/m1-notifications-ui.spec.ts` (`cpt-noter-flow-ui-notifications-receive`)
 
 ### Permission from a call's page
 
@@ -216,6 +216,8 @@ With notifications denied, the menu bar and the Call page show every ready and f
 ## 7. Additional Context
 
 **Prototype reuse.** Source of truth only: macOS draws notifications, so `surface('notifications')` and `NT_STATES` in `src/js/10-a-surfaces.js` define the content and states; the `.nt-*` styles are not ported. The Call page banner is ported with `cpt-noter-feature-ui-call-page-frame`; the Settings line with `cpt-noter-feature-ui-settings`.
+
+**Change log.** 1.1 — clarified the existing core-to-native delivery boundary while keeping the notification rule contract and marker in the UI feature.
 
 **States coverage.**
 

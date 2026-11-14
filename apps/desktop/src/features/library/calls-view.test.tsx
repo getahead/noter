@@ -67,7 +67,7 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
   it("renders LC-R1 with the counts and the table with a month header and the sorted column", () => {
     const h = html({});
     expect(h).toContain('data-region="LC-R1"');
-    expect(h).toContain("2 calls · 2 hours · since 2 Oct");
+    expect(h).toContain("2 calls · 2 hours · since Oct 2");
     expect(h).toContain("October 2026");
     expect(h).toContain('aria-sort="descending"');
     expect(h).toContain("Call a");

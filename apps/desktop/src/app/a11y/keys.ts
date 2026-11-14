@@ -110,10 +110,6 @@ export function handleShortcut(
   return true;
 }
 
-/** `onKeyDown` for a region element; its table wins over the window's (which stops at the region). */
-export const useShortcuts = (table: ShortcutTable) => (e: ShortcutEvent) =>
-  void handleShortcut(e, [table]);
-
 /** Listens for the table's chords on the window; `first` listens before the window's other tables (capture phase), so a page's chord beats the shell's. Returns the cleanup. */
 export function listenKeys(table: ShortcutTable, first: boolean, target: Pick<Window, "addEventListener" | "removeEventListener"> = window): () => void {
   const on = (e: KeyboardEvent) => void handleShortcut(e, [table]);

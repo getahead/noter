@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView, OutputSection, SectionKind } from "../../core/bindings";
-import { applyProgress, currentItems, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
+import { currentItems, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
@@ -37,26 +37,6 @@ it("uses the newer current item record for counts after a review", () => {
   const accepted = { ...held, review: "accepted", rev: 2 } as ItemView;
   expect(sectionCounts(sec("action_items", { items: [held] })).review).toBe(1);
   expect(sectionCounts(sec("action_items", { items: currentItems([held], { [held.id]: accepted }) })).review).toBe(0);
-});
-
-describe("applyProgress", () => {
-  const base = { call_id: "c1", status: "writing" as const };
-  it("changes only the matching call and section", () => {
-    const secs = [sec("summary"), sec("decisions")];
-    const next = applyProgress(secs, "c1", { ...base, section: "decisions", state: { type: "writing" } });
-    expect(next[0]).toBe(secs[0]);
-    expect(next[1]!.state).toEqual({ type: "writing" });
-  });
-  it("ignores another call", () => {
-    const secs = [sec("summary")];
-    expect(applyProgress(secs, "c2", { ...base, section: "summary", state: { type: "writing" } })).toBe(secs);
-  });
-  it("keeps prior text on a failure", () => {
-    const secs = [sec("summary", { body_md: "old" })];
-    const next = applyProgress(secs, "c1", { ...base, section: "summary", state: { type: "failed", code: "job_failed", local_fallback_available: true } as never });
-    expect(next[0]!.body_md).toBe("old");
-    expect(next[0]!.state.type).toBe("failed");
-  });
 });
 
 describe("mergeSection", () => {

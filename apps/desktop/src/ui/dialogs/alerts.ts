@@ -48,17 +48,6 @@ export function deleteAlert(calls: { id: string; title: string }[]): AlertSpec {
   // @cpt-end:cpt-noter-algo-ui-dialogs-host-delete-alert:p1:inst-else-many
 }
 
-// @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
-/** The quit-while-recording strings; the core draws the alert and reads them from the catalogue. */
-export const quitAlert = (callTitle: string): AlertSpec => ({
-  title: t("dialogs.quit.title", { title: callTitle }),
-  message: t("dialogs.quit.message"),
-  cancel: t("dialogs.cancel"),
-  confirm: t("dialogs.quit.confirm"),
-  destructive: false,
-});
-// @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
-
 // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-request-alert
 /** Shows the alert and answers whether the user chose the confirm button; a dialog that cannot be shown counts as Cancel. */
 export const askAlert = (

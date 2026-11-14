@@ -1,9 +1,32 @@
 // Focus: return to the opener after an overlay, Tab order independent of the macOS keyboard-navigation
 // setting (D51), and focused elements kept clear of sticky parts (WCAG 2.4.11).
-import { useEffect, useRef, type RefObject } from "react";
-
 export type FocusTarget = { focus(): void; isConnected?: boolean };
 type FocusState = "IN_PAGE" | "IN_OVERLAY" | "RETURNED";
+
+/** Move focus into a transient surface and return it to the connected opener on cleanup. */
+// @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
+export function focusAndReturn(first: FocusTarget | null | undefined, getActive: () => FocusTarget | null): () => void {
+  const opener = getActive();
+  let state: FocusState = "IN_PAGE";
+  // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-page-overlay
+  first?.focus();
+  state = "IN_OVERLAY";
+  // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-page-overlay
+  return () => {
+    // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
+    if (state !== "IN_OVERLAY") return;
+    // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
+    // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
+    // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
+    if (opener && opener.isConnected !== false) opener.focus();
+    // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
+    state = "RETURNED";
+    // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
+    // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-returned-page
+    state = "IN_PAGE";
+    // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-returned-page
+  };
+}
 
 // @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
 export function focusFirstAvailable(doc: Pick<Document, "getElementById">, ids: readonly string[]): boolean {
@@ -15,39 +38,6 @@ export function focusFirstAvailable(doc: Pick<Document, "getElementById">, ids: 
   }
   return false;
 }
-
-// @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
-export function createFocusReturn(getActive: () => FocusTarget | null) {
-  let state: FocusState = "IN_PAGE";
-  let opener: FocusTarget | null = null;
-  return {
-    state: () => state,
-    open(first?: FocusTarget) {
-      // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-page-overlay
-      opener = getActive();
-      first?.focus();
-      state = "IN_OVERLAY";
-      // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-page-overlay
-    },
-    close() {
-      if (state !== "IN_OVERLAY") return;
-      // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
-      // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
-      // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
-      if (opener?.isConnected) opener.focus();
-      // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
-      // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
-      state = "RETURNED";
-      // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
-    },
-    moveOn() {
-      // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-returned-page
-      if (state === "RETURNED") state = "IN_PAGE";
-      // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-returned-page
-    },
-  };
-}
-
 // `:disabled` also covers controls inside a disabled fieldset.
 const NOT_OFF =
   ':not(:disabled):not([tabindex="-1"]):not([hidden]):not([inert])';
@@ -193,46 +183,4 @@ export function installUnobscure(root: Document): () => void {
   };
   root.addEventListener("focusin", on);
   return () => root.removeEventListener("focusin", on);
-}
-
-/** Open overlays, innermost last: only the topmost one closes on Esc or a press outside it. */
-const overlays: object[] = [];
-
-/** While `open`: focus the overlay's first control; Esc or a press outside calls `onClose`; closing returns focus to the opener. */
-export function useFocusReturn(
-  open: boolean,
-  overlayRef: RefObject<HTMLElement | null>,
-  onClose: () => void,
-): void {
-  const close = useRef(onClose);
-  close.current = onClose;
-  useEffect(() => {
-    if (!open) return;
-    const me = {};
-    overlays.push(me);
-    const fr = createFocusReturn(
-      () => document.activeElement as HTMLElement | null,
-    );
-    fr.open(overlayRef.current ? focusables(overlayRef.current)[0] : undefined);
-    const top = () => overlays.at(-1) === me;
-    const key = (e: KeyboardEvent) => {
-      if (!top() || e.key !== "Escape") return;
-      e.stopPropagation(); // window shortcuts never see the Esc that closed the overlay
-      close.current();
-    };
-    const press = (e: PointerEvent) =>
-      top() &&
-      !overlayRef.current?.contains(e.target as Node) &&
-      close.current();
-    document.addEventListener("keydown", key);
-    document.addEventListener("pointerdown", press);
-    return () => {
-      overlays.splice(overlays.indexOf(me), 1);
-      document.removeEventListener("keydown", key);
-      document.removeEventListener("pointerdown", press);
-      // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus-done
-      fr.close();
-      // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus-done
-    };
-  }, [open, overlayRef]);
 }

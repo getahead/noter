@@ -1,7 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { createElement } from "react";
 
 import { orderBanners } from "../../ui/feedback/banners";
 import { appBanners, commandFailures, commandFailuresKey, isBannerKind, type BannerActions } from "./app-banners";
+import { InlineBanner } from "../../ui/feedback/inline-banner";
 
 const actions = (over: Partial<BannerActions> = {}): BannerActions => ({
   runSelfTest: vi.fn(),
@@ -18,6 +21,7 @@ const banners = (...list: unknown[]) => ({ version: 1, banners: list }) as never
 const call = { id: "call_1", title: "Planning: VHI 8.0", started_at: 0, call_type: "x" };
 
 describe("appBanners", () => {
+  afterEach(() => vi.unstubAllGlobals());
   it("shows nothing for an empty set and a passed self-test (EMPTY)", () => {
     expect(appBanners({ banners: banners(), setup: setup("passed") }, actions())).toEqual([]);
     expect(appBanners({}, actions())).toEqual([]);
@@ -55,6 +59,13 @@ describe("appBanners", () => {
     list[1]!.actions![0]!.onAction!();
     expect(a.restartNow).toHaveBeenCalledOnce();
   });
+
+  it("keeps the quit-call title's language on its rendered text", () => {
+    vi.stubGlobal("navigator", { language: "fr-CA" });
+    const [banner] = appBanners({ banners: banners({ type: "recording_interrupted_by_quit", call }) }, actions());
+    expect(renderToStaticMarkup(createElement(InlineBanner, { banner: banner! }))).toContain('<span lang="fr-CA">“Planning: VHI 8.0”</span>');
+  });
+
 
   it("keeps the update action with Try Again when update_install failed, and shows it working while it runs", () => {
     const update = banners({ type: "update_ready", version: "1.2" });

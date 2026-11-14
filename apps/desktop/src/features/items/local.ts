@@ -1,7 +1,7 @@
 // What a row keeps while the user works on it and the core has nothing to say about: the edit draft and phase,
 // the outcome being shown (**Accepted**, **Rejected · Undo**), the open handoff question and the last error.
 // A module store like the undo strip's, so the commands in `actions.ts` drive it and the rows only read it.
-import { useSyncExternalStore } from "react";
+import { createLocal } from "../../app/create-local";
 
 import type { ItemView, UndoTarget } from "../../core/bindings";
 import type { Draft } from "./review";
@@ -29,20 +29,5 @@ export interface Local {
   retryAccept?: boolean;
 }
 
-const NONE: Local = {};
-let rows = new Map<string, Local>();
-const listeners = new Set<() => void>();
-const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
-
-/** Merge `patch` into the row's local state; an `undefined` value removes the field. */
-export function patchLocal(id: string, patch: { [K in keyof Local]: Local[K] | undefined }) {
-  const next = { ...rows.get(id), ...patch };
-  for (const k of Object.keys(next) as (keyof Local)[]) if (next[k] === undefined) delete next[k];
-  rows = new Map(rows).set(id, next);
-  listeners.forEach((l) => l());
-}
-export const localOf = (id: string): Local => rows.get(id) ?? NONE;
-export const useLocal = (id: string): Local => useSyncExternalStore(subscribe, () => localOf(id), () => localOf(id));
-/** Every row's local state, for a list that depends on several (the Rejected list). */
-export const useLocals = () => useSyncExternalStore(subscribe, () => rows, () => rows);
-export const resetLocal = () => ((rows = new Map()), listeners.forEach((l) => l()));
+const { patchLocal, localOf, useLocal, useLocals, resetLocal } = createLocal<Local>();
+export { patchLocal, localOf, useLocal, useLocals, resetLocal };

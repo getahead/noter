@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 
-import { PANES, searchPanes } from "./search";
+import { laterNote, paneLabel, PANES, searchPanes } from "./search";
 
 describe("searchPanes", () => {
   it("lists all 11 panes in their fixed order for empty or blank text", () => {
@@ -27,5 +27,15 @@ describe("searchPanes", () => {
 
   it("returns the empty state with the typed text when no pane matches", () => {
     expect(searchPanes("  qqqq ")).toEqual({ kind: "none", panes: [], text: "qqqq" });
+  });
+});
+
+describe("settings pane labels", () => {
+  it("keeps implemented panes out of the later-feature messages", () => {
+    expect(paneLabel("models_and_runtimes")).toBe("Models & Runtimes");
+    expect(paneLabel("repositories")).toBe("Repositories");
+    expect(laterNote("knowledge_sources")).toBeTruthy();
+    expect(laterNote("maintenance")).toBeTruthy();
+    expectTypeOf<"models_and_runtimes" extends Parameters<typeof laterNote>[0] ? true : false>().toEqualTypeOf<false>();
   });
 });

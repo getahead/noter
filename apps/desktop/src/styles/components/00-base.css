@@ -11,8 +11,6 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-tnum { font-variant-numeric: tabular-nums; }
 .np-mono { font-family: var(--mono); font-size: 12px; line-height: 18px; }
 .np-ic { flex: none; display: inline-block; vertical-align: -2px; }
-.np-pad { padding: 16px; }
-.np-err { color: var(--error); white-space: pre-wrap; font: 12px var(--mono); padding: 16px; }
 .np-muted { color: var(--label-2); }
 .np-dim { color: var(--label-3); }
 .np-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
@@ -31,13 +29,6 @@ h1, h2, h3, h4, p { margin: 0; }
 
 /* ---------------- Window chrome ---------------- */
 .np-win { position: relative; background: var(--content-bg); border-radius: 12px; box-shadow: var(--shadow-win); overflow: hidden; display: flex; flex-direction: column; margin: 0 auto; }
-.np-win__titlebar { height: 38px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 12px; background: var(--win-bg); border-bottom: 1px solid var(--sep); }
-.np-win__title { flex: 1 1 auto; text-align: center; font-weight: 600; font-size: 13px; color: var(--label); margin-right: 52px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-lights { display: inline-flex; gap: 8px; flex: none; }
-.np-light { width: 12px; height: 12px; border-radius: 50%; background: var(--light-close); box-shadow: inset 0 0 0 .5px var(--ink-15); }
-.np-light--min { background: var(--light-min); }
-.np-light--zoom { background: var(--light-zoom); }
-.np-light--zoom[data-off] { background: var(--sep); }
 
 /* ---------------- Shell — Main window ---------------- */
 .np-win--main { flex-direction: row; width: 100%; min-width: 900px; max-width: 1600px; height: calc(100vh - 120px); min-height: 600px; }
@@ -50,7 +41,6 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-srclist__item .np-ic { color: var(--accent-text); }
 .np-srclist__item:hover { background: var(--sel-unemph); }
 .np-srclist__item.is-sel { background: var(--sel-accent); font-weight: 600; }
-.np-srclist__item.is-missing { opacity: .55; }
 .np-srclist__label { flex: 1 1 auto; white-space: nowrap; }
 .np-srclist__badge { font: 600 11px/16px var(--font); color: var(--label-2); background: var(--sel-unemph); border-radius: 8px; padding: 0 6px; font-variant-numeric: tabular-nums; }
 .np-srclist__warn, .np-srclist__item .np-srclist__warn .np-ic { color: var(--warning); display: inline-flex; }
@@ -61,7 +51,6 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-toolbar__titles { display: flex; flex-direction: column; min-width: 0; flex: 0 1 auto; }
 .np-toolbar__title { font: 600 15px/20px var(--font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-toolbar__sub { font: 400 11px/14px var(--font); color: var(--label-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.np-toolbar__center { flex: none; margin-left: 12px; }
 .np-toolbar__actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .np-toolbar__search { width: 260px; flex: 0 1 260px; }
 .np-tb__spacer { flex: 1 1 auto; }
@@ -204,9 +193,7 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-pop__title { font-weight: 600; display: flex; align-items: center; gap: 6px; }
 .np-pop__text { color: var(--label-2); }
 .np-pop__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.np-float-menu { position: absolute; z-index: 45; visibility: hidden; }
-.np-sheet-layer, .np-alert-layer { position: absolute; inset: 0; z-index: 20; display: flex; justify-content: center; align-items: flex-start; background: var(--ink-18); padding-top: 52px; overflow: auto; }
-.np-alert-layer { align-items: center; padding-top: 0; z-index: 25; }
+.np-sheet-layer { position: absolute; inset: 0; z-index: 20; display: flex; justify-content: center; align-items: flex-start; background: var(--ink-18); padding-top: 52px; overflow: auto; }
 .np-sheet { width: 520px; max-width: calc(100% - 32px); background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow-win); margin-bottom: 24px; }
 .np-sheet-layer.is-new .np-sheet { animation: np-sheet 200ms ease-out; }
 @keyframes np-sheet { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
@@ -216,12 +203,6 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-sheet__body { padding: 10px 20px 14px; display: grid; gap: 12px; }
 .np-sheet__foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--sep); }
 .np-sheet__foot .np-tb__spacer { flex: 1 1 auto; }
-.np-alert { width: 280px; background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow-win); padding: 18px 16px 14px; text-align: center; display: grid; gap: 8px; justify-items: center; }
-.np-alert__icon { color: var(--accent-text); }
-.np-alert__title { font-weight: 700; }
-.np-alert__body { font-size: 12px; color: var(--label); }
-.np-alert__btns { display: grid; gap: 6px; width: 100%; margin-top: 6px; }
-.np-alert__btns .np-btn { width: 100%; }
 
 /* ---------------- Shared components ---------------- */
 .np-recdot { width: 9px; height: 9px; border-radius: 50%; background: var(--rec); display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--white); }
@@ -246,6 +227,8 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-spk--btn:hover { text-decoration: underline; }
 .np-lang { display: inline-flex; align-items: center; height: 16px; padding: 0 4px; border: 1px solid var(--ctrl-border-soft); border-radius: 4px; font: 600 10px/14px var(--font); color: var(--label-2); letter-spacing: .03em; flex: none; }
 .np-lang.is-low { border-style: dashed; }
+/* Reserved for M4 copilot cards and M3 library topics; see their FEATURE specs. */
+/* M3/M4 Agents and Topics surfaces use these DESIGN inventory styles before their UI components ship. */
 .np-agent { display: inline-flex; align-items: center; height: 20px; padding: 0 7px; border: 1px solid var(--ctrl-border-soft); border-radius: 5px; font: 600 11px/14px var(--font); color: var(--label-2); background: transparent; white-space: nowrap; flex: none; }
 .np-agent--btn { cursor: pointer; }
 .np-agent--btn:hover { background: var(--sel-unemph); }
@@ -257,7 +240,7 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-prov--chip .np-ic { color: var(--label-3); }
 .np-prov--timestamp { font-variant-numeric: tabular-nums; }
 .np-prov--guess { color: var(--warning); background: var(--warning-tint); border-radius: 5px; padding: 1px 6px; font-weight: 600; }
-.np-prov.is-loading, .np-prov.is-disabled { color: var(--label-3); }
+.np-prov.is-disabled { color: var(--label-3); }
 .np-person { display: inline-flex; align-items: center; gap: 5px; color: var(--label); text-decoration: none; white-space: nowrap; max-width: 100%; border: 0; background: transparent; padding: 0; font: inherit; cursor: default; }
 .np-person__ini { width: 18px; height: 18px; border-radius: 50%; background: var(--sel-unemph); color: var(--label-2); font: 600 9px/18px var(--font); text-align: center; flex: none; }
 .np-person__name { overflow: hidden; text-overflow: ellipsis; }
@@ -271,7 +254,6 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-topic__counts { color: var(--label-3); white-space: nowrap; }
 .np-topic--suggestion { height: auto; min-height: 28px; padding: 4px 10px; flex-wrap: wrap; }
 .np-undo { display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 14px; border-radius: 8px; background: var(--card-bg); border: 1px solid var(--sep); box-shadow: var(--shadow-pop); }
-.np-undo.is-sticky { position: sticky; top: 0; z-index: 3; }
 .np-undo__text { flex: 1 1 auto; min-width: 0; }
 .np-undo__msg { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .np-undo__ctx { font-size: 12px; color: var(--label-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -304,12 +286,7 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 
 /* Common content blocks screens can reuse */
 .np-card { background: var(--card-bg); border: 1px solid var(--sep); border-radius: 10px; }
-.np-section-h { font: 600 13px/18px var(--font); display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
-.np-section-h .np-dim { font-weight: 400; }
 .np-row { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.np-stack { display: grid; gap: 12px; }
-.np-grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
-@media (max-width: 1100px) { .np-grid2 { grid-template-columns: minmax(0, 1fr); } }
 .np-kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; align-items: baseline; }
 .np-kv dt { color: var(--label-2); font-size: 12px; }
 .np-kv dd { margin: 0; min-width: 0; }
@@ -318,6 +295,5 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-ins { background: var(--diff-ins); text-decoration: underline; }
 .np-del { background: var(--diff-del); text-decoration: line-through; }
 
-.np-stub { border: 1px dashed var(--ctrl-border-soft); border-radius: 6px; padding: 4px 8px; color: var(--label-3); font: 11px var(--mono); }
 .np-menu__sub { position: relative; display: grid; }
 .np-menu__subpanel { position: absolute; left: 100%; top: -5px; }

@@ -66,7 +66,7 @@ export function CallsView(p: CallsViewProps) {
             state.rows,
             state.total ?? state.rows.length,
             chosen.length,
-            p.prefs?.time_zone || undefined,
+            p.prefs,
           )}
       </div>
       {p.failed && (
@@ -108,7 +108,7 @@ export function CallsView(p: CallsViewProps) {
 function Body(p: CallsViewProps) {
   const { state, selected } = p;
   const groups = useMemo(
-    () => groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined),
+    () => groupByMonth(state.rows, p.prefs),
     [state.rows, p.prefs?.time_zone],
   );
   if (state.status === "ERROR")
