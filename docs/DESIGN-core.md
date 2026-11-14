@@ -672,7 +672,7 @@ Every model call has to pick a runtime by task, privacy and availability, honour
 
 ##### Responsibility scope
 
-Crate `noter-llm`, which also holds the egress gate (`cpt-noter-component-core-privacy`). One `LlmRuntime` interface (`cpt-noter-interface-llm-runtime`) with adapters for Claude Code (API key or own account), Codex (API key or own account) and Ollama. Applies the routing policy table of the PRD, the agent registry and the per-task runtime settings; checks CLI versions at startup; keeps warm streaming sessions for live ticks and resets them every 15 ticks; validates output against the skill schema, retries once with the failure explained, then falls back to the simpler schema; logs every run in `llm_runs`, with cost for API-key runs. Every request passes the egress gate first.
+Crate `noter-llm`, which also holds the egress gate (`cpt-noter-component-core-privacy`). One `Llm` router API (`cpt-noter-interface-llm-runtime`) dispatches to adapters for Claude Code (API key or own account), Codex (API key or own account) and Ollama. The router applies the routing policy table of the PRD, the agent registry and the per-task runtime settings; checks CLI versions at startup; keeps warm streaming sessions for live ticks and resets them every 15 ticks; validates output against the skill schema, retries once with the failure explained, then falls back to the simpler schema; logs every run in `llm_runs`, with cost for API-key runs. Every request passes the egress gate first.
 
 Spawns every run in an empty Noter-owned working directory and locks it down, own-account runs included (`--bare` cannot use a subscription login):
 
