@@ -7,9 +7,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use test_support::FixedClock;
 
-use noter_core::{
-    BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices,
-};
+use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices};
 use noter_db::rusqlite::Connection;
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -72,7 +70,7 @@ fn open(dir: &Path) -> (Core, Arc<Events>) {
 
 fn open_with_native(dir: &Path, native: impl NativeServices + 'static) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let mut deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let mut deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
     deps.native = Arc::new(native);
     (Core::open(dir, deps).expect("core opens"), events)
 }
