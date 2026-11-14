@@ -55,20 +55,37 @@ describe("helpTag", () => {
 });
 
 describe("Tooltip wiring", () => {
-  it("keeps the control's own handlers and drives the help tag from pointer, focus and Esc", async () => {
+  it("keeps the control's handlers, delays hover, shows on keyboard focus and cancels on leave or Esc", async () => {
+    vi.useFakeTimers();
     const { find, rendered } = await import("../testing");
     const own = vi.fn();
     const tree = rendered(Tooltip, { text: "Back (⌘[)", children: <button type="button" onFocus={own} onBlur={own} onKeyDown={own} onPointerEnter={own} onPointerLeave={own}>B</button> });
     const button = find(tree, (_, t) => t === "button").props as Record<string, (e: unknown) => void>;
-    const target = { getBoundingClientRect: () => ({ left: 10, bottom: 30 }), matches: () => true };
+    const rect = vi.fn(() => ({ left: 10, bottom: 30 }));
+    const target = { getBoundingClientRect: rect, matches: () => true };
     button.onPointerEnter({ currentTarget: target });
+    expect(vi.getTimerCount()).toBe(1);
     button.onPointerLeave({});
-    button.onFocus({ currentTarget: target }); // keyboard focus: shows at once (state set outside a render is dropped here)
+    expect(vi.getTimerCount()).toBe(0);
+    button.onFocus({ currentTarget: target });
+    expect(rect).toHaveBeenCalledOnce();
     button.onFocus({ currentTarget: { ...target, matches: () => { throw new Error("no :focus-visible"); } } });
+    expect(rect).toHaveBeenCalledOnce();
+    button.onPointerEnter({ currentTarget: target });
     button.onKeyDown({ key: "Escape" });
+    expect(vi.getTimerCount()).toBe(0);
     button.onKeyDown({ key: "a" });
     button.onBlur({});
-    expect(own).toHaveBeenCalledTimes(7);
+    expect(own.mock.calls).toEqual([
+      [{ currentTarget: target }],
+      [{}],
+      [{ currentTarget: target }],
+      [{ currentTarget: { ...target, matches: expect.any(Function) } }],
+      [{ currentTarget: target }],
+      [{ key: "Escape" }],
+      [{ key: "a" }],
+      [{}],
+    ]);
   });
 
   it("shows the help tag after the hover delay", async () => {
