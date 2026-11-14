@@ -2,7 +2,7 @@
 title: "Feature: Items, Today, sharing and export"
 description: "Item lifecycle and review, stable evidence, ranked Today, scoped rich sharing, export and call tags."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -163,7 +163,7 @@ The user can review what a call produced, check the words behind an item, tick w
 1. [x] - `p1` - API: `today_get {}`; read local date, Today settings, capture state and current calendar authorization - `inst-today-request`
 2. [x] - `p1` - **IF** calendar is not asked or denied, return the corresponding `CalendarAccess` and no protected events; only `permission_request` may ask for access - `inst-today-no-access`
 3. [x] - `p1` - **ELSE** read allowed calendars for the configured horizon through EventKit; **IF** it fails **RETURN** `calendar_unavailable` - `inst-today-calendar`
-4. [x] - `p1` - For each event run `cpt-noter-algo-core-items-today-carry`, add known attendees, sensitivity, last-time summary and source call; group Today and This week by event time - `inst-today-carry`
+4. [x] - `p1` - For each event resolve attendee identity through a persisted speaker `person_id` and its `people.display_name` or alias (never the engine `speakers.label`); run `cpt-noter-algo-core-items-today-carry`, add sensitivity, last-time summary and source call; group Today and This week by event time - `inst-today-carry`
 5. [x] - `p1` - Include the live call even without a calendar match, due-without-call items, done-today items, suggested review count and existing waiting proposals; before M5 proposal production these may be empty - `inst-today-sections`
 6. [x] - `p1` - Return self-test, audio-access and interrupted-recording banners from existing setup/capture facts; first use has no invented open items - `inst-today-banners`
 7. [x] - `p1` - **RETURN** a complete `TodayView` with its effective ranking - `inst-today-return`
@@ -236,7 +236,7 @@ The user can review what a call produced, check the words behind an item, tick w
 **Output**: Ranked open work, questions and awaiting handoffs with source-call references.
 
 **Steps**:
-1. [x] - `p1` - Resolve known participants and read the last two calls with the same people; unknown attendees alone do not imply a match - `inst-carry-match`
+1. [x] - `p1` - Resolve known participants through `people` rows joined by the speaker's `person_id` and match the attendee against display names or aliases; never match an attendee against the engine `speakers.label`; read the last two calls with the same people - `inst-carry-match`
 2. [x] - `p1` - Select open accepted items and suggested items marked Not reviewed; exclude rejected or completed work and include awaiting handoffs in their separate collection - `inst-carry-select`
 3. [x] - `p1` - Deduplicate by item id, join owners, due dates and spans, and retain `carried_from` provenance - `inst-carry-join`
 4. [x] - `p1` - For default `owed_to_todays_people`, rank items owed to today's people first, then due date, then age; for `due_then_owed_to_you`, rank due date then owed to you, with stable identity tie-breaking - `inst-carry-rank`
@@ -365,3 +365,5 @@ Not covered here: the built-app clipboard and save-panel XCUITest is UI M2 (owne
 - [ ] Unit tests prove deterministic ranking, no implicit calendar request, no duplicate tag usage, correct set/clear patches and rollback without orphan changes.
 - [ ] Regressions in `crates/noter-core/tests/today.rs` and `crates/noter-core/tests/items.rs` prove normalized tag overlap is rejected atomically and empty transactional writes return no-change results. Conformance in `apps/desktop/tests/conformance/m2-items-conformance.test.ts` checks tag overlap against both cores; the existing real-core E2E `cpt-noter-seq-call-page-review-suggested-items` retains bulk review coverage.
 - [ ] `just gate` passes.
+
+**Changelog.** v0.2 (13 Nov 2026): attendee matching uses persisted people identities, names and aliases rather than engine labels.

@@ -26,9 +26,9 @@ import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { IconButton } from "../../ui/primitives/icon-button";
 import type { MenuItem } from "../../ui/primitives/menu";
 import { find, rendered } from "../../ui/testing";
-import { CallWindow } from "./call-window";
+import { CallWindow, loadParticipants } from "./call-window";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
-import { CallStatusStrip, CollapsedCallStrip, MoreMenu, type StripProps } from "./strip";
+import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, type StripProps } from "./strip";
 
 let bridge: Bridge | null = null;
 let fake: FakeCore;
@@ -72,6 +72,29 @@ const more = () => {
 const icon = (label: string) => find(tree(), (p, type) => type === IconButton && p.label === label).props as unknown as { onAction: () => void; help?: string };
 
 describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
+  it("loads participants only for the current call and clears on close", async () => {
+    const participants = [{ id: "per_anna", display_name: "Anna", short_name: "Anna", initials: "A", is_you: false }];
+    const update = vi.fn();
+    const bridgeForCall = { core: { callGet: vi.fn().mockResolvedValue({ status: "ok", data: { call: { participants } } }) } } as unknown as Bridge;
+    loadParticipants(bridgeForCall, "call_live", update);
+    await Promise.resolve();
+    expect(bridgeForCall.core.callGet).toHaveBeenCalledWith({ call_id: "call_live" });
+    expect(update).toHaveBeenCalledWith(participants);
+    loadParticipants(bridgeForCall, null, update);
+    expect(update).toHaveBeenLastCalledWith([]);
+  });
+
+  it("ignores an old participants read after the call changes", async () => {
+    let resolve!: (result: unknown) => void;
+    const callGet = vi.fn(() => new Promise((done) => { resolve = done; }));
+    const update = vi.fn();
+    const stop = loadParticipants({ core: { callGet } } as unknown as Bridge, "call_old", update);
+    stop();
+    resolve({ status: "ok", data: { call: { participants: [] } } });
+    await Promise.resolve();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("is mounted by App for the call-screen window and draws the dedicated layout", async () => {
     await open();
     const page = renderToString(<App bridge={bridge!} />);
@@ -128,6 +151,17 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(page).toContain("You");
     expect(page).toContain("Anna K.");
     expect(page).toContain("Speaker 3");
+  });
+
+  it("wires the live speaker chip to its first transcript line", async () => {
+    await open({ phase: "recording", call_id: "call_live" });
+    await bridge!.subscribe("transcript_subscribe", live);
+    const chip = find(tree(), (props, type) => type === PersonChip && (props.speaker as { id: string }).id === "spk_3").props as {
+      speaker: { id: string };
+      onRename: (anchor: HTMLElement) => void;
+    };
+    expect(chip.speaker.id).toBe("spk_3");
+    expect(() => chip.onRename({} as HTMLElement)).not.toThrow();
   });
 
   it("draws the floating layout and the collapsed strip, Paused 3 min while paused", async () => {

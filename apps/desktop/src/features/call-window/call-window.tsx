@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, Result } from "../../core/bindings";
+import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, PersonChip as PersonChipView, Result, SegmentId, SpeakerView } from "../../core/bindings";
 import { callTime, clock as timeOf, quote, t } from "../../i18n/format";
 import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
@@ -26,9 +26,25 @@ import { captureAnnouncements, captureView, closingTitle, degradedBanners, failu
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
 import { TranscriptBar, TranscriptLog, useTranscript } from "../transcript/hosts";
+import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 
 const NO_STATES: readonly DegradedState[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
+export function loadParticipants(
+  bridge: Bridge,
+  callId: string | null,
+  update: (participants: PersonChipView[]) => void,
+): () => void {
+  if (!callId) {
+    update([]);
+    return () => {};
+  }
+  let current = true;
+  void bridge.core.callGet({ call_id: callId }).then((r) => {
+    if (current) update(r.status === "ok" ? r.data.call.participants ?? [] : []);
+  });
+  return () => { current = false; };
+}
 const DEFAULT_KEYS: Partial<Record<HotkeyAction, string>> = {
   mark_moment: "⌃⌥⌘M",
   pause: "⌃⌥⌘P",
@@ -101,6 +117,8 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // the flash ends 2 s after the latest mark, and not after unmount
   useEffect(() => leaveTimer(!!marked, () => setMarked(null), 2000), [marked]);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
+  const [participants, setParticipants] = useState<PersonChipView[]>([]);
+  const [renaming, setRenaming] = useState<{ speaker: SpeakerView; segmentId: SegmentId; anchor: HTMLElement } | null>(null);
   const [continueClosed, setContinueClosed] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
@@ -109,6 +127,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     const b = hotkeys?.find((h) => h.action === action);
     return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
   };
+  useEffect(() => loadParticipants(bridge, callId, setParticipants), [bridge, callId]);
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden
@@ -467,9 +486,18 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                     <MoreMenu items={moreItems} />
                   </div>{" "}
                   <div className="cs-r1__line cs-r1__people">
+                    {/* @cpt-begin:cpt-noter-flow-ui-speakers-live-name:p1:inst-open */}
                     {speakers.map((s) => (
-                      <PersonChip key={s.id} speaker={s} />
+                      <PersonChip
+                        key={s.id}
+                        speaker={s}
+                        onRename={(anchor) => {
+                          const segmentId = tr.data?.segments.find((segment) => segment.speaker.speaker_id === s.id)?.id;
+                          if (segmentId) setRenaming({ speaker: s, segmentId, anchor });
+                        }}
+                      />
                     ))}
+                    {/* @cpt-end:cpt-noter-flow-ui-speakers-live-name:p1:inst-open */}
                   </div>
                 </header>
                 {regions.has("CS-R3") && (
@@ -486,6 +514,19 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
           </>
         )}
         {strip("dedicated")}
+        {renaming && callId && tr.data && (
+          <SpeakerRenamePopover
+            bridge={bridge}
+            callId={callId}
+            speaker={renaming.speaker}
+            segmentId={renaming.segmentId}
+            participants={participants}
+            speakers={tr.data.speakers}
+            anchor={renaming.anchor}
+            onClose={() => setRenaming(null)}
+            onNamed={(text) => setFeedback({ text, variant: "notice" })}
+          />
+        )}
       </div>
     );
   else if (layout === "COLLAPSED")

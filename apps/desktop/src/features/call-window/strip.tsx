@@ -61,7 +61,7 @@ export function RecordingIndicator({ variant, status, clock }: { variant: "dot" 
 // @cpt-component:cpt-noter-component-ui-person-chip:p1
 // @cpt-dod:cpt-noter-dod-ui-call-window-person-chip:p1
 /** A participant of the live call in CS-R1: **You**, a named person, or an unnamed **Speaker 3** (renaming is M2). */
-export function PersonChip({ speaker }: { speaker: SpeakerView }) {
+export function PersonChip({ speaker, onRename }: { speaker: SpeakerView; onRename?: (anchor: HTMLElement) => void }) {
   const l = speaker.label;
   const [variant, initials, name] =
     l.type === "you"
@@ -71,19 +71,22 @@ export function PersonChip({ speaker }: { speaker: SpeakerView }) {
         : l.type === "unnamed"
           ? ["unnamed", "?", t("cw.speaker.unnamed", { n: l.n })]
           : ["unnamed", "?", t("cw.speaker.guest")];
-  return (
-    <span
-      data-component="cpt-noter-component-ui-person-chip"
-      data-variant={variant}
-      className={cx("np-person np-person--cw", variant === "unnamed" && "is-secondary")}
-      title={l.type === "person" ? l.person.display_name : undefined}
-    >
+  const attrs = {
+    "data-component": "cpt-noter-component-ui-person-chip",
+    "data-variant": variant,
+    className: cx("np-person np-person--cw", variant === "unnamed" && "is-secondary"),
+    title: l.type === "person" ? l.person.display_name : undefined,
+  };
+  const contents = <>
       <span className="np-person__ini" aria-hidden="true">
         {initials}
       </span>{" "}
       <span className="np-person__name">{name}</span>{" "}
-    </span>
-  );
+    </>;
+  return onRename && variant !== "you" ? (
+    // @cpt-dod:cpt-noter-dod-ui-call-window-person-chip:p2
+    <button {...attrs} type="button" aria-label={t("speakers.rename_title", { name })} onClick={(e) => onRename(e.currentTarget)}>{contents}</button>
+  ) : <span {...attrs}>{contents}</span>;
 }
 
 /** The ⋯ pull-down of the header and the compact strip: an icon button that opens an item menu under it. */

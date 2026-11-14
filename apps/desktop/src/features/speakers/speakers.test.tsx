@@ -89,6 +89,7 @@ describe("PersonPicker", () => {
 
 type Ev = {
   key: string;
+  metaKey?: boolean;
   preventDefault: () => void;
   nativeEvent: { isComposing: boolean };
 };
@@ -127,12 +128,14 @@ describe("PersonPicker keys and choices", () => {
     field.onChange({ target: { value: "Pa" } });
     expect(calls.pick).toHaveBeenCalledWith(null, "Pa");
   });
-  it("Return on the highlighted person confirms it as an existing person (ArrowDown highlights from the list start)", () => {
+  it("Return selects the first matching person without requiring an arrow key", () => {
     const { calls, field } = input("Pavel");
-    field.onKeyDown(keyEv("ArrowDown"));
-    field.onKeyDown(keyEv("ArrowUp"));
-    field.onKeyDown(keyEv("Enter")); // nothing is highlighted in this render: Return does nothing
-    expect(calls.confirm).not.toHaveBeenCalled();
+    field.onKeyDown(keyEv("Enter"));
+    expect(calls.confirm).toHaveBeenCalledWith(
+      { type: "existing", person_id: "p1" },
+      "Pavel Romanov",
+      false,
+    );
   });
   it("with no match the New Person… entry is the one Return opens, and the first Esc clears the query", () => {
     const { calls, field } = input("Zoya");
@@ -141,6 +144,12 @@ describe("PersonPicker keys and choices", () => {
     field.onKeyDown(keyEv("Escape"));
     expect(calls.pick).toHaveBeenCalledWith(null, "");
     expect(calls.close).not.toHaveBeenCalled();
+  });
+  it("Meta+N prevents the browser shortcut while opening the new-person form", () => {
+    const { field } = input("Pav");
+    const preventDefault = vi.fn();
+    field.onKeyDown({ ...keyEv("n"), metaKey: true, preventDefault });
+    expect(preventDefault).toHaveBeenCalledOnce();
   });
   it("Esc on an empty field closes the host; an input method's keys are left alone", () => {
     const { calls, field } = input();
@@ -201,7 +210,7 @@ describe("NewPersonForm", () => {
     button("Create and Name").onAction();
     expect(calls.confirm).not.toHaveBeenCalled();
     button("Back").onAction();
-    expect(calls.back).toHaveBeenCalled();
+    expect(calls.back).toHaveBeenCalledWith("");
   });
   it("a name already in people is not created until Create Anyway says so", () => {
     const row = {
@@ -214,6 +223,33 @@ describe("NewPersonForm", () => {
     };
     const { calls, button } = form("zoya ivanova", { people: [row] });
     button("Create and Name").onAction();
+    expect(calls.confirm).not.toHaveBeenCalled();
+  });
+  it("Esc returns to the list with the current name", () => {
+    const { calls, tree } = form("Zoya");
+    const input = find(tree, (pr) => pr["aria-label"] === "Name").props as {
+      onKeyDown: (event: Ev & { preventDefault: () => void }) => void;
+    };
+    input.onKeyDown({ ...keyEv("Escape"), preventDefault: vi.fn() });
+    expect(calls.back).toHaveBeenCalledWith("Zoya");
+  });
+  it("Enter submits the current draft", () => {
+    const { calls, tree } = form("Zoya");
+    const name = find(tree, (pr) => pr["aria-label"] === "Name").props as {
+      onKeyDown: (event: Ev) => void;
+    };
+    name.onKeyDown({ ...keyEv("Enter"), preventDefault: vi.fn() });
+    expect(calls.confirm).toHaveBeenCalledWith({ type: "new", display_name: "Zoya", email: null }, "Zoya", true);
+  });
+  it("validates fields on blur and Esc returns the latest draft", () => {
+    const { calls, tree } = form("Zoya");
+    const name = find(tree, (pr) => pr["aria-label"] === "Name").props as {
+      onBlur: () => void;
+      onKeyDown: (event: Ev) => void;
+    };
+    name.onBlur();
+    name.onKeyDown({ ...keyEv("Escape"), preventDefault: vi.fn() });
+    expect(calls.back).toHaveBeenCalledWith("Zoya");
     expect(calls.confirm).not.toHaveBeenCalled();
   });
   it("the form is titled, its fields carry placeholders, and the footer pairs Back with the confirm", () => {
@@ -231,6 +267,8 @@ describe("NewPersonForm", () => {
     expect(html).toContain("New person");
     expect(html).toContain('placeholder="name@company.com"');
     expect(html).toContain('placeholder="Designer"');
+    expect(html).toContain('aria-label="Role"');
+    expect(html).toContain('disabled=""');
   });
 });
 

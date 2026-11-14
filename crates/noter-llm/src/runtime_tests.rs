@@ -1176,11 +1176,11 @@ async fn running(
     req: RunRequest,
 ) -> (String, tokio::task::JoinHandle<crate::RunOutcome>) {
     let llm = f.llm.clone();
-    let run = tokio::spawn(async move { llm.run_once(req).await });
-    for _ in 0..50 {
-        tokio::task::yield_now().await;
-        if !f.scripted.received().is_empty() {
-            break;
+    let mut run = tokio::spawn(async move { llm.run_once(req).await });
+    while f.scripted.received().is_empty() || host.started.lock().unwrap().is_empty() {
+        tokio::select! {
+            _ = tokio::task::yield_now() => {}
+            result = &mut run => panic!("run ended before its scripted request and MCP host were ready: {result:?}"),
         }
     }
     let id = host.started.lock().unwrap()[0]

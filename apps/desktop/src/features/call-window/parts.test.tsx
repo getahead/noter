@@ -39,6 +39,16 @@ describe("PersonChip (cpt-noter-component-ui-person-chip)", () => {
     expect(renderToString(<PersonChip speaker={speaker({ type: "unnamed", n: 3 })} />)).toContain("Speaker 3");
     expect(renderToString(<PersonChip speaker={speaker({ type: "guest_your_side" })} />)).toContain("Guest (your side)");
   });
+  it("makes a renameable participant chip an accessible button", () => {
+    const onRename = vi.fn();
+    const tree = rendered(PersonChip, { speaker: speaker({ type: "unnamed", n: 3 }), onRename });
+    const chip = find(tree, (p) => p["aria-label"] === "Rename Speaker 3").props as {
+      onClick: (event: { currentTarget: HTMLElement }) => void;
+    };
+    const anchor = {} as HTMLElement;
+    chip.onClick({ currentTarget: anchor });
+    expect(onRename).toHaveBeenCalledWith(anchor);
+  });
 });
 
 const stripProps = (patch: Partial<StripProps> = {}): StripProps => ({

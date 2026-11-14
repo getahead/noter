@@ -1752,7 +1752,7 @@ The call screen is the dedicated layout of the call window on a second display. 
 | Disk nearly full | CS-R3 | Warning **2 GB free on this Mac. Recording continues.** with **Delete Old Audio…** | PRD › Live copilot loop › Degraded states; PM-59 | `cpt-noter-seq-call-screen-recover-capture` (Error — Disk nearly full) |
 | Second audio source | CS-R3 | **Slack is also playing audio** · **Exclude Slack** · **Keep** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-call-screen-recover-capture` (Happy path) |
 | Device changed | CS-R2 | Marker row **Microphone changed · 2 s lost** | PRD › Audio capture on macOS | `cpt-noter-seq-call-screen-recover-capture` (Error — Headphones connected) |
-| No matching person | Rename popover | **No one called “Lena”** · **New Person “Lena”…**, then the New person form with **Name**, **Email**, **Role** and **Create and Name** | D89, D92 | `cpt-noter-seq-call-screen-name-speaker` (Empty — No matching person) |
+| No matching person | Rename popover | **No one called “Lena”** · **New Person “Lena”…**, then the New person form with **Name**, **Email**, disabled **Role** and **Create and Name** | D89, D92 | `cpt-noter-seq-call-screen-name-speaker` (Empty — No matching person) |
 | Call seems to have ended | CS-R0 | **The call seems to have ended** · **Microsoft Teams stopped using audio and the microphone 20 s ago. Stopping in 10 s.** · **Keep Recording** · **Stop Now**; **Paused while you're here** on hover or focus | D80, PM-16 | `cpt-noter-seq-call-screen-stop-at-call-end` (Happy path) |
 | New meeting | CS-R0; CS-R1; CS-R5 | **A new meeting may have started: 1:1 with Anna K.** · **Start as New Call** · **Keep in This Call**; after **Start as New Call**, **1:1 with Anna K.** in the header, the clock at **00:00:12**, **Waiting for speech…** in CS-R2 and **Saved “Planning: VHI 8.0 drawer redesign” · started “1:1 with Anna K.”** in the strip | PM-39, PM-59 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Next meeting starts straight away) |
 | Stopped automatically | CS-R0; CS-R5 | **Stopped at 11:02 · the call had ended · 48 min saved** with **Continue Recording** and **Open in Noter** (default) for 10 s, then the panel closes | D80, D81, PM-59 | `cpt-noter-seq-call-screen-stop-at-call-end` (Empty — No answer to the notice) |
@@ -2470,7 +2470,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 | **Add…** and **Replace…** for an API key | sheet, 480 wide, `cpt-noter-component-ui-primitives` | Title **Replace Anthropic API Key** (or **Add …**); secure field with the note **Paste works; the key goes to the Keychain only**; **Verify** checks the key and stores it in the Keychain in one step (`api_key_set`), replacing the old key at that moment, then shows **Verified · Claude Code can use this key**; **Cancel** · **Save**, enabled once verified: **Save** closes the sheet without sending the key again, **Cancel** before **Verify** leaves the old key unchanged and after a successful **Verify** only closes (HoD decision D-3); afterwards the row shows **••••••••  Stored in the Keychain**; from Settings › Models & Runtimes and the sign-in sheet's **Use an API Key Instead** |
 | **Run Audio Self-Test…** | sheet, 560 wide, `cpt-noter-component-ui-self-test-panel` | Subtitle **Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.**; the self-test with **Play Test Clip**, **Run Test** and the four result lines (D99); **Cancel** · **Done**; from Settings › Audio & Transcription and **Run Audio Self-Test…** on Today |
 | Speaker label, owner chip | popover, `cpt-noter-component-ui-person-picker` | Rename: **Whole call** or **Only this line**, **Also update the voice profile**, **New Person…** (D33) |
-| New person form | popover, `cpt-noter-component-ui-person-picker` | Replaces the picker's list in the same popover: **Name**, **Email**, **Role**; **Back** and **Create and Name**, **Create and Assign** or **Create**; never a sheet, so it works in the call window (D92, D93) |
+| New person form | popover, `cpt-noter-component-ui-person-picker` | Replaces the picker's list in the same popover: **Name**, **Email**, disabled **Role**; **Back** and **Create and Name**, **Create and Assign** or **Create**; never a sheet, so it works in the call window (D92, D93). Role stays disabled until the command contract can persist it. |
 | **Rename…** for a topic | popover, `cpt-noter-component-ui-primitives` | The name field filled in and **Rename** (default); a clash shows **A topic called “Notification service” already exists.** with **Merge Instead** (D94) |
 | **Add Tag…** | popover, 300 wide, `cpt-noter-component-ui-primitives` | Title **Add tag to 3 calls**, the tag field with **Add tag…**, and the line **In use: release · backend · installer · infra**; Return adds and closes with **Tagged 3 calls “release”**; from the Calls list context menu (D90) |
 | **Fix Term…** | popover, `cpt-noter-component-ui-term-fix-popover` | **Correct term**, **Language**, **Add to glossary**, **Fix** |
@@ -2527,7 +2527,7 @@ The ChatGPT sheet is the same with **ChatGPT account**, **Codex**, **chatgpt.com
 | Screen share test | SH, in the Settings window | **What a share would show**; after **Run Capture Test**, **On your screen** and **What the share sees** | D96 | `cpt-noter-seq-settings-check-privacy` (Other — Screen share test) |
 | Inline discard asked | CS-R0 or FP-R0 | **Discard this recording? This can't be undone.** · **Discard** · **Back**, after **Discard Recording** in the nothing-heard notice | D38 | `cpt-noter-seq-call-screen-recover-capture` (Empty — Nothing heard yet) |
 | Rename popover open | PO | The person picker; Esc closes and returns focus to the label | D33, D89 | `cpt-noter-seq-call-screen-name-speaker` (Happy path) |
-| New person form | PO | **Name**, **Email**, **Role** and **Create and Name** inside the rename popover | D92 | `cpt-noter-seq-call-screen-name-speaker` (Empty — No matching person) |
+| New person form | PO | **Name**, **Email**, disabled **Role** and **Create and Name** inside the rename popover | D92 | `cpt-noter-seq-call-screen-name-speaker` (Empty — No matching person) |
 | Topic rename | PO | The name field with **Rename** | D94 | `cpt-noter-seq-library-follow-topic` (Other — Rename a topic) |
 | Tags added to several calls | PO | **Add Tag…** popover with **Add tag…** | D90 | `cpt-noter-seq-library-filter-calls` (Other — Tag several calls at once) |
 | Span preview open | PO, in the call window | Quote, speaker and time, with **Open in Noter** | D30 | `cpt-noter-seq-call-screen-catch-up` (Happy path) |
@@ -3009,7 +3009,7 @@ Person page, Overview:
 | Element | Component | References |
 | --- | --- | --- |
 | Search field | `cpt-noter-component-ui-primitives` | Filters PL-R2 and PL-R3; matching folds ё/е and uses aliases, so **Дима** finds Dmitri S. |
-| **Add Person** | Icon button with a `cpt-noter-component-ui-person-picker` popover | Opens the New person form **New person**: **Name**, **Email**, **Role** and **Create**, disabled until there is a name; a name that exists shows **A person called “Lena” already exists: Lena K. (QA)** with **Use Lena K.** and **Create Anyway** (D92) |
+| **Add Person** | Icon button with a `cpt-noter-component-ui-person-picker` popover | Opens the New person form **New person**: **Name**, **Email**, disabled **Role** and **Create**, disabled until there is a name; a name that exists shows **A person called “Lena” already exists: Lena K. (QA)** with **Use Lena K.** and **Create Anyway** (D92). Role stays disabled until the command contract can persist it. |
 | Person row | Table row with `cpt-noter-component-ui-person-chip` | Click selects and ⌘-click adds to the selection; Return, double-click or the name pushes the Person page › **Overview** (PM-59) |
 | **Name…** on an unnamed speaker | `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-person-picker` | Opens the popover **Name Speaker 2** with the quoted sample, a name field (**Name…**) over up to five matching people, **No one called “Lena”** when none match and **New Person “Lena”…**, and the footnote **Names Speaker 2 in all 3 calls as one change you can undo.** Choosing a person names that speaker in every listed call as one batch; the undo strip reads **Named Speaker 2 as Dmitri S. in 3 calls** · **Undo**, with the context **3 calls · last on 9 Oct** (PM-59) |
 | View switch **Overview** · **Calls** · **History** | Segmented control | Replaces the page content |
@@ -3043,7 +3043,7 @@ Person page, Overview:
 | No match | PL-R2 | **No people match “Lena”** · **Clear Search** | UX B.10 | `cpt-noter-seq-people-name-unnamed-speaker` (Empty — New person) |
 | Unnamed speakers waiting | PL-R3 | **Unnamed speakers · 2** with one row per speaker | D16 | `cpt-noter-seq-people-name-unnamed-speaker` (Happy path) |
 | Speaker named | PL-R3 | **Named Speaker 2 as Dmitri S. in 3 calls** · **Undo** for 10 s | D89 | `cpt-noter-seq-people-name-unnamed-speaker` (Happy path) |
-| New person | Person picker | **No one called “Lena”** · **New Person “Lena”…**, then the New person form **New person for Speaker 2** with **Name** filled in, **Email**, **Role** and **Create and Name** | D89, D92; PM-59 | `cpt-noter-seq-people-name-unnamed-speaker` (Empty — New person) |
+| New person | Person picker | **No one called “Lena”** · **New Person “Lena”…**, then the New person form **New person for Speaker 2** with **Name** filled in, **Email**, disabled **Role** and **Create and Name** | D89, D92; PM-59 | `cpt-noter-seq-people-name-unnamed-speaker` (Empty — New person) |
 | Wrong person chosen | PL-R3, History view | **Undo** on the strip, or on the History entry after it has gone | PRD › Feature specification › 11 | `cpt-noter-seq-people-name-unnamed-speaker` (Error — Wrong person chosen) |
 | Loading | PE-R2 to PE-R6 | Skeleton rows after 300 ms | UX B.0 | Transient; no path |
 | No calls with this person yet | PE-R2 to PE-R6 | **No calls with Anna K. yet** · **Their commitments, questions and topics appear after your first call together.** | UX B.10; PM-59 |
@@ -6956,7 +6956,7 @@ The user chooses a person when renaming a speaker, setting an owner, naming spea
 - Lets the user type a name and choose from grouped suggestions: **In this call** (invitees and people already named on this call, source **from the invite**) and **Recent people** (everyone else, most recent first, source **recent calls**) (PM-59).
 - Matches names, aliases and transliterations in Latin and Cyrillic, folding ё/е and ß/ss, so “Дима” finds Dmitri S.
 - Offers **New Person…** with a plus glyph at the end of the list, and **New Person “Dima”…** when nothing matches. Both open the New person form in place of the list, inside the same popover (D92).
-- Shows the New person form under the heading **New person**: **Name** (prefilled with what was typed), **Email** (placeholder **name@company.com**), **Role** (placeholder **Designer**), **Back**, and the host's confirm as the default button: **Create and Name** (speaker rename and naming panel), **Create and Assign** (owner fields) or **Create** (People › **Add Person**).
+- Shows the New person form under the heading **New person**: **Name** (prefilled with what was typed), **Email** (placeholder **name@company.com**), disabled **Role**, **Back**, and the host's confirm as the default button: **Create and Name** (speaker rename and naming panel), **Create and Assign** (owner fields) or **Create** (People › **Add Person**).
 - Checks for a duplicate while the name is typed: an info line **Lena K. (QA) is already in your people.** with **Use Lena K.** and **Create Anyway** (quiet) (PM-59).
 - Shows the host's scope controls where the host supplies them: **Whole call** and **Only this line** in the rename popover, and **Also update the voice profile** for people who opted in (D33).
 
@@ -6990,7 +6990,7 @@ The user chooses a person when renaming a speaker, setting an owner, naming spea
 3. Suggestion list box, grouped under sentence-case headers; each entry is a person chip with a second line for role and source (**backend · from the invite**); the list scrolls after eight entries.
 4. **New Person…** as the last entry.
 5. Host scope controls under the list (optional), then the host's confirm button, disabled until an entry is chosen: **Rename** in the rename popover titled **Rename Speaker 2**, **Name** in the popover titled **Name Speaker 2** and in the naming panel, **Set Owner** in the popover titled **Owner** (PM-59).
-6. New person form, in place of parts 3 to 5: **Name**, **Email**, **Role**, the duplicate line when one applies, **Back** and the confirm button.
+6. New person form, in place of parts 3 to 5: **Name**, **Email**, disabled **Role**, the duplicate line when one applies, **Back** and the confirm button.
 
 **Variants**
 
@@ -7035,7 +7035,7 @@ The user chooses a person when renaming a speaker, setting an owner, naming spea
 | ⌘N | Opens the New person form while the list is open | window; panel-local |
 | Esc | Clears the text; a second Esc closes the list or the popover | window; panel-local |
 | Tab | Leaves the field for the scope controls and the host's buttons | window; panel-local |
-| Tab in the form | **Name**, **Email**, **Role**, **Back**, confirm | window; panel-local |
+| Tab in the form | **Name**, **Email**, **Back**, confirm; disabled **Role** is not a Tab stop | window; panel-local |
 | Return in the form | Submits from any single-line field | window; panel-local |
 | Esc in the form | First press: back to the list, keeping the typed name; second press: closes the popover | window; panel-local |
 
@@ -9915,7 +9915,7 @@ User:
 
 1. Clicks **Speaker 3** and types Lena in **Name…**
 2. Sees **No one called “Lena”** with **New Person “Lena”…**
-3. Presses Return on **New Person “Lena”…** and sees **Name**, **Email** and **Role** in the popover, with Lena in **Name**
+3. Presses Return on **New Person “Lena”…** and sees **Name**, **Email** and disabled **Role** in the popover, with Lena in **Name**
 4. Presses Return to choose **Create and Name**
 5. Sees **You added Lena and named Speaker 3 as Lena · 12 lines** in the status strip
 6. Gets Lena on every line Speaker 3 spoke, a new person in People, and typing back in Microsoft Teams
@@ -11419,7 +11419,7 @@ User:
 
 1. Opens **People** in the sidebar before the first recorded call
 2. Sees **No people yet** with **People appear when you record calls or add them.** and **Add Person**
-3. Clicks **Add Person** and sees the form **New person** with **Name**, **Email** and **Role**
+3. Clicks **Add Person** and sees the form **New person** with **Name**, **Email** and disabled **Role**
 4. Types “Anna K.” in **Name**
 5. Clicks **Create**
 6. Gets Anna K.'s row in **People**, ready before the first 1:1 with her
@@ -12423,7 +12423,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-68) is
 | D89 | One person picker serves speaker rename, owner fields, the naming panel and **Add Person**. | One behaviour for choosing people, including aliases. | `cpt-noter-component-ui-person-picker` | Accepted; extended by the New person form (D92) and the merge variant (D95); changed by PM-56 |
 | D90 | Calls carry free-text tags: edited in Call info › **Tags** and with **Add Tag…** and a **Remove Tag** section that lists the selection's tags in the context menu of selected calls; suggestions come only from tags already in use; every change is a user change with **Undo**. | Meets the PRD's tag filter with one editing place. | `cpt-noter-component-screen-call-page`, `cpt-noter-component-screen-library`, `cpt-noter-component-ui-call-row`, `cpt-noter-component-ui-filter-bar`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-change-row` | Accepted (owner, 17 Oct) (PM-50) |
 | D91 | Filtering by tag: a **Tags ▾** pop-up in the filter bar and **Tag: release** tokens in the search field, where typing # suggests tags; Calls rows show up to two tags. | One filter state with two inputs (D22). | `cpt-noter-component-ui-filter-bar`, `cpt-noter-component-ui-call-row`, `cpt-noter-component-screen-library` | Accepted (owner, 17 Oct) (PM-50) |
-| D92 | **New Person…** opens a three-field form (**Name**, **Email**, **Role**) inside the person picker's own popover in both windows; it checks for duplicates and confirms with **Create and Name**, **Create and Assign** or **Create**. | No sheet and no alert in the call window (D2, D38). | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-screen-people` | Accepted; changed by PM-56 |
+| D92 | **New Person…** opens a three-field form (**Name**, **Email**, disabled **Role**) inside the person picker's own popover in both windows; it checks for duplicates and confirms with **Create and Name**, **Create and Assign** or **Create**. Role stays disabled until the command contract can persist it. | No sheet and no alert in the call window (D2, D38). | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-screen-people` | Accepted; changed by PM-56 |
 | D93 | The New person form keeps its draft when the call window loses key; a click on a field or ⌃⌥⌘N resumes typing; Return never submits during an input-method composition. | Calls interrupt typing, and Cyrillic and German input use compositions. | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-shell-call-window` | Accepted |
 | D94 | Topic rename is a popover with a clash check that offers **Merge Instead**; person rename is the **Edit Details…** sheet, which keeps the old name as an alias by default. | Topic names are short; people have more fields. | `cpt-noter-component-screen-library`, `cpt-noter-component-screen-people`, `cpt-noter-component-screen-dialogs` | Accepted |
 | D95 | Merging topics or people is a sheet with a target picker and a preview of what moves; the kept entry keeps its name and the merged entry's names become its aliases; a people merge moves voice profiles; the whole merge is one change-log batch with **Undo**, so no alert asks first. | Every change stays undoable (PRD › Feature specification › 11). | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-change-row`, `cpt-noter-component-ui-history-timeline`, `cpt-noter-component-screen-dialogs` | Accepted; changed by PM-56 |
