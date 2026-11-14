@@ -1430,27 +1430,25 @@ impl McpSource for Spy {
 
     fn list_resources<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
         remote: &'a noter_core::McpRemote<'a>,
     ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
-        self.inner.list_resources(server, token, remote)
+        self.inner.list_resources(remote)
     }
 
     fn read_resource<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        uri: &'a str,
         remote: &'a noter_core::McpRemote<'a>,
+        uri: &'a str,
     ) -> BoxFuture<'a, Result<Page, McpError>> {
         Box::pin(async move {
             let audit = |d: &str, b: &[u8]| self.audited(remote, d, b);
             let seen = noter_core::McpRemote {
+                server: remote.server,
+                token: remote.token,
                 audit: &audit,
                 renewed: remote.renewed,
             };
-            let page = self.inner.read_resource(server, token, uri, &seen).await;
+            let page = self.inner.read_resource(&seen, uri).await;
             self.answered.fetch_add(1, Ordering::SeqCst);
             page
         })
@@ -1458,18 +1456,18 @@ impl McpSource for Spy {
 
     fn seed_query<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        query: &'a str,
         remote: &'a noter_core::McpRemote<'a>,
+        query: &'a str,
     ) -> BoxFuture<'a, Result<Listing, McpError>> {
         Box::pin(async move {
             let audit = |d: &str, b: &[u8]| self.audited(remote, d, b);
             let seen = noter_core::McpRemote {
+                server: remote.server,
+                token: remote.token,
                 audit: &audit,
                 renewed: remote.renewed,
             };
-            let found = self.inner.seed_query(server, token, query, &seen).await;
+            let found = self.inner.seed_query(&seen, query).await;
             // The request is out (its row committed); the server is slow to answer.
             if self.hold.load(Ordering::SeqCst) {
                 tokio::time::sleep(std::time::Duration::from_secs(30)).await;

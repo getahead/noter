@@ -8,10 +8,33 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use noter_protocol::ipc::Sink;
-use noter_protocol::model::{StreamEndReason, WindowLabel};
-use noter_protocol::{CoreError, Seq, SubscriptionId};
+use noter_protocol::model::{StreamAckArgs, StreamEndReason, UnsubscribeArgs, WindowLabel};
+use noter_protocol::{Ack, CoreError, Seq, SubscriptionId};
 
-use crate::Clock;
+use crate::{Clock, Core};
+
+pub(super) fn stream_ack(core: &Core, args: StreamAckArgs) -> Ack {
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-ack
+    // A late ack for an ended subscription is normal: nothing to do.
+    let _ = core
+        .hubs()
+        .iter()
+        .any(|hub| hub.ack(&args.subscription_id, args.seq));
+    // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-ack
+    Ack {}
+}
+
+pub(super) fn stream_unsubscribe(core: &Core, args: UnsubscribeArgs) -> Ack {
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-if-unsubscribe
+    let _ = core
+        .hubs()
+        .iter()
+        .any(|hub| hub.unsubscribe(&args.subscription_id));
+    // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-if-unsubscribe
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-return-unsubscribed
+    Ack {}
+    // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-return-unsubscribed
+}
 
 /// Unacknowledged messages at which a subscription ends `lagged`; also the replay bound.
 pub const LAG_LIMIT: u64 = 2000;
@@ -270,7 +293,12 @@ impl<M: StreamMsg> StreamHub<M> {
 
     /// A stream ended (call stopped, discarded): its subscriptions end with that reason.
     pub fn end_stream(&self, key: &str, reason: StreamEndReason) {
-        self.reset(Reset::Streams(Some(key), reason));
+        let mut streams = self.lock();
+        if let Some(mut stream) = streams.remove(key) {
+            // @cpt-begin:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-end-stream
+            stream.end_where(|_| true, reason);
+            // @cpt-end:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-end-stream
+        }
     }
 
     /// Whether a stream still has a live subscription (Ask stops a turn nobody watches).
@@ -286,11 +314,11 @@ impl<M: StreamMsg> StreamHub<M> {
 
     /// Every stream ends (shutdown).
     pub fn end_all(&self, reason: StreamEndReason) {
-        self.reset(Reset::Streams(None, reason));
+        self.reset(Reset::Streams(reason));
     }
 
     // @cpt-algo:cpt-noter-algo-core-ipc-host-webview-reset:p1
-    fn reset(&self, what: Reset<'_>) {
+    fn reset(&self, what: Reset) {
         let mut streams = self.lock();
         match what {
             // @cpt-begin:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-if-webview
@@ -306,12 +334,9 @@ impl<M: StreamMsg> StreamHub<M> {
             }
             // @cpt-end:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-if-webview
             // @cpt-begin:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-if-stream-end
-            Reset::Streams(key, reason) => {
+            Reset::Streams(reason) => {
                 // @cpt-begin:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-end-stream
-                for (_, stream) in streams
-                    .iter_mut()
-                    .filter(|(k, _)| key.map_or(true, |key| key == k.as_str()))
-                {
+                for stream in streams.values_mut() {
                     stream.end_where(|_| true, reason);
                 }
                 // @cpt-end:cpt-noter-algo-core-ipc-host-webview-reset:p1:inst-end-stream
@@ -337,9 +362,9 @@ impl<M: StreamMsg> StreamHub<M> {
     }
 }
 
-enum Reset<'a> {
+enum Reset {
     Webview(WindowLabel),
-    Streams(Option<&'a str>, StreamEndReason),
+    Streams(StreamEndReason),
 }
 
 /// A hub as the core routes commands to it, whatever its message type.

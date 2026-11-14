@@ -2,7 +2,7 @@
 title: "Feature: Engine capture, live ASR and capture-first restart"
 description: "Both channels on one clock into a crash-safe ring, live transcription with language ID and filters, the facts the session manager needs, replay playback, and a capture-first restart with at most a 2 s gap."
 status: PROPOSED
-version: "0.3"
+version: "0.4"
 date: "2026-10-18"
 milestone: M1
 lane: engine
@@ -12,7 +12,7 @@ design: docs/DESIGN-core.md
 
 # Feature: Engine capture, live ASR and capture-first restart
 
-> **Change log (v0.3):** Added recovery reads for unfinalized audio, continuation preservation and finalizer draining on shutdown.
+> **Change log (v0.4):** The engine rejects unsupported capture backends before opening streams. v0.3 added recovery reads for unfinalized audio, continuation preservation and finalizer draining on shutdown.
 
 <!-- toc -->
 
@@ -99,6 +99,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - A session directory with one trailing slash is accepted; returned timeline and audio paths have one separator between components.
 
 **Error Scenarios**:
+- The requested backend is not supported: the engine returns `error { bad_command }` before opening streams or creating capture files.
 - The microphone is unavailable or access is off: the session still starts with the system channel; `error { device_unavailable }` or silent buffers let the core raise `MicrophoneOff`.
 - A session directory is absolute, contains empty, dot, parent or NUL components, or resolves through a symlink outside the App Group container: the command fails before any capture files are created or streams started. One trailing directory slash is removed before validation.
 - The disk fills: AAC writing stops (`disk_full` error event), transcription goes on.
@@ -378,5 +379,6 @@ The system **MUST** play spans natively on `play` with positions reported and it
 
 ## Change log
 
+- **0.4 (14 Nov 2026)**: Specify rejection of unsupported capture backends before session resources are opened.
 - **0.3 (13 Nov 2026)**: Clarify call-relative fact offsets, restart error handling, stop and pause during restart, and failed resume behavior under the existing engine flow and state contracts. `just gate` passes.
 - **0.2 (13 Nov 2026)**: Clarify clean-stop ring cleanup under the existing capture-session stop instruction and pipeline DoD. `CaptureTests` verifies both storage modes through `EngineLoop`, inspecting both mapped channels and the on-disk PCM; `CaptureTests` also verifies a successor session survives the previous session finishing. Existing crash-recovery tests retain their recovery guarantee. No IPC or UI story changes; conformance and E2E coverage remain the existing capture-session suites (`cpt-noter-seq-call-screen-recover-capture`). Completion requires `just gate` passes.

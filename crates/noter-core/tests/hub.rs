@@ -262,11 +262,17 @@ fn a_stream_ends_with_its_reason() {
         .unwrap();
     hub.subscribe("call_2", MAIN, two.sink(), || Ok(()))
         .unwrap();
+    hub.publish("call_1", value(1));
     hub.end_stream("call_1", StreamEndReason::CallStopped);
     assert_eq!(
         (one.ended(), two.ended()),
         (Some(StreamEndReason::CallStopped), None)
     );
+    let next = hub
+        .subscribe("call_1", MAIN, Window::default().sink(), || Ok(()))
+        .unwrap();
+    assert_eq!(next.last_seq, Seq(0), "ended streams release their state");
+    assert!(hub.replay_after("call_1", Seq(0)).is_empty());
     hub.end_all(StreamEndReason::Shutdown);
     assert_eq!(two.ended(), Some(StreamEndReason::Shutdown));
 }

@@ -9,7 +9,7 @@ use std::sync::{Arc, Mutex};
 use noter_db::{ChangeMeta, Store};
 use noter_llm::{key_account, Availability, Failure, KeychainLocked, Secret, SecretStore};
 use noter_protocol::error::{RuntimeUnavailableReason, ValidationRule};
-use noter_protocol::ipc::event_names;
+use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde::{Deserialize, Serialize};
@@ -17,7 +17,34 @@ use serde_json::Value;
 use tokio::sync::Notify;
 
 use crate::app::{self, WholeState};
-use crate::{lock, Clock, EventEmitter};
+use crate::{lock, Clock, Core, EventEmitter};
+
+pub(super) async fn api_key_set(
+    core: &Core,
+    ctx: &CommandCtx,
+    args: ApiKeySetArgs,
+) -> Result<AccountsView, CoreError> {
+    let (provider, candidate) = candidate(args)?;
+    // @cpt-begin:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-verify
+    core.accounts.verifying(provider, true);
+    // @cpt-end:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-verify
+    let privacy = noter_llm::Privacy {
+        mode: lock(&core.settings).privacy.mode,
+        sensitive: false,
+        offline: !core.app().environment.online,
+    };
+    let runtime = runtime_of(provider);
+    let verified = core
+        .llm
+        .verify_key(runtime, candidate.clone(), privacy)
+        .await;
+    let meta = core.change_meta(
+        ctx,
+        format!("Verified the {provider:?} API key"),
+        "api_key_set",
+    );
+    core.accounts.settle(meta, provider, &candidate, verified)
+}
 
 /// The `settings` row that holds each key's status (never the key).
 const KEYS_ROW: &str = "keys";

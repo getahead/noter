@@ -39,7 +39,7 @@ lint: lint-rust lint-ui
 # Rust formatting and clippy
 lint-rust:
     cargo fmt --all -- --check
-    cargo clippy --workspace --all-targets --locked -- -D warnings
+    cargo clippy --workspace --all-targets --locked --features noter-protocol/export,noter-protocol/fixtures -- -D warnings
 
 # TypeScript type check
 lint-ui:
@@ -47,12 +47,12 @@ lint-ui:
 
 # The contract: generated files up to date, contract tests
 contract:
-    cargo run --quiet --locked -p noter-protocol --bin noter-contract-export -- --check
-    cargo test --quiet --locked -p noter-protocol
+    cargo run --quiet --locked -p noter-protocol --features export,fixtures --bin noter-contract-export -- --check
+    cargo test --quiet --locked -p noter-protocol --features export,fixtures
 
 # Regenerate bindings, manifest, schemas and fixtures after changing noter-protocol
 contract-regen:
-    cargo run --quiet -p noter-protocol --bin noter-contract-export
+    cargo run --quiet -p noter-protocol --features export,fixtures --bin noter-contract-export
 
 # Architecture checks and the harness's own tests
 arch:
@@ -65,7 +65,7 @@ trace:
 
 # Unit tests, Rust and UI
 test-unit:
-    cargo test --quiet --workspace --locked
+    cargo test --quiet --workspace --locked --features noter-protocol/export,noter-protocol/fixtures
     pnpm --dir apps/desktop test:unit
 
 # Unit tests with coverage, judged by the unit-coverage gate (80% per side and on changed lines)
@@ -75,8 +75,8 @@ cov-unit: cov-unit-rust cov-unit-ui
 cov-unit-rust:
     rm -rf coverage/unit && mkdir -p coverage/unit
     cargo llvm-cov clean --workspace
-    cargo llvm-cov --no-report --quiet run --locked -p noter-protocol --bin noter-contract-export -- --check
-    cargo llvm-cov --no-report --quiet --workspace --locked
+    cargo llvm-cov --no-report --quiet run --locked -p noter-protocol --features export,fixtures --bin noter-contract-export -- --check
+    cargo llvm-cov --no-report --quiet --workspace --locked --features noter-protocol/export,noter-protocol/fixtures
     cargo llvm-cov report --lcov --output-path coverage/unit/rust.lcov
     python3 scripts/harness/coverage_gate.py --rust coverage/unit/rust.lcov --base {{base}}
 

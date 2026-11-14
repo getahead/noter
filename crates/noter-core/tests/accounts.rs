@@ -9,9 +9,7 @@ use std::sync::{Arc, Mutex};
 use noter_core::{
     Adapters, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted, Secret, SecretStore,
 };
-use noter_llm::{
-    LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
-};
+use noter_llm::{Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::settings::AuditWhat;

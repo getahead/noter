@@ -1,6 +1,6 @@
 // @cpt-component:cpt-noter-component-core-llm-router:p1
 // @cpt-interface:cpt-noter-interface-llm-runtime:p1
-//! The `LlmRuntime` interface: one entry point for every model call (post-call, handoff, Ask,
+//! The `Llm` router: one entry point for every model call (post-call, handoff, Ask,
 //! live ticks). A request is routed, recorded in `llm_runs`, released through the egress gate,
 //! run with its task timeout and cancellation, validated against the app-owned schema with one
 //! repair retry and a simpler fallback, and finished with its usage in `llm_runs`.
@@ -16,14 +16,8 @@ use noter_db::{ChangeMeta, Mutation, Store};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::model::settings::AuditWhat;
 use noter_protocol::model::Actor;
-use noter_protocol::skills::{
-    AskAnswerOutput, CouncilTickOutput, HandoffPromptOutput, PostCallOutput,
-    ReconcileJudgementOutput, RoleReviewOutput,
-};
-use noter_protocol::{
-    AgentId, AuditId, CallId, CoreError, Effort, ErrorCode, LlmRunId, PrivacyMode, RuntimeChoice,
-    TimestampMs,
-};
+use noter_protocol::{AgentId, AuditId, Effort};
+use noter_protocol::{CallId, CoreError, ErrorCode, LlmRunId, RuntimeChoice, TimestampMs};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
@@ -41,426 +35,20 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// Turns of a warm session before it is reset (live ticks).
 const SESSION_TICKS: u32 = 15;
 
-/// The skills whose output contracts `noter_protocol::skills` owns (`contracts/skills/`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Skill {
-    PostCall,
-    CouncilTick,
-    RoleReview,
-    Handoff,
-    AskAnswer,
-    Reconcile,
-}
+pub use crate::request::{
+    Availability, Budget, Cancel, Failure, Packet, PacketContext, PacketItem, Privacy, Provenance,
+    RunOutcome, RunRequest, SessionId, Skill, SourceClass, TaskKind, TaskSettings, Tested, Usage,
+    Validated,
+};
+pub(crate) use crate::request::{Now, RequestState};
 
-impl Skill {
-    pub const ALL: [Skill; 6] = [
-        Skill::PostCall,
-        Skill::CouncilTick,
-        Skill::RoleReview,
-        Skill::Handoff,
-        Skill::AskAnswer,
-        Skill::Reconcile,
-    ];
-
-    pub fn id(self) -> &'static str {
-        match self {
-            Skill::PostCall => "post-call",
-            Skill::CouncilTick => "council-tick",
-            Skill::RoleReview => "role-review",
-            Skill::Handoff => "handoff",
-            Skill::AskAnswer => "ask-answer",
-            Skill::Reconcile => "reconcile",
-        }
-    }
-
-    pub fn from_id(id: &str) -> Option<Skill> {
-        Skill::ALL.into_iter().find(|s| s.id() == id)
-    }
-
-    /// The output schema every adapter is given (Claude `--json-schema`, Codex
-    /// `--output-schema`, Ollama `format`), as `just contract-regen` exports it.
-    pub fn schema(self) -> Value {
-        let json = match self {
-            Skill::PostCall => include_str!("../../../contracts/skills/post-call.schema.json"),
-            Skill::CouncilTick => {
-                include_str!("../../../contracts/skills/council-tick.schema.json")
-            }
-            Skill::RoleReview => include_str!("../../../contracts/skills/role-review.schema.json"),
-            Skill::Handoff => include_str!("../../../contracts/skills/handoff.schema.json"),
-            Skill::AskAnswer => include_str!("../../../contracts/skills/ask-answer.schema.json"),
-            Skill::Reconcile => include_str!("../../../contracts/skills/reconcile.schema.json"),
-        };
-        serde_json::from_str(json).expect("contracts/skills holds generated JSON")
-    }
-
-    /// Whether `output` has the shape of this skill's contract type (the schema above is
-    /// exported from the same types).
-    pub(crate) fn conforms(self, output: &Value) -> Result<(), serde_json::Error> {
-        fn shape<T: serde::de::DeserializeOwned>(v: &Value) -> Result<(), serde_json::Error> {
-            T::deserialize(v).map(drop)
-        }
-        match self {
-            Skill::PostCall => shape::<PostCallOutput>(output),
-            Skill::CouncilTick => shape::<CouncilTickOutput>(output),
-            Skill::RoleReview => shape::<RoleReviewOutput>(output),
-            Skill::Handoff => shape::<HandoffPromptOutput>(output),
-            Skill::AskAnswer => shape::<AskAnswerOutput>(output),
-            Skill::Reconcile => shape::<ReconcileJudgementOutput>(output),
-        }
-    }
-}
-
-/// Who calls, which sets the order and the timeout.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TaskKind {
-    PostCall,
-    /// Prefers the target tool's runtime, then local.
-    Handoff {
-        target: RuntimeChoice,
-    },
-    Ask,
-    Live,
-}
-
-/// The per-task runtime settings.
-#[derive(Debug, Clone, PartialEq)]
-pub struct TaskSettings {
-    /// The runtime chosen for the task in Settings, if any.
-    pub configured: Option<RuntimeChoice>,
-    pub model: Option<String>,
-    pub effort: Effort,
-    /// Tools the run may use (M2: none; noter-mcp tools arrive in M3).
-    pub tools: Vec<String>,
-    /// Stable person pseudonyms in cloud packets, mapped back on return.
-    pub pseudonyms: bool,
-}
-
-impl Default for TaskSettings {
-    fn default() -> Self {
-        Self {
-            configured: None,
-            model: None,
-            effort: Effort::Medium,
-            tools: Vec::new(),
-            pseudonyms: false,
-        }
-    }
-}
-
-/// The privacy that applies to a request; read again by the gate at release time.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Privacy {
-    pub mode: PrivacyMode,
-    pub sensitive: bool,
-    pub offline: bool,
-}
-
-impl Privacy {
-    /// Whether D1 lets a run under this privacy query the user's live MCP sources: Cloud
-    /// allowed, with no sensitive context, and online.
-    pub fn allows_live(&self) -> bool {
-        self.mode == PrivacyMode::CloudAllowed && !self.sensitive && !self.offline
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Budget {
-    /// Cost cap for API-key runs; own accounts and local runs have no cost.
-    pub max_cost_usd: Option<f64>,
-}
-
-/// The privacy class of one packet item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SourceClass {
-    Normal,
-    /// Never admitted to a cloud packet.
-    Sensitive,
-    /// Never leaves the Mac.
-    Audio,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PacketItem {
-    /// The segment or chunk id outputs cite.
-    pub id: String,
-    pub source: SourceClass,
-    pub text: String,
-}
-
-/// What the caller hands the model; callers build it, the gate decides what of it leaves.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Packet {
-    /// What leaves, as the Privacy pane names it.
-    pub what: AuditWhat,
-    pub items: Vec<PacketItem>,
-    /// Names to pseudonymize when the task asks for it.
-    pub people: Vec<String>,
-    /// What the call is, beside its lines; empty for skills that need none.
-    pub context: PacketContext,
-}
-
-/// The call's context a skill reads with the lines: its type, the language outputs are written
-/// in and the glossary's terms. Leaves with the items, redacted and pseudonymized like them.
-#[derive(Debug, Clone, Default, PartialEq)]
-pub struct PacketContext {
-    pub call_type: Option<String>,
-    pub language: Option<noter_protocol::Lang>,
-    pub glossary: Vec<String>,
-}
-
-impl PacketContext {
-    pub(crate) fn is_empty(&self) -> bool {
-        self.call_type.is_none() && self.language.is_none() && self.glossary.is_empty()
-    }
-}
-
-/// The caller's cancellation handle; cloning shares it.
-#[derive(Debug, Clone)]
-pub struct Cancel(Arc<watch::Sender<bool>>);
-
-impl Default for Cancel {
-    fn default() -> Self {
-        Self(Arc::new(watch::channel(false).0))
-    }
-}
-
-impl Cancel {
-    pub fn cancel(&self) {
-        self.0.send_replace(true);
-    }
-
-    pub fn is_cancelled(&self) -> bool {
-        *self.0.borrow()
-    }
-
-    async fn cancelled(&self) {
-        let mut rx = self.0.subscribe();
-        let _ = rx.wait_for(|c| *c).await;
-    }
-}
-
-/// One model call.
-#[derive(Debug, Clone)]
-pub struct RunRequest {
-    pub skill: Skill,
-    pub skill_version: String,
-    /// The simpler skill/schema used after a failed repair, if the caller has one.
-    pub fallback: Option<Skill>,
-    pub packet: Packet,
-    pub task: TaskKind,
-    pub settings: TaskSettings,
-    pub budget: Budget,
-    pub privacy: watch::Receiver<Privacy>,
-    pub cancel: Cancel,
-    pub call_id: Option<CallId>,
-    pub agent_id: Option<AgentId>,
-}
-
-impl RunRequest {
-    pub fn new(
-        skill: Skill,
-        skill_version: &str,
-        packet: Packet,
-        task: TaskKind,
-        privacy: watch::Receiver<Privacy>,
-    ) -> Self {
-        Self {
-            skill,
-            skill_version: skill_version.into(),
-            fallback: None,
-            packet,
-            task,
-            settings: TaskSettings::default(),
-            budget: Budget::default(),
-            privacy,
-            cancel: Cancel::default(),
-            call_id: None,
-            agent_id: None,
-        }
-    }
-}
-
-/// One runtime choice as its adapter sees it now.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Availability {
-    pub runtime: RuntimeChoice,
-    /// `None` when the runtime can run.
-    pub unavailable: Option<RuntimeUnavailableReason>,
-    /// The installed CLI's version (CLI runtimes).
-    pub version: Option<String>,
-    /// Where the runtime was found: the CLI that answered `--version`, or the Ollama URL that
-    /// answered `/api/tags`; `None` when it was not found.
-    pub path: Option<String>,
-    /// The CLI versions the adapter was tested with; any other is refused.
-    pub tested: Option<Tested>,
-    pub models: Vec<String>,
-}
-
-/// A tested CLI version range: from `min` up to, not including, `below`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Tested {
-    pub min: [u64; 3],
-    pub below: [u64; 3],
-}
-
-impl Tested {
-    /// `major.minor.patch`, ignoring a pre-release or build suffix.
-    pub(crate) fn parse(version: &str) -> Option<[u64; 3]> {
-        let core = version.split(['-', '+']).next()?;
-        let mut parts = core.split('.').map(|p| p.parse::<u64>().ok());
-        let v = [parts.next()??, parts.next()??, parts.next()??];
-        parts.next().is_none().then_some(v)
-    }
-
-    pub fn admits(&self, version: &str) -> bool {
-        Self::parse(version).is_some_and(|v| self.min <= v && v < self.below)
-    }
-}
-
-impl std::fmt::Display for Tested {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let [a, b, c] = self.min;
-        let [x, y, z] = self.below;
-        write!(f, ">={a}.{b}.{c}, <{x}.{y}.{z}")
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct Usage {
-    pub tokens_in: u64,
-    pub tokens_out: u64,
-    /// API-key runs only.
-    pub cost_usd: Option<f64>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Provenance {
-    pub llm_run_id: LlmRunId,
-    pub runtime: RuntimeChoice,
-    pub adapter: &'static str,
-    pub model: String,
-    pub skill: Skill,
-    pub skill_version: String,
-    pub retried: bool,
-    pub fallback: bool,
-    pub usage: Usage,
-    pub duration_ms: u64,
-    pub first_token_ms: Option<u64>,
-    pub session_id: Option<String>,
-    /// One `audit_log` row per cloud release of this run.
-    pub audit_ids: Vec<AuditId>,
-}
-
-/// Output that passed schema and evidence checks, with its provenance.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Validated {
-    pub output: Value,
-    pub provenance: Provenance,
-}
-
-/// Why a request ended without output; the caller keeps whatever it already had.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Failure {
-    /// `runtime_unavailable` or `cli_version_unsupported`, with `ErrorDetail`.
-    Unavailable(CoreError),
-    /// `llm_runs` or `audit_log` could not be written; nothing was released.
-    Storage(CoreError),
-    /// The runtime answered with an error code.
-    Runtime {
-        code: String,
-    },
-    /// Still invalid after the repair retry and the fallback (`schema`, `html`, `citations`).
-    Invalid {
-        reason: &'static str,
-    },
-    Budget,
-    Timeout,
-    Cancelled,
-}
-
-pub type RunOutcome = Result<Validated, Failure>;
-
-/// A warm session opened with [`LlmRuntime::open_session`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct SessionId(String);
-
-/// The internal runtime interface (DESIGN-core 3.3): post-call (2.17) and handoff (2.19) call it.
-pub trait LlmRuntime: Send + Sync {
-    fn availability(&self) -> Vec<Availability>;
-    fn run_once(&self, req: RunRequest) -> BoxFuture<'_, RunOutcome>;
-    fn open_session<'a>(&'a self, req: &'a RunRequest)
-        -> BoxFuture<'a, Result<SessionId, Failure>>;
-    fn send_turn<'a>(
-        &'a self,
-        session: &'a SessionId,
-        req: RunRequest,
-    ) -> BoxFuture<'a, RunOutcome>;
-    fn close_session(&self, session: &SessionId);
-    /// A follow-up in a recorded CLI session (post-call questions).
-    fn resume<'a>(&'a self, cli_session: &'a str, req: RunRequest) -> BoxFuture<'a, RunOutcome>;
-}
-
-/// Request lifecycle (`cpt-noter-state-core-llm-gate-request`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum RequestState {
-    Preparing,
-    Gated,
-    Running,
-    Validating,
-    Succeeded,
-    Failed,
-    Cancelled,
-}
-
-impl RequestState {
-    // @cpt-state:cpt-noter-state-core-llm-gate-request:p1
-    pub(crate) fn can(self, next: RequestState) -> bool {
-        use RequestState::*;
-        match (self, next) {
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-gated
-            (Preparing, Gated) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-gated
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-running
-            (Gated, Running) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-running
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-validating
-            (Running, Validating) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-validating
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-retry
-            (Validating, Preparing) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-retry
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-success
-            (Validating, Succeeded) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-success
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-failure
-            (Preparing | Running | Validating, Failed) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-failure
-            // @cpt-begin:cpt-noter-state-core-llm-gate-request:p1:inst-st-cancel
-            (Preparing | Running | Validating, Cancelled) => true,
-            // @cpt-end:cpt-noter-state-core-llm-gate-request:p1:inst-st-cancel
-            _ => false,
-        }
-    }
-
-    fn name(self) -> &'static str {
-        match self {
-            RequestState::Preparing => "preparing",
-            RequestState::Gated => "gated",
-            RequestState::Running => "running",
-            RequestState::Validating => "validating",
-            RequestState::Succeeded => "succeeded",
-            RequestState::Failed => "failed",
-            RequestState::Cancelled => "cancelled",
-        }
-    }
-}
-
+#[cfg(test)]
 type Log = Box<dyn Fn(&Value) + Send + Sync>;
+#[cfg(test)]
 type OnSwitch = Box<dyn Fn(&CallId) + Send + Sync>;
 type OnKeyRejected = Box<dyn Fn(RuntimeChoice, &LlmRunId) + Send + Sync>;
 /// A verification's runtime and the candidate key it runs with.
 type Candidate = Option<(RuntimeChoice, Secret)>;
-pub(crate) type Now = Arc<dyn Fn() -> TimestampMs + Send + Sync>;
 
 struct Session {
     runtime: RuntimeChoice,
@@ -471,7 +59,9 @@ struct Session {
 struct Inner {
     gate: Gate,
     store: Arc<Store>,
+    #[cfg(test)]
     log: Option<Log>,
+    #[cfg(test)]
     on_switch: Option<OnSwitch>,
     /// The API keys of the API-key runtimes (the Keychain in the app).
     secrets: Arc<dyn SecretStore>,
@@ -519,7 +109,7 @@ impl Drop for ToolGuard<'_> {
     }
 }
 
-/// The runtime router: the one `LlmRuntime` implementation. Cloning shares it.
+/// The runtime router. Cloning shares it.
 #[derive(Clone)]
 pub struct Llm(Arc<Inner>);
 
@@ -532,7 +122,9 @@ impl Llm {
         Self(Arc::new(Inner {
             gate: Gate::new(adapters, store.clone(), Arc::new(now)),
             store,
+            #[cfg(test)]
             log: None,
+            #[cfg(test)]
             on_switch: None,
             secrets: Arc::new(MemorySecrets::default()),
             on_key_rejected: None,
@@ -594,13 +186,14 @@ impl Llm {
             .release_result(&release, &mut tool.map, privacy, people, result)
     }
 
-    /// Operational log lines (ids, states, codes, timings; never packet, model text or keys).
+    /// Test-only log capture; production does not expose this callback.
+    #[cfg(test)]
     pub fn on_log(self, f: impl Fn(&Value) + Send + Sync + 'static) -> Self {
         self.configure(|i| i.log = Some(Box::new(f)))
     }
 
-    /// Called when two consecutive runtime failures switch a call to local: the core publishes
-    /// `privacy:changed` with `EffectiveMode::SwitchedToLocal`.
+    /// Test-only observation of a local fallback.
+    #[cfg(test)]
     pub fn on_switch_to_local(self, f: impl Fn(&CallId) + Send + Sync + 'static) -> Self {
         self.configure(|i| i.on_switch = Some(Box::new(f)))
     }
@@ -619,16 +212,12 @@ impl Llm {
         self.configure(|i| i.on_key_rejected = Some(Box::new(f)))
     }
 
-    // @cpt-begin:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
-    /// Verifies a candidate API key with one minimal run on its own runtime, never another,
-    /// through the gate (an `llm_runs` row and, for the cloud, its audit row): an empty packet,
-    /// so nothing of the user's leaves. Any answer means the provider took the key; the
-    /// candidate is not stored here.
-    pub async fn verify_key(
+    async fn verify(
         &self,
         runtime: RuntimeChoice,
-        candidate: Secret,
         privacy: Privacy,
+        task: &str,
+        candidate: Candidate,
     ) -> Result<(), Failure> {
         let packet = Packet {
             // shortcut: the closest category for a call that carries no user text; a `key_check`
@@ -639,42 +228,37 @@ impl Llm {
             context: PacketContext::default(),
         };
         let (_privacy, rx) = watch::channel(privacy);
-        let mut req = RunRequest::new(Skill::AskAnswer, "key-check", packet, TaskKind::Ask, rx);
+        let mut req = RunRequest::new(Skill::AskAnswer, task, packet, TaskKind::Ask, rx);
         req.settings.configured = Some(runtime);
         req.settings.effort = Effort::Low;
-        match self
-            .0
-            .run(req, None, Some((runtime, candidate)), None)
-            .await
-        {
+        match self.0.run(req, None, candidate, Some(runtime)).await {
             Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
             Err(failure) => Err(failure),
         }
     }
+
+    // @cpt-begin:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
+    /// Verifies a candidate API key with one minimal run on its own runtime, never another,
+    /// through the gate; the candidate is not stored here.
+    pub async fn verify_key(
+        &self,
+        runtime: RuntimeChoice,
+        candidate: Secret,
+        privacy: Privacy,
+    ) -> Result<(), Failure> {
+        self.verify(runtime, privacy, "key-check", Some((runtime, candidate)))
+            .await
+    }
     // @cpt-end:cpt-noter-flow-core-credentials-privacy-keys:p1:inst-key-verify
 
     // @cpt-begin:cpt-noter-algo-core-credentials-privacy-check-account:p1:inst-check-test
-    /// The short test request of an own-account check or `account_test`: the same empty packet,
-    /// gate, isolation and audit as `verify_key`, on the account's own runtime and no candidate.
+    /// The short test request of an own-account check or `account_test`, with no candidate key.
     pub async fn verify_account(
         &self,
         runtime: RuntimeChoice,
         privacy: Privacy,
     ) -> Result<(), Failure> {
-        let packet = Packet {
-            what: AuditWhat::Outputs,
-            items: Vec::new(),
-            people: Vec::new(),
-            context: PacketContext::default(),
-        };
-        let (_privacy, rx) = watch::channel(privacy);
-        let mut req = RunRequest::new(Skill::AskAnswer, "account-check", packet, TaskKind::Ask, rx);
-        req.settings.configured = Some(runtime);
-        req.settings.effort = Effort::Low;
-        match self.0.run(req, None, None, Some(runtime)).await {
-            Ok(_) | Err(Failure::Invalid { .. }) => Ok(()),
-            Err(failure) => Err(failure),
-        }
+        self.verify(runtime, privacy, "account-check", None).await
     }
     // @cpt-end:cpt-noter-algo-core-credentials-privacy-check-account:p1:inst-check-test
 
@@ -720,18 +304,21 @@ struct Tally {
 }
 
 impl Inner {
+    #[cfg(test)]
     fn log(&self, line: Value) {
         if let Some(log) = &self.log {
             log(&line);
         }
     }
 
-    fn enter(&self, state: &mut RequestState, next: RequestState, run: Option<&LlmRunId>) {
+    fn enter(&self, state: &mut RequestState, next: RequestState, _run: Option<&LlmRunId>) {
         debug_assert!(state.can(next), "request {state:?} cannot become {next:?}");
         *state = next;
-        self.log_state(next, run);
+        #[cfg(test)]
+        self.log_state(next, _run);
     }
 
+    #[cfg(test)]
     fn log_state(&self, state: RequestState, run: Option<&LlmRunId>) {
         let run = run.map(LlmRunId::as_str);
         self.log(
@@ -818,9 +405,11 @@ impl Inner {
         *count += 1;
         // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-failover
         if *count >= 2 && lock(&self.switched).insert(call.clone()) {
+            #[cfg(test)]
             self.log(
                 json!({"module": "llm", "event": "switched_to_local", "call_id": call.as_str()}),
             );
+            #[cfg(test)]
             if let Some(on_switch) = &self.on_switch {
                 on_switch(call);
             }
@@ -839,6 +428,7 @@ impl Inner {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-input
         let started = Instant::now();
         let mut state = RequestState::Preparing;
+        #[cfg(test)]
         self.log_state(state, None);
         // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-input
         if req.cancel.is_cancelled() {
@@ -910,10 +500,11 @@ impl Inner {
             }
         }
         // @cpt-end:cpt-noter-state-core-credentials-privacy-key:p1:inst-key-state-revoked
-        let code = outcome.as_ref().map_or_else(failure_code, |_| "succeeded");
+        let _code = outcome.as_ref().map_or_else(failure_code, |_| "succeeded");
+        #[cfg(test)]
         self.log(
             json!({"module": "llm", "event": "run_end", "llm_run_id": tally.run_id.as_str(),
-            "runtime": runtime_name(tally.choice.runtime), "outcome": code,
+            "runtime": runtime_name(tally.choice.runtime), "outcome": _code,
             "duration_ms": elapsed_ms(tally.started), "retried": tally.retried}),
         );
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-return
@@ -1125,6 +716,7 @@ impl Inner {
         let Ok(launch) =
             host.start_with_runtime(start, tally.choice.runtime, tally.choice.model.clone())
         else {
+            #[cfg(test)]
             self.log(json!({"module": "llm", "event": "tools_unavailable",
                 "llm_run_id": tally.run_id.as_str()}));
             return (None, None);
@@ -1290,64 +882,53 @@ impl Inner {
     }
 }
 
-impl LlmRuntime for Llm {
-    fn availability(&self) -> Vec<Availability> {
+impl Llm {
+    pub fn availability(&self) -> Vec<Availability> {
         self.0.availability(None)
     }
 
-    fn run_once(&self, req: RunRequest) -> BoxFuture<'_, RunOutcome> {
-        Box::pin(self.0.run(req, None, None, None))
+    pub async fn run_once(&self, req: RunRequest) -> RunOutcome {
+        self.0.run(req, None, None, None).await
     }
 
-    fn open_session<'a>(
-        &'a self,
-        req: &'a RunRequest,
-    ) -> BoxFuture<'a, Result<SessionId, Failure>> {
-        Box::pin(async move {
-            let choice = self.0.open_route(req).await?;
-            let cli_session = self
-                .0
-                .gate
-                .open_session(choice.runtime, None)
-                .map_err(|code| Failure::Runtime { code })?;
-            let id = SessionId(format!("ses_{}", ulid::Ulid::generate()));
-            let session = Session {
-                runtime: choice.runtime,
-                cli_session,
-                ticks: 0,
-            };
-            lock(&self.0.sessions).insert(id.clone(), session);
-            Ok(id)
-        })
+    pub async fn open_session(&self, req: &RunRequest) -> Result<SessionId, Failure> {
+        let choice = self.0.open_route(req).await?;
+        let cli_session = self
+            .0
+            .gate
+            .open_session(choice.runtime, None)
+            .map_err(|code| Failure::Runtime { code })?;
+        let id = SessionId(format!("ses_{}", ulid::Ulid::generate()));
+        let session = Session {
+            runtime: choice.runtime,
+            cli_session,
+            ticks: 0,
+        };
+        lock(&self.0.sessions).insert(id.clone(), session);
+        Ok(id)
     }
 
-    fn send_turn<'a>(
-        &'a self,
-        session: &'a SessionId,
-        req: RunRequest,
-    ) -> BoxFuture<'a, RunOutcome> {
-        Box::pin(self.0.turn(session, req))
+    pub async fn send_turn(&self, session: &SessionId, req: RunRequest) -> RunOutcome {
+        self.0.turn(session, req).await
     }
 
-    fn close_session(&self, session: &SessionId) {
+    pub fn close_session(&self, session: &SessionId) {
         self.0.close(session);
     }
 
-    fn resume<'a>(&'a self, cli_session: &'a str, req: RunRequest) -> BoxFuture<'a, RunOutcome> {
-        Box::pin(async move {
-            let choice = self.0.open_route(&req).await?;
-            let resumed = self
-                .0
-                .gate
-                .open_session(choice.runtime, Some(cli_session))
-                .map_err(|code| Failure::Runtime { code })?;
-            let outcome = self
-                .0
-                .run(req, Some((choice.runtime, resumed.clone())), None, None)
-                .await;
-            self.0.gate.close_session(choice.runtime, &resumed);
-            outcome
-        })
+    pub async fn resume(&self, cli_session: &str, req: RunRequest) -> RunOutcome {
+        let choice = self.0.open_route(&req).await?;
+        let resumed = self
+            .0
+            .gate
+            .open_session(choice.runtime, Some(cli_session))
+            .map_err(|code| Failure::Runtime { code })?;
+        let outcome = self
+            .0
+            .run(req, Some((choice.runtime, resumed.clone())), None, None)
+            .await;
+        self.0.gate.close_session(choice.runtime, &resumed);
+        outcome
     }
 }
 

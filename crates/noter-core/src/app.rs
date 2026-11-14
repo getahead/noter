@@ -1,9 +1,52 @@
 //! App-level state every window renders from (`app_snapshot`), and the whole-state
 //! payloads with their versions.
 
+use noter_protocol::ipc::{event_names, Caller, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde::Serialize;
+
+use crate::Core;
+
+// @cpt-dod:cpt-noter-dod-core-ipc-host-snapshot:p1
+pub(super) fn app_snapshot(core: &Core, ctx: &CommandCtx) -> AppSnapshot {
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
+    let mut snapshot = core.app().clone();
+    snapshot.accounts = core.accounts.view();
+    snapshot.window = match ctx.caller {
+        Caller::Window { label } => label,
+        Caller::Native { .. } => WindowLabel::Main,
+    };
+    // @cpt-end:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
+    snapshot
+}
+
+// @cpt-flow:cpt-noter-flow-core-ipc-host-banner-dismiss:p1
+pub(super) async fn banner_dismiss(
+    core: &Core,
+    args: BannerDismissArgs,
+) -> Result<BannerSet, CoreError> {
+    if args.banner == BannerKind::RecordingInterruptedByQuit {
+        // The call the banner offered to resume ends at its last audio.
+        core.drop_interrupted()?;
+    }
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-dismiss
+    let mut app = core.app();
+    let before = app.banners.banners.len();
+    // @cpt-end:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-dismiss
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-remove-banner
+    app.banners.banners.retain(|b| b.kind() != args.banner);
+    if app.banners.banners.len() == before {
+        return Ok(app.banners.clone());
+    }
+    // @cpt-end:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-remove-banner
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-emit-banners
+    let set = core.publish(event_names::BANNERS_CHANGED, &mut app.banners);
+    // @cpt-end:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-emit-banners
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-return-banners
+    Ok(set)
+    // @cpt-end:cpt-noter-flow-core-ipc-host-banner-dismiss:p1:inst-return-banners
+}
 
 /// The app snapshot of a core that just started: every slice at version 1. Slices whose
 /// feature comes later hold its first-run defaults until that feature owns them.

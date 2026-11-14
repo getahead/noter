@@ -13,8 +13,8 @@ use std::time::Duration;
 
 use noter_db::Store;
 use noter_llm::{
-    Adapters, CliConfig, Failure, Llm, LlmRuntime, MemorySecrets, OllamaConfig, Packet, PacketItem,
-    Privacy, RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, Validated,
+    Adapters, CliConfig, Failure, Llm, MemorySecrets, OllamaConfig, Packet, PacketItem, Privacy,
+    RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, Validated,
 };
 use noter_protocol::model::settings::AuditWhat;
 use noter_protocol::skills::{ExtractedItem, PostCallOutput};

@@ -19,9 +19,9 @@ use crate::route::{route, timeout, Route};
 use crate::runtime::{tests_support, RequestState};
 use crate::validate::validate;
 use crate::{
-    Availability, Budget, Failure, Llm, LlmRuntime, MemorySecrets, Packet, PacketContext,
-    PacketItem, Privacy, RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind,
-    TaskSettings, Tested, ToolHost, ToolLaunch, ToolStart,
+    Availability, Budget, Failure, Llm, MemorySecrets, Packet, PacketContext, PacketItem, Privacy,
+    RunRequest, Secret, SecretStore, Skill, SourceClass, TaskKind, TaskSettings, Tested, ToolHost,
+    ToolLaunch, ToolStart,
 };
 
 const NORMAL_TEXT: &str =
@@ -1426,7 +1426,7 @@ mod launch_tests {
     use crate::adapters::ollama::OllamaConfig;
     use crate::adapters::{Invocation, RuntimeAdapter};
     use crate::gate::Adapters;
-    use crate::runtime::{Llm, LlmRuntime, Packet, PacketContext, Privacy, RunRequest, TaskKind};
+    use crate::runtime::{Llm, Packet, PacketContext, Privacy, RunRequest, TaskKind};
     use crate::secrets::Secret;
     use crate::tools::McpLaunch;
     use crate::Skill;

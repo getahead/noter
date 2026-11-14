@@ -4,6 +4,7 @@
 //! network.
 
 use noter_db::lock;
+use noter_llm::{McpClient, Resource, Resources};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -14,76 +15,28 @@ use noter_protocol::{CoreError, ErrorCode, ErrorDetail, TimestampMs};
 use serde::Deserialize;
 use serde_json::json;
 
-/// Why a server did not answer.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum McpError {
-    /// The user closed or refused the server's sign-in.
-    Cancelled,
-    /// The server cannot be reached.
-    Offline,
-    /// The server rejected the token: expired or revoked.
-    Rejected,
-    /// No such server, or its configuration is not usable.
-    Invalid,
-    /// The request's audit row did not commit, so nothing was sent.
-    Unaudited,
-}
+pub use noter_llm::{Audit, Call as Remote, Contents as Page, McpClientError as McpError};
+pub type RemoteDoc = Resource;
+pub type Listing = Resources;
 
-impl From<McpError> for CoreError {
-    fn from(e: McpError) -> Self {
-        match e {
-            McpError::Cancelled => {
-                CoreError::new(ErrorCode::SignInCancelled, "the sign-in was cancelled")
-            }
-            McpError::Offline => CoreError::new(ErrorCode::Offline, "the server is offline"),
-            McpError::Rejected => {
-                CoreError::new(ErrorCode::SourceSignInExpired, "the sign-in has expired")
-            }
-            McpError::Invalid => CoreError::new(ErrorCode::InvalidInput, "an unknown server")
-                .with_detail(ErrorDetail::Validation {
-                    field: "server".into(),
-                    rule: ValidationRule::InvalidFormat,
-                }),
-            McpError::Unaudited => {
-                CoreError::new(ErrorCode::Internal, "the request could not be audited")
-            }
+pub(crate) fn mcp_error(error: McpError) -> CoreError {
+    match error {
+        McpError::Cancelled => {
+            CoreError::new(ErrorCode::SignInCancelled, "the sign-in was cancelled")
+        }
+        McpError::Offline => CoreError::new(ErrorCode::Offline, "the server is offline"),
+        McpError::Unauthorized => {
+            CoreError::new(ErrorCode::SourceSignInExpired, "the sign-in has expired")
+        }
+        McpError::Invalid => CoreError::new(ErrorCode::InvalidInput, "an unknown server")
+            .with_detail(ErrorDetail::Validation {
+                field: "server".into(),
+                rule: ValidationRule::InvalidFormat,
+            }),
+        McpError::Unaudited => {
+            CoreError::new(ErrorCode::Internal, "the request could not be audited")
         }
     }
-}
-
-/// A document a listing or a seed query names; `hash` lets the sync skip it unread.
-#[derive(Debug, Clone, PartialEq)]
-pub struct RemoteDoc {
-    pub uri: String,
-    pub title: String,
-    pub hash: Option<String>,
-}
-
-/// `complete: false` (a partial listing, a seed-query crawl) never deletes indexed pages.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Listing {
-    pub items: Vec<RemoteDoc>,
-    pub complete: bool,
-}
-
-/// A document's text as the server returns it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Page {
-    pub title: String,
-    /// `text/markdown`, `text/html` or anything else read as plain text.
-    pub mime: String,
-    pub text: String,
-}
-
-/// Commits the `lookup` audit row of one request (its destination and the bytes that leave)
-/// before it may leave; `false` means it must not.
-pub type Audit<'a> = &'a (dyn Fn(&str, &[u8]) -> bool + Send + Sync);
-
-/// What a request to a server needs from the caller: the audit row of every request that
-/// leaves, and where a token renewed on the way is kept (the source's Keychain item).
-pub struct Remote<'a> {
-    pub audit: Audit<'a>,
-    pub renewed: &'a (dyn Fn(String) + Send + Sync),
 }
 
 /// What the sync and `source_add_mcp` need from an MCP server.
@@ -97,25 +50,57 @@ pub trait McpSource: Send + Sync {
     /// Its resources; `None` when the server offers none (the sync crawls seed queries then).
     fn list_resources<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
         remote: &'a Remote<'a>,
     ) -> BoxFuture<'a, Result<Option<Listing>, McpError>>;
     fn read_resource<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        uri: &'a str,
         remote: &'a Remote<'a>,
+        uri: &'a str,
     ) -> BoxFuture<'a, Result<Page, McpError>>;
     /// The server's search for `query`.
     fn seed_query<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        query: &'a str,
         remote: &'a Remote<'a>,
+        query: &'a str,
     ) -> BoxFuture<'a, Result<Listing, McpError>>;
+}
+
+impl McpSource for McpClient {
+    fn oauth<'a>(
+        &'a self,
+        server: &'a str,
+        audit: Audit<'a>,
+    ) -> BoxFuture<'a, Result<String, McpError>> {
+        Box::pin(async move { self.sign_in(server, audit).await })
+    }
+
+    fn list_resources<'a>(
+        &'a self,
+        remote: &'a Remote<'a>,
+    ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
+        Box::pin(async move { self.list(remote).await })
+    }
+
+    fn read_resource<'a>(
+        &'a self,
+        remote: &'a Remote<'a>,
+        uri: &'a str,
+    ) -> BoxFuture<'a, Result<Page, McpError>> {
+        Box::pin(async move { self.read(remote, uri).await })
+    }
+
+    fn seed_query<'a>(
+        &'a self,
+        remote: &'a Remote<'a>,
+        query: &'a str,
+    ) -> BoxFuture<'a, Result<Listing, McpError>> {
+        Box::pin(async move {
+            self.search(remote, query).await.map(|items| Resources {
+                items,
+                complete: false,
+            })
+        })
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Deserialize)]
@@ -202,7 +187,7 @@ impl ScriptedMcp {
         let issued = lock(&self.issued).get(name).map(String::as_str) == Some(token);
         let expired = server.expires_at.is_some_and(|at| (self.now)() >= at);
         if !issued || expired {
-            return Err(McpError::Rejected);
+            return Err(McpError::Unauthorized);
         }
         Ok(server)
     }
@@ -220,7 +205,7 @@ fn doc(p: &ScriptedPage) -> RemoteDoc {
     RemoteDoc {
         uri: p.uri.clone(),
         title: p.title.clone(),
-        hash: p.hash.clone(),
+        version: p.hash.clone(),
     }
 }
 
@@ -246,13 +231,11 @@ impl McpSource for ScriptedMcp {
 
     fn list_resources<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
         remote: &'a Remote<'a>,
     ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
         Box::pin(async move {
-            audited(remote, server, json!({ "method": "resources/list" }))?;
-            let s = self.serve(server, token)?;
+            audited(remote, remote.server, json!({ "method": "resources/list" }))?;
+            let s = self.serve(remote.server, remote.token)?;
             let complete = match s.listing {
                 ScriptedListing::None => return Ok(None),
                 listing => listing == ScriptedListing::Complete,
@@ -264,22 +247,19 @@ impl McpSource for ScriptedMcp {
 
     fn read_resource<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        uri: &'a str,
         remote: &'a Remote<'a>,
+        uri: &'a str,
     ) -> BoxFuture<'a, Result<Page, McpError>> {
         Box::pin(async move {
             let request = json!({ "method": "resources/read", "params": { "uri": uri } });
-            audited(remote, server, request)?;
-            let s = self.serve(server, token)?;
+            audited(remote, remote.server, request)?;
+            let s = self.serve(remote.server, remote.token)?;
             let p = s
                 .pages
                 .iter()
                 .find(|p| p.uri == uri)
                 .ok_or(McpError::Invalid)?;
             Ok(Page {
-                title: p.title.clone(),
                 mime: p.mime.clone().unwrap_or_else(|| "text/markdown".into()),
                 text: p.text.clone(),
             })
@@ -288,15 +268,13 @@ impl McpSource for ScriptedMcp {
 
     fn seed_query<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        query: &'a str,
         remote: &'a Remote<'a>,
+        query: &'a str,
     ) -> BoxFuture<'a, Result<Listing, McpError>> {
         Box::pin(async move {
             let request = json!({ "method": "seed_query", "params": { "query": query } });
-            audited(remote, server, request)?;
-            let s = self.serve(server, token)?;
+            audited(remote, remote.server, request)?;
+            let s = self.serve(remote.server, remote.token)?;
             let q = query.to_lowercase();
             let items = s
                 .pages

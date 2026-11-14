@@ -12,10 +12,16 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Pinned exactly: specta 2 is a release candidate and its exporter API moves between RCs (ADR-0001).
 specta = { version = "=2.0.0-rc.25", features = ["derive", "serde_json"] }
-specta-typescript = "=0.0.12"
-specta-serde = "=0.0.12"
+specta-typescript = { version = "=0.0.12", optional = true }
+specta-serde = { version = "=0.0.12", optional = true }
 schemars = "1"
+
+[features]
+default = []
+export = ["dep:specta-typescript", "dep:specta-serde"]
+fixtures = []
 
 [[bin]]
 name = "noter-contract-export"
 path = "src/bin/export.rs"
+required-features = ["export", "fixtures"]

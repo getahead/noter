@@ -7,7 +7,41 @@ use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
 use std::path::Path;
 use std::sync::Mutex;
 
+use noter_protocol::ipc::{Caller, CommandCtx};
+use noter_protocol::model::UiLogArgs;
+use noter_protocol::{Ack, CoreError, ErrorCode};
 use serde_json::{Map, Value};
+
+use crate::Core;
+
+// @cpt-flow:cpt-noter-flow-core-ipc-host-log-ui:p2
+// @cpt-dod:cpt-noter-dod-core-ipc-host-log-scrub:p1
+pub(super) fn log_ui(core: &Core, ctx: &CommandCtx, args: UiLogArgs) -> Result<Ack, CoreError> {
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-call
+    let window = match ctx.caller {
+        Caller::Window { label } => label.as_str(),
+        Caller::Native { .. } => "native",
+    };
+    let record = serde_json::json!({
+        "level": args.level,
+        "module": "ui",
+        "window": window,
+        "screen": args.screen,
+        "code": args.code,
+        "message_len": args.message.chars().count(),
+    });
+    // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-call
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-scrub
+    let line = scrub(crate::object(record));
+    // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-scrub
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-write
+    let written = core.log.append(line, core.deps.clock.now().0);
+    written.map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))?;
+    // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-write
+    // @cpt-begin:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-return
+    Ok(Ack {})
+    // @cpt-end:cpt-noter-flow-core-ipc-host-log-ui:p2:inst-log-return
+}
 
 /// Longest identifier a log line keeps (a screen, a command, an id).
 const ID_MAX: usize = 64;

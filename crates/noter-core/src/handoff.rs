@@ -7,7 +7,7 @@ use std::sync::Arc;
 use noter_db::rusqlite::OptionalExtension;
 use noter_db::ChangeMeta;
 use noter_handoff::{Begin, Facts, NewVersion, Quote};
-use noter_llm::{Cancel, Failure, LlmRuntime, Provenance, RunRequest, Skill, TaskKind};
+use noter_llm::{Cancel, Failure, Provenance, RunRequest, Skill, TaskKind};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;

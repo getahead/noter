@@ -182,6 +182,24 @@ final class CaptureTests: XCTestCase {
         }
     }
 
+    // cpt-noter-flow-core-engine-capture-session: unsupported backends fail before capture starts.
+    func testUnsupportedBackendIsRejectedBeforeOpeningCaptureResources() throws {
+        let (lines, source, root) = (Lines(), FakeSource(), try container())
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = engine(lines, source, root, TestClock())
+        let command = startLine(id: 7).replacingOccurrences(of: "whisper_turbo", with: "future_backend")
+
+        _ = e.handle(command)
+
+        let error = try XCTUnwrap(lines.events.last)
+        XCTAssertEqual(error["type"] as? String, "error")
+        XCTAssertEqual(error["cmd_id"] as? Int, 7)
+        XCTAssertEqual(error["code"] as? String, "bad_command")
+        XCTAssertEqual(source.starts, 0)
+        XCTAssertFalse(e.isCapturing)
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: root.path), [])
+    }
+
     func testASessionStartsCapturesWithLevelsAndStopsWithItsFiles() throws {
         let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
         let e = engine(lines, source, root, clock)
