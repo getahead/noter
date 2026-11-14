@@ -151,7 +151,7 @@ Post-call and handoff can call a model without creating another path for user te
 2. [x] - `p1` - For post-call, prefer the configured available runtime, then the PRD fallback order Claude Code, Codex, local; handoff prefers its target runtime then local - `inst-route-order`
 3. [x] - `p1` - Keep embeddings and redaction local; if the local redaction model is unavailable, retain regex redaction - `inst-route-redaction`
 4. [x] - `p1` - Refuse unknown CLI majors or versions outside the tested range with `cli_version_unsupported`; never assume a new CLI honors lockdown flags - `inst-route-version`
-5. [x] - `p1` - Apply API-key cost caps and allowed tools; two consecutive runtime failures within a call switch it to local, with effective state published through `privacy:changed` - `inst-route-failover`
+5. [x] - `p1` - Apply API-key cost caps and allowed tools; two consecutive runtime failures within a call switch it to local, record `switched_to_local` for that call in the core degraded state, and publish the effective state through `privacy:changed` - `inst-route-failover`
 6. [x] - `p1` - **IF** no policy-compliant runtime is available, **RETURN** `runtime_unavailable` with the existing runtime reason; never relax privacy - `inst-route-none`
 7. [x] - `p1` - **RETURN** the choice, model, effort, tools and timeout: post-call 10 minutes, Ask 60 seconds and live agent 8 seconds where those callers later use the interface - `inst-route-return`
 

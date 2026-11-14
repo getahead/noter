@@ -238,7 +238,7 @@ pub struct Core {
     /// Model downloads, shown in the setup status.
     downloads: Mutex<models::Downloads>,
     /// This core, for the tasks first run spawns (set by `start_first_run`).
-    this: std::sync::OnceLock<std::sync::Weak<Core>>,
+    this: Arc<std::sync::OnceLock<std::sync::Weak<Core>>>,
     /// The async runtime first run started on, for work that macOS notices start on its own
     /// threads.
     runtime: std::sync::OnceLock<tokio::runtime::Handle>,
@@ -405,8 +405,32 @@ impl Core {
         );
         let clock = deps.clock.clone();
         let revoked = Arc::downgrade(&accounts);
+        let this: Arc<std::sync::OnceLock<std::sync::Weak<Core>>> =
+            Arc::new(std::sync::OnceLock::new());
+        let switched = this.clone();
         let llm = Llm::new(store.clone(), deps.llm.clone(), move || clock.now())
             .with_secrets(deps.secrets.clone())
+            // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-failover
+            .on_switch_to_local(move |call_id| {
+                if let Some(core) = switched.get().and_then(std::sync::Weak::upgrade) {
+                    let mut states = core.app().degraded.states.clone();
+                    if !states.iter().any(|state| {
+                        matches!(
+                            state,
+                            DegradedState::SwitchedToLocal { call_id: Some(existing), .. }
+                                if *existing == *call_id
+                        )
+                    }) {
+                        states.push(DegradedState::SwitchedToLocal {
+                            call_id: Some(call_id.clone()),
+                            reason: noter_protocol::error::RuntimeUnavailableReason::Offline,
+                            retry_at: None,
+                        });
+                        core.set_degraded(states);
+                    }
+                }
+            })
+            // @cpt-end:cpt-noter-algo-core-llm-gate-route:p1:inst-route-failover
             .on_key_rejected(move |runtime, run| {
                 if let Some(accounts) = revoked.upgrade() {
                     accounts.revoked(runtime, run);
@@ -434,7 +458,7 @@ impl Core {
             hotkeys: Mutex::new(hotkeys::fresh_list()),
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
-            this: std::sync::OnceLock::new(),
+            this,
             runtime: std::sync::OnceLock::new(),
             engine,
             self_test_hub: std::sync::OnceLock::new(),
