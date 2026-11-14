@@ -9,7 +9,7 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
         let originalFrame = main.frame
         app.typeKey("w", modifierFlags: .command)
-        XCTAssertTrue(waitUntil(5) { app.state == .runningForeground }, "closing the main window must leave the app running")
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 5), "closing the main window leaves the menu bar extra available")
         XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing the main window should hide it")
         let menu = openMenu()
         item("Open Noter", in: menu).click()
@@ -23,17 +23,16 @@ final class MenuBarTests: NoterTestCase {
         startRecording()
         let main = window("Noter")
         XCTAssertTrue(main.waitForExistence(timeout: 5))
-        main.typeKey("w", modifierFlags: .command)
+        app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(waitUntil(5) { !main.isHittable }, "the main window is hidden before opening the call panel")
         press("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "the call panel opens for Mark Moment feedback")
         XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 5), "the call panel has loaded its page")
         let menu = openMenu()
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
-        let marked = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Marked '")).firstMatch
-        XCTAssertFalse(marked.exists, "there is no mark feedback before Mark Moment is clicked")
+        XCTAssertFalse(accessibilityTreeContains("Marked ", in: callWindow), "there is no mark feedback before Mark Moment is clicked")
         item("Mark Moment", in: menu).click()
-        XCTAssertTrue(marked.waitForExistence(timeout: 5), "Mark Moment adds visible feedback to the call window")
+        XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("Marked ", in: callWindow) }, "Mark Moment adds visible feedback to the call window")
         let reopened = openMenu()
         item("Pause", in: reopened).click()
         let paused = openMenu()
@@ -151,9 +150,9 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
         let main = window("Noter")
         XCTAssertTrue(main.waitForExistence(timeout: 5))
-        main.typeKey("w", modifierFlags: .command)
+        app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing hides the main window while leaving the call panel open")
-        XCTAssertTrue(waitUntil(5) { app.state == .runningForeground }, "closing the main window leaves Noter running in the menu bar")
+        XCTAssertTrue(statusItem.waitForExistence(timeout: 5), "closing the main window leaves the menu bar extra available")
         let menu = openMenu()
         XCTAssertFalse(main.isHittable, "opening the menu does not itself restore the main window")
         let openNoter = item("Open Noter", in: menu)
@@ -169,7 +168,7 @@ final class MenuBarTests: NoterTestCase {
         launch("idle")
         let main = window("Noter")
         XCTAssertTrue(main.waitForExistence(timeout: 5))
-        main.typeKey("w", modifierFlags: .command)
+        app.typeKey("w", modifierFlags: .command)
         XCTAssertTrue(waitUntil(5) { !main.isHittable }, "the main window is hidden before Open Last Summary")
         let last = openMenu().menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Open Last Summary — '")).firstMatch
         XCTAssertTrue(last.waitForExistence(timeout: 10), "the menu offers Open Last Summary for the call with ready outputs")
@@ -178,7 +177,7 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Last Summary shows the hidden main window")
         XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("Backend sync", in: main) }, "the selected call is the latest ready summary")
         let summaryTab = app.buttons["Summary"]
-        let summaryPopup = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'View'")).firstMatch
+        let summaryPopup = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Call page view'")).firstMatch
         XCTAssertTrue(waitUntil(5) {
             (summaryTab.exists && summaryTab.isSelected)
                 || (summaryPopup.exists && (summaryPopup.value as? String) == "Summary")

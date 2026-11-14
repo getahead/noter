@@ -81,10 +81,18 @@ final class HandoffTests: NoterTestCase {
                        "the handoff sheet pre-fills the project key")
         XCTAssertTrue(choose.isEnabled, "Choose is enabled once the project key is valid")
         choose.click()
-        let panel = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'open' OR label CONTAINS[c] 'choose' OR title CONTAINS[c] 'open' OR title CONTAINS[c] 'choose'")).firstMatch
+        let nativePanelTypes = NSPredicate(format: "elementType == %d OR elementType == %d OR elementType == %d",
+                                           XCUIElement.ElementType.sheet.rawValue,
+                                           XCUIElement.ElementType.dialog.rawValue,
+                                           XCUIElement.ElementType.window.rawValue)
+        let panelWithOpenAction = NSPredicate(format: "label == 'Open' OR title == 'Open'")
+        let panel = app.descendants(matching: .any).matching(nativePanelTypes).containing(panelWithOpenAction).firstMatch
         XCTAssertTrue(panel.waitForExistence(timeout: 10), "the native folder picker is shown — \(screen())")
+        XCTAssertTrue(panel.buttons["Open"].waitForExistence(timeout: 5), "the native folder picker offers its Open action")
         app.typeKey(.escape, modifierFlags: [])
         XCTAssertTrue(panel.waitForNonExistence(timeout: 5), "Escape cancels the native folder picker")
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "cancelling leaves the mapping draft open")
+        XCTAssertEqual(key.value as? String, "VSTOR", "cancelling preserves the project key")
     }
 
     func test_automation_denied_leaves_copy_prompt_available() {

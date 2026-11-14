@@ -25,12 +25,9 @@ final class NotificationsTests: NoterTestCase {
         XCTAssertTrue(stop.waitForExistence(timeout: 5), "the menu did not open")
         XCTAssertTrue(waitUntil(3) { self.other.state == .runningForeground }, "opening the menu bar extra keeps the call app in front")
         clickKeepingFocus(stop)
-        var start = item("Start Recording", in: openMenu())
-        for _ in 0..<5 where !start.waitForExistence(timeout: 1) {
-            closeMenu()
-            start = item("Start Recording", in: openMenu())
-        }
-        XCTAssertTrue(start.waitForExistence(timeout: 2), "stopping returns the menu to its not-recording state")
+        clickKeepingFocus(statusItem)
+        let start = item("Start Recording", in: statusItem.menus.firstMatch)
+        XCTAssertTrue(start.waitForExistence(timeout: 5), "stopping returns the menu to its not-recording state")
         XCTAssertTrue(waitUntil(3) { self.other.state == .runningForeground }, "stopping from the menu keeps focus on the other app")
     }
 }
