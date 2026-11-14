@@ -57,12 +57,12 @@ export function recorderReduce(s: RecorderState, e: RecorderEvent): RecorderStat
     case "refused":
       // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-conflict
       // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
-      return s.type === "RECORDING" || s.type === "IDLE" ? { type: "CONFLICT", message: e.message } : s;
+      return s.type === "RECORDING" || s.type === "IDLE" || s.type === "CLEARED" ? { type: "CONFLICT", message: e.message } : s;
       // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-conflict
       // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-idle-conflict
     case "clear":
       // @cpt-begin:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
-      return recording || s.type === "IDLE" ? { type: "CLEARED" } : s;
+      return s.type === "DISABLED" ? s : { type: "CLEARED" };
       // @cpt-end:cpt-noter-state-ui-settings-hotkey-recorder:p1:inst-recording-cleared
     case "dismiss":
       return s.type === "INVALID" || s.type === "CONFLICT" ? { type: "IDLE" } : s;

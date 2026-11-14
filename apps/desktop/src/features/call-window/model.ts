@@ -1,9 +1,9 @@
 // The call window's logic (docs/features/ui/call-window.md): what it shows for the core's capture,
 // degraded, window and presenting state. Pure functions; the components render what they return.
-import type { CallWindowState, CaptureNotice, CaptureState, DegradedState, PauseInfo, PermissionKind } from "../../core/bindings";
+import type { CallWindowState, CaptureNotice, CaptureState, DegradedState, PauseInfo, PermissionKind, UiPrefs } from "../../core/bindings";
 import type { AnnounceEvent } from "../../app/a11y/announce";
 import type { Banner } from "../../ui/feedback/inline-banner";
-import { t } from "../../i18n/format";
+import { clock, t } from "../../i18n/format";
 
 export type CaptureView = "RECORDING" | "MIC_ONLY" | "NO_MIC" | "PAUSED" | "NOT_RECORDING" | "NOTICE_CALL_ENDED" | "NOTICE_NEW_MEETING" | "NOTICE_NOTHING_HEARD" | "STOPPED";
 export type IndicatorStatus = "recording" | "paused" | "mic-only" | "no-mic" | "not-recording" | "stopped";
@@ -264,17 +264,12 @@ const minutes = (ms: number) => Math.max(1, Math.round(ms / 60_000));
 const CONTINUE_MS = 5 * 60_000;
 
 /** The closing state's title: Continue Recording is offered for 5 minutes after the stop, so the stop was `continue_until` minus 5 minutes. */
-export function closingTitle(c: CaptureState, timeZone?: string, h12 = false): { auto: boolean; text: string } {
+export function closingTitle(c: CaptureState, prefs?: UiPrefs): { auto: boolean; text: string } {
   // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-if-auto
   if (c.notice?.type === "stopped_automatically") {
     // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-auto
     const at = (c.continue_until ?? Date.now() + CONTINUE_MS) - CONTINUE_MS;
-    const time = new Intl.DateTimeFormat("en", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: h12 ? "h12" : "h23",
-      timeZone: timeZone || undefined,
-    }).format(at);
+    const time = clock(at, prefs);
     return {
       auto: true,
       text: t("cw.closing.auto", { time, minutes: minutes(c.recorded_ms) }),

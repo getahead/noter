@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import { useAfter } from "../../app/use-after";
 import type { CallPageTab, TimeSpan } from "../../core/bindings";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
@@ -13,7 +14,7 @@ import { audioLine, StoredTranscript } from "../transcript/hosts";
 import { LanguageTag } from "../transcript/labels";
 import { deleteCall, openCallPage, pageKey, readCall, readKey, reportView } from "./actions";
 import { holdDeleteError, useDeleteError, useExtras } from "./cache";
-import { afterTimer, callViews, pageState } from "./logic";
+import { callViews, pageState } from "./logic";
 import { registeredViews, views } from "./views";
 import "./call-page.css";
 import "./outputs.css";
@@ -104,13 +105,6 @@ export function CallPage({ bridge, callId, span, tab = "transcript" }: { bridge:
     </div>
   );
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-return-open
-}
-
-/** True once `active` has held for `ms` (skeleton rows after 300 ms, never a flash for a quick read). */
-function useAfter(ms: number, active: boolean): boolean {
-  const [late, setLate] = useState(false);
-  useEffect(() => afterTimer(ms, active, setLate), [ms, active]);
-  return active && late;
 }
 
 /** Skeleton rows while the call is read. */

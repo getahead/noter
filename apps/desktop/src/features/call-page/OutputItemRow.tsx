@@ -3,6 +3,7 @@
 import { useWindow } from "../../app/use-window";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { ItemView } from "../../core/bindings";
+import { openSpan } from "../items/evidence";
 import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { Link } from "../../ui/primitives/link";
@@ -22,7 +23,7 @@ export function OutputItemRow({ bridge, item: listed }: { bridge: Bridge; item: 
       {item.topic && <Badge kind="kind" text={item.topic.name} />}
       {item.review === "suggested" && <Badge kind="status" tone="accent" text={t("outputs.suggested")} />}
       {/* the evidence opens the transcript at the span (`window_navigate`, as a notification does) */}
-      {Tail ? <Tail bridge={bridge} item={item} /> : span && <Link label={t("outputs.evidence")} onAction={() => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen: "main-window-shell" })} />}
+      {Tail ? <Tail bridge={bridge} item={item} /> : span && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, span, "main-window-shell")} />}
     </li>
   );
 }

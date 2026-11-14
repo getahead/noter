@@ -1,13 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { createElement } from "react";
+import { renderToString } from "react-dom/server";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { deleteCall, loadCall, loadTypes, menuActs, pageKey, openCallPage, openPrivacySettings, readCall, rename, reportView, requestNotifications, revealFolder, saveTitle, setCallType, setSensitive } from "./actions";
-import { deleteErrorOf, holdExtras, resetCache, useExtras } from "./cache";
+import { holdExtras, resetCache, useDeleteError, useExtras } from "./cache";
 import { slots } from "./slots";
 
 let bridge: Bridge;
 let fake: FakeCore;
+const DeleteErrorProbe = ({ callId }: { callId: string }) => createElement("output", null, useDeleteError(callId)?.code ?? "none");
+const deleteErrorText = (callId: string) => renderToString(createElement(DeleteErrorProbe, { callId }));
 afterEach(() => {
   slots.deleteCall = null;
   resetCache();
@@ -182,14 +186,14 @@ describe("opening the page and its controls", () => {
     const id = fake.world.calls[0]!.id;
     const error = { code: "internal", message: "x", retryable: true, detail: null } as const;
     let next: Awaited<ReturnType<NonNullable<typeof slots.deleteCall>>> = { outcome: "failed", error };
-    const seen: unknown[] = [];
-    slots.deleteCall = async () => (seen.push(deleteErrorOf(id)), next);
+    const seen: string[] = [];
+    slots.deleteCall = async () => (seen.push(deleteErrorText(id)), next);
     await deleteCall(bridge, id);
-    expect(deleteErrorOf(id)).toEqual(error);
+    expect(deleteErrorText(id)).toContain("internal");
     next = { outcome: "deleted" };
     await deleteCall(bridge, id);
-    expect(seen).toEqual([undefined, undefined]);
-    expect(deleteErrorOf(id)).toBeUndefined();
+    expect(seen).toEqual(["<output>none</output>", "<output>none</output>"]);
+    expect(deleteErrorText(id)).toContain("none");
   });
 
   it("⌘⌫ deletes the call, but not while a text field has the key, nor with another modifier or a repeat", async () => {

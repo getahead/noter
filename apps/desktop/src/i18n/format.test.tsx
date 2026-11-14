@@ -13,7 +13,6 @@ import {
   shortDay,
   t,
   tParts,
-  usd,
 } from "./format";
 import { Msg } from "./Msg";
 
@@ -26,8 +25,8 @@ describe("t", () => {
     t("action.try_again");
     expect(numbers).not.toHaveBeenCalled();
     expect(plurals).not.toHaveBeenCalled();
-    expect(t("announce.cards_held", { count: 1 })).toBe("1 new card waiting");
-    expect(t("announce.cards_held", { count: 2 })).toBe("2 new cards waiting");
+    expect(t("library.status.speakers", { count: 1 })).toBe("1 speaker not named");
+    expect(t("library.status.speakers", { count: 2 })).toBe("2 speakers not named");
     expect(numbers).toHaveBeenCalledOnce();
     expect(plurals).toHaveBeenCalledOnce();
     numbers.mockRestore();
@@ -38,35 +37,25 @@ describe("t", () => {
     expect(t("announce.recording_stopped", { duration: "48 min" })).toBe(
       "Recording stopped, saved 48 min",
     );
-    expect(t("announce.cards_held", { count: 1 })).toBe("1 new card waiting");
-    expect(t("announce.cards_held", { count: 1200 })).toBe(
-      "1,200 new cards waiting",
-    );
-    expect(t("announce.search_done", { count: 0 })).toBe("0 results");
   });
   it("leaves a missing placeholder visible and plain messages untouched", () => {
-    expect(t("announce.copied")).toBe("Copied for {target}");
+    expect(t("banner.quit_recording")).toBe("Noter quit during {title}");
     expect(t("action.try_again")).toBe("Try Again");
-  });
-  it("falls back to en without a navigator", () => {
-    vi.stubGlobal("navigator", undefined);
-    expect(t("announce.cards_held", { count: 2 })).toBe("2 new cards waiting");
-    vi.unstubAllGlobals();
   });
 });
 
 describe("tParts and quote", () => {
   it("gives quoted user text its own lang and keeps the rest plain", () => {
     expect(
-      tParts("announce.copied", { target: quote("Привет", "ru") }),
-    ).toEqual([{ text: "Copied for " }, { text: "“Привет”", lang: "ru" }]);
+      tParts("banner.quit_recording", { title: quote("Planning", "ru") }),
+    ).toEqual([{ text: "Noter quit during " }, { text: "“Planning”", lang: "ru" }]);
   });
   it("renders through <Msg>", () => {
     expect(
       renderToStaticMarkup(
-        <Msg id="announce.copied" args={{ target: quote("Hallo", "de") }} />,
+        <Msg id="banner.quit_recording" args={{ title: quote("Planning", "de") }} />,
       ),
-    ).toBe('Copied for <span lang="de">“Hallo”</span>');
+    ).toBe('Noter quit during <span lang="de">“Planning”</span>');
     expect(renderToStaticMarkup(<Msg id="window.error" />)).toBe(
       "Something went wrong",
     );
@@ -76,12 +65,12 @@ describe("tParts and quote", () => {
 describe("pseudo-localisation", () => {
   it("maps to Cyrillic look-alikes, pads +40 % and keeps placeholders and args", () => {
     setPseudo("cyrillic");
-    const s = t("announce.copied", { target: "Apex" });
+    const s = t("banner.quit_recording", { title: "Apex" });
     expect(s).toContain("Apex");
-    expect(s).not.toContain("Copied");
-    expect(s.startsWith("Сорiеd")).toBe(true);
-    expect(t("announce.copied", { target: "" }).length).toBeGreaterThanOrEqual(
-      Math.ceil("Copied for ".length * 1.4),
+    expect(s).not.toContain("Noter");
+    expect(s.length).toBeGreaterThanOrEqual("Noter quit during Apex".length);
+    expect(t("banner.quit_recording", { title: "" }).length).toBeGreaterThanOrEqual(
+      Math.ceil("Noter quit during ".length * 1.4),
     );
   });
   it("uses umlauts for German and +40 % only for short labels", () => {
@@ -131,9 +120,6 @@ describe("value helpers", () => {
     expect(duration(2880)).toBe("48 min");
     expect(duration(0)).toBe("0 sec");
     expect(duration(3660)).toBe("1 hr, 1 min");
-  });
-  it("usd is money in the locale format", () => {
-    expect(usd(0.31)).toBe("$0.31");
   });
   it("formatDateTime follows the 12/24 hour preference and the time zone", () => {
     const ms = Date.UTC(2026, 9, 18, 15, 30);

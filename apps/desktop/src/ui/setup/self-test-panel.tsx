@@ -11,8 +11,8 @@ import "./setup.css";
 
 export interface SelfTestPanelProps {
   panel: Panel;
-  /** step (first-run), sheet (the self-test sheet) or settings. */
-  variant?: "step" | "sheet" | "settings";
+  /** step (first-run) or sheet (the self-test sheet). */
+  variant?: "step" | "sheet";
   /** The speech model's progress, while the panel waits for it. */
   waitingPercent?: number;
   /** The user pressed Play Test Clip for this run. */

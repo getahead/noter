@@ -6,7 +6,7 @@ const run = (s: WindowState, ...events: Parameters<typeof windowReduce>[1][]) =>
 
 describe("settings window state", () => {
   it("starts on the General pane", () => {
-    expect(INITIAL_WINDOW).toMatchObject({ pane: "general", search: "", error: null, hidden: false });
+    expect(INITIAL_WINDOW).toEqual({ pane: "general", search: "" });
     expect(windowKind(INITIAL_WINDOW)).toBe("PANE");
   });
 
@@ -28,18 +28,9 @@ describe("settings window state", () => {
     expect(s).toMatchObject({ pane: "hotkeys", search: "zoom" });
   });
 
-  it("shows PANE_ERROR until the core reports the fix", () => {
-    const s = run(INITIAL_WINDOW, { type: "error", message: "Keychain is locked" });
-    expect(windowKind(s)).toBe("PANE_ERROR");
-    expect(s.error).toBe("Keychain is locked");
-    expect(windowKind(windowReduce(s, { type: "fixed" }))).toBe("PANE");
-  });
-
-  it("comes back as it was after being hidden for presenting", () => {
-    const before = run(INITIAL_WINDOW, { type: "pane", pane: "privacy" }, { type: "error", message: "x" });
-    const hidden = windowReduce(before, { type: "hidden", hidden: true });
-    expect(windowKind(hidden)).toBe("HIDDEN_FOR_PRESENTING");
-    expect(windowReduce(hidden, { type: "hidden", hidden: false })).toEqual(before);
+  it("shows the read error above the pane and returns to it when the read recovers", () => {
+    expect(windowKind(INITIAL_WINDOW, true)).toBe("PANE_ERROR");
+    expect(windowKind(INITIAL_WINDOW, false)).toBe("PANE");
   });
 });
 

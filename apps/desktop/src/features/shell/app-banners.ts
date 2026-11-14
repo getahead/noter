@@ -1,5 +1,5 @@
 import type { BannerKind, CallId } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { locale, quote, t, tParts } from "../../i18n/format";
 import type { WholeSlices } from "../../app/store/window-store";
 import type { Banner } from "../../ui/feedback/inline-banner";
 
@@ -36,9 +36,6 @@ export function commandFailuresKey(commands: Record<string, { state: string; err
 
 export const isBannerKind = (id: string): id is BannerKind => id === "recording_interrupted_by_quit" || id === "update_ready" || id === "roll_up_failed";
 
-/** The title between “ ” in the quit banner, as DESIGN writes it. */
-const quoted = (title: string) => `“${title}”`;
-
 /**
  * The app-level banners MW-R5 shows, before the slot orders them (error, warning, degraded, info): the core's
  * `banners:changed` set, and the self-test notice, which the shell derives from the setup status because the
@@ -50,6 +47,7 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
   const out: Banner[] = [];
   for (const b of whole.banners?.banners ?? []) {
     if (b.type === "recording_interrupted_by_quit") {
+      const textParts = tParts("banner.quit_recording", { title: quote(b.call.title, locale()) });
       out.push({
         id: b.type,
         severity: "warning",
@@ -57,7 +55,8 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
         dismissible: true,
         // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-dismiss
         // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-quit
-        text: t("banner.quit_recording", { title: quoted(b.call.title) }),
+        text: textParts.map(({ text }) => text).join(""),
+        textParts,
         actions: [
           { label: t("banner.open_call"), onAction: () => a.openCall(b.call.id) },
           // @cpt-end:cpt-noter-flow-ui-today-capture:p1:inst-quit

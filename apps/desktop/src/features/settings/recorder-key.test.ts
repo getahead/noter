@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { holdMore, onRecordKey, releasedSet, type RecorderKey } from "./recorder-key";
+import { clearRecorder, holdMore, onRecordKey, releasedSet, type RecorderKey } from "./recorder-key";
 
 const key = (over: Partial<RecorderKey> = {}): RecorderKey => ({ code: "KeyU", ctrlKey: true, altKey: true, metaKey: true, shiftKey: false, repeat: false, ...over });
 
@@ -32,6 +32,15 @@ describe("onRecordKey", () => {
       modifiers: { control: true, option: false, command: false, shift: false },
     });
   });
+});
+
+it("clears the recorder state and settles the core response from the Clear button", async () => {
+  const dispatch = vi.fn();
+  const settle = vi.fn();
+  const answer = Promise.resolve({ ok: true as const });
+  clearRecorder({ dispatch, settle, onClear: () => answer });
+  expect(dispatch).toHaveBeenCalledWith({ type: "clear" });
+  expect(settle).toHaveBeenCalledWith(answer);
 });
 
 describe("a modifier set is saved once, when the keys are released", () => {

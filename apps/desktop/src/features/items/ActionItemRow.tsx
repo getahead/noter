@@ -4,10 +4,11 @@
 import { useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
+import { elementId } from "../../app/element-id";
 import { isTyping } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { ItemView, PersonChip } from "../../core/bindings";
-import { dayOf, locale, quote, t } from "../../i18n/format";
+import { dayOf, quote, t, zoned } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { Badge } from "../../ui/primitives/badge";
@@ -27,10 +28,10 @@ import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, r
 import { ShareMenu } from "../call-page/ShareMenu";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { handoffButtonId, slots } from "./slots";
+import { openSpan } from "./evidence";
 import "./items.css";
 
-export const elementId = (kind: string, id: string) => [kind, id].join("-");
-const dueText = (due: string) => new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${due}T00:00`));
+const dueText = (due: string) => zoned(new Date(`${due}T00:00`).getTime(), { weekday: "short", day: "numeric", month: "short" }, undefined);
 
 /** The live item: the store's record unless the section handed over a newer one. */
 export function useItem(bridge: Bridge, item: ItemView): ItemView {
@@ -145,7 +146,7 @@ export function rowKey(bridge: Bridge, it: ItemView, local: Local, e: KeyboardEv
   if (rowFocused && !isTyping(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === " " && it.kind === "action_item") return stop(), void setDone(bridge, it, it.status !== "done");
   if (rowFocused && !isTyping(e.target) && !e.metaKey && !e.ctrlKey && !e.altKey && e.key === "Enter" && it.spans[0]) {
     const span = it.spans[0];
-    return stop(), void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen: "main-window-shell" });
+    return stop(), void openSpan(bridge, span, "main-window-shell");
   }
   const key = keyOf(e);
   if (it.review !== "suggested" || !key) return;
@@ -261,7 +262,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {owner}
           {text}
           {due}
-          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }), { screen: "main-window-shell" })} />}
+          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, it.spans[0]!, "main-window-shell")} />}
           {tags}
           {prov}
           <span className="np-tb__spacer" />
@@ -284,7 +285,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
         </div>
         <div className="it-row__line2">
           {due}
-          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }), { screen: "main-window-shell" })} />}
+          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, it.spans[0]!, "main-window-shell")} />}
           {tags}
           {prov}
         </div>

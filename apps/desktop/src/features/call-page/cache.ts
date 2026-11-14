@@ -52,7 +52,6 @@ export const useExtras = (callId: string): Extras | undefined => {
   const get = () => held.extras.get(callId);
   return useSyncExternalStore(subscribe, get, get);
 };
-export const deleteErrorOf = (callId: string): CoreError | undefined => held.deleteErrors.get(callId);
 export const useDeleteError = (callId: string): CoreError | undefined => {
   const get = () => held.deleteErrors.get(callId);
   return useSyncExternalStore(subscribe, get, get);

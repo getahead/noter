@@ -968,10 +968,10 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Milestone**: M1. **Spec**: [`docs/features/ui/notifications.md`](features/ui/notifications.md). **Status**: IMPLEMENTED.
 
-- **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-settings`
+- **Depends On**: `cpt-noter-feature-ui-call-page-frame`, `cpt-noter-feature-ui-settings`, `cpt-noter-feature-core-capture-session`
 
 - **Scope**:
-  - The content and send rules of NT-1, NT-2 and NT-3 (built and posted by the core, native)
+  - The notification content and permission UI; the core decides when to send, hold or drop NT-1, NT-2 and NT-3, and the UI native host maps delivered kinds and posts the native notifications
   - The permission request from the Call page banner, and **Notifications are off for Noter** in Settings › General
   - Clicks that open the Call page or the call window; XCUITest coverage of posting and clicks
 

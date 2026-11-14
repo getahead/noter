@@ -1,6 +1,7 @@
 // What follows a decision, question or risk in the Summary view: its provenance time, the review buttons while it is
 // suggested (Edit opens the Item inspector) and the (i) button. Registered in the section's seam (`register.tsx`).
 import type { Bridge } from "../../app/bridge/bridge";
+import { elementId } from "../../app/element-id";
 import type { ItemView } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
@@ -8,7 +9,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { ShareMenu } from "../call-page/ShareMenu";
 import { SECTION_OF } from "./review";
 import { undoRow } from "./actions";
-import { elementId, ReviewButtons, useItem } from "./ActionItemRow";
+import { ReviewButtons, useItem } from "./ActionItemRow";
 import { patchLocal, useLocal } from "./local";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";

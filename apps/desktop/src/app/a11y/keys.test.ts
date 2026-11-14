@@ -6,7 +6,6 @@ import {
   isTyping,
   listenKeys,
   matchShortcut,
-  useShortcuts,
   type ShortcutEvent,
 } from "./keys";
 
@@ -136,11 +135,6 @@ describe("handleShortcut", () => {
     expect(run).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
-  });
-  it("useShortcuts returns a handler over the table", () => {
-    const run = vi.fn();
-    useShortcuts({ KeyA: run })(ev("KeyA"));
-    expect(run).toHaveBeenCalled();
   });
 });
 

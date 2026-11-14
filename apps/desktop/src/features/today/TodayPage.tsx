@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
+import { useAfter } from "../../app/use-after";
 import { openReview } from "../items/review-banner";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { Disclosure } from "../../ui/primitives/disclosure";
@@ -13,20 +14,13 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Link } from "../../ui/primitives/link";
 import { PushButton } from "../../ui/primitives/push-button";
-import { afterTimer } from "../call-page/logic";
 import { allowCalendar, loadToday, READ_KEY } from "./actions";
 import { useToday } from "./cache";
 import { expandLive, calendarState, cards, isExpanded, proposalPreview, reviewLine, weekCards } from "./model";
+import { openSpan } from "../items/evidence";
 import { ProposalRow } from "./ProposalRow";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 import "./today.css";
-
-/** True once `active` has held for `ms` (skeleton cards after 300 ms, never a flash for a quick read). */
-function useAfter(ms: number, active: boolean): boolean {
-  const [late, setLate] = useState(false);
-  useEffect(() => afterTimer(ms, active, setLate), [ms, active]);
-  return active && late;
-}
 
 // @cpt-component:cpt-noter-component-screen-today:p1
 // @cpt-dod:cpt-noter-dod-ui-today-dashboard:p1
@@ -100,7 +94,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       if (span) {
         event.preventDefault();
         // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-links
-        void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: span.call_id, tab: "transcript", span } }), { screen: "main-window-shell" });
+        void openSpan(bridge, span, "main-window-shell");
         // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-links
       }
     }

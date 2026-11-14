@@ -1,7 +1,7 @@
 // The window's behaviour that is not drawing: what each shell action does to the view state, how a navigation request
 // of the core moves the history, the page's scroll memory, focus after navigation and the width watcher. Kept out of
 // the component so each one is tested on its own (the unit environment has no DOM).
-import { createFocusReturn, type FocusTarget } from "../../app/a11y/focus";
+import { focusAndReturn, type FocusTarget } from "../../app/a11y/focus";
 import type { NavTarget } from "../../core/bindings";
 import { collapse, type CollapseInput, type CollapseResult } from "./collapse";
 import type { History, HistoryMove } from "./history";
@@ -127,11 +127,15 @@ export function leaveTimer(leaving: boolean, done: () => void, ms: number = exit
 }
 
 /** The inspector took focus when it opened: closing it returns focus to the control that opened it, at once. */
-export function openFocus(open: boolean, inspector: Parameters<ReturnType<typeof createFocusReturn>["open"]>[0], getActive: () => FocusTarget | null): (() => void) | undefined {
+// @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
+export function openFocus(open: boolean, inspector: FocusTarget | undefined, getActive: () => FocusTarget | null): (() => void) | undefined {
   if (!open) return undefined;
-  const fr = createFocusReturn(getActive);
-  fr.open(inspector);
-  return () => fr.close();
+  const restore = focusAndReturn(inspector, getActive);
+  return () => {
+    // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus-done
+    restore();
+    // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus-done
+  };
 }
 
 /** The inspector opens for the user, or docks by itself (D81): only the user's open takes focus; the flag is spent either way. */

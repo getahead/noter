@@ -15,7 +15,6 @@ export interface CellStatus {
   /** The text links to the call's page (the naming panel arrives in M2). */
   link?: boolean;
 }
-
 // @cpt-algo:cpt-noter-algo-ui-library-calls-status-cell:p1
 /** The first that applies: summary failed, writing, speakers not named, archive pending; null when none. */
 export function statusOf(c: CallRow): CellStatus | null {
@@ -50,27 +49,9 @@ export function statusOf(c: CallRow): CellStatus | null {
   // @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-order
 }
 
-// "15 Nov": en-US supplies the short month ("Sep", where en-GB says "Sept"); the day goes first, as in the prototype
-const dayFormatters = new Map<string, Intl.DateTimeFormat>();
-const day = (ms: number, tz?: string) => {
-  let fmt = dayFormatters.get(tz ?? "");
-  if (!fmt) {
-    fmt = new Intl.DateTimeFormat("en-US", {
-      day: "numeric",
-      month: "short",
-      timeZone: tz,
-    });
-    dayFormatters.set(tz ?? "", fmt);
-  }
-  const p = fmt.formatToParts(ms);
-  return `${p.find((x) => x.type === "day")!.value} ${p.find((x) => x.type === "month")!.value}`;
-};
-
 /** The help tag of the audio-deleted glyph (D-36: no date, no retention). */
 export function audioDeletedHelp(c: CallRow): string | null {
   // @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-audio-glyph
   return c.audio_deleted ? t("library.row.audio_deleted") : null;
   // @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-audio-glyph
 }
-
-export { day as shortDay };

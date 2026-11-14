@@ -344,6 +344,7 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
           return s;
       }
     }
+    // @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-progress
     case "outputs:progress":
       return {
         ...s,
@@ -352,6 +353,7 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
           [`${e.payload.call_id}/${e.payload.section}`]: e.payload,
         },
       };
+    // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-progress
     case "jobs:progress":
       return { ...s, jobs: { ...s.jobs, [e.payload.run.id]: e.payload.run } };
     case "signin:progress":

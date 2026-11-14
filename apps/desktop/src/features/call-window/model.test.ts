@@ -1,6 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { CallWindowState, CaptureState, DegradedState } from "../../core/bindings";
+import type { CallWindowState, CaptureState, DegradedState, UiPrefs } from "../../core/bindings";
 import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncement, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, windowState, type BannerHandlers } from "./model";
 
 const cap = (patch: Partial<CaptureState> = {}): CaptureState => ({
@@ -20,6 +20,7 @@ const cap = (patch: Partial<CaptureState> = {}): CaptureState => ({
   audio_writing: true,
   ...patch,
 });
+const prefs = (time_format: "h12" | "h24" = "h24") => ({ time_zone: "UTC", time_format }) as UiPrefs;
 const win = (patch: Partial<CallWindowState> = {}): CallWindowState => ({ version: 1, visible: true, key: false, layout: "dedicated", collapsed: false, display_id: null, chosen_display_missing: false, show_share_warning: false, ...patch });
 const SLACK: DegradedState = { type: "second_audio_source", call_id: "call_live", app_name: "Slack", bundle_id: "com.tinyspeck.slackmacgap", since: 1 };
 const handlers = (): BannerHandlers => ({ exclude: vi.fn(), keep: vi.fn(), openSettings: vi.fn(), retry: vi.fn(), deleteOldAudio: vi.fn() });
@@ -114,15 +115,23 @@ describe("failureAnnouncement", () => {
 
 describe("closingTitle (cpt-noter-algo-ui-call-window-closing-state)", () => {
   it("reads Saved · N min after a manual stop, and Stopped at hh:mm after an automatic one", () => {
-    expect(closingTitle(cap({ phase: "stopped", continue_until: Date.UTC(2026, 9, 24, 11, 7) }), "UTC")).toEqual({ auto: false, text: "Saved · 48 min · Summary in about 2 minutes" });
-    const auto = closingTitle(cap({ phase: "stopped", notice: { type: "stopped_automatically", call_id: "call_live" }, continue_until: Date.UTC(2026, 9, 24, 11, 7) }), "UTC");
+    expect(closingTitle(cap({ phase: "stopped", continue_until: Date.UTC(2026, 9, 24, 11, 7) }), prefs())).toEqual({ auto: false, text: "Saved · 48 min · Summary in about 2 minutes" });
+    const auto = closingTitle(cap({ phase: "stopped", notice: { type: "stopped_automatically", call_id: "call_live" }, continue_until: Date.UTC(2026, 9, 24, 11, 7) }), prefs());
     expect(auto).toEqual({ auto: true, text: "Stopped at 11:02 · the call had ended · 48 min saved" });
   });
 
+  it("formats the stopped time with the interface locale and 12-hour preference", () => {
+    vi.stubGlobal("navigator", { language: "en-GB" });
+    const auto = closingTitle(cap({ phase: "stopped", notice: { type: "stopped_automatically", call_id: "call_live" }, continue_until: Date.UTC(2026, 9, 24, 11, 7) }), prefs("h12"));
+    expect(auto.text).toContain("Stopped at 11:02 am");
+  });
+
   it("never says 0 min", () => {
-    expect(closingTitle(cap({ phase: "stopped", recorded_ms: 10_000 }), "UTC").text).toContain("1 min");
+    expect(closingTitle(cap({ phase: "stopped", recorded_ms: 10_000 }), prefs()).text).toContain("1 min");
   });
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 describe("layoutRegions (cpt-noter-algo-ui-call-window-layout-content)", () => {
   it("lists the regions of each layout with the copilot off", () => {

@@ -445,7 +445,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-stop
   const closing = view === "CLOSING" && (
     <ClosingState
-      title={closingTitle(cap, prefs?.time_zone, prefs?.time_format === "h12")}
+      title={closingTitle(cap, prefs)}
       floating={floating}
       canContinue={continueClosed !== callId && (cap.continue_until === null || cap.continue_until > now)}
       continuing={busy("capture_continue")}

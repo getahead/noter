@@ -3,6 +3,7 @@
 // The banners come from the owning screen, which maps them from typed errors and degraded events and runs the
 // commands behind their actions.
 import { useState, type KeyboardEvent } from "react";
+import type { Part } from "../../i18n/format";
 import { t } from "../../i18n/format";
 import { Icon, type IconName } from "../icons";
 import { cx } from "../primitives/attrs";
@@ -27,6 +28,8 @@ export interface Banner {
   title?: string;
   /** One sentence: the cause and the fix. */
   text: string;
+  /** The same message split so quoted user text can keep its language. */
+  textParts?: readonly Part[];
   actions?: BannerAction[];
   /** 0 to 100. */
   progress?: number;
@@ -70,7 +73,7 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
       </span>
       <div className="np-banner__main">
         {b.title && <div className="np-banner__title">{b.title}</div>}
-        <div className="np-banner__text">{b.text}</div>
+        <div className="np-banner__text">{b.textParts ? b.textParts.map((part, i) => <span key={i} lang={part.lang}>{part.text}</span>) : b.text}</div>
         {b.progress != null && (
           <div className="np-banner__prog">
             <Progress value={b.progress} label={b.text} />

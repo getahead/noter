@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 
 import { createBridge } from "../../../src/app/bridge/bridge";
 import { FakeCore } from "../../../src/core/fake/fake-core";
+import { Icon } from "../../../src/ui/icons";
 import { Badge } from "../../../src/ui/primitives/badge";
 import { Checkbox } from "../../../src/ui/primitives/checkbox";
 import { Disclosure } from "../../../src/ui/primitives/disclosure";
@@ -169,7 +170,11 @@ function Gallery() {
         <Row>
           <Checkbox id="check-off" label="Off" checked={false} />
           <Checkbox label="On" checked />
-          <Checkbox label="Mixed" checked={false} mixed variant="mixed" />
+          <label className="np-check" data-component="cpt-noter-component-ui-primitives" data-primitive="checkbox" data-variant="group" data-state="mixed">
+            <input type="checkbox" aria-label="Mixed" />
+            <span className="np-check__box" aria-hidden="true"><Icon name="minus" size={11} /></span>
+            <span className="np-check__label">Mixed</span>
+          </label>
           <Checkbox label="Disabled" checked={false} disabled />
           <Checkbox label="Disabled on" checked disabled />
           <Checkbox ariaLabel="Select row" checked variant="group" />

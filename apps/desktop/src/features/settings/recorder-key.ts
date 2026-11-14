@@ -21,8 +21,8 @@ export interface KeyOutcome {
 export function onRecordKey(recording: boolean, e: RecorderKey, variant: "single" | "modifier-set"): KeyOutcome | null {
   if (!recording || e.repeat) return null;
   const modifiers = { control: e.ctrlKey, option: e.altKey, command: e.metaKey, shift: e.shiftKey };
-  // the core owns the VoiceOver state: it refuses the chord with `hotkey_reserved`, so it is not read here
-  const result: ChordResult = checkChord({ code: e.code, modifiers, variant, voiceOver: false });
+  // The core reports conflicts with VoiceOver or macOS when the chord is registered.
+  const result: ChordResult = checkChord({ code: e.code, modifiers, variant });
   const event: RecorderEvent = { type: "chord", result };
   // a modifier set is complete only when the user lets go of the keys: Control alone must not be saved on the way to ⌃⌥⌘
   if (result.type === "accept") return { event, send: variant === "modifier-set" ? { type: "hold", modifiers: result.modifiers } : { type: "record", code: result.code, modifiers: result.modifiers } };
@@ -54,6 +54,12 @@ export interface RecorderCtx {
   settle: (answer: Promise<HotkeyAnswer> | undefined) => void;
   onRecord?: (chord: { code: string; modifiers: ChordModifiers }) => Promise<HotkeyAnswer>;
   onClear?: () => Promise<HotkeyAnswer>;
+}
+
+/** Clear from the explicit button through the same state transition as ⌫. */
+export function clearRecorder(ctx: Pick<RecorderCtx, "dispatch" | "settle" | "onClear">): void {
+  ctx.dispatch({ type: "clear" });
+  ctx.settle(ctx.onClear?.());
 }
 
 export type KeyEvent = RecorderKey & { key: string; preventDefault(): void; stopPropagation(): void };

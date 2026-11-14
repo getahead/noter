@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
 import { InspectorSlot } from "./inspector";
 
-const def = { width: 320 as const, label: "shell.inspector" as const, render: () => <p>Item details</p> };
+const def = { width: 320 as const, label: "shell.sidebar" as const, render: () => <p>Item details</p> };
 
 const ROUTE = { section: "library", key: "call:c:transcript" } as const;
 const BRIDGE = {} as never;
@@ -19,7 +19,7 @@ describe("InspectorSlot (MW-R4)", () => {
     expect(docked).toContain('data-region="MW-R4"');
     expect(docked).toContain('data-state="open"');
     expect(docked).toContain("width:320px");
-    expect(docked).toContain('aria-label="Inspector"');
+    expect(docked).toContain('aria-label="Sidebar"');
     expect(docked).toContain("Item details");
     expect(docked).not.toContain("is-overlay");
     expect(docked).not.toContain("inert");

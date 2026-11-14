@@ -39,7 +39,7 @@ describe("recorderReduce", () => {
     const rec = recorderReduce(IDLE_RECORDER, { type: "start" });
     const invalid = recorderReduce(rec, { type: "chord", result: { type: "keep", reason: "no_modifier", message: "Add Command, Option or Control" } });
     expect(invalid).toEqual({ type: "INVALID", message: "Add Command, Option or Control" });
-    const conflict = recorderReduce(recorderReduce(invalid, { type: "start" }), { type: "chord", result: { type: "keep", reason: "voiceover", message: "Used by VoiceOver" } });
+    const conflict = recorderReduce(recorderReduce(invalid, { type: "start" }), { type: "refused", message: "Used by VoiceOver" });
     expect(conflict).toEqual({ type: "CONFLICT", message: "Used by VoiceOver" });
     expect(recorderReduce(conflict, { type: "start" })).toEqual({ type: "RECORDING", from: "IDLE" });
   });
@@ -52,6 +52,12 @@ describe("recorderReduce", () => {
 
   it("clears from the Clear shortcut button while IDLE", () => {
     expect(run(IDLE_RECORDER, { type: "clear" })).toEqual({ type: "CLEARED" });
+  });
+
+  it("clears a stale refusal when the Clear shortcut button is used", () => {
+    const conflict = recorderReduce(IDLE_RECORDER, { type: "refused", message: "Used by VoiceOver" });
+    expect(recorderReduce(conflict, { type: "clear" })).toEqual({ type: "CLEARED" });
+    expect(recorderReduce({ type: "CLEARED" }, { type: "refused", message: "Could not clear shortcut" })).toEqual({ type: "CONFLICT", message: "Could not clear shortcut" });
   });
 
   it("disables with its switch and returns IDLE when the switch is on", () => {

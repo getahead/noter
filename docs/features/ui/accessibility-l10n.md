@@ -2,8 +2,8 @@
 title: "Feature — Accessibility, keyboard and localisation"
 description: "The shared services every Noter screen uses for keyboard-first operation, focus, VoiceOver announcements and translation-ready text, with the automated checks that gate them."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-14"
 feature: cpt-noter-feature-ui-accessibility-l10n
 milestone: M0
 ---
@@ -245,6 +245,6 @@ The system **MUST** take every interface string from a catalogue with plural rul
 
 ## 7. Additional Context
 
-**Prototype reuse.** Source of truth only. The prototype wires roles and `aria-*` attributes inside its render functions, restores focus and selection after each render (`renderNow` in `src/js/00-core.js`) and closes overlays with Esc (`bindEvents`). Production rewrites this as React hooks (`useAnnounce`, `useFocusReturn`, `usePhysicalKey`) used by the components that the screen features port; the roles and labels the prototype emits are kept. The prototype does not wire single-key shortcuts and uses ⌃1 to ⌃8 for the sidebar (README › Not built), so DESIGN's keyboard tables are the reference for those.
+**Prototype reuse.** Source of truth only. The prototype wires roles and `aria-*` attributes inside its render functions, restores focus and selection after each render (`renderNow` in `src/js/00-core.js`) and closes overlays with Esc (`bindEvents`). Production rewrites this as shared React helpers (`useAnnounce`, `focusAndReturn`, `usePhysicalKey`) used by the components that the screen features port; the roles and labels the prototype emits are kept. The prototype does not wire single-key shortcuts and uses ⌃1 to ⌃8 for the sidebar (README › Not built), so DESIGN's keyboard tables are the reference for those.
 
 **Not applicable.** Data and authentication: none. Translations into German and Russian are v1.x (PM-02); v1 ships English strings in a translation-ready catalogue.

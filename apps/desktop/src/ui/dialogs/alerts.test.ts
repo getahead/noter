@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { askAlert, deleteAlert, quitAlert } from "./alerts";
+import { askAlert, deleteAlert } from "./alerts";
 
 describe("deleteAlert (cpt-noter-algo-ui-dialogs-host-delete-alert)", () => {
   it("asks about one call by its own title, Cancel first", () => {
@@ -34,18 +34,6 @@ describe("deleteAlert (cpt-noter-algo-ui-dialogs-host-delete-alert)", () => {
   });
 });
 
-describe("quitAlert (cpt-noter-flow-ui-dialogs-host-quit)", () => {
-  it("names the recording and keeps Cancel as the safe button", () => {
-    expect(quitAlert("Planning")).toEqual({
-      title: "Noter is recording “Planning”",
-      message: "Quitting stops the recording. The transcript so far is kept.",
-      cancel: "Cancel",
-      confirm: "Stop and Quit",
-      destructive: false,
-    });
-  });
-});
-
 describe("askAlert (cpt-noter-flow-ui-dialogs-host-delete-call)", () => {
   const spec = deleteAlert([{ id: "c1", title: "A" }]);
 
@@ -70,7 +58,7 @@ describe("askAlert (cpt-noter-flow-ui-dialogs-host-delete-call)", () => {
 
   it("is informational when the action is not destructive", async () => {
     const ask = vi.fn().mockResolvedValue(true);
-    await askAlert(quitAlert("A"), ask);
+    await askAlert({ title: "Info", message: "Message", cancel: "Cancel", confirm: "OK", destructive: false }, ask);
     expect(ask.mock.calls[0][0].kind).toBe("info");
   });
 });

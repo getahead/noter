@@ -203,11 +203,5 @@ export const duration = (seconds: number): string => {
   );
 };
 
-export const usd = (amount: number): string => {
-  const options: Intl.NumberFormatOptions = {
-    style: "currency",
-    currency: "USD",
-  };
-  return numberFormatter(locale(), options).format(amount);
-};
+
 // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values

@@ -1,6 +1,7 @@
 import type { KeyboardEvent } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { FOCUSABLE } from "../../app/a11y/focus";
 import { Sheet, sheetKey } from "./sheet";
 
 describe("Sheet (cpt-noter-dod-ui-primitives-controls)", () => {
@@ -74,9 +75,11 @@ describe("focusInside", () => {
     const { focusInside } = await import("./sheet");
     const before = { focus: vi.fn() };
     const first = { focus: vi.fn() };
+    const selectors: string[] = [];
     vi.stubGlobal("document", { activeElement: before });
-    const restore = focusInside({ querySelector: () => first } as unknown as HTMLElement);
+    const restore = focusInside({ querySelector: (selector: string) => (selectors.push(selector), first) } as unknown as HTMLElement);
     expect(first.focus).toHaveBeenCalled();
+    expect(selectors).toEqual([FOCUSABLE]);
     restore();
     expect(before.focus).toHaveBeenCalled();
     const root = { querySelector: () => null, focus: vi.fn() };

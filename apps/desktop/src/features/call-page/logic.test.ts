@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandState } from "../../app/store/window-store";
 import type { CallRow, UiPrefs } from "../../core/bindings";
-import { afterTimer, callInfo, callKey, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
+import { callInfo, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
+import { afterTimer } from "../../app/use-after";
 
 const PREFS: UiPrefs = { time_format: "h24", time_zone: "UTC", first_weekday: 1 };
 const NOW = Date.UTC(2026, 9, 24, 12, 0);
@@ -18,10 +19,10 @@ const row = (o: Partial<CallRow> = {}): CallRow =>
   }) as unknown as CallRow;
 
 describe("route key", () => {
-  it("round-trips call id and tab", () => {
-    expect(parseCallKey(callKey("call_x", "transcript"))).toEqual({ callId: "call_x", tab: "transcript" });
+  it("reads call id and tab from the window route", () => {
+    expect(parseCallKey("call:call_x:transcript")).toEqual({ callId: "call_x", tab: "transcript" });
   });
-  it("is null for a key that is not a call page", () => {
+  it("reads a highlighted span or rejects a non-call route", () => {
     expect(parseCallKey("call:call_x:transcript:12000:20000")).toEqual({ callId: "call_x", tab: "transcript", span: { call_id: "call_x", channel: null, t0_ms: 12000, t1_ms: 20000 } });
     expect(parseCallKey("root")).toBeNull();
     expect(parseCallKey("item:i1")).toBeNull();

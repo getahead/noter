@@ -391,8 +391,17 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
 }
 
 /** The permission row's state for what the core reports, the wizard's own checking and the self-test's zero buffers. */
+// @cpt-state:cpt-noter-state-ui-first-run-permission-row:p1
 export function rowStateFor(kind: PermissionKind, core: PermissionState | undefined, s: Pick<WizardState, "checking" | "zeroBuffers">): PermissionRowState {
   const row = initialPermissionRow(kind, core ?? "not_asked");
-  if (s.checking.includes(kind) && core !== "granted") return permissionRowNext(row, { type: "returned_from_settings" });
-  return kind === "system_audio" && s.zeroBuffers ? permissionRowNext(row, { type: "self_test_zero_buffers" }) : row;
+  if (s.checking.includes(kind)) {
+    // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-granted
+    if (core === "granted") return row;
+    // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-granted
+    return permissionRowNext(row, { type: "returned_from_settings" });
+  }
+  if (kind === "system_audio" && s.zeroBuffers) return permissionRowNext(row, { type: "self_test_zero_buffers" });
+  // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-missing
+  return row;
+  // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-missing
 }

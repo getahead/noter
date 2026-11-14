@@ -64,7 +64,7 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   useEffect(() => void (main.current && (main.current.scrollTop = scroll.current[win.pane] ?? 0)), [win.pane]);
 
   const found = searchPanes(win.search);
-  const kind = windowKind({ ...win, error: readFailed ? "settings:get" : win.error });
+  const kind = windowKind(win, readFailed);
   // one result is always a tab stop: the open pane, or the first match when the open pane is filtered out
   const tabStop = found.panes.some((p) => p.id === win.pane) ? win.pane : found.panes[0]?.id;
   // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-open-pane

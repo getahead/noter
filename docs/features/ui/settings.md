@@ -2,8 +2,8 @@
 title: "Feature — Settings window"
 description: "The separate Noter Settings window: 11 panes with a search field, settings applied at once, the hotkey and card-key recorder with conflict checks, and the panes Noter needs from M0."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.2"
+date: "2026-11-14"
 feature: cpt-noter-feature-ui-settings
 milestone: M0
 ---
@@ -46,6 +46,8 @@ milestone: M0
 ### 1.1 Overview
 
 Settings is its own window (⌘,) with a pane list in the style of System Settings and a search field that filters panes by name and keywords. Every change applies at once through `settings_update` with the whole section as wanted state. This feature builds the window and the panes Noter needs from M0 — General, Audio & Transcription, Privacy (its settings rows and the Screen Share Test), Call Screen & Menu Bar, Hotkeys, Performance and Updates — and the empty frames of Models & Runtimes, Repositories, Knowledge Sources and Maintenance, which later features fill.
+
+Window visibility during screen presentation is controlled by the host; the settings view retains its pane and search state while hidden.
 
 ### 1.2 Purpose
 
@@ -176,7 +178,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-settings-check-chord`
 
-**Input**: the key event while a chord field records, the row's variant (single chord, modifier set) and the VoiceOver state
+**Input**: the key event while a chord field records and the row's variant (single chord, modifier set)
 
 **Output**: accept the chord, keep the old one with a message, cancel or clear
 
@@ -187,10 +189,8 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
    1. [x] - `p1` - **RETURN** clear: the field reads **None** and menus show the item without a key - `inst-return-clear`
 3. [x] - `p1` - **IF** no Command, Option or Control modifier is held - `inst-if-nomod`
    1. [x] - `p1` - **RETURN** keep the old chord with **Add Command, Option or Control** - `inst-return-nomod`
-4. [x] - `p1` - **IF** VoiceOver runs and the chord starts with ⌃⌥ - `inst-if-vo`
-   1. [x] - `p1` - **RETURN** keep the old chord with **Used by VoiceOver** (the pane's note explains the VO-Tab pass-through) - `inst-return-vo`
-5. [x] - `p1` - Read the key by physical code so the Latin letter shows on any layout - `inst-physical`
-6. [x] - `p1` - **RETURN** accept; the core may still refuse it at registration - `inst-return-accept`
+4. [x] - `p1` - Read the key by physical code so the Latin letter shows on any layout - `inst-physical`
+5. [x] - `p1` - **RETURN** accept locally; the core may still refuse a chord reserved by VoiceOver or macOS at registration and report the conflict - `inst-return-accept`
 
 ### Filter panes by search
 
@@ -225,7 +225,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 5. [x] - `p1` - **FROM** IDLE **TO** CONFLICT **WHEN** the pane's test registration reports the row's chord refused - `inst-idle-conflict`
 6. [x] - `p1` - **FROM** CONFLICT **TO** RECORDING **WHEN** the user records again - `inst-conflict-recording`
 7. [x] - `p1` - **FROM** INVALID **TO** RECORDING **WHEN** the user records again - `inst-invalid-recording`
-8. [x] - `p1` - **FROM** RECORDING **TO** CLEARED **WHEN** the user presses ⌫ or **Clear shortcut** - `inst-recording-cleared`
+8. [x] - `p1` - **FROM** IDLE, RECORDING, CONFLICT or INVALID **TO** CLEARED **WHEN** the user presses ⌫ or **Clear shortcut**; keep DISABLED unchanged - `inst-recording-cleared`
 9. [x] - `p1` - **FROM** IDLE **TO** DISABLED **WHEN** **Use card keys during calls** turns off (card rows) or **Dismiss with keys** is off (**Dismiss a card**) - `inst-idle-disabled`
 10. [x] - `p1` - **FROM** DISABLED **TO** IDLE **WHEN** the switch turns on - `inst-disabled-idle`
 
@@ -233,7 +233,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 
 - [x] `p1` - **ID**: `cpt-noter-state-ui-settings-window`
 
-**States**: PANE, SEARCH_RESULTS, NO_MATCH, PANE_ERROR, HIDDEN_FOR_PRESENTING
+**States**: PANE, SEARCH_RESULTS, NO_MATCH, PANE_ERROR
 
 **Initial State**: PANE
 
@@ -243,8 +243,6 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
 3. [x] - `p1` - **FROM** NO_MATCH **TO** PANE **WHEN** the user clears the field - `inst-nomatch-pane`
 4. [x] - `p1` - **FROM** PANE **TO** PANE_ERROR **WHEN** a pane-level error arrives (ST-R3), such as **Keychain is locked** (M3) - `inst-pane-error`
 5. [x] - `p1` - **FROM** PANE_ERROR **TO** PANE **WHEN** the core reports the fix - `inst-error-pane`
-6. [x] - `p1` - **FROM** PANE **TO** HIDDEN_FOR_PRESENTING **WHEN** Noter hides for presenting; it comes back as it was - `inst-pane-hidden`
-7. [x] - `p1` - **FROM** HIDDEN_FOR_PRESENTING **TO** PANE **WHEN** Noter is shown again - `inst-hidden-pane`
 
 ## 5. Definitions of Done
 
@@ -281,7 +279,7 @@ The system **MUST** provide the hotkey recorder in its single-chord, modifier-se
 **Touches**:
 - Commands: `hotkeys_list`, `hotkey_set`, `hotkeys_reset`
 - Events: `hotkeys:changed`
-- Tests: E2E `cpt-noter-seq-settings-set-hotkeys` (Happy path and every Error and Empty path) against `noter-core-harness`; screenshot specs `hk-voiceover`, `hk-nomod`, `hk-card-conflict`
+- Tests: E2E `cpt-noter-seq-settings-set-hotkeys` (Happy path and every Error and Empty path) against `noter-core-harness`; UI unit `apps/desktop/src/features/settings/recorder.test.ts` and `recorder-key.test.ts`; screenshot specs `hk-voiceover`, `hk-nomod`, `hk-card-conflict`
 
 ### Privacy settings rows and the Screen Share Test
 
@@ -307,6 +305,9 @@ The system **MUST** show the Privacy pane's **Privacy mode** (with the mode indi
 - [x] The Models & Runtimes, Repositories, Knowledge Sources and Maintenance panes show their frames and state their later milestone instead of a blank area
 
 ## 7. Additional Context
+
+**Change log.** 1.1 — Clear shortcut dismisses a stale recorder conflict as well as clearing a chord; a refused clear still reports its conflict.
+1.2 — Reserved chord conflicts are reported by the core; the Settings window keeps pane/search state while the host hides it for presentation.
 
 **Prototype reuse.** Rewritten in React with the same structure, classes and data attributes: `surface('settings')`, `PANES`, the pane renderers `general`, `audio`, `privacy`, `callscreen`, `hotkeys`, `performancePane` and `updates` in `src/js/50-e-5-settings.js`; `C.hotkeyRecorder` in `src/js/10-a-components.js`; the `dlg-selftest` and `dlg-share-test` sheets in `src/js/30-c-dialogs.js`. Styles `.st-*` and `.e-*` (`src/css/50-e.css`) and `.hk-*` (`src/css/10-a.css`) are ported as-is. Not reusable: `ST()` local state, `onDemo` and the `ALIAS` table (prototype navigation shortcuts).
 

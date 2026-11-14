@@ -2,8 +2,8 @@
 title: "Feature — First-run wizard"
 description: "Six-step first-run window that downloads the models in the background, asks for Microphone and System Audio Recording, proves both streams with the self-test, and sets the call display and audio retention, so call detection is on before the first call."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-14"
 feature: cpt-noter-feature-ui-first-run
 milestone: M0
 ---
@@ -259,12 +259,12 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 **Initial State**: NOT_ASKED
 
 **Transitions**:
-1. [x] - `p1` - **FROM** NOT_ASKED **TO** GRANTED **WHEN** the user allows the macOS prompt after **Allow…** - `inst-notasked-granted`
-2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the user clicks **Don't Allow** - `inst-notasked-denied`
+1. [x] - `p1` - **FROM** NOT_ASKED **TO** GRANTED **WHEN** the core reports the permission granted after **Allow…** - `inst-notasked-granted`
+2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the core reports the permission denied after **Don't Allow** - `inst-notasked-denied`
 3. [x] - `p1` - **FROM** MISSING **TO** CHECKING **WHEN** the user returns from System Settings after **Open System Settings…** (system audio starts in MISSING because macOS has no prompt for it) - `inst-missing-checking`
 4. [x] - `p1` - **FROM** DENIED **TO** CHECKING **WHEN** the user returns from System Settings - `inst-denied-checking`
-5. [x] - `p1` - **FROM** CHECKING **TO** GRANTED **WHEN** the core reads the permission as granted - `inst-checking-granted`
-6. [x] - `p1` - **FROM** CHECKING **TO** MISSING **WHEN** the core still reads it as not granted - `inst-checking-missing`
+5. [x] - `p1` - **FROM** CHECKING **TO** GRANTED **WHEN** the core reports the permission granted - `inst-checking-granted`
+6. [x] - `p1` - **FROM** CHECKING **TO** MISSING or DENIED **WHEN** the re-check finishes without a grant; the row reflects the core's current permission state - `inst-checking-missing`
 
 ### Self-test panel
 
@@ -323,7 +323,7 @@ The system **MUST** show the three model bundles with progress, **Pause** and **
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-components`
 
-The system **MUST** provide the permission check row (setup, status and test-only variants), the self-test panel (step and sheet variants) and the display picker (several displays, one display, remembered display absent) as reusable components with the prototype's markup, so Settings and the self-test sheet use the same ones. The first-run microphone row reserves the meter's space before levels arrive so the **Run Test** control does not move when metering starts.
+The system **MUST** provide the permission check row (setup and status variants), the self-test panel (step and sheet variants) and the display picker (several displays, one display, remembered display absent) as reusable components with the prototype's markup. Settings reuses the permission row and self-test sheet reuses the self-test panel. The first-run microphone row reserves the meter's space before levels arrive so the **Run Test** control does not move when metering starts.
 
 **Implements**:
 - `cpt-noter-flow-ui-first-run-self-test`
@@ -347,6 +347,8 @@ The system **MUST** provide the permission check row (setup, status and test-onl
 - [x] The self-test's transcript line is never announced; each result line is announced once
 
 ## 7. Additional Context
+
+**Change log.** 1.1 — Permission row states reflect the core's reported permission status and the wizard's recheck interval; synthetic prompt-answer and permission-read events are not part of the UI contract.
 
 **Prototype reuse.** Rewritten in React with the same structure, classes and data attributes: `surface('firstrun')` and its step renderers in `src/js/10-a-surfaces.js` (FR-R1, FR-R2, FR-R3 regions), and `C.wizardStepper`, `C.permissionCheckRow`, `C.selfTestPanel`, `C.displayPicker` in `src/js/10-a-components.js`; the `.fr-*` styles of `src/css/10-a.css` are ported as-is. Not reusable: the `setInterval` timers that simulate downloads and the self-test, and the `state.setup` flags (prototype plumbing); production reads both from the core.
 
