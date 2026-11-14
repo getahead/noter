@@ -14,7 +14,7 @@ import { holdUndo } from "../history/undo";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 import { SpeakerNamingPanel } from "../speakers/SpeakerNamingPanel";
 import { rereadSegment, TermFixPopover } from "../speakers/TermFixPopover";
-import { buildRows, speakerColumn, spanKeys, type Row, type Variant } from "./model";
+import { buildRows, holdFollowForRename, speakerColumn, spanKeys, type Row, type Variant } from "./model";
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
 import { playControl, REFUSED } from "./play-control";
@@ -131,7 +131,6 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-api-subscribe
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-mount
 
-  const rows = useMemo(() => (data ? buildRows(data, "stored") : []), [data]);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-if-waiting
   const waiting = !!data?.live && data.segments.length === 0 && data.hypotheses.length === 0;
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-if-waiting
@@ -143,7 +142,7 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   const span = o.span;
   const loaded = !!data;
   const [archive, setArchive] = useState<ArchiveNote | null>(null);
-  useEffect(() => evidenceSpanEffect(bridge, span, loaded, rows, setHighlight), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
+  useEffect(() => evidenceSpanEffect(bridge, span, loaded, data && span ? buildRows(data, "stored") : [], setHighlight), [span?.call_id, span?.t0_ms, span?.t1_ms, loaded]); // eslint-disable-line react-hooks/exhaustive-deps -- a new span object each render must not restart the 3 s highlight
   useEffect(() => spanArchiveEffect(bridge, span, setArchive), [bridge, span?.call_id, span?.t0_ms, span?.t1_ms]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => (highlight.length ? after(HIGHLIGHT_MS, () => setHighlight([])) : undefined), [highlight]);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-if-span
@@ -190,7 +189,6 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
     callId,
     detail: o.detail ?? null,
     data,
-    rows,
     waiting,
     levels,
     control,
@@ -257,7 +255,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   const [fixing, setFixing] = useState<{ seg: SegmentView; range: TextRange; anchor: HTMLElement; menu: boolean } | null>(null);
   const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
-  const rows = useMemo(() => (variant === "tail" && tr.data ? buildRows(tr.data, "tail", tailLines) : tr.rows), [variant, tr.data, tr.rows, tailLines]);
+  const rows = useMemo(() => (tr.data ? buildRows(tr.data, variant === "tail" ? "tail" : "stored", tailLines) : []), [variant, tr.data, tailLines]);
   const line = header !== undefined ? header : variant === "stored" ? audioLine(tr.detail, prefs) : null;
   const gone = !!tr.detail && (tr.detail.call.audio_deleted || tr.detail.audio_not_stored);
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-return-stored
@@ -276,13 +274,16 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
+  // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-renamed-speaker
+  const holdFollow = holdFollowForRename(variant, renamed);
+  // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-renamed-speaker
   return (
     <>
     <TranscriptView
       key={tr.callId}
       variant={variant}
       rows={rows}
-      holdFollow={variant === "live" && !!renaming}
+      holdFollow={holdFollow}
       speakers={tr.data?.speakers ?? []}
       loaded={!!tr.data}
       loading={tr.loading}

@@ -166,7 +166,7 @@ It implements the **Keyboard and VoiceOver** and **Localisation rules for contro
 **Steps**:
 1. [x] - `p1` - Pick the English message (v1) from the catalogue; never concatenate fragments - `inst-pick-message`
 2. [x] - `p1` - **FOR EACH** count argument: choose the plural form by the plural rules of the interface language - `inst-plural`
-3. [x] - `p1` - Format dates and times by the macOS locale, with the 12- or 24-hour preference the core sends; call-relative times as HH:MM:SS; durations localised (**48 min**); money as US dollars in the locale format - `inst-format-values`
+3. [x] - `p1` - Format dates and times by the macOS locale, with the 12- or 24-hour preference the core sends; call-relative times as HH:MM:SS; durations localised (**48 min**); money as US dollars in the locale format; reuse formatters for the same locale and options, and create a number formatter only when a numeric placeholder is present - `inst-format-values`
 4. [x] - `p1` - Wrap quoted user text in “…” and give it its own language attribute - `inst-quote-user-text`
 5. [x] - `p1` - **RETURN** the string - `inst-return-string`
 

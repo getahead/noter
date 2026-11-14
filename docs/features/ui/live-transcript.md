@@ -45,7 +45,7 @@ milestone: M1
 
 ### 1.1 Overview
 
-The transcript view renders a call's segments as a log: confirmed rows in time order that never move, one hypothesis row last, gap rows for time lost, mark rows for marked moments. It follows live speech while the user is at the end, stops following when the user scrolls up and offers **Jump to Live · 12 new lines**, and stays fast for a three-hour call by drawing only the rows on screen. Each row carries speaker, time and language; its play control replays the line where that is safe. The same components draw the live log in the call screen, the tail in the floating panel and the stored transcript on a call's page.
+The transcript view renders a call's segments as a log: confirmed rows in time order that never move, one hypothesis row last, gap rows for time lost, mark rows for marked moments. It follows live speech while the user is at the end, stops following when the user scrolls up and offers **Jump to Live · 12 new lines**, and stays fast for a three-hour call by drawing only the rows on screen. The floating panel's tail maps only the rows it displays. Each row carries speaker, time and language; its play control replays the line where that is safe. The same components draw the live log in the call screen, the tail in the floating panel and the stored transcript on a call's page.
 
 ### 1.2 Purpose
 
@@ -163,9 +163,9 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-live-transcript-follow-output`
 
-**Input**: the scroll position, the number of rows added since the last flush, the user's last scroll action
+**Input**: the scroll position, the number of rows added since the last flush, the user's last scroll action, and whether the renamed speaker is still present in the current live snapshot
 
-**Output**: following or detached with a count
+**Output**: following or detached with a count; a live rename holds following only while its speaker remains in the current snapshot
 
 **Steps**:
 1. [x] - `p1` - **IF** the view is at the end (within one row) - `inst-if-end`
@@ -174,6 +174,8 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 2. [x] - `p1` - Add the new confirmed rows to the pill's count - `inst-count`
 3. [x] - `p1` - Never move the rows in view: confirmed rows keep their position - `inst-no-jump`
 4. [x] - `p1` - **RETURN** detached with the count - `inst-return-detached`
+5. [x] - `p1` - **IF** a live rename is open and its speaker is absent from the current snapshot - `inst-release-renamed-speaker`
+   1. [x] - `p1` - Release the hold and follow the current call again - `inst-return-renamed-speaker`
 
 ### Decide the play control
 
@@ -253,7 +255,7 @@ The system **MUST** render the transcript view in its live, tail and stored vari
 
 **Touches**:
 - Commands: `transcript_subscribe`, `levels_subscribe`, `transcript_span`
-- Tests: unit tests for append, replace and gap handling; a performance scenario that replays a 90-minute stream (`harness/perf.toml`); screenshot specs `detached` and the waiting state
+- Tests: unit tests for append, replace, gap handling, tail row bounds and releasing follow when a renamed speaker leaves the live snapshot; a performance scenario that replays a 90-minute stream (`harness/perf.toml`); screenshot specs `detached` and the waiting state
 
 ### Speaker label and language tag (display)
 

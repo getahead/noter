@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GapView, SpeakerView } from "../../core/bindings";
-import { buildRows, findMatches, gapText, langAttr, langName, langTag, markText, meterLevel, rowVariant, speakerColumn, speakerName, speakerVariant, spanKeys, splitMatch } from "./model";
+import { buildRows, findMatches, gapText, holdFollowForRename, langAttr, langName, langTag, markText, meterLevel, rowVariant, speakerColumn, speakerName, speakerVariant, spanKeys, splitMatch } from "./model";
 import { ANNA, S3, seg, YOU } from "./testing";
 
 const gap = (t0: number, t1: number, reason: GapView["reason"] = "paused"): GapView => ({ call_id: "call_1", t0_ms: t0, t1_ms: t1, reason });
@@ -29,6 +29,28 @@ describe("buildRows (transcript view rows)", () => {
   it("the tail keeps the last lines only, without gap or mark rows", () => {
     expect(buildRows(tr, "tail").map((r) => r.key)).toEqual(["c", "hyp:sys", "hyp:mic"]);
     expect(buildRows(tr, "tail", 8)).toHaveLength(5);
+  });
+
+  it("maps only the confirmed segments needed for the tail", () => {
+    let reads = 0;
+    const segments = new Proxy(Array.from({ length: 5000 }, (_, i) => seg(`seg_${i}`, i)), {
+      get(target, property, receiver) {
+        if (typeof property === "string" && /^\d+$/.test(property)) reads += 1;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const rows = buildRows({ segments, hypotheses: tr.hypotheses, gaps: [], marks: [] }, "tail", 8);
+    expect(rows.map((row) => row.key)).toEqual(["seg_4994", "seg_4995", "seg_4996", "seg_4997", "seg_4998", "seg_4999", "hyp:sys", "hyp:mic"]);
+    expect(reads).toBe(8);
+  });
+});
+
+describe("holdFollowForRename", () => {
+  it("holds only while the renamed speaker remains in the live snapshot", () => {
+    const speakers = [{ id: "spk_2" }] as SpeakerView[];
+    expect(holdFollowForRename("live", speakers.find((speaker) => speaker.id === "spk_2"))).toBe(true);
+    expect(holdFollowForRename("live", speakers.find((speaker) => speaker.id === "missing"))).toBe(false);
+    expect(holdFollowForRename("stored", speakers[0])).toBe(false);
   });
 });
 

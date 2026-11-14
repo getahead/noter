@@ -26,8 +26,11 @@ export const LOW_CONFIDENCE = 0.7;
  */
 export function buildRows(tr: TranscriptRows, variant: Variant, tailLines = 3): Row[] {
   const hyps = [...tr.hypotheses].sort((a, b) => a.t0_ms - b.t0_ms).map((seg): Row => ({ kind: "hypothesis", key: `hyp:${seg.channel}`, at: seg.t0_ms, seg }));
+  if (variant === "tail") {
+    const segs = tr.segments.slice(-tailLines).map((seg): Row => ({ kind: "segment", key: seg.id, at: seg.t0_ms, seg }));
+    return [...segs, ...hyps].slice(-tailLines);
+  }
   const segs = tr.segments.map((seg): Row => ({ kind: "segment", key: seg.id, at: seg.t0_ms, seg }));
-  if (variant === "tail") return [...segs, ...hyps].slice(-tailLines);
   const extra = [
     ...tr.gaps.map((gap): Row => ({ kind: "gap", key: `gap:${gap.t0_ms}`, at: gap.t0_ms, gap })),
     ...tr.marks.map((mark): Row => ({ kind: "mark", key: mark.id, at: mark.at_ms, mark })),
@@ -42,6 +45,10 @@ export function buildRows(tr: TranscriptRows, variant: Variant, tailLines = 3): 
   return [...rows, ...extra.slice(j), ...hyps];
 }
 // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-render-rows
+
+// @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-release-renamed-speaker
+export const holdFollowForRename = (variant: Variant, renamed: SpeakerView | null | undefined) => variant === "live" && !!renamed;
+// @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-release-renamed-speaker
 
 const GAP_SPAN: Partial<Record<GapView["reason"], MsgKey>> = {
   paused: "transcript.gap.paused",

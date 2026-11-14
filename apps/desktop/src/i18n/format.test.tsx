@@ -20,6 +20,20 @@ import { Msg } from "./Msg";
 afterEach(() => setPseudo("off"));
 
 describe("t", () => {
+  it("reuses plural and number formatters, and does not construct a number formatter without a number", () => {
+    const numbers = vi.spyOn(Intl, "NumberFormat");
+    const plurals = vi.spyOn(Intl, "PluralRules");
+    t("action.try_again");
+    expect(numbers).not.toHaveBeenCalled();
+    expect(plurals).not.toHaveBeenCalled();
+    expect(t("announce.cards_held", { count: 1 })).toBe("1 new card waiting");
+    expect(t("announce.cards_held", { count: 2 })).toBe("2 new cards waiting");
+    expect(numbers).toHaveBeenCalledOnce();
+    expect(plurals).toHaveBeenCalledOnce();
+    numbers.mockRestore();
+    plurals.mockRestore();
+  });
+
   it("fills placeholders, formats numbers by locale and picks the plural", () => {
     expect(t("announce.recording_stopped", { duration: "48 min" })).toBe(
       "Recording stopped, saved 48 min",
@@ -84,6 +98,19 @@ describe("pseudo-localisation", () => {
 });
 
 describe("value helpers", () => {
+  it("reuses the number and list formatters for the same duration units", () => {
+    const numbers = vi.spyOn(Intl, "NumberFormat");
+    const lists = vi.spyOn(Intl, "ListFormat");
+    expect(duration(3660)).toBe("1 hr, 1 min");
+    const numberCalls = numbers.mock.calls.length;
+    const listCalls = lists.mock.calls.length;
+    expect(duration(3660)).toBe("1 hr, 1 min");
+    expect(numbers).toHaveBeenCalledTimes(numberCalls);
+    expect(lists).toHaveBeenCalledTimes(listCalls);
+    numbers.mockRestore();
+    lists.mockRestore();
+  });
+
   it("clock, dayOf and shortDay follow the 12/24-hour setting and the zone the core passes", () => {
     const at = Date.UTC(2026, 10, 8, 23, 5); // 23:05 UTC, already the 9th in Auckland
     const h12 = { time_format: "h12" as const, first_weekday: 1, time_zone: "UTC" };

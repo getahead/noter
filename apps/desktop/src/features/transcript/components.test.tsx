@@ -355,6 +355,15 @@ describe("readNaming (the Summary's naming panel)", () => {
 });
 
 describe("useTranscript and TranscriptPanel (hosts)", () => {
+  it("leaves row construction to the displayed transcript variant", async () => {
+    const { bridge: b } = await open("call-screen", (w) => void (w.live_script = []));
+    await b.subscribe("transcript_subscribe", { call_id: LIVE });
+    const tr = hookOf(b, LIVE);
+    expect("rows" in tr).toBe(false);
+    const tail = find(rendered(TranscriptLog, { tr, variant: "tail", tailLines: 2 }), (p) => p.variant === "tail" && Array.isArray(p.rows));
+    expect(tail.props.rows).toHaveLength(2);
+  });
+
   it("offers term fixes and corrected-word reopening in live and stored logs", async () => {
     const { bridge: b } = await open("main");
     await b.subscribe("transcript_subscribe", { call_id: LIVE });
