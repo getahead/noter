@@ -11,8 +11,11 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(cancel.waitForExistence(timeout: 5), "Delete Call… shows no alert")
         app.typeKey(.return, modifierFlags: [])
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
-        XCTAssertTrue(cancel.waitForNonExistence(timeout: 5), "Return presses the default button, which is Cancel")
-        XCTAssertTrue(app.staticTexts["Backend sync"].firstMatch.exists, "Return chose Cancel: the call is kept")
+        app.typeKey("3", modifierFlags: .command)
+        let library = app.tables["Calls"].firstMatch
+        XCTAssertTrue(library.waitForExistence(timeout: 5), "⌘3 returns to the Calls library")
+        let row = library.descendants(matching: .staticText)["Backend sync"]
+        XCTAssertFalse(row.waitForNonExistence(timeout: 3), "Return chose Cancel: the call remains in the refreshed library")
     }
 
     func test_cpt_noter_seq_dialogs_delete_call__other_several_calls_selected() {

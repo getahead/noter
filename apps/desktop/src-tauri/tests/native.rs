@@ -8,7 +8,11 @@ use noter_protocol::{PermissionKind, PermissionState};
 fn the_mac_reads_the_environment_of_the_storage_volume() {
     let dir = tempfile::tempdir().unwrap();
     let mac = Mac::new(dir.path());
-    assert!(mac.environment().disk_free_mb > 0);
+    assert_eq!(
+        mac.environment().disk_free_mb,
+        noter_native::disk_free_mb(dir.path()),
+        "the host reads free space from its configured storage volume"
+    );
 }
 
 #[test]
@@ -26,9 +30,10 @@ fn system_audio_is_never_asked_through_the_mac() {
 fn a_login_item_macos_refuses_is_an_error_the_core_logs() {
     // A test binary is not an app bundle: SMAppService answers an error or "not found".
     let mac = Mac::new(&std::env::temp_dir());
-    if let Err(e) = mac.set_login_item(false) {
-        assert!(!e.message.is_empty());
-    }
+    let error = mac
+        .set_login_item(false)
+        .expect_err("a test binary is not an app bundle");
+    assert!(!error.message.is_empty());
 }
 
 #[test]

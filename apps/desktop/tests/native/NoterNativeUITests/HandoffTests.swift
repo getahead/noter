@@ -1,5 +1,4 @@
-// M2 Handoff drawer and Add Mapping (docs/features/ui/handoff.md): the real native folder panel answered by the
-// harness (NOTER_TEST_FOLDER_PANELS, a JSON list consumed in order, null is Cancel), on the `handoff` scenario that
+// M2 Handoff drawer and Add Mapping (docs/features/ui/handoff.md): native interactions on the `handoff` scenario that
 // puts the engineering item in the call “Backend sync”.
 import XCTest
 
@@ -70,7 +69,25 @@ final class HandoffTests: NoterTestCase {
     /// The item row's status chip (items.handed_off).
     private var handedOff: XCUIElement { app.staticTexts["Handed off · awaiting PR"].firstMatch }
 
-    func test_cpt_noter_seq_call_page_hand_off_item__automation_denied() {
+    func test_cpt_noter_seq_call_page_hand_off_item__folder_picker_shows_native_panel() {
+        app.launchEnvironment["NOTER_TEST_NATIVE_FOLDER_PANEL"] = "1"
+        launch("handoff")
+        openDrawer()
+        addMapping.click()
+        XCTAssertTrue(choose.waitForExistence(timeout: 5), "Add Mapping opens the repository sheet")
+        let key = app.textFields["Jira project or component"]
+        XCTAssertTrue(key.waitForExistence(timeout: 5), "the mapping sheet asks for a project key")
+        XCTAssertFalse((key.value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       "the handoff sheet pre-fills the project key")
+        XCTAssertTrue(choose.isEnabled, "Choose is enabled once the project key is valid")
+        choose.click()
+        let panel = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS[c] 'open' OR label CONTAINS[c] 'choose' OR title CONTAINS[c] 'open' OR title CONTAINS[c] 'choose'")).firstMatch
+        XCTAssertTrue(panel.waitForExistence(timeout: 10), "the native folder picker is shown — \(screen())")
+        app.typeKey(.escape, modifierFlags: [])
+        XCTAssertTrue(panel.waitForNonExistence(timeout: 5), "Escape cancels the native folder picker")
+    }
+
+    func test_automation_denied_leaves_copy_prompt_available() {
         // The launch plan says macOS refused Automation: Open fails, nothing is marked Handed off, Copy Prompt stays.
         app.launchEnvironment["NOTER_TEST_LAUNCH_WORLD"] = #"{"plan":{"path":"terminal","needs_automation":false,"automation_denied":true}}"#
         answers([makeRepo()])
@@ -84,7 +101,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(app.buttons["Copy Prompt"].firstMatch.isEnabled, "Copy Prompt stays available")
     }
 
-    func test_cpt_noter_seq_call_page_hand_off_item__error_no_link_handler_falls_back_to_the_terminal() {
+    func test_no_link_handler_falls_back_to_the_terminal() {
         // Claude's link and iTerm both refuse: the core falls back to the terminal and the launch counts as opened.
         app.launchEnvironment["NOTER_TEST_LAUNCH_WORLD"] = #"{"plan":{"path":"claude_cli_link","needs_automation":false,"automation_denied":false},"fail":[{"path":"claude_cli_link","code":"no_link_handler"},{"path":"iterm","code":"no_link_handler"}]}"#
         answers([makeRepo()])
@@ -96,7 +113,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertFalse(openFailed.exists, "a fallback that worked shows no failure")
     }
 
-    func test_cpt_noter_seq_call_page_hand_off_item__error_no_repository_mapped_choose_folder() {
+    func test_repository_mapping_uses_the_harness_folder_answer() {
         answers([makeRepo()])
         launch("handoff")
         openDrawer()
@@ -110,7 +127,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(openButton.isEnabled, "Open is available once the project is mapped")
     }
 
-    func test_cpt_noter_seq_call_page_hand_off_item__error_folder_panel_cancelled_keeps_the_draft() {
+    func test_cancelled_harness_folder_answer_keeps_the_draft() {
         answers([nil, makeRepo()])
         launch("handoff")
         openDrawer()
@@ -123,7 +140,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the second panel answer chose the folder")
     }
 
-    func test_cpt_noter_seq_call_page_hand_off_item__other_copy_prompt_hands_the_item_off() {
+    func test_copy_prompt_marks_the_item_handed_off() {
         answers([makeRepo()])
         launch("handoff")
         openDrawer()

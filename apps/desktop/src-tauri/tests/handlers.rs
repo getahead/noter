@@ -109,22 +109,10 @@ fn every_command_from_every_window_is_answered_or_refused() {
 }
 
 #[test]
-fn the_registered_handlers_are_the_contract_commands() {
+fn a_command_outside_the_contract_has_no_handler() {
     let dir = tempfile::tempdir().unwrap();
     let app = app(dir.path());
     let webview = window(&app, "main");
-    // Every contract command has its handler: the answer is a result or a CoreError,
-    // never Tauri's own rejection for a name nobody handles.
-    for spec in COMMANDS {
-        if let Err(e) = call(&webview, spec.name, body(spec.name)) {
-            assert!(
-                serde_json::from_value::<CoreError>(e).is_ok(),
-                "{}",
-                spec.name
-            );
-        }
-    }
-    // A name outside the contract has no handler: Tauri's own rejection, not a CoreError.
     let unknown = call(&webview, "drop_database", json!({ "args": {} })).unwrap_err();
     assert!(serde_json::from_value::<CoreError>(unknown).is_err());
 }

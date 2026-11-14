@@ -66,7 +66,10 @@ pub fn frame_of(
     Some((display.id.clone(), frame(&display.id)?))
 }
 
-fn display_for<'a>(chosen: Option<&DisplayId>, displays: &'a [DisplayInfo]) -> Option<&'a DisplayInfo> {
+fn display_for<'a>(
+    chosen: Option<&DisplayId>,
+    displays: &'a [DisplayInfo],
+) -> Option<&'a DisplayInfo> {
     let main = || displays.iter().find(|d| d.is_main).or(displays.first());
     let display = chosen
         .and_then(|id| displays.iter().find(|d| d.id == *id))
@@ -143,12 +146,7 @@ impl SavedFrames {
 /// Where the call window goes: the whole display (dedicated) or a panel in its top-right corner.
 pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, f64, f64, f64) {
     match layout {
-        CallLayout::Dedicated => (
-            screen.x,
-            screen.y,
-            screen.width,
-            screen.height,
-        ),
+        CallLayout::Dedicated => (screen.x, screen.y, screen.width, screen.height),
         CallLayout::Floating => {
             let (w, h) = if collapsed { STRIP } else { PANEL };
             let x = screen.x + screen.width - w - MARGIN;
@@ -206,12 +204,7 @@ pub fn prompt_display<'a>(
 }
 
 pub fn prompt_frame(screen: &Frame, (w, h): (f64, f64)) -> (f64, f64, f64, f64) {
-    (
-        screen.x + screen.width - w - 12.0,
-        screen.y + 12.0,
-        w,
-        h,
-    )
+    (screen.x + screen.width - w - 12.0, screen.y + 12.0, w, h)
 }
 // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
 
@@ -826,7 +819,19 @@ pub struct TauriSurfaces<R: Runtime> {
 
 impl<R: Runtime> TauriSurfaces<R> {
     pub fn new(app: AppHandle<R>, storage: PathBuf) -> Arc<Self> {
-        let frames = SavedFrames::load(&storage.join("call-window-frames.json"));
+        let frame_store = {
+            #[cfg(all(debug_assertions, feature = "test-hooks"))]
+            {
+                std::env::var_os("NOTER_TEST_FRAME_STORE")
+                    .map(PathBuf::from)
+                    .unwrap_or_else(|| storage.join("call-window-frames.json"))
+            }
+            #[cfg(not(all(debug_assertions, feature = "test-hooks")))]
+            {
+                storage.join("call-window-frames.json")
+            }
+        };
+        let frames = SavedFrames::load(&frame_store);
         let surfaces = Arc::new(Self {
             app,
             storage,

@@ -215,7 +215,7 @@ The system **MUST** offer **Rename…**, **Call Type ▸**, **Mark as Sensitive*
 
 **Touches**:
 - Commands: `call_update`, `call_types_list`, `capture_set_sensitive`, `open_external`, `permission_request`, `calls_delete`
-- Tests: E2E `cpt-noter-seq-dialogs-delete-call` (Happy path from the ⋯ menu); E2E `cpt-noter-seq-notifications-allow-notifications` (Happy path) with XCUITest for the macOS prompt
+- Tests: E2E `cpt-noter-seq-dialogs-delete-call` (Happy path from the ⋯ menu); E2E `cpt-noter-seq-notifications-allow-notifications` (Happy path). The native XCUITest harness scripts the permission answer and does not display or verify the macOS permission prompt.
 
 ## 6. Acceptance Criteria
 

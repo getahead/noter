@@ -10,6 +10,7 @@ use noter_core::{EventEmitter, ShortcutRegistrar};
 use noter_core_harness::boot::{Harness, Options};
 use tauri::{AppHandle, Manager, Runtime, Webview};
 
+use crate::native::{MacOps, Windows};
 use crate::surfaces::TauriSurfaces;
 use crate::Booted;
 
@@ -31,9 +32,18 @@ pub fn boot<R: Runtime>(
                 ..options?
             };
             tauri::async_runtime::block_on(Harness::start_with(options, events, move |deps| {
-                deps.with_app_version(env!("CARGO_PKG_VERSION"))
+                let deps = deps
+                    .with_app_version(env!("CARGO_PKG_VERSION"))
                     .with_shortcuts(shortcuts)
-                    .with_surfaces(host)
+                    .with_surfaces(host.clone());
+                if std::env::var_os("NOTER_TEST_NATIVE_FOLDER_PANEL").as_deref()
+                    == Some(std::ffi::OsStr::new("1"))
+                {
+                    let windows: Arc<dyn Windows> = host;
+                    deps.with_native_ops(Arc::new(MacOps::new(windows)))
+                } else {
+                    deps
+                }
             }))
         }
         Err(e) => Err(e),

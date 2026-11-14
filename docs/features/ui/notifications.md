@@ -204,7 +204,7 @@ The system **MUST** ask for the Notifications permission only from **Notify Me W
 
 **Touches**:
 - Commands: `permission_request`, `open_external`
-- Tests: E2E and XCUITest `cpt-noter-seq-notifications-allow-notifications` (every path)
+- Tests: real-core E2E `cpt-noter-seq-notifications-allow-notifications` (every path). The native harness answers the permission command without showing the macOS prompt; `NotificationsTests.swift` checks the banner after that scripted answer and does not claim native prompt coverage. The actual macOS permission prompt remains untested by XCUITest.
 
 ## 6. Acceptance Criteria
 
