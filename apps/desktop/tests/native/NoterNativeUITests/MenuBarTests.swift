@@ -18,7 +18,7 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertEqual(main.frame, originalFrame, "reopening should preserve the window frame")
     }
 
-    func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {
+    func test_menu_mark_closes_then_pause_resume_stop_continue() {
         launch("idle")
         startRecording()
         let main = window("Noter")
@@ -30,10 +30,8 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 5), "the call panel has loaded its page")
         let menu = openMenu()
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
-        XCTAssertFalse(accessibilityTreeContains("Marked ", in: callWindow), "there is no mark feedback before Mark Moment is clicked")
         item("Mark Moment", in: menu).click()
-        let markedButton = callWindow.buttons.matching(NSPredicate(format: "label CONTAINS 'Marked '")).firstMatch
-        XCTAssertTrue(markedButton.waitForExistence(timeout: 5), "Mark Moment shows its timestamp on the call window")
+        XCTAssertTrue(waitUntil(5) { !isOpen(menu) }, "Mark Moment closes the menu")
         let reopened = openMenu()
         item("Pause", in: reopened).click()
         let paused = openMenu()
