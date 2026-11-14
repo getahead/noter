@@ -28,6 +28,11 @@ export const tauriTransport: Transport = {
   },
 };
 
+/** Native application menu selections that target the main-window shell (the menu is owned by macOS). */
+export async function listenNativeMenuAction(handler: (key: string) => void): Promise<() => void> {
+  return listen<string>("shell:menu-action", (event) => handler(event.payload));
+}
+
 /** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. The plugin has no
  * `ask` command: an ask is a two-button message. NSAlert makes the first button the default and gives Escape to the
  * one titled Cancel, so Cancel goes first and neither key confirms. */

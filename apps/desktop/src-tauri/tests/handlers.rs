@@ -180,6 +180,7 @@ fn each_window_capability_allows_only_listening_dialogs_and_its_commands() {
             WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
         ) {
             expected.insert("dialog:allow-message".to_string());
+            expected.insert("core:window:allow-start-dragging".to_string());
         }
         assert_eq!(allowed, expected, "{}", w.as_str());
     }

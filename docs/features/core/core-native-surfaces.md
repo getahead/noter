@@ -2,7 +2,7 @@
 title: "Feature: Native surfaces: panels, menu bar, notifications and windows"
 description: "Non-activating, content-protected panels; the call window's two layouts across displays; hide for presenting; the menu bar and tray; notifications through UNUserNotificationCenter; announcements, navigation and external opens; menu and hotkey actions as native callers."
 status: PROPOSED
-version: "0.2"
+version: "0.3"
 date: "2026-11-14"
 milestone: M1
 lane: core (src-tauri) and engine (noter-native)
@@ -59,6 +59,7 @@ In `apps/desktop/src-tauri` and the `noter-native` crate (objc2), the core build
 ### Changelog
 
 - 2026-11-14: Hide and restore transitions keep the core window-state lock free while the native adapter interacts with AppKit, so a main-thread focus callback can complete during the transition.
+- 2026-11-14: Navigation requests for a newly created window are retained until that window's page finishes loading.
 
 ### 1.2 Purpose
 
@@ -197,13 +198,13 @@ During a call Noter must never steal focus from the call app, never appear in a 
 **Actor**: UI window
 
 **Success Scenarios**:
-- `window_navigate` shows the main or Settings window at a place; `window_announce` speaks text for a panel that is not key; `window_report_view` tells the core which call the main window shows; `open_external` opens a URL, a document citation, a System Settings pane or a Finder location.
+- `window_navigate` shows the main or Settings window at a place; when it creates that window, the navigation request is delivered after its page finishes loading. `window_announce` speaks text for a panel that is not key; `window_report_view` tells the core which call the main window shows; `open_external` opens a URL, a document citation, a System Settings pane or a Finder location.
 
 **Error Scenarios**:
 - `open_external` with a scheme outside the allowed list: `invalid_input`.
 
 **Steps**:
-1. [x] - `p1` - API: `window_navigate { target }`: show the right window and emit `nav:request` to it - `inst-navigate`
+1. [x] - `p1` - API: `window_navigate { target }`: show the right window and emit `nav:request` to it; if that window is being created, deliver the target on page load completion - `inst-navigate`
 2. [x] - `p1` - API: `window_announce { text, politeness }`: post an NSAccessibility announcement - `inst-announce`
 3. [x] - `p1` - API: `window_report_view { call_id }`: store it for the notification rule - `inst-report-view`
 4. [x] - `p1` - API: `open_external { target }`: open through Launch Services (`https`, document paths the core gave the UI, `x-apple.systempreferences:` panes, reveal in Finder); **IF** the target is not allowed **RETURN** `invalid_input` - `inst-open-external`

@@ -67,7 +67,7 @@ function LiveRow({ live, onShowCall }: { live: LiveCall; onShowCall: () => void 
 export function Sidebar({ selected, waiting, problems, writing, live, mode, footer, overlay, width, onSelect, onShowCall, onToggle, onOpenPrivacy }: SidebarProps) {
   return (
     <aside className={overlay ? "np-sidebar is-overlay" : "np-sidebar"} data-region="MW-R2" style={{ width }} aria-label={t("shell.sidebar")}>
-      <div className="np-sidebar__top">
+      <div className="np-sidebar__top" data-tauri-drag-region>
         <IconButton icon="sidebar" label={t("shell.hide_sidebar")} help={t("shell.hide_sidebar_help")} cls="np-sidebar__toggle" onAction={onToggle} />
       </div>
       <SourceList label={t("shell.sidebar")}>

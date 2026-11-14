@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use noter_core::{Core, Notification, Placement, Surfaces, TrayModel};
 use noter_native::ParentWindow;
-use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
+use noter_protocol::ipc::{dispatch_json, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
     AppSnapshot, CallLayout, CapturePhase, ExternalTarget, NoterSurface, Politeness, SettingsPane,
     WindowLabel,
@@ -159,9 +159,21 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
         return Some(w);
     }
     let url = WebviewUrl::App(format!("index.html?window={}", label.as_str()).into());
+    // @cpt-topology:cpt-noter-topology-ui-windows:p1
+    let title = window_title(label);
     let builder = tauri::WebviewWindowBuilder::new(app, label.as_str(), url)
-        .title("Noter")
+        .title(title)
         .visible(false);
+    let builder = if matches!(
+        label,
+        WindowLabel::Main | WindowLabel::Settings | WindowLabel::FirstRun
+    ) {
+        builder
+            .title_bar_style(tauri::TitleBarStyle::Overlay)
+            .hidden_title(true)
+    } else {
+        builder
+    };
     let builder = if is_panel(label) {
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-content-protect
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-level
@@ -188,7 +200,6 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     };
     // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-chrome
     // Without a size AppKit opens 800×600 pixels: 400×300 pt on Retina, too small for Settings.
-    // @cpt-topology:cpt-noter-topology-ui-windows:p1
     let builder = match label {
         WindowLabel::Main => builder
             .inner_size(1280.0, 820.0)
@@ -215,6 +226,26 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
     // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-return-panels
     Some(window)
     // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-return-panels
+}
+
+fn window_title(label: WindowLabel) -> &'static str {
+    match label {
+        WindowLabel::Settings => "Settings",
+        WindowLabel::FirstRun => "Noter Setup",
+        _ => "Noter",
+    }
+}
+
+#[cfg(test)]
+mod window_title_tests {
+    use super::*;
+
+    #[test]
+    fn settings_and_setup_have_distinct_native_titles() {
+        assert_eq!(window_title(WindowLabel::Settings), "Settings");
+        assert_eq!(window_title(WindowLabel::FirstRun), "Noter Setup");
+        assert_eq!(window_title(WindowLabel::Main), "Noter");
+    }
 }
 
 /// The host's `Surfaces`: Tauri windows, the tray, `open`.

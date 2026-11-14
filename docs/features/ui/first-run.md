@@ -10,9 +10,14 @@ milestone: M0
 
 # Feature: First-run wizard
 
+## Changelog
+
+- 2026-11-14: The first-run window hides its native title in the overlaid title bar.
+
 
 <!-- toc -->
 
+- [Changelog](#changelog)
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
   - [1.2 Purpose](#12-purpose)

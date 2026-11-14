@@ -1,7 +1,9 @@
 import { t } from "../../i18n/format";
+import type { MsgKey } from "../../i18n/en";
 import type { ShortcutTable } from "../../app/a11y/keys";
 import { SECTIONS } from "./sections";
 import type { SectionKey } from "./history";
+import model from "./menu-model.json";
 
 /** What a shell shortcut does; the window turns each into history, layout or a command. */
 export type ShellAction =
@@ -24,70 +26,28 @@ export interface Menu {
   items: MenuEntry[];
 }
 
-const item = (label: string, accel?: string, extra: Partial<MenuItem> = {}): MenuItem => ({ label, accel, ...extra });
-
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
 /** The app menu (DESIGN › Shell — Main window › App menu); the core builds it natively from this model. */
-export const APP_MENU: readonly Menu[] = [
-  {
-    title: t("menu.title.noter"),
-    items: [item(t("menu.about_noter")), "separator", item(t("menu.settings"), "⌘,", { chords: ["Meta+Comma"], action: { type: "open-settings" } }), item(t("menu.run_setup_again")), "separator", item(t("menu.hide_noter")), item(t("menu.quit_noter"), "⌘Q")],
-  },
-  { title: t("menu.title.file"), items: [item(t("menu.new_question"), "⌘N"), item(t("menu.export"), "⌘E"), "separator", item(t("menu.delete"), "⌘⌫")] },
-  {
-    title: t("menu.title.edit"),
-    items: [
-      item(t("menu.undo"), "⌘Z"),
-      item(t("menu.redo"), "⇧⌘Z"),
-      "separator",
-      item(t("menu.cut"), "⌘X"),
-      item(t("menu.copy"), "⌘C"),
-      item(t("menu.paste"), "⌘V"),
-      "separator",
-      item(t("menu.copy_for_slack"), "⌘⇧C"),
-      item(t("menu.copy_for_jira"), "⌥⌘C"),
-      item(t("menu.copy_as_markdown"), "⌥⇧⌘C"),
-      "separator",
-      item(t("menu.accept_item")),
-      item(t("menu.accept_all_suggestions")),
-      item(t("menu.reject_item")),
-      "separator",
-      item(t("menu.find"), "⌘F", { chords: ["Meta+KeyF"], action: { type: "focus-search" } }),
-    ],
-  },
-  {
-    title: t("menu.title.view"),
-    items: [
-      item(t("menu.hide_sidebar"), "⌃⌘S", { chords: ["Control+Meta+KeyS"], action: { type: "toggle-sidebar" } }),
-      item(t("menu.show_inspector"), "⌥⌘I", { chords: ["Alt+Meta+KeyI"], action: { type: "toggle-inspector" } }),
-      "separator",
-      ...SECTIONS.map((s) => item(t(s.label), `⌘${s.digit}`, { chords: [`Meta+Digit${s.digit}`], action: { type: "section", section: s.key } })),
-      "separator",
-      item(t("menu.back"), "⌘[", { chords: ["Meta+BracketLeft"], action: { type: "back" } }),
-      item(t("menu.forward"), "⌘]", { chords: ["Meta+BracketRight"], action: { type: "forward" } }),
-      "separator",
-      item(t("menu.actual_size"), "⌘0", { chords: ["Meta+Digit0"], action: { type: "zoom", to: "reset" } }),
-      item(t("menu.zoom_in"), "⌘+", { chords: ["Meta+Equal", "Meta+Shift+Equal"], action: { type: "zoom", to: "in" } }),
-      item(t("menu.zoom_out"), "⌘−", { chords: ["Meta+Minus"], action: { type: "zoom", to: "out" } }),
-    ],
-  },
-  {
-    title: t("menu.title.call"),
-    items: [
-      item(t("menu.start_recording"), "⌃⌥⌘R"),
-      item(t("menu.pause"), "⌃⌥⌘P"),
-      item(t("menu.mark_moment"), "⌃⌥⌘M"),
-      item(t("menu.catch_me_up"), "⌃⌥⌘C"),
-      item(t("menu.ask_about_this_call"), "⌃⌥⌘A"),
-      item(t("menu.open_call_screen"), "⌃⌥⌘N"),
-      item(t("menu.use_floating_panel")),
-      item(t("menu.mute_copilot")),
-      item(t("menu.hide_for_presenting"), "⌃⌥⌘0"),
-    ],
-  },
-  { title: t("menu.title.window"), items: [item(t("menu.minimize"), "⌘M"), item(t("menu.close"), "⌘W")] },
-  { title: t("menu.title.help"), items: [item(t("menu.noter_help"))] },
-];
+const actionFor = (key: string): Pick<MenuItem, "action" | "chords"> => {
+  if (key === "menu.settings") return { action: { type: "open-settings" }, chords: ["Meta+Comma"] };
+  if (key === "menu.find") return { action: { type: "focus-search" }, chords: ["Meta+KeyF"] };
+  if (key === "menu.hide_sidebar") return { action: { type: "toggle-sidebar" }, chords: ["Control+Meta+KeyS"] };
+  if (key === "menu.show_inspector") return { action: { type: "toggle-inspector" }, chords: ["Alt+Meta+KeyI"] };
+  if (key === "menu.back") return { action: { type: "back" }, chords: ["Meta+BracketLeft"] };
+  if (key === "menu.forward") return { action: { type: "forward" }, chords: ["Meta+BracketRight"] };
+  if (key === "menu.actual_size") return { action: { type: "zoom", to: "reset" }, chords: ["Meta+Digit0"] };
+  if (key === "menu.zoom_in") return { action: { type: "zoom", to: "in" }, chords: ["Meta+Equal", "Meta+Shift+Equal"] };
+  if (key === "menu.zoom_out") return { action: { type: "zoom", to: "out" }, chords: ["Meta+Minus"] };
+  const section = SECTIONS.find((candidate) => candidate.label === key);
+  return section ? { action: { type: "section", section: section.key }, chords: [`Meta+Digit${section.digit}`] } : {};
+};
+
+export const shellActionForMenuItem = (key: string): ShellAction | undefined => actionFor(key).action;
+
+export const APP_MENU: readonly Menu[] = model.map(({ title, items }) => ({
+  title: t(title as MsgKey),
+  items: items.map((entry) => entry ? { label: t(entry.key as MsgKey), accel: entry.shortcut, ...actionFor(entry.key) } : "separator"),
+}));
 
 /** Every chord the window handles, with its action: the keyboard table is read off the menu so the two never differ. */
 export function shellShortcuts(run: (a: ShellAction) => void): ShortcutTable {

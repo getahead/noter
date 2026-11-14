@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { APP_MENU, shellShortcuts, type MenuItem } from "./menu-model";
+import { APP_MENU, shellActionForMenuItem, shellShortcuts, type MenuItem } from "./menu-model";
 
 const items = APP_MENU.flatMap((m) => m.items).filter((e): e is MenuItem => e !== "separator");
 
@@ -38,5 +38,12 @@ describe("app menu model", () => {
     table["Meta+Shift+Equal"]!();
     expect(run.mock.calls.map(([a]) => a)).toEqual([{ type: "section", section: "library" }, { type: "back" }, { type: "toggle-sidebar" }, { type: "zoom", to: "in" }]);
     expect(table["Meta+KeyQ"]).toBeUndefined(); // ⌘Q stays with the native menu
+  });
+
+  it("routes native menu selections through the same shell actions as their shortcuts", () => {
+    expect(shellActionForMenuItem("section.library")).toEqual({ type: "section", section: "library" });
+    expect(shellActionForMenuItem("menu.back")).toEqual({ type: "back" });
+    expect(shellActionForMenuItem("menu.settings")).toEqual({ type: "open-settings" });
+    expect(shellActionForMenuItem("menu.export")).toBeUndefined();
   });
 });

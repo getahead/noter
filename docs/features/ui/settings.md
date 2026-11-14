@@ -10,9 +10,14 @@ milestone: M0
 
 # Feature: Settings window
 
+## Changelog
+
+- 2026-11-14: The Settings window uses its own native title, hides that title in the overlaid title bar, and participates in the shared app menu.
+
 
 <!-- toc -->
 
+- [Changelog](#changelog)
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
   - [1.2 Purpose](#12-purpose)

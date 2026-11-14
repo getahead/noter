@@ -7,6 +7,7 @@ import { useAnnounce } from "../../app/a11y/announce";
 import { useWindowShortcuts } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
+import { listenNativeMenuAction } from "../../core/native-menu";
 import type { BannerKind, CommandName, NavTarget, Result } from "../../core/bindings";
 import type { WholeName } from "../../app/store/window-store";
 import { t } from "../../i18n/format";
@@ -22,7 +23,7 @@ import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./
 import { elapsedSeconds, isLive, shortTitle } from "./live-row";
 import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
-import { shellShortcuts, type ShellAction } from "./menu-model";
+import { shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
@@ -144,6 +145,19 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     },
     [overlay, navigate],
   );
+  // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | undefined;
+    void listenNativeMenuAction((key) => {
+      const action = shellActionForMenuItem(key);
+      if (action) act(action);
+    }).then((stop) => active ? unlisten = stop : stop());
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [act]);
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-user-nav
   const shortcuts = useMemo(() => ({ ...shellShortcuts(act), Escape: () => inspectorOverride() ? closeInspector() : dispatch(escapeEvent(shellRef.current.history)) }), [act]);
   useWindowShortcuts(shortcuts);
