@@ -1,5 +1,6 @@
 import XCTest
 import AppKit
+import CoreGraphics
 
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
 final class NativeAppMenuTests: NoterTestCase {
@@ -192,8 +193,11 @@ final class NativeAppMenuTests: NoterTestCase {
     private func attachScreenshot(_ name: String) {
         let environment = ProcessInfo.processInfo.environment
         let build = environment["GITHUB_SHA"] ?? environment["NOTER_BUILD_SHA"] ?? "unset"
-        let appearance = NSApp.effectiveAppearance.name.rawValue
-        let scale = NSScreen.main?.backingScaleFactor ?? 0
+        let globalAppearance = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["AppleInterfaceStyle"] as? String
+        let appearance = globalAppearance == "Dark" ? "Dark" : "Light"
+        let display = CGMainDisplayID()
+        let bounds = CGDisplayBounds(display)
+        let scale = bounds.width > 0 ? Double(CGDisplayPixelsWide(display)) / bounds.width : 0
         let metadata = XCTAttachment(string: "build_sha=\(build)\nos=\(ProcessInfo.processInfo.operatingSystemVersionString)\nappearance=\(appearance)\nscale=\(scale)x")
         metadata.name = "\(name)-environment"
         metadata.lifetime = .keepAlways
