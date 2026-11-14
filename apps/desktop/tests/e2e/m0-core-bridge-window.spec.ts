@@ -21,8 +21,8 @@ test.describe("cpt-noter-seq-core-window-open", () => {
       await expect(frame(page)).toHaveAttribute("aria-busy", "false");
       await expect(page.getByRole("alert")).toHaveCount(0);
       if (label === "main") {
-        const hostEvents = await page.evaluate(() => (globalThis as unknown as { __noterEmits?: Array<{ event: string; payload: unknown }> }).__noterEmits ?? []);
-        expect(hostEvents).toContainEqual({ event: "shell:menu-context", payload: { sidebarVisible: true } });
+        await expect.poll(() => page.evaluate(() => (globalThis as unknown as { __noterEmits?: Array<{ event: string; payload: unknown }> }).__noterEmits ?? []))
+          .toContainEqual({ event: "shell:menu-context", payload: { sidebarVisible: true } });
       }
 
       const log = await calls(page);
