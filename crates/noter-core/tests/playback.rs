@@ -156,7 +156,7 @@ fn play(call_id: &str) -> PlayAudioArgs {
         call_id: CallId::new(call_id),
         from_ms: OffsetMs(1_000),
         to_ms: Some(OffsetMs(5_000)),
-        channel: None,
+        channel: Some(AudioChannel::Mic),
     }
 }
 
@@ -188,7 +188,15 @@ async fn after_a_call_any_output_plays_and_the_engine_is_asked() {
     assert_eq!(state.to_ms, Some(OffsetMs(5_000)));
     assert!(r.engine.commands().iter().any(|c| matches!(
         c,
-        EngineCommand::Play { from_ms, .. } if *from_ms == OffsetMs(1_000)
+        EngineCommand::Play {
+            call_id,
+            from_ms,
+            to_ms,
+            channel,
+        } if call_id == &CallId::new("call_old")
+            && *from_ms == OffsetMs(1_000)
+            && *to_ms == Some(OffsetMs(5_000))
+            && *channel == Some(AudioChannel::Mic)
     )));
     assert_eq!(r.events.playback(), vec![state]);
 }
@@ -385,5 +393,12 @@ async fn a_capture_starting_stops_it() {
     assert_eq!(
         last.stopped_reason,
         Some(PlaybackStopReason::CaptureStarted)
+    );
+    assert!(
+        r.engine
+            .commands()
+            .iter()
+            .any(|command| matches!(command, EngineCommand::StopPlayback)),
+        "capture start must stop the active playback"
     );
 }

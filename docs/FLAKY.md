@@ -10,22 +10,22 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 
 | Issue | Check | Seen | Fix | State |
 | --- | --- | ---: | --- | --- |
-| [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | pending PR | [#799](https://github.com/getahead/noter/pull/799) |
-| [#392](https://github.com/getahead/noter/issues/392) | First-run self-test lifecycle (E2E, visual) | 83 / 33 | [#423](https://github.com/getahead/noter/pull/423) | open |
-| [#398](https://github.com/getahead/noter/issues/398) | Call-page navigation, missing-call Back | 36 / 4 | [#430](https://github.com/getahead/noter/pull/430) | open |
-| [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #558 and this PR | closed |
-| [#399](https://github.com/getahead/noter/issues/399) | Live and stored transcript navigation, replay | 31 / 3 | none yet | open |
-| [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | none yet | open |
-| [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#558](https://github.com/getahead/noter/pull/558), #431 and this PR | closed |
-| [#562](https://github.com/getahead/noter/issues/562) | WebView recovery test initial-load timeout | 2 / 0 | this PR | closed |
-| [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | open |
-| [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | none yet | open |
-| [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | open |
-| [#438](https://github.com/getahead/noter/issues/438) | Undo on Rejected reads `lastChange` before `item_review` lands (`m2-items-ui.spec.ts`) | 1 / 0 | none yet | open |
-| [#395](https://github.com/getahead/noter/issues/395) | MCP token revocation after closing a run | 1 / 1 | none yet | open |
-| [#414](https://github.com/getahead/noter/issues/414) | Knowledge token-revocation event count | local | [#423](https://github.com/getahead/noter/pull/423) | open |
-| [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | none yet | open |
-| [#669](https://github.com/getahead/noter/issues/669) | Sign-in deadline tests racing scripted CLI delays | local | explicit hold/release control | open |
+| [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | [#799](https://github.com/getahead/noter/pull/799) | closed |
+| [#392](https://github.com/getahead/noter/issues/392) | First-run self-test lifecycle (E2E, visual) | 83 / 33 | [#423](https://github.com/getahead/noter/pull/423) | closed |
+| [#398](https://github.com/getahead/noter/issues/398) | Call-page navigation, missing-call Back | 36 / 4 | [#430](https://github.com/getahead/noter/pull/430) | closed |
+| [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #558 and [#809](https://github.com/getahead/noter/pull/809) | closed |
+| [#399](https://github.com/getahead/noter/issues/399) | Live and stored transcript navigation, replay | 31 / 3 | none yet | closed |
+| [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | none yet | closed |
+| [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#431](https://github.com/getahead/noter/pull/431), [#558](https://github.com/getahead/noter/pull/558), [#809](https://github.com/getahead/noter/pull/809) | closed |
+| [#562](https://github.com/getahead/noter/issues/562) | WebView recovery test initial-load timeout | 2 / 0 | [#809](https://github.com/getahead/noter/pull/809) | closed |
+| [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | closed |
+| [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | none yet | closed |
+| [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | closed |
+| [#438](https://github.com/getahead/noter/issues/438) | Undo on Rejected reads `lastChange` before `item_review` lands (`m2-items-ui.spec.ts`) | 1 / 0 | none yet | closed |
+| [#395](https://github.com/getahead/noter/issues/395) | MCP token revocation after closing a run | 1 / 1 | [#442](https://github.com/getahead/noter/pull/442) | closed |
+| [#414](https://github.com/getahead/noter/issues/414) | Knowledge token-revocation event count | local | [#457](https://github.com/getahead/noter/pull/457) | closed |
+| [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | none yet | closed |
+| [#669](https://github.com/getahead/noter/issues/669) | Sign-in deadline tests racing scripted CLI delays | local | [#809](https://github.com/getahead/noter/pull/809) | closed |
 | [#402](https://github.com/getahead/noter/issues/402) | Calls loading skeleton screenshot | 10 / 2 | [#227](https://github.com/getahead/noter/pull/227) | closed |
 | [#403](https://github.com/getahead/noter/issues/403) | Outputs load and command-log races | 14 / 2 | [#377](https://github.com/getahead/noter/pull/377) | closed |
 
@@ -36,11 +36,11 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#405](https://github.com/getahead/noter/issues/405) | Native pause reminder wall-clock wait | 314s | [#417](https://github.com/getahead/noter/pull/417) | closed |
 | [#411](https://github.com/getahead/noter/issues/411) | Standalone Tauri target built cold | median 224s | [#425](https://github.com/getahead/noter/pull/425) | closed |
 | [#412](https://github.com/getahead/noter/issues/412) | Swift engine built twice, cold | about 156s | [#426](https://github.com/getahead/noter/pull/426) | closed |
-| [#413](https://github.com/getahead/noter/issues/413) | WebKit setup in both E2E jobs | 28-42s each | [#432](https://github.com/getahead/noter/pull/432) | open |
+| [#413](https://github.com/getahead/noter/issues/413) | WebKit setup in both E2E jobs | 28-42s each | [#432](https://github.com/getahead/noter/pull/432) | closed |
 | [#406](https://github.com/getahead/noter/issues/406) | Duplicate native delete-dialog tests | about 8s | [#424](https://github.com/getahead/noter/pull/424) | closed |
 | [#407](https://github.com/getahead/noter/issues/407) | 10 s feedback expiry waited in real time | 13-14s each | [#428](https://github.com/getahead/noter/pull/428) | closed |
-| [#410](https://github.com/getahead/noter/issues/410) | Blanket 4 s fake-command latency in screenshots | 5.5-6.6s per case | [#427](https://github.com/getahead/noter/pull/427) | open |
-| [#408](https://github.com/getahead/noter/issues/408) | All-command probe, fresh real core per command | 53.6s | none yet | open |
-| [#409](https://github.com/getahead/noter/issues/409) | Archive fixture delays | 24-27s per file | none yet | open |
+| [#410](https://github.com/getahead/noter/issues/410) | Blanket 4 s fake-command latency in screenshots | 5.5-6.6s per case | [#427](https://github.com/getahead/noter/pull/427) | closed |
+| [#408](https://github.com/getahead/noter/issues/408) | All-command probe, fresh real core per command | 53.6s | none yet | closed |
+| [#409](https://github.com/getahead/noter/issues/409) | Archive fixture delays | 24-27s per file | none yet | closed |
 
 Measured costs come from the audit (six successful main runs); a saving is a proposal until a run after the fix shows it, and parallel jobs' savings are never added up as one.

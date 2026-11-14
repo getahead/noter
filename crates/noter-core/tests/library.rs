@@ -419,6 +419,24 @@ async fn sorts_and_cursor_pages_cover_every_call_once() {
 }
 
 #[tokio::test]
+async fn newest_sort_uses_call_id_as_the_tie_breaker() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let db = Connection::open(dir.path().join("noter.db")).unwrap();
+    db.execute(
+        "UPDATE calls SET started_at = (SELECT started_at FROM calls WHERE id = 'call_b') WHERE id = 'call_a'",
+        [],
+    )
+    .unwrap();
+
+    assert_eq!(
+        ids(&core, CallFilter::default(), CallSort::Newest).await,
+        ["call_c", "call_b", "call_a"]
+    );
+}
+
+#[tokio::test]
 async fn filters_narrow_the_list_in_sql() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());
@@ -964,7 +982,6 @@ async fn delete_removes_call_audio_from_the_configured_models_container() {
     let recording = container.path().join("audio/call_external/mic.m4a");
     std::fs::create_dir_all(recording.parent().unwrap()).unwrap();
     std::fs::write(&recording, b"recording").unwrap();
-
     core.calls_delete(
         &main_window(),
         CallsDeleteArgs {
@@ -973,8 +990,38 @@ async fn delete_removes_call_audio_from_the_configured_models_container() {
     )
     .await
     .unwrap();
-
     assert!(!recording.exists());
+}
+
+#[tokio::test]
+async fn startup_retries_audio_removal_after_calls_delete_cannot_remove_its_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let audio = dir.path().join("audio");
+    std::fs::create_dir_all(&audio).unwrap();
+    let folder = audio.join("call_a");
+    // A non-directory at the call-folder path makes remove_dir_all fail even when the test runs
+    // as root, exercising calls_delete's durable retry record without relying on chmod.
+    std::fs::write(&folder, b"temporary obstacle").unwrap();
+    core.calls_delete(
+        &main_window(),
+        CallsDeleteArgs {
+            call_ids: vec![CallId::new("call_a")],
+        },
+    )
+    .await
+    .unwrap();
+    let pending = dir.path().join("audio/.pending-delete");
+    assert_eq!(std::fs::read_to_string(&pending).unwrap(), "call_a\n");
+    std::fs::remove_file(&folder).unwrap();
+    std::fs::create_dir(&folder).unwrap();
+    std::fs::write(folder.join("mic.m4a"), b"x").unwrap();
+    drop(core);
+    let (reopened, _) = open(dir.path());
+    assert!(!folder.exists());
+    assert!(!pending.exists());
+    drop(reopened);
 }
 
 #[tokio::test]

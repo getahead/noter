@@ -22,6 +22,7 @@ fn call() -> CallId {
 }
 
 fn engine(dir: &Path) -> ScriptedEngine {
+    write(dir, "audio/call_1/mic.wav", b"test audio");
     ScriptedEngine::new().with_container(dir)
 }
 
@@ -210,6 +211,68 @@ async fn without_a_container_nothing_is_sent() {
     let r = pass(&c, "audio/call_1/r.json").await;
     assert!(matches!(r, Err(OfflineError::UnsafePath(_))));
     assert_eq!(offline_cmds(&engine), 0);
+}
+
+// cpt-noter-algo-core-harness-scripted-engine: the built-in answer reuses the live transcript.
+#[tokio::test(start_paused = true)]
+async fn built_in_archive_echoes_live_segments_when_audio_exists() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "audio/call_1/mic.wav", b"audio");
+    let transcript = [
+        r#"{"id":"seg_1","call_id":"call_1","channel":"sys","speaker":{"speaker_id":"spk_0","label":{"type":"unnamed","n":0}},"crosstalk_with":[],"t0_ms":1000,"t1_ms":1400,"text":"first words","lang":"en","lang_p":0.9,"confidence":0.8,"state":"confirmed","pass":"live","corrections":[]}"#,
+        r#"{"id":"seg_2","call_id":"call_1","channel":"mic","speaker":{"speaker_id":"spk_you","label":{"type":"you"}},"crosstalk_with":[],"t0_ms":1800,"t1_ms":2200,"text":"second words","lang":"en","lang_p":0.95,"confidence":0.7,"state":"confirmed","pass":"live","corrections":[]}"#,
+    ]
+    .join("\n");
+    write(dir.path(), "audio/call_1/transcript.jsonl", transcript);
+    let engine = engine(dir.path());
+    let c = client(&engine);
+
+    let result_path = pass(&c, "audio/call_1/result.json").await.unwrap();
+    let result: ArchiveResult =
+        serde_json::from_slice(&std::fs::read(dir.path().join(result_path)).unwrap()).unwrap();
+    assert_eq!(
+        result
+            .segments
+            .iter()
+            .map(|segment| segment.text.as_str())
+            .collect::<Vec<_>>(),
+        ["first words", "second words"]
+    );
+    assert_eq!(result.segments[0].t0_ms, OffsetMs(1_000));
+    assert_eq!(result.segments[1].t1_ms, OffsetMs(2_200));
+}
+
+// cpt-noter-algo-core-harness-scripted-engine: no-audio cannot report an empty successful pass.
+#[tokio::test(start_paused = true)]
+async fn built_in_archive_fails_when_the_call_has_no_audio() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new().with_container(dir.path());
+    let c = client(&engine);
+
+    let result = pass(&c, "audio/call_1/result.json").await;
+    assert!(matches!(
+        result,
+        Err(OfflineError::Engine {
+            code: EngineErrorCode::ZeroBuffers,
+            ..
+        })
+    ));
+}
+
+#[tokio::test(start_paused = true)]
+async fn built_in_archive_preserves_audio_folder_read_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "audio/call_1", b"not a directory");
+    let engine = ScriptedEngine::new().with_container(dir.path());
+    let c = client(&engine);
+
+    assert!(matches!(
+        pass(&c, "audio/call_1/result.json").await,
+        Err(OfflineError::Engine {
+            code: EngineErrorCode::Internal,
+            ..
+        })
+    ));
 }
 
 #[tokio::test(start_paused = true)]

@@ -546,7 +546,7 @@ async fn an_engine_that_cannot_start_leaves_the_call_failed_not_refused() {
     } else {
         r.phase_becomes(CapturePhase::Failed).await
     };
-    assert!(failed.call_id.is_some());
+    let call_id = failed.call_id.clone().expect("failed call has an id");
     assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 1);
     // A failed call can still be stopped; it ends at the last audio.
     let stopped = r
@@ -554,12 +554,13 @@ async fn an_engine_that_cannot_start_leaves_the_call_failed_not_refused() {
         .capture_stop(
             &main_window(),
             CallIdArgs {
-                call_id: failed.call_id.unwrap(),
+                call_id: call_id.clone(),
             },
         )
         .await
         .unwrap();
     assert_eq!(stopped.phase, CapturePhase::Stopped);
+    assert_eq!(r.call_row(&call_id).1, Some(T0));
     // The post-call job writes the call's outputs (empty: nothing was heard): processing
     // becomes ready.
     tokio::time::sleep(Duration::from_secs(1)).await;
@@ -2378,7 +2379,7 @@ async fn try_again_restarts_the_engine_on_the_same_call() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn low_and_full_disks_are_degraded_states_and_a_full_one_stops_audio_only() {
+async fn a_full_disk_disables_audio_writing_without_stopping_the_recording() {
     let r = rig();
     let disk = |free: u32| EnvironmentReading {
         disk_free_mb: free,
@@ -3227,10 +3228,20 @@ async fn stop_queues_post_call_then_archive_and_the_guard_follows_the_call() {
     assert_eq!((post.len(), archive.len()), (1, 1));
     assert_eq!(post[0].status, JobRunStatus::Succeeded);
     assert_eq!(archive[0].status, JobRunStatus::Succeeded);
-    assert!(
-        post[0].started_at <= archive[0].started_at,
-        "post-call first"
-    );
+    let first_running_event = |id: &JobRunId| {
+        r.events
+            .0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(event, _)| *event == event_names::JOBS_PROGRESS)
+            .filter_map(|(_, payload)| serde_json::from_value::<JobProgress>(payload.clone()).ok())
+            .position(|progress| {
+                progress.run.id == *id && progress.run.status == JobRunStatus::Running
+            })
+            .expect("run publishes a Running row")
+    };
+    assert!(first_running_event(&post[0].id) < first_running_event(&archive[0].id));
 }
 
 #[tokio::test(start_paused = true)]

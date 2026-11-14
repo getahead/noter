@@ -2,8 +2,8 @@
 title: "Feature: Speaker naming, term fixes and audio deletion"
 description: "Logged transcript corrections that survive the archive pass, post-call naming and permanent audio deletion."
 status: PROPOSED
-version: "0.2"
-date: "2026-10-18"
+version: "0.3"
+date: "2026-11-14"
 milestone: M2
 lane: core
 decomposition: docs/DECOMPOSITION-core.md
@@ -13,6 +13,7 @@ design: docs/DESIGN-core.md
 # Feature: Speaker naming, term fixes and audio deletion
 
 > **Change log (v0.2):** Call folder reads and deletion now share the engine container root.
+> **Change log (v0.3):** Corrected segment shadow text uses the retrieval normalizer and is covered by a non-ASCII keyword-search regression.
 
 <!-- toc -->
 
@@ -48,6 +49,8 @@ design: docs/DESIGN-core.md
 The transcript service gains whole-call and single-line speaker naming, term fixes with glossary teaching, post-call naming and permanent audio deletion by call or age. Corrections become constraints for the archive pass. Voice-profile creation and person-page commands remain M3; a new name can still be created through the existing `PersonRef` in a naming command.
 
 > **M2 decisions (Backend Teamlead, 1 Nov 2026).** `CallRow` and `CallDetail` gain `audio_deleted_at: Option<TimestampMs>` and `audio_retention_days`, delivered with `audio_delete_older` in a contract-lane PR (wire change, UI review by the UI Teamlead; `milestones.toml` untouched); the dated "Audio deleted on <date> (kept N days)" copy returns with it (TL-20, D-36). Story tests are story-named files in `apps/desktop/tests/conformance/m2-stories-*.test.ts` that drive the real core over `StdioCore` with the scripted runtime, secret store, native ops and engine, and assert the core-visible steps (rows, events, state); the UI E2E takes over when the UI M2 lands (TL-18, D-26).
+
+> **Clarification (14 Nov 2026; version 0.2).** Term fixes use the same normalized search shadow as capture via `noter_retrieval::normalize`; the non-ASCII regression below verifies this existing requirement without adding a new design element.
 
 ### 1.2 Purpose
 
@@ -116,7 +119,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 **Steps**:
 1. [x] - `p1` - API: `transcript_fix_term { call_id, segment_id, range, replacement, add_to_glossary }` - `inst-term-request`
 2. [x] - `p1` - On the writer, validate call membership, range and replacement; apply the replacement and record its original text - `inst-term-validate`
-3. [x] - `p1` - DB: UPDATE `segments` text, normalized shadow text and corrections; when requested, upsert the glossary term in the same logged operation - `inst-term-write`
+3. [x] - `p1` - DB: UPDATE `segments` text, `text_norm` computed from the complete corrected text using `noter_retrieval::normalize` (NFKC, lowercase, ё to е, ß to ss, matching capture), and corrections; when requested, upsert the glossary term in the same logged operation - `inst-term-write`
 4. [x] - `p1` - Commit, refresh the per-call transcript file and indexes, send `segments_updated` and `entity:changed`, and update the engine glossary for future decoding - `inst-term-publish`
 5. [x] - `p1` - Record reconciliation intent for earlier calls without rewriting them; return `proposal_queued` truthfully for work queued, with processing and proposal controls deferred to M5 - `inst-term-reconcile`
 6. [x] - `p1` - **RETURN** `FixTermResult` with segment, change id and optional glossary term id - `inst-term-return`
@@ -215,7 +218,7 @@ The system **MUST** delete stored audio explicitly or by age through a non-undoa
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-tests`
 
-The system **MUST** pass unit tests for line scope, call scope, Unicode term ranges, constraint persistence, undo, partial filesystem failure and idempotent deletion; conformance for all five commands; and real-core E2E for both naming stories. Call folder lookup and physical removal use the same configured container root as the engine. `just gate` passes.
+The system **MUST** pass unit tests for line scope, call scope, Unicode term ranges, a non-ASCII term-fix regression in `crates/noter-core/tests/speakers.rs` that verifies persisted `text_norm` matches capture normalization and normalized keyword search finds the corrected segment, constraint persistence, undo, partial filesystem failure and idempotent deletion; conformance for all five commands; and real-core E2E for both naming stories. Call folder lookup and physical removal use the same configured container root as the engine. `just gate` passes.
 
 **Implements**:
 - `cpt-noter-flow-core-speakers-audio-name`
@@ -230,7 +233,7 @@ The system **MUST** pass unit tests for line scope, call scope, Unicode term ran
 - [x] Real-core E2E `cpt-noter-seq-call-screen-name-speaker`: name Speaker 3 as an existing or new person; all intended lines update and undo restores them.
 - [x] Real-core E2E `cpt-noter-seq-call-page-name-speakers`: sample replay, skip and text-only naming work; dependent owners and names update while edited wording is kept.
 - [x] A one-line rename changes one line; the archive pass respects its cannot-link constraint and whole-call must-link constraints.
-- [x] Term fixes preserve originals and update normalized search text; glossary teaching affects future decoding without silently rewriting earlier calls.
+- [x] Term fixes preserve originals and write `text_norm` using `noter_retrieval::normalize` over the complete corrected segment. A non-ASCII regression replaces a term with `ﬁle Ｗｅｂ Ёлка Straße`, verifies the stored shadow is `file web елка strasse` while display text retains the replacement, and finds the segment through normalized keyword queries. Glossary teaching affects future decoding without silently rewriting earlier calls.
 - [x] Both deletion commands succeed in real-core E2E; replay after deletion returns `audio_deleted`, text evidence still opens and undo returns `not_undoable`.
 - [x] Unit and conformance tests cover missing ids, cross-call input, invalid ranges and failed file removal without false freed-byte counts.
 - [x] `just gate` passes.

@@ -139,7 +139,8 @@ async fn lists_every_page_and_reads_json_and_sse_answers() {
         "resources/read" => {
             let message = json!({"jsonrpc": "2.0", "id": id(r), "result": {"contents": [
                 {"uri": "doc://b", "mimeType": "text/plain", "text": "Beta"}]}});
-            let body = format!("event: message\ndata: {message}\n\n");
+            let notification = json!({"jsonrpc": "2.0", "method": "notifications/progress", "params": {"progress": 1}});
+            let body = format!("event: message\r\ndata: {notification}\r\n\r\nevent: message\r\ndata: {message}\r\n\r\n");
             Some(StubResponse {
                 status: 200,
                 headers: vec![("Content-Type".into(), "text/event-stream".into())],
@@ -205,6 +206,33 @@ async fn lists_every_page_and_reads_json_and_sse_answers() {
         assert_eq!(r.headers["mcp-protocol-version"], "2025-06-18");
     }
     audited_before_each(&audits, &servers);
+}
+
+#[tokio::test]
+async fn rejects_a_response_body_over_the_limit() {
+    let stub = mcp(true, |method, _, _| {
+        (method == "resources/read").then(|| StubResponse {
+            status: 200,
+            headers: vec![("Content-Type".into(), "application/json".into())],
+            body: vec![b'x'; 32 * 1024 * 1024 + 1],
+        })
+    });
+    let audits = Audits::new(true);
+    let servers = [&stub];
+    let audit = audit_of(&audits, &servers);
+    let renewed = no_renewal();
+    let server = stub.url("/mcp");
+    let call = Call {
+        server: &server,
+        token: "bearer-1",
+        audit: &audit,
+        renewed: &renewed,
+    };
+
+    assert!(matches!(
+        client().read(&call, "doc://large").await,
+        Err(McpClientError::Invalid)
+    ));
 }
 
 #[tokio::test]

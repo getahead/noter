@@ -788,7 +788,9 @@ impl Harness {
                         ("text", seg["text"].clone()),
                         (
                             "text_norm",
-                            json!(seg["text"].as_str().unwrap_or_default().to_lowercase()),
+                            json!(noter_retrieval::normalize(
+                                seg["text"].as_str().unwrap_or_default()
+                            )),
                         ),
                         ("lang", seg["lang"].clone()),
                         ("lang_p", seg["lang_p"].clone()),

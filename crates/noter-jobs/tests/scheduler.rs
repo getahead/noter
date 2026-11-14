@@ -720,10 +720,20 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
     r.sched.start().unwrap();
     let running = r.go(r.post_call("call_1"));
     settle().await;
-    r.live(true, None);
+    assert_eq!(
+        r.started.recv().await,
+        Some((JobKind::PostCall, Some("call_1".into())))
+    );
     let paused = r.go(r.archive("call_1"));
     settle().await;
-    let _ = r.started.recv().await;
+    assert_eq!(
+        r.started.recv().await,
+        Some((JobKind::ArchivePass, Some("call_1".into())))
+    );
+    r.live(true, None);
+    r.step(JobKind::ArchivePass, Step::Checkpoint);
+    settle().await;
+    assert_eq!(r.status(&paused), JobRunStatus::Paused);
     let queued = r.go(Request::for_call(
         JobKind::Regeneration,
         Trigger::OnDemand,
@@ -731,7 +741,6 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
     ));
     settle().await;
     assert_eq!(r.status(&queued), JobRunStatus::Queued);
-    let _ = paused;
     // The process ends: a new scheduler opens the same database.
     let dir = r.dir;
     drop(r.sched);
@@ -744,6 +753,11 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
         (old.status, old.error),
         (JobRunStatus::Failed, Some(ErrorCode::Internal))
     );
+    let interrupted_archive = runs.iter().find(|x| x.id == paused).unwrap();
+    assert_eq!(
+        (interrupted_archive.status, interrupted_archive.error),
+        (JobRunStatus::Failed, Some(ErrorCode::Internal))
+    );
     // The unfinished post-call was retried as a new run, which started.
     let retry: Vec<_> = runs
         .iter()
@@ -751,6 +765,17 @@ async fn restart_fails_unfinished_runs_and_queues_a_retry() {
         .collect();
     assert_eq!(retry.len(), 1);
     assert_eq!(retry[0].status, JobRunStatus::Running);
+    let retry_subject: Option<String> = r2
+        .store
+        .read(|c| {
+            c.query_row(
+                "SELECT subject FROM job_runs WHERE id = ?1",
+                [retry[0].id.as_str()],
+                |row| row.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(retry_subject.as_deref(), Some("call_1"));
     // The queued run was never started: it is still queued and now runs.
     assert_eq!(
         runs.iter().find(|x| x.id == queued).unwrap().status,
