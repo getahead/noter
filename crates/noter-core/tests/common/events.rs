@@ -12,6 +12,26 @@ impl EventEmitter for Events {
 }
 
 impl Events {
+    /// All events without consuming them, for assertions that inspect history more than once.
+    #[allow(dead_code)]
+    pub fn snapshot(&self) -> Vec<(&'static str, Value)> {
+        self.0.lock().unwrap().clone()
+    }
+
+    /// Remove only events matching `predicate`, preserving the order of both groups.
+    #[allow(dead_code)]
+    pub fn take_matching(
+        &self,
+        mut predicate: impl FnMut(&'static str, &Value) -> bool,
+    ) -> Vec<(&'static str, Value)> {
+        let mut all = self.0.lock().unwrap();
+        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
+            .into_iter()
+            .partition(|(event, payload)| predicate(event, payload));
+        *all = kept;
+        taken
+    }
+
     #[allow(dead_code)] // Not every integration test needs to inspect emitted events.
     pub fn named(&self, name: &str) -> Vec<Value> {
         let mut all = self.0.lock().unwrap();

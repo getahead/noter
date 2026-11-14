@@ -2,17 +2,20 @@
 //! suggested items with their evidence, the merge regeneration, the archive pass and the
 //! Summary-ready notification. The scripted runtime and the scripted engine answer; paused time.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/postcall.rs"]
 mod postcall_common;
 #[path = "common/test_support.rs"]
 mod test_support;
+use common_events::Events;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use test_support::FixedClock;
 
 use noter_core::{
-    Adapters, Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Scripted,
-    Surfaces, TrayModel,
+    Adapters, Core, CoreDeps, Notification, NotificationKind, Placement, Scripted, Surfaces,
+    TrayModel,
 };
 use noter_engine_client::scripted::{Script, ScriptedEngine};
 use noter_jobs::{Request, Trigger};
@@ -24,21 +27,12 @@ use serde_json::{json, Value};
 const NOW: i64 = 1_790_000_000_000;
 const CALL: &str = "call_pc";
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
     fn entity(&self) -> Vec<Value> {
-        let all = self.0.lock().unwrap();
-        all.iter()
+        self.snapshot()
+            .into_iter()
             .filter(|(e, _)| *e == "entity:changed")
-            .map(|(_, p)| p.clone())
+            .map(|(_, p)| p)
             .collect()
     }
 }
@@ -641,7 +635,7 @@ async fn open_last_summary_opens_the_summary_of_the_latest_call_with_ready_outpu
     let r = open("", true).await;
     seed_call(&r.core, CALL, 3);
     let navigate = || {
-        let events = r.events.0.lock().unwrap().len();
+        let events = r.events.snapshot().len();
         let core = r.core.clone();
         async move {
             core.window_navigate(
@@ -656,7 +650,7 @@ async fn open_last_summary_opens_the_summary_of_the_latest_call_with_ready_outpu
         }
     };
     let navs = |from: usize| -> Vec<Value> {
-        r.events.0.lock().unwrap()[from..]
+        r.events.snapshot()[from..]
             .iter()
             .filter(|(e, _)| *e == "nav:request")
             .map(|(_, p)| p.clone())

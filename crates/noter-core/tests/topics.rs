@@ -2,13 +2,16 @@
 //! items to topics (the scripted runtime writes them, the scripted engine embeds them), and the
 //! topic commands read, rename, merge, undo and keep topics separate through the core.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
-use std::sync::{Arc, Mutex};
+use common_events::Events;
+use std::sync::Arc;
 use std::time::Duration;
 use test_support::FixedClock;
 
-use noter_core::{Adapters, Core, CoreDeps, EventEmitter, Scripted};
+use noter_core::{Adapters, Core, CoreDeps, Scripted};
 use noter_db::Insert;
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_jobs::{Request, Trigger};
@@ -20,21 +23,12 @@ use serde_json::{json, Value};
 const NOW: i64 = 1_790_000_000_000;
 const HOUR: i64 = 3_600_000;
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
     /// The topic ids `entity:changed` carried since the last call (whole rows or removals).
     fn topics(&self) -> Vec<String> {
-        let mut all = self.0.lock().unwrap();
-        let ids = all
-            .iter()
+        let ids = self
+            .take()
+            .into_iter()
             .filter(|(e, _)| *e == "entity:changed")
             .filter_map(|(_, p)| match p["type"].as_str() {
                 Some("topic") => p["topic"]["id"].as_str().map(String::from),
@@ -42,7 +36,6 @@ impl Events {
                 _ => None,
             })
             .collect();
-        all.clear();
         ids
     }
 }

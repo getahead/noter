@@ -2,15 +2,18 @@
 //! live transcript section by section through the router (the scripted runtime here), and the
 //! outputs commands read, edit, compare and undo them. Paused tokio time throughout.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/postcall.rs"]
 mod postcall_common;
 #[path = "common/test_support.rs"]
 mod test_support;
-use std::sync::{Arc, Mutex};
+use common_events::Events;
+use std::sync::Arc;
 use std::time::Duration;
 use test_support::FixedClock;
 
-use noter_core::{Adapters, Core, CoreDeps, EventEmitter, Scripted};
+use noter_core::{Adapters, Core, CoreDeps, Scripted};
 use noter_db::Insert;
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -29,18 +32,9 @@ use serde_json::{json, Value};
 const NOW: i64 = 1_790_000_000_000;
 const CALL: &str = "call_pc";
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
     fn all(&self) -> Vec<(&'static str, Value)> {
-        self.0.lock().unwrap().clone()
+        self.snapshot()
     }
 
     fn progress(&self) -> Vec<OutputsProgress> {

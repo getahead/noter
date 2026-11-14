@@ -1,14 +1,17 @@
 //! FEATURE cpt-noter-feature-core-live-transcript (replay): `audio_play` and `audio_stop`, the
 //! replay route rule during capture, `playback:state` whole with a version, and the stop reasons.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
+use common_events::Events;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use test_support::FixedClock;
 
-use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices};
+use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, NativeServices};
 use noter_db::Mutation;
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_engine_client::EngineLauncher;
@@ -16,25 +19,14 @@ use noter_protocol::engine::{EngineCommand, EngineEvent};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
+use serde_json::json;
 
 impl Events {
     fn playback(&self) -> Vec<PlaybackState> {
-        self.0
-            .lock()
-            .unwrap()
-            .iter()
+        self.snapshot()
+            .into_iter()
             .filter(|(e, _)| *e == "playback:state")
-            .map(|(_, p)| serde_json::from_value(p.clone()).unwrap())
+            .map(|(_, p)| serde_json::from_value(p).unwrap())
             .collect()
     }
 }

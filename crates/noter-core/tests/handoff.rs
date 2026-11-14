@@ -1,45 +1,36 @@
 //! FEATURE cpt-noter-feature-core-handoff: the ten handoff and repository commands over the
 //! scripted runtime and scripted native ops (TL-13, TL-15), on paused time.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
+use common_events::Events;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use test_support::FixedClock;
 
 use noter_core::{
-    Adapters, ClipboardText, Core, CoreDeps, EventEmitter, LaunchRequest, NativeOps, SaveKind,
-    Scripted,
+    Adapters, ClipboardText, Core, CoreDeps, LaunchRequest, NativeOps, SaveKind, Scripted,
 };
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 #[path = "common/row.rs"]
 mod common_row;
 use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
     /// The handoff views published so far, oldest first (taken).
     fn handoffs(&self) -> Vec<HandoffView> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, p)| *e == event_names::ENTITY_CHANGED && p["type"] == "handoff");
-        *all = kept;
+        let taken = self.take_matching(|event, payload| {
+            event == event_names::ENTITY_CHANGED && payload["type"] == "handoff"
+        });
         taken
             .into_iter()
             .map(|(_, p)| match serde_json::from_value(p).unwrap() {

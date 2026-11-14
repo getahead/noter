@@ -2,32 +2,23 @@
 //! with the core, its runs go out as `jobs:progress` with complete rows, and the capture guard is
 //! the session manager's one input.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
-use std::sync::{Arc, Mutex};
+use common_events::Events;
+use std::sync::Arc;
 use std::time::Duration;
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps};
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::model::{JobKind, JobProgress, JobRunStatus};
 use noter_protocol::CallId;
-use serde_json::Value;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
 
 impl Events {
     fn progress(&self) -> Vec<JobProgress> {
-        self.0
-            .lock()
-            .unwrap()
+        self.snapshot()
             .iter()
             .filter(|(e, _)| *e == "jobs:progress")
             .map(|(_, p)| serde_json::from_value(p.clone()).unwrap())

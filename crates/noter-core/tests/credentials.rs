@@ -7,15 +7,18 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+#[path = "common/events.rs"]
+mod common_events;
+use common_events::Events;
 use noter_core::{
-    Adapters, BoxFuture, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, NativeOps, SaveKind,
-    Scripted, ScriptedAccountCli, SecretStore, ToolScript,
+    Adapters, BoxFuture, Clock, Core, CoreDeps, MemorySecrets, NativeOps, SaveKind, Scripted,
+    ScriptedAccountCli, SecretStore, ToolScript,
 };
 use noter_llm::Skill;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 
 const KEY: &str = "sk-ant-api03-THE-SECRET-KEY-VALUE";
 const SECRET_TEXT: &str = "Ann agreed to ship the importer behind the blue door.";
@@ -28,24 +31,7 @@ impl Clock for TickClock {
     }
 }
 
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
 impl Events {
-    fn named(&self, name: &str) -> Vec<Value> {
-        let all = self.0.lock().unwrap();
-        all.iter()
-            .filter(|(e, _)| *e == name)
-            .map(|(_, p)| p.clone())
-            .collect()
-    }
-
     fn key_statuses(&self, provider: &str) -> Vec<String> {
         self.named(event_names::ACCOUNTS_CHANGED)
             .iter()
