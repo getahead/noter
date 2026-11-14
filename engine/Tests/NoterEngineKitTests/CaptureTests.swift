@@ -1,4 +1,5 @@
 import AVFoundation
+import CoreAudio
 import Foundation
 import XCTest
 
@@ -11,6 +12,7 @@ final class FakeSource: AudioSource, @unchecked Sendable {
     private(set) var starts = 0
     private(set) var stops = 0
     var failStart = false
+    var microphoneAvailable = true
 
     func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws {
         if failStart { throw LiveAudioSource.Failure(description: "no tap") }
@@ -27,14 +29,14 @@ final class FakeSource: AudioSource, @unchecked Sendable {
         }
     }
 
-    var devices: (mic: String, output: String) { ("Test Mic", "Test Speakers") }
+    var devices: (mic: String, output: String) { (microphoneAvailable ? "Test Mic" : "", "Test Speakers") }
 
     /// `ms` of a 440 Hz tone on both channels at 16 kHz, in 100 ms chunks.
     func push(ms: Int, amplitude: Float = 0.3) {
         let deliver = lock.withLock { onChunk }
         for _ in 0..<(ms / 100) {
             let samples = (0..<1600).map { i in amplitude * sin(Float(i) * 2 * .pi * 440 / 16_000) }
-            deliver?(AudioChunk(channel: .mic, samples: samples))
+            if microphoneAvailable { deliver?(AudioChunk(channel: .mic, samples: samples)) }
             deliver?(AudioChunk(channel: .sys, samples: samples))
         }
     }
@@ -93,6 +95,33 @@ private func assertAudio(_ url: URL, _ audio: Double, parts: Int = 1, line: UInt
     let s = try seconds(url)
     XCTAssertGreaterThanOrEqual(s, audio - 0.13 * Double(parts - 1), line: line)
     XCTAssertLessThanOrEqual(s, audio + 0.2 * Double(parts), line: line)
+}
+
+final class LiveAudioSourcePlanningTests: XCTestCase {
+    func testTapOnlyAggregateOmitsTheMicrophoneButRetainsTheTap() {
+        let systemOnly = LiveAudioSource.aggregateDescription(tapUID: "tap", microphoneUID: nil)
+        XCTAssertNil(systemOnly[kAudioAggregateDeviceMainSubDeviceKey])
+        XCTAssertNil(systemOnly[kAudioAggregateDeviceSubDeviceListKey])
+        XCTAssertEqual(
+            (systemOnly[kAudioAggregateDeviceTapListKey] as? [[String: Any]])?.first?[kAudioSubTapUIDKey] as? String, "tap")
+
+        let withMic = LiveAudioSource.aggregateDescription(tapUID: "tap", microphoneUID: "mic")
+        XCTAssertEqual(withMic[kAudioAggregateDeviceMainSubDeviceKey] as? String, "mic")
+        XCTAssertEqual(
+            (withMic[kAudioAggregateDeviceSubDeviceListKey] as? [[String: String]])?.first?[kAudioSubDeviceUIDKey], "mic")
+    }
+
+    func testMissingMicrophoneDoesNotLookUpADeviceOrCreateMicBuffers() throws {
+        var lookedUp = false
+        let device = try LiveAudioSource.microphoneDevice(nil) { _ in lookedUp = true; return nil }
+        XCTAssertNil(device)
+        XCTAssertFalse(lookedUp)
+        XCTAssertEqual(LiveAudioSource.microphoneBufferCount(nil) { _ in 2 }, 0)
+        XCTAssertFalse(LiveAudioSource(micUid: "missing").microphoneAvailable)
+        XCTAssertEqual(try LiveAudioSource.microphoneDevice("mic") { _ in AudioObjectID(42) }, 42)
+        XCTAssertThrowsError(try LiveAudioSource.microphoneDevice("mic") { _ in nil })
+        XCTAssertEqual(LiveAudioSource.microphoneBufferCount(AudioObjectID(42)) { _ in 2 }, 2)
+    }
 }
 
 final class CaptureTests: XCTestCase {
@@ -417,6 +446,24 @@ final class CaptureTests: XCTestCase {
         XCTAssertNil(lines.events.first { $0["type"] as? String == "session_started" })
         _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
         XCTAssertEqual(lines.events.last?["code"] as? String, "no_session")
+    }
+
+    func testMissingMicrophoneKeepsTheSystemChannelSessionRunning() throws {
+        let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
+        source.microphoneAvailable = false
+        let e = engine(lines, source, root, clock)
+        _ = e.handle(startLine(id: 1))
+        XCTAssertNotNil(lines.waitFor("session_started"))
+        XCTAssertTrue(lines.events.contains { $0["type"] as? String == "ack" && $0["cmd_id"] as? Int == 1 })
+        XCTAssertTrue(lines.events.contains { $0["type"] as? String == "error" && $0["cmd_id"] is NSNull && $0["code"] as? String == "device_unavailable" })
+        let (started, error) = (
+            try XCTUnwrap(lines.types.firstIndex(of: "session_started")),
+            try XCTUnwrap(lines.types.firstIndex(of: "error")))
+        XCTAssertLessThan(started, error)
+        source.push(ms: 200)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        XCTAssertNotNil(lines.waitFor("session_stopped"))
+        try assertAudio(root.appendingPathComponent("audio/call_1/sys.m4a"), 0.2)
     }
 
     func testGlossaryLanguagesAndExclusionsAreAcknowledged() throws {

@@ -111,11 +111,18 @@ final class LiveASRTests: XCTestCase {
 
     func testLanguageIDOutsideTheSessionLanguagesFallsBackToTheFirstOneNotTheStrayLanguage() {
         // WhisperKit reports only the top language: when it is none of the session's, no filter helps.
-        XCTAssertEqual(LiveASR.language(["uk": -0.1], among: ["ru", "en", "de"]).lang, "ru")
-        XCTAssertEqual(LiveASR.language(["uk": -0.1], among: ["ru", "en", "de"]).p, 0)
-        XCTAssertEqual(LiveASR.language(["de": -0.2], among: ["ru", "en", "de"]).lang, "de")
+        XCTAssertEqual(LiveASR.language(["uk": 0.9], among: ["ru", "en", "de"]).lang, "ru")
+        XCTAssertEqual(LiveASR.language(["uk": 0.9], among: ["ru", "en", "de"]).p, 0)
+        XCTAssertEqual(LiveASR.language(["de": 0.8], among: ["ru", "en", "de"]).lang, "de")
+        XCTAssertEqual(LiveASR.language(["en": 0.25, "de": 0.75], among: []).p, 0.75)
         XCTAssertEqual(LiveASR.language(["ja": -0.3], among: []).lang, "ja", "no session languages: any")
         XCTAssertEqual(LiveASR.language([:], among: []).lang, "en")
+    }
+
+    func testWhisperLanguageConfidenceConvertsLogProbabilitiesAndKeepsSingleLanguageCertain() {
+        XCTAssertEqual(WhisperTranscriber.languageProbabilities(["en"], [:]), ["en": 1])
+        let confidence = WhisperTranscriber.languageProbabilities([], ["en": -0.1])["en"]
+        XCTAssertEqual(confidence ?? 0, exp(Float(-0.1)), accuracy: 0.0001)
     }
 
     func testAChannelsLastConfirmedLanguageLeadsItsNextLanguageID() throws {
@@ -129,6 +136,19 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(
             t.asked.map(\.languages), [["en", "de", "ru"], ["ru", "en", "de"]],
             "the speaker most likely goes on in the language they spoke last")
+    }
+
+    func testUnrestrictedLanguageIdentificationStaysUnrestrictedAfterConfirmation() throws {
+        let t = FakeTranscriber("hello")
+        t.lang = "en"
+        let a = asr(t, languages: .array([]))
+        play(a, .mic, from: 0, 500, speaking: true)
+        play(a, .mic, from: 500, 1000, speaking: false)
+        t.lang = "ru"
+        play(a, .mic, from: 1500, 500, speaking: true)
+        play(a, .mic, from: 2000, 1000, speaking: false)
+        XCTAssertEqual(t.asked.map(\.languages), [[], []])
+        XCTAssertEqual(confirmed.compactMap { $0["lang"] as? String }, ["en", "ru"])
     }
 
     func testTheGlossaryCorrectsTermsAndSaysSo() throws {
@@ -183,6 +203,15 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(facts.count, 1)
         XCTAssertEqual(facts.first?["since_ms"] as? Int, 0)
         XCTAssertEqual(facts.first?["call_id"] as? String, "call_1")
+    }
+
+    func testFilteredDecodeClearsThePreviousStallBeforeTheNextUtterance() throws {
+        let a = asr(FakeTranscriber("Продолжение следует..."))
+        play(a, .mic, from: 0, 500, speaking: true)
+        play(a, .mic, from: 500, 1000, speaking: false)
+        play(a, .mic, from: 60_000, 500, speaking: true)
+        play(a, .mic, from: 60_500, 1000, speaking: false)
+        XCTAssertTrue(lines.events.filter { $0["type"] as? String == "no_segments" }.isEmpty)
     }
 
     func testNoSpeechOnEitherChannelIsSilenceOnceUntilSpeechComesBack() throws {

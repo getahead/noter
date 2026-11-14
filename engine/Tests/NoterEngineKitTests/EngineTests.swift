@@ -150,6 +150,20 @@ final class ChunkTests: XCTestCase {
         XCTAssertEqual(out.first ?? 0, 0.25, accuracy: 0.0001)
         XCTAssertEqual(Mix.resample([1, 2], from: 16_000, to: 16_000), [1, 2])
     }
+
+    func testCaptureResamplerFiltersAliasingAndKeepsPhaseAcrossChunks() {
+        let samples = (0..<48_000).map { 0.3 * sin(Float($0) * 2 * .pi * 12_000 / 48_000) }
+        var whole = Resampled()
+        let expected = whole.process(samples, from: 48_000, to: 16_000)
+        var chunks = Resampled()
+        let actual = stride(from: 0, to: samples.count, by: 512).flatMap { start in
+            chunks.process(Array(samples[start..<min(start + 512, samples.count)]), from: 48_000, to: 16_000)
+        }
+        XCTAssertEqual(actual.count, 16_000)
+        XCTAssertEqual(actual, expected, "chunk boundaries must not reset resampler phase or filter history")
+        let rms = sqrt(actual.dropFirst(100).reduce(Float(0)) { $0 + $1 * $1 } / Float(actual.count - 100))
+        XCTAssertLessThan(rms, 0.01, "12 kHz input must not alias into the 4 kHz speech band")
+    }
 }
 
 final class WAVTests: XCTestCase {
