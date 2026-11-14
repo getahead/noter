@@ -155,7 +155,6 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         try check(AudioDeviceStart(device, proc), "start the capture")
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     static func aggregateDescription(tapUID: String, microphoneUID: String?) -> [String: Any] {
         var aggregate: [String: Any] = [
             kAudioAggregateDeviceNameKey: "Noter capture",
@@ -171,14 +170,12 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         return aggregate
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     static func microphoneDevice(_ uid: String?, lookup: (String) -> AudioObjectID?) throws -> AudioObjectID? {
         guard let uid else { return nil }
         guard let device = lookup(uid) else { throw Failure(description: "no microphone \(uid)") }
         return device
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
     static func microphoneBufferCount(_ device: AudioObjectID?, count: (AudioObjectID) -> Int) -> Int {
         device.map(count) ?? 0
     }
