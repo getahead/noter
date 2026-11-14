@@ -33,6 +33,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     test(`default`, async ({ page }) => {
       await calls(page, px, (w) => W.morePastCalls(w, 3));
       await expect(page.locator(ROW)).toHaveCount(5);
+      await expect(rowOf(page, "Backend sync").locator('[data-primitive="badge"][data-variant="count"]')).toHaveCount(0);
       await shot(page, "default", width);
     });
 

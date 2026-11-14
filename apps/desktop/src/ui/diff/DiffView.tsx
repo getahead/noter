@@ -1,5 +1,5 @@
 // diff-view: the words inserted and deleted between two texts, unchanged runs folded (prototype C.diffView).
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { t } from "../../i18n/format";
 import { Icon } from "../icons";
 import { changedWords, diffWords, fold, toLines } from "./diff";
@@ -10,6 +10,17 @@ export interface DiffViewProps {
   after: string;
   title?: string;
   lang?: string;
+}
+
+const hasWordCharacter = (text: string) => /[\p{L}\p{N}]/u.test(text);
+
+function separatesReplacement(parts: { op: string; text: string }[], index: number): boolean {
+  const current = parts[index]!;
+  if (current.op === "eq") return false;
+  const opposite = current.op === "ins" ? "del" : "ins";
+  let hasPreviousWord = false;
+  for (let i = index - 1; i >= 0 && parts[i]!.op === opposite; i--) hasPreviousWord ||= hasWordCharacter(parts[i]!.text);
+  return hasPreviousWord && hasWordCharacter(current.text);
 }
 
 // @cpt-component:cpt-noter-component-ui-diff-view:p1
@@ -35,7 +46,15 @@ export function DiffView({ before, after, title, lang }: DiffViewProps) {
           ) : (
             b.lines.map((l, li) => (
               <span key={`${bi}-${li}`} className="pc-diff__line">
-                {l.parts.map((p, k) => (p.op === "ins" ? <ins key={k} className="np-ins">{p.text}</ins> : p.op === "del" ? <del key={k} className="np-del">{p.text}</del> : p.text))}
+                {l.parts.map((p, k) => {
+                  const separator = separatesReplacement(l.parts, k);
+                  return (
+                    <Fragment key={k}>
+                      {separator ? " " : null}
+                      {p.op === "ins" ? <ins className="np-ins">{p.text}</ins> : p.op === "del" ? <del className="np-del">{p.text}</del> : p.text}
+                    </Fragment>
+                  );
+                })}
                 {"\n"}
               </span>
             ))

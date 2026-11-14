@@ -9,7 +9,12 @@ import * as W from "../../support/world-presets";
 import type { World } from "../../support/scenario";
 
 export const TITLE = "Backend sync";
-const WRITER = { from_pass: "live", generated_at: 1792140600000, model: "claude-sonnet", runtime: "claude_api_key", skill: "planning", skill_version: "1.0.0" } as const;
+const WRITER = { from_pass: "live", model: "claude-sonnet", runtime: "claude_api_key", skill: "planning", skill_version: "1.0.0" } as const;
+
+const writerOf = (w: World) => {
+  const call = w.calls.find((item) => item.id === W.PAST_CALL)!;
+  return { ...WRITER, generated_at: call.started_at + call.duration_ms + 100_000 };
+};
 
 export const outputsOf = (w: World) => w.outputs.find((o) => o.call_id === W.PAST_CALL)!;
 export const sectionOf = (w: World, kind: SectionKind) => outputsOf(w).sections.find((s) => s.kind === kind)!;
@@ -19,12 +24,12 @@ function item(w: World, id: string, kind: ItemView["kind"], text: string, review
   return { ...structuredClone(base), id, kind, text, review, status: "open", closed_by: null, done_at: null, linked_issue: null } as ItemView;
 }
 
-function textSection(kind: SectionKind, id: string, body: string, rev = 2, versions = 2): OutputSection {
-  return { kind, state: { type: "ready" }, summary_id: id, rev, body_md: body, items: [], reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: versions } as OutputSection;
+function textSection(w: World, kind: SectionKind, id: string, body: string, rev = 2, versions = 2): OutputSection {
+  return { kind, state: { type: "ready" }, summary_id: id, rev, body_md: body, items: [], reviews: [], writer: writerOf(w), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: versions } as OutputSection;
 }
 
-function itemSection(kind: SectionKind, items: ItemView[]): OutputSection {
-  return { kind, state: { type: items.length ? "ready" : "empty" }, summary_id: null, rev: null, body_md: null, items, reviews: [], writer: structuredClone(WRITER), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: 1 } as OutputSection;
+function itemSection(w: World, kind: SectionKind, items: ItemView[]): OutputSection {
+  return { kind, state: { type: items.length ? "ready" : "empty" }, summary_id: null, rev: null, body_md: null, items, reviews: [], writer: writerOf(w), user_edited: false, regenerated_with_edits: false, names_updated: false, version_count: 1 } as OutputSection;
 }
 
 /** The call's outputs written and reviewed: Summary, Decisions 2, Action items 4, Open questions 2, Per participant. */
@@ -34,11 +39,11 @@ export function written(w: World): void {
   o.status = "ready";
   o.review_waiting = 0;
   o.sections = [
-    textSection("summary", "sum_backend", "Backend and QA aligned on the websocket notifications. Drawer events will ship behind a flag."),
-    itemSection("decisions", [item(w, "itm_d1", "decision", "Ship drawer events behind a flag", "accepted"), item(w, "itm_d2", "decision", "Keep the polling fallback for one release", "accepted")]),
-    itemSection("action_items", ["Rotate the staging Jira token", "Write the flag rollout note", "Ask QA for a websocket soak run", "Update the drawer spec"].map((t, i) => item(w, `itm_a${i}`, "action_item", t, "accepted"))),
-    itemSection("open_questions", [item(w, "itm_q1", "open_question", "Who owns the soak run?", "accepted"), item(w, "itm_q2", "open_question", "Does Safari need the fallback?", "accepted")]),
-    textSection("per_participant", "sum_pp_backend", "Dmitri: flag. Oleg: soak run. You: spec.", 1, 1),
+    textSection(w, "summary", "sum_backend", "Backend and QA aligned on the websocket notifications. Drawer events will ship behind a flag."),
+    itemSection(w, "decisions", [item(w, "itm_d1", "decision", "Ship drawer events behind a flag", "accepted"), item(w, "itm_d2", "decision", "Keep the polling fallback for one release", "accepted")]),
+    itemSection(w, "action_items", ["Rotate the staging Jira token", "Write the flag rollout note", "Ask QA for a websocket soak run", "Update the drawer spec"].map((t, i) => item(w, `itm_a${i}`, "action_item", t, "accepted"))),
+    itemSection(w, "open_questions", [item(w, "itm_q1", "open_question", "Who owns the soak run?", "accepted"), item(w, "itm_q2", "open_question", "Does Safari need the fallback?", "accepted")]),
+    textSection(w, "per_participant", "sum_pp_backend", "Dmitri: flag. Oleg: soak run. You: spec.", 1, 1),
   ];
   w.items = [...w.items.filter((i) => i.call.id !== W.PAST_CALL), ...o.sections.flatMap((s) => s.items)];
 }
@@ -65,7 +70,7 @@ export function writingLocally(w: World): void {
   outputsOf(w).written_locally = true;
   const summary = sectionOf(w, "summary");
   summary.body_md = "";
-  summary.writer = { ...WRITER, runtime: "local" };
+  summary.writer = { ...writerOf(w), runtime: "local" };
 }
 
 /** Action items failed (Claude Code timed out); the others stay ready. */

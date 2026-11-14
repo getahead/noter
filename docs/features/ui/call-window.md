@@ -2,7 +2,7 @@
 title: "Feature — Call window: call screen and floating panel"
 description: "One non-activating, content-protected call window with a dedicated layout on a second display and a floating layout beside the call app: recording state, capture notices, degraded banners, capture controls, layout switch, collapse, hide and hide for presenting, in the copilot-off layout of M1."
 status: DRAFT
-version: "1.1"
+version: "1.2"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-call-window
 milestone: M1
@@ -413,7 +413,7 @@ The system **MUST** render the call window as one React tree with the dedicated 
 
 **Touches**:
 - Commands: `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_navigate`
-- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); host placement tests simulate display unplug and reconnect; XCUITest covers non-activation, ⌃⌥⌘N, window-share exclusion and loaded WebView process recovery (`test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates`); screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`, `presenting`
+- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); host placement tests simulate display unplug and reconnect; XCUITest covers non-activation, ⌃⌥⌘N, window-share exclusion and loaded WebView process recovery (`test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates`); screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`. Hide-for-presenting is verified by its story because the hidden surface has no visible screenshot state.
 
 ### Capture notices, closing state and controls
 
@@ -515,3 +515,5 @@ The system **MUST** show a person chip per participant in CS-R1 (with **You** an
 **Milestone notes.** The M1 stories `cpt-noter-seq-floating-panel-display-unplugged` (step 4 pins card 2) and `cpt-noter-seq-floating-panel-collapse-strip` (card line, **Pin** from the strip, Copilot muted while collapsed) contain copilot steps whose commands are M4 and draft; M1 proves them in the copilot-off layout, and `cpt-noter-feature-ui-copilot` proves the card steps in M4 (discrepancy 4). The **Summary ready** steps of the stop and presenting stories are proven in M2 (discrepancy 6). Owner decision A (28 Oct 2026): the M4 card-height step of the layout algorithm (`inst-floating-heights`) moved to `cpt-noter-feature-ui-copilot` (`cpt-noter-algo-ui-copilot-card-stream`, `inst-capacity`); the XCUITest-only criterion (no click moves focus) is proven by the native suite.
 
 **Not applicable.** Alerts and sheets in this window: none by design (D38). Data: the window reads the capture state and the transcript; it writes nothing itself.
+
+**Changelog.** v1.2 (14 Nov 2026): screenshot captures use a frozen clock and empty live script so the transcript, countdown and notice bar remain visible to comparison; remove the duplicate presenting screenshot, which showed the visible window rather than the hidden state.

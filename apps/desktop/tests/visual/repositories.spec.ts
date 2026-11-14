@@ -1,7 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { openWindow } from "../e2e/support/app";
 
-for (const state of ["empty", "mapped", "missing", "add", "edit"] as const) {
+// The mapped default is already captured by Settings › Repositories; keep only states that add a distinct view.
+for (const state of ["empty", "missing", "add", "edit"] as const) {
   test(`Repositories — ${state}`, async ({ page }) => {
     await openWindow(page, "settings", { world: (w) => {
       if (state === "empty" || state === "add") w.repos.mappings = [];

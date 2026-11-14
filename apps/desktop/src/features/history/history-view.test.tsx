@@ -1,5 +1,5 @@
 // The History timeline's markup per read state, a change row's actions, the diff view, the strip and the Export Log sheet.
-import { renderToString } from "react-dom/server";
+import { renderToStaticMarkup, renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { ChangeRow as Change, UiPrefs } from "../../core/bindings";
@@ -128,6 +128,15 @@ describe("DiffView (cpt-noter-component-ui-diff-view)", () => {
     expect(out).toContain("<ins");
     expect(out).toContain("2 words changed");
     expect(renderToString(<DiffView before="same" after="same" />)).toContain("No differences");
+  });
+
+  it("separates adjacent deleted and inserted words without changing either marked text", () => {
+    const word = renderToStaticMarkup(<DiffView before="ship it friday" after="ship it on Friday" />);
+    expect(word).toContain('<del class="np-del">friday</del> <ins class="np-ins">on</ins>');
+    const reversed = renderToStaticMarkup(<DiffView before="ship it on Friday" after="ship it friday" />);
+    expect(reversed).toContain('<del class="np-del">Friday</del> <ins class="np-ins">friday</ins>');
+    const sentence = renderToStaticMarkup(<DiffView before="Backend and QA agreed." after="Backend and QA made a decision." />);
+    expect(sentence).toContain('<del class="np-del">agreed.</del> <ins class="np-ins">made</ins>');
   });
 
   it("folds a long unchanged run", () => {
