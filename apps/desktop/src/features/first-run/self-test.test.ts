@@ -165,7 +165,7 @@ describe("against the fake core's self-test stream", () => {
     expect(messages.map((m) => m.seq)).toEqual(messages.map((_, i) => i + 1));
     const panel = messages.reduce((p, m) => applySelfTestEvent(p, m.event), running());
     expect(panel).toMatchObject({ state: "PASSED", arrived: { mic: true, sys: true }, aligned: true, ownSounds: "excluded", failure: null });
-    expect(panel.line?.text).toBeTruthy();
+    expect(panel.line?.text).toBe("This is the Noter self-test.");
   });
 });
 

@@ -232,10 +232,11 @@ describe("createWizard", () => {
     expect(state().panel.state).toBe("RUNNING");
     await settle(2000);
     expect(state().panel).toMatchObject({ state: "PASSED", aligned: true, arrived: { mic: true, sys: true } });
-    expect(said).toEqual(expect.arrayContaining(["Your microphone arrives", "System audio arrives", "Both streams line up", "Self-test passed"]));
-    expect(said.filter((s) => s === "Self-test passed")).toHaveLength(1);
+    expect(said).toEqual([
+      "Models downloaded", "Your microphone arrives", "System audio arrives", "Both streams line up",
+      "Noter's own sounds stay out of the recording", "Self-test passed",
+    ]);
     expect(state().panel.line).toEqual({ channel: "sys", text: "This is the Noter self-test." }); // shown, never announced
-    expect(said).not.toContain("This is the Noter self-test.");
   });
 
   it("runs Play Test Clip, and again after a verdict", async () => {
