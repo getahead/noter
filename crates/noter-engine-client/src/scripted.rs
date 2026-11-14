@@ -136,6 +136,13 @@ impl Script {
     fn names(&self, tag: &str) -> bool {
         self.steps.iter().any(|s| s.on == tag)
     }
+
+    fn answers(&self, tag: &str, is_answer: impl Fn(&EngineEvent) -> bool) -> bool {
+        self.steps.iter().any(|step| {
+            step.on == tag
+                && matches!(&step.action, Action::Event(event) if is_answer(event.as_ref()))
+        })
+    }
 }
 
 /// How one launched engine behaves.
@@ -147,6 +154,8 @@ pub struct Behaviour {
     pub protocol_version: Option<String>,
     /// Answers `ping` with `pong`.
     pub answer_ping: bool,
+    /// Answers capture start and stop commands with deterministic session events and files.
+    pub answer_capture_sessions: bool,
     /// Answers every command but `ping` and `shutdown` with `error { code: bad_command }`.
     pub reject: bool,
     /// Answers nothing (a hung engine).
@@ -168,6 +177,7 @@ impl Default for Behaviour {
             launch_fails: false,
             protocol_version: Some(ENGINE_PROTOCOL_VERSION.to_string()),
             answer_ping: true,
+            answer_capture_sessions: false,
             reject: false,
             hang: false,
             self_test_failure: None,
@@ -362,6 +372,12 @@ impl<W: AsyncWrite + Unpin> Out<W> {
 /// The wire name of a command (`offline_pass`).
 fn tag(cmd: &EngineCommand) -> &'static str {
     match cmd {
+        // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-session
+        EngineCommand::StartSession(_) => "start_session",
+        // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-session
+        // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-stop
+        EngineCommand::Stop { .. } => "stop",
+        // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-stop
         EngineCommand::OfflinePass { .. } => "offline_pass",
         EngineCommand::SpeakerEmbedding { .. } => "speaker_embedding",
         EngineCommand::EmbedTexts { .. } => "embed_texts",
@@ -557,6 +573,36 @@ fn answer_offline(root: &Path, cmd: EngineCommand) -> Vec<EngineEvent> {
 /// asks for: copied into the pass's own result file with the call id set, as the engine would
 /// write it; a file that cannot be read fails the pass. Anything else plays as written.
 fn played(action: &Action, cmd: &EngineCommand, container: Option<&Path>) -> Action {
+    if let (Action::Event(event), EngineCommand::StartSession(start)) = (action, cmd) {
+        if let EngineEvent::SessionStarted {
+            mic_device,
+            output_device,
+            ..
+        } = event.as_ref()
+        {
+            return Action::Event(Box::new(EngineEvent::SessionStarted {
+                call_id: start.call_id.clone(),
+                mic_device: mic_device.clone(),
+                output_device: output_device.clone(),
+            }));
+        }
+    }
+    if let (Action::Event(event), EngineCommand::Stop { call_id }) = (action, cmd) {
+        if let EngineEvent::SessionStopped {
+            timeline_path,
+            mic_path,
+            sys_path,
+            ..
+        } = event.as_ref()
+        {
+            return Action::Event(Box::new(EngineEvent::SessionStopped {
+                call_id: call_id.clone(),
+                timeline_path: timeline_path.clone(),
+                mic_path: mic_path.clone(),
+                sys_path: sys_path.clone(),
+            }));
+        }
+    }
     let (
         Action::Event(event),
         EngineCommand::OfflinePass {
@@ -698,6 +744,13 @@ async fn run(
         }
         // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ack-command
         let ack = EngineEvent::Ack { cmd_id: id };
+        let command_tag = tag(&cmd);
+        let scripted_start = script.answers(command_tag, |event| {
+            matches!(event, EngineEvent::SessionStarted { .. })
+        });
+        let scripted_stop = script.answers(command_tag, |event| {
+            matches!(event, EngineEvent::SessionStopped { .. })
+        });
         match cmd {
             EngineCommand::Ping => {
                 if b.answer_ping {
@@ -718,6 +771,57 @@ async fn run(
                 })
                 .await;
             }
+            // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-session
+            EngineCommand::StartSession(ref start)
+                if b.answer_capture_sessions && !scripted_start =>
+            {
+                out.emit(ack).await;
+                out.emit(EngineEvent::SessionStarted {
+                    call_id: start.call_id.clone(),
+                    mic_device: "Scripted Microphone".into(),
+                    output_device: "Scripted Speakers".into(),
+                })
+                .await;
+                schedule(&mut steps, &script, &cmd, container.as_deref());
+            }
+            // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-session
+            // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-stop
+            EngineCommand::Stop { ref call_id } if b.answer_capture_sessions && !scripted_stop => {
+                out.emit(ack).await;
+                let session =
+                    engine
+                        .commands()
+                        .into_iter()
+                        .rev()
+                        .find_map(|command| match command {
+                            EngineCommand::StartSession(start) if &start.call_id == call_id => {
+                                Some((start.session_dir, start.store_audio))
+                            }
+                            _ => None,
+                        });
+                let (session_dir, store_audio) =
+                    session.unwrap_or_else(|| (format!("audio/{call_id}"), false));
+                let result = container
+                    .as_deref()
+                    .ok_or_else(|| "no App Group container".to_string())
+                    .and_then(|root| {
+                        answer_stop(root, &session_dir, call_id, store_audio)
+                            .map_err(|code| format!("scripted stop failed: {code:?}"))
+                    });
+                match result {
+                    Ok(event) => out.emit(event).await,
+                    Err(message) => {
+                        out.emit(EngineEvent::Error {
+                            cmd_id: Some(id),
+                            code: EngineErrorCode::Internal,
+                            message,
+                        })
+                        .await;
+                    }
+                }
+                schedule(&mut steps, &script, &cmd, container.as_deref());
+            }
+            // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-stop
             EngineCommand::SelfTest { .. } => {
                 // @cpt-begin:cpt-noter-algo-core-harness-scripted-engine:p1:inst-start-section
                 // A new self-test cancels the rest of the previous one, as the real engine does.
@@ -811,4 +915,41 @@ async fn run(
         // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-ack-command
     }
     // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-for-commands
+}
+
+fn answer_stop(
+    root: &Path,
+    session_dir: &str,
+    call_id: &noter_protocol::CallId,
+    store_audio: bool,
+) -> Result<EngineEvent, EngineErrorCode> {
+    if store_audio {
+        write_file(
+            root,
+            &format!("{session_dir}/mic.m4a"),
+            b"scripted microphone recording",
+        )
+        .map_err(|_| EngineErrorCode::Internal)?;
+        write_file(
+            root,
+            &format!("{session_dir}/sys.m4a"),
+            b"scripted system recording",
+        )
+        .map_err(|_| EngineErrorCode::Internal)?;
+    }
+    let timeline_path = format!("{session_dir}/timeline.json");
+    let timeline = serde_json::to_vec(&serde_json::json!({
+        "call_id": call_id,
+        "duration_ms": 1,
+        "gaps": [],
+        "parts": 1
+    }))
+    .map_err(|_| EngineErrorCode::Internal)?;
+    write_file(root, &timeline_path, &timeline).map_err(|_| EngineErrorCode::Internal)?;
+    Ok(EngineEvent::SessionStopped {
+        call_id: call_id.clone(),
+        timeline_path,
+        mic_path: store_audio.then(|| format!("{session_dir}/mic.m4a")),
+        sys_path: store_audio.then(|| format!("{session_dir}/sys.m4a")),
+    })
 }

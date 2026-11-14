@@ -3,10 +3,12 @@
 
 use std::time::Duration;
 
-use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
+use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_engine_client::{Config, EngineClient};
-use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
-use noter_protocol::{AudioChannel, PermissionState};
+use noter_protocol::engine::{
+    AsrBackend, EngineCommand, EngineErrorCode, EngineEvent, StartSession,
+};
+use noter_protocol::{AudioChannel, CallId, PermissionState};
 use tokio::time::Instant;
 
 fn client(engine: &ScriptedEngine) -> EngineClient<ScriptedEngine> {
@@ -205,6 +207,176 @@ async fn system_audio_follows_the_permission_state_the_world_gives() {
             "{state:?}"
         );
     }
+}
+
+// cpt-noter-algo-core-harness-scripted-engine: default capture answers own their recording files.
+#[tokio::test]
+async fn default_capture_answers_start_and_stop_the_session() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new()
+        .with_default(Behaviour {
+            answer_capture_sessions: true,
+            ..Behaviour::default()
+        })
+        .with_container(dir.path());
+    let c = client(&engine);
+    let mut events = c.events();
+    for (name, store_audio) in [("call-recorded", true), ("call-private", false)] {
+        let call_id = CallId::new(name);
+        let session_dir = format!("audio/{name}");
+        c.command(EngineCommand::StartSession(StartSession {
+            call_id: call_id.clone(),
+            session_dir: session_dir.clone(),
+            store_audio,
+            mic_device_uid: None,
+            exclude_bundle_ids: vec![],
+            languages: vec![],
+            backend: AsrBackend::ParakeetTdtV3,
+            glossary: vec![],
+            speaker_priors: vec![],
+            enrolled_embeddings_path: None,
+            resume_from_ms: None,
+        }))
+        .await
+        .unwrap();
+        let started = tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let EngineEvent::SessionStarted {
+                    call_id: started_call,
+                    ..
+                } = events.recv().await.unwrap().event
+                {
+                    break started_call;
+                }
+            }
+        })
+        .await
+        .expect("start emits session_started");
+        assert_eq!(started, call_id);
+
+        c.command(EngineCommand::Stop {
+            call_id: call_id.clone(),
+        })
+        .await
+        .unwrap();
+        let stopped = tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                let event = events.recv().await.unwrap().event;
+                if let EngineEvent::SessionStopped {
+                    call_id: stopped_call,
+                    ..
+                } = event
+                {
+                    break stopped_call;
+                }
+            }
+        })
+        .await
+        .expect("stop emits session_stopped");
+        assert_eq!(stopped, call_id);
+
+        let recording = dir.path().join(session_dir);
+        assert_eq!(recording.join("mic.m4a").is_file(), store_audio);
+        assert_eq!(recording.join("sys.m4a").is_file(), store_audio);
+        assert!(recording.join("timeline.json").is_file());
+    }
+}
+
+// cpt-noter-algo-core-harness-scripted-engine: a command's scripted side events keep their timing.
+#[tokio::test]
+async fn default_session_answer_runs_alongside_scripted_side_events() {
+    let script = Script::parse(
+        r#"{"on":"start_session","after_ms":10000,"event":{"type":"levels","call_id":"call-scripted","mic_db":-30.0,"sys_db":-30.0}}"#,
+    )
+    .unwrap();
+    let engine = ScriptedEngine::new()
+        .with_default(Behaviour {
+            answer_capture_sessions: true,
+            ..Behaviour::default()
+        })
+        .with_script(script);
+    let c = client(&engine);
+    let mut events = c.events();
+    let call_id = CallId::new("call-scripted");
+    c.command(EngineCommand::StartSession(StartSession {
+        call_id: call_id.clone(),
+        session_dir: "audio/call-scripted".into(),
+        store_audio: false,
+        mic_device_uid: None,
+        exclude_bundle_ids: vec![],
+        languages: vec![],
+        backend: AsrBackend::ParakeetTdtV3,
+        glossary: vec![],
+        speaker_priors: vec![],
+        enrolled_embeddings_path: None,
+        resume_from_ms: None,
+    }))
+    .await
+    .unwrap();
+    let started = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let EngineEvent::SessionStarted {
+                call_id: started_call,
+                ..
+            } = events.recv().await.unwrap().event
+            {
+                break started_call;
+            }
+        }
+    })
+    .await
+    .expect("the engine answers the session while its script is active");
+    assert_eq!(started, call_id);
+}
+
+// cpt-noter-algo-core-harness-scripted-engine: scripted session events bind to the live command id.
+#[tokio::test]
+async fn scripted_start_answer_uses_the_command_call_id() {
+    let script = Script::parse(
+        r#"{"on":"start_session","after_ms":0,"event":{"type":"session_started","call_id":"placeholder","mic_device":"Fixture Mic","output_device":"Fixture Speakers"}}"#,
+    )
+    .unwrap();
+    let engine = ScriptedEngine::new()
+        .with_default(Behaviour {
+            answer_capture_sessions: true,
+            ..Behaviour::default()
+        })
+        .with_script(script);
+    let c = client(&engine);
+    let mut events = c.events();
+    let call_id = CallId::new("actual-call");
+    c.command(EngineCommand::StartSession(StartSession {
+        call_id: call_id.clone(),
+        session_dir: "audio/actual-call".into(),
+        store_audio: false,
+        mic_device_uid: None,
+        exclude_bundle_ids: vec![],
+        languages: vec![],
+        backend: AsrBackend::ParakeetTdtV3,
+        glossary: vec![],
+        speaker_priors: vec![],
+        enrolled_embeddings_path: None,
+        resume_from_ms: None,
+    }))
+    .await
+    .unwrap();
+    let (started, mic, output) = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let EngineEvent::SessionStarted {
+                call_id,
+                mic_device,
+                output_device,
+            } = events.recv().await.unwrap().event
+            {
+                break (call_id, mic_device, output_device);
+            }
+        }
+    })
+    .await
+    .expect("scripted answer is emitted");
+    assert_eq!(started, call_id);
+    assert_eq!(mic, "Fixture Mic");
+    assert_eq!(output, "Fixture Speakers");
 }
 
 #[tokio::test(start_paused = true)]

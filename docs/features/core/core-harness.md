@@ -15,6 +15,7 @@ design: docs/DESIGN-core.md
 > **Change log (v0.2):** The fixture seeds engine-named audio files and the scripted stop writes physical recordings.
 > **Change log (v0.3):** The built-in offline archive returns live transcript segments when call audio exists and fails when it does not.
 > **Change log (v0.4):** Protocol fixtures and TypeScript-export dependencies are feature-gated so ordinary application builds omit them; the harness and export binary opt into the needed features. Scripted native services mirror calendar range/attendee/time-zone behavior and expose deterministic failures for permission, login-item and updater operations.
+> **Change log (v0.5):** The harness enables deterministic capture-session answers in the scripted engine, including the recording files and timeline written by `Stop`; matching scripted session events answer their command using its actual call id, while other scripted events run alongside them.
 
 <!-- toc -->
 
@@ -147,6 +148,8 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 **Output**: The same events the supervisor would read from a live engine, answered commands acknowledged.
 
+When capture-session answers are enabled, a fresh `start_session` reports `session_started` with the request's actual call id. A matching script event may supply the answer for any session start or `stop`; the engine binds its call id to the command, and other scripted events on those commands still run. The built-in `stop` answer writes `timeline.json` plus any requested recording files before reporting `session_stopped`. The harness enables these answers; the scripted engine's default leaves session control to tests that inject events themselves.
+
 **Built-in archive behavior** (implemented in this change for issue #681): when no explicit `offline_pass` script overrides the built-in answer, a call whose audio directory contains audio must return that call's live segments as its scripted archive result. The real core installs that result through its normal archive path. If the directory contains no audio, the built-in answer must fail the archive pass. A two-segment live transcript is a regression scenario, not a fixed segment count for every call. This scripts the engine seam; it does not perform speech recognition.
 
 **Steps**:
@@ -154,6 +157,8 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 2. [x] - `p1` - **FOR EACH** command the supervisor sends - `inst-for-commands`
    1. [x] - `p1` - Write `ack` (or the scripted `error`) with the command id - `inst-ack-command`
    2. [x] - `p1` - Start the script section bound to that command (for example `start_session` → `session_started`, segments, levels) on the injected clock - `inst-start-section`
+   3. [x] - `p1` - Answer a fresh `start_session` with `session_started`, or use the scripted event for a resumed session - `inst-answer-session`
+   4. [x] - `p1` - When no scripted `session_stopped` event answers `stop`, write the session timeline and requested recordings, then answer with `session_stopped` - `inst-answer-stop`
 3. [x] - `p1` - **RETURN** when the script ends or `shutdown` arrives - `inst-return-engine`
 
 ## 4. States (CDSL)
