@@ -11,7 +11,7 @@ import type { OutputRoute, SegmentView, SpeakerRef } from "../../src/core/bindin
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow, wheelUpTo, type Steer } from "./support/app";
-import { navigate } from "./support/call-page";
+import { navigate, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const FAKE = process.env.NOTER_CORE !== "stdio";
@@ -22,7 +22,6 @@ const rowWith = (page: Page, text: string) => rows(page).filter({ hasText: text 
 const play = (page: Page, text: string) => rowWith(page, text).getByRole("button", { name: "Play this line" });
 const jump = (page: Page, text: RegExp | string = /^Jump to Live/) => page.getByRole("button", { name: text });
 const bar = (page: Page) => page.locator('[data-region="CS-R2b"], [data-region="PC-R6"]');
-const sent = async (page: Page, name: string) => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 const ANNA_LINE = "drawer redesign до пятницы"; // seg_live_002, spk_anna, 00:19:58
 const REASON = {

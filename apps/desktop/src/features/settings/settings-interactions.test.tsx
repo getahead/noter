@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { sentCommands } from "../../../tests/support/fake-core";
 import { loadSettings } from "./actions";
 import { AudioPane, registerSystemAudioReturn } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
@@ -36,10 +37,7 @@ type Tree = ReturnType<typeof rendered>;
 /** The handler of the control that has this label (or aria-label) and a handler under `prop`. */
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => void;
 const calls = () => {
-  const seen: string[] = [];
-  const invoke = fake.invoke.bind(fake);
-  fake.invoke = ((cmd: string, ...rest: unknown[]) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, ...rest))) as typeof fake.invoke;
-  return seen;
+  return sentCommands(fake);
 };
 
 describe("General", () => {
@@ -55,7 +53,7 @@ describe("General", () => {
     await vi.waitFor(() => expect(stored().general.summary_language).toBe("ru"));
     expect(stored().today.horizon).toBe("today");
     expect(stored().today.ranking).toBe("due_then_owed_to_you");
-    expect(seen).toEqual(expect.arrayContaining(["open_external", "window_navigate"]));
+    expect(seen.map(([cmd]) => cmd)).toEqual(expect.arrayContaining(["open_external", "window_navigate"]));
     const html = renderToString(<GeneralPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Needs a passed audio self-test");
     expect(html).toContain("Notifications are off for Noter");
@@ -90,8 +88,8 @@ describe("Audio", () => {
     (mic.onOpenSettings as () => void)();
     (find(tree, (p) => p.id === "sys" && typeof p.onOpenSettings === "function").props.onOpenSettings as () => void)();
     await vi.waitFor(() => expect(stored().audio.offline_backend).toBe("whisper_large_v3"));
-    expect(seen.filter((c) => c === "open_external")).toHaveLength(2);
-    expect(seen).toContain("permission_request");
+    expect(seen.filter(([cmd]) => cmd === "open_external")).toHaveLength(2);
+    expect(seen.map(([cmd]) => cmd)).toContain("permission_request");
     expect(on(tree, "Run Audio Self-Test…")).toBeTypeOf("function");
   });
 
@@ -119,7 +117,7 @@ describe("Call screen", () => {
     await ready();
     const seen = calls();
     (find(rendered(CallScreenPane, { bridge, settings: stored() }), (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
-    await vi.waitFor(() => expect(seen).toContain("setup_set_call_display"));
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("setup_set_call_display"));
   });
 
   it("shows a refused display change and a refused Run Setup command", async () => {
@@ -142,8 +140,8 @@ describe("Privacy", () => {
     const cal = find(tree, (p) => p.id === "cal").props;
     (cal.onAllow as () => void)();
     (cal.onOpenSettings as () => void)();
-    await vi.waitFor(() => expect(seen).toEqual(expect.arrayContaining(["permission_request", "open_external"])));
-    expect(seen).not.toContain("window_navigate"); // the voice-profiles button is disabled until Person Pages land
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toEqual(expect.arrayContaining(["permission_request", "open_external"])));
+    expect(seen.map(([cmd]) => cmd)).not.toContain("window_navigate"); // the voice-profiles button is disabled until Person Pages land
   });
 });
 
@@ -173,14 +171,14 @@ describe("Hotkeys, Performance, Updates, Models", () => {
     const banner = find(tree, (p) => p.banner !== undefined).props.banner as { actions: { onAction: () => void }[] };
     banner.actions[0]!.onAction();
     on(tree, "Check Now")();
-    await vi.waitFor(() => expect(seen).toEqual(expect.arrayContaining(["update_install", "app_snapshot"])));
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toEqual(expect.arrayContaining(["update_install", "app_snapshot"])));
   });
 
   it("a pending model offers Download and runs models_download", async () => {
     await ready((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
     const seen = calls();
     on(rendered(ModelsGroup, { bridge }), "Download")();
-    await vi.waitFor(() => expect(seen).toContain("models_download"));
+    await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("models_download"));
     expect(renderToString(<ModelsGroup bridge={bridge} />)).toContain("Download");
   });
 });

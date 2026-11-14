@@ -14,6 +14,7 @@ import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
 import { calls, openWindow, steerFor, type Steer } from "./support/app";
+import { sent } from "./support/call-page";
 import { alerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
@@ -29,7 +30,6 @@ const header = (p: Page) => p.locator('[data-region="CS-R1"], [data-region="FP-R
 const button = (p: Page, name: string) => p.getByRole("button", { name, exact: true });
 /** The recording indicator's state word (text in the dot-text variant, label in the dot variant). */
 const word = (p: Page, w: string) => p.getByText(w, { exact: true }).or(p.getByRole("img", { name: w, exact: true })).first();
-const sent = async (p: Page, name: string): Promise<unknown[]> => (await calls(p)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 const live = { call_id: W.LIVE_CALL };
 
 /** Drive call-window state through the same IPC commands the native host uses. */

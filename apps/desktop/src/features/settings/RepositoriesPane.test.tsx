@@ -40,11 +40,14 @@ describe("Repositories pane", () => {
   });
 
   it("offers a retry when the repository read fails", async () => {
+    const list = vi.spyOn(bridge.core, "reposList");
     fake.failNext("repos_list", "internal");
     await readRepos(bridge);
+    expect(list).toHaveBeenCalledOnce();
     expect(draw()).toContain("read repository mappings");
     const { content } = tree();
     await (find(content, (p) => p.label === "Try Again").props.onAction as () => Promise<void>)();
+    expect(list).toHaveBeenCalledTimes(2);
   });
 
   it("opens new and existing mappings through the shared sheet host", async () => {

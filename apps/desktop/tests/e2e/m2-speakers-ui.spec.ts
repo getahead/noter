@@ -226,6 +226,16 @@ test.describe("cpt-noter-seq-call-page-name-speakers", () => {
     await expect(panel(page)).toContainText("Name speakers · 2 not named");
   });
 
+  test("UI — error path: a refused sample returns the speaker row to Play Sample", async ({ page }) => {
+    const steer = await open(page);
+    await steer.failNext("audio_play", "internal");
+    const row = rowOf(page, "Speaker 3");
+    await row.getByRole("button", { name: "Play Sample" }).click();
+    await expect.poll(async () => sent(page, "audio_play")).toHaveLength(1);
+    await expect(row.getByRole("button", { name: "Play Sample" })).toBeVisible();
+    await expect(row).not.toContainText("Playing…");
+  });
+
   test("UI — happy path: the Summary tab shows the same Name speakers panel above the sections and naming there says Named Speaker 3 as Pavel", async ({ page }) => {
     await openWindow(page, "main", { world: (w) => S.unnamed(w, 2) });
     await navigate(page, "summary", S.CALL);

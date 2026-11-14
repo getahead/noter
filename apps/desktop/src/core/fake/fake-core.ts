@@ -135,10 +135,6 @@ export class FakeCore implements Transport {
   playback: PlaybackState;
   /** The call window (`window:call`). */
   callWindow: CallWindowState;
-  /** The call the main window reported with `window_report_view`. */
-  viewedCall: string | null = null;
-  /** Highest `seq` acknowledged per subscription (`stream_ack`). */
-  readonly acks = new Map<string, number>();
   handlerState: HandlerState;
   private handlers: Handlers;
   private failures = new Map<CommandName, CoreError[]>();

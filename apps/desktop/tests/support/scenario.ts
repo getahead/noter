@@ -211,9 +211,7 @@ class FakeScenario extends BaseScenario {
   }
 
   async corruptNextDownload(): Promise<void> {
-    const fake = this.root as FakeCore & { corruptNextDownload?: () => void };
-    if (!fake.corruptNextDownload) throw new Error("the fake core has no corruptNextDownload yet (backend ask in _team/ui/e2e/M0-coverage.md)");
-    fake.corruptNextDownload();
+    this.root.corruptNextDownload();
   }
 
   async push(cmd: ChannelCommand, body: ChannelBody): Promise<number | null> {

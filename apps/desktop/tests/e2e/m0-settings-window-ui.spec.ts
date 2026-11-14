@@ -4,11 +4,11 @@
 import type { Page } from "@playwright/test";
 
 import { calls, openWindow, type CorePlan } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
-const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
   test("the Settings self-test rechecks System Audio Recording when focus returns", async ({ page }) => {
@@ -130,6 +130,19 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 });
 
 test.describe("cpt-noter-seq-settings-check-privacy", () => {
+  test("UI — privacy mode: its explanation opens from the sidebar indicator and Esc restores focus", async ({ page }) => {
+    await openWindow(page, "main");
+    const mode = page.getByRole("button", { name: "Mode: cloud with redaction" });
+    await mode.click();
+    const info = page.getByRole("dialog", { name: "Cloud, redacted" });
+    await expect(mode).toHaveAttribute("aria-expanded", "true");
+    await expect(info).toContainText("names and PII are replaced before anything leaves this Mac.");
+    await page.keyboard.press("Escape");
+    await expect(info).toHaveCount(0);
+    await expect(mode).toHaveAttribute("aria-expanded", "false");
+    await expect(mode).toBeFocused();
+  });
+
   test("Error — Screen Recording not allowed: the row says macOS won’t ask again and opens the Screen Recording pane", async ({ page }) => {
     const notAsked: CorePlan["world"] = (w) => {
       w.app.capture.phase = "idle";

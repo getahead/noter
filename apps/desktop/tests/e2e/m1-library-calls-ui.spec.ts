@@ -14,6 +14,7 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { hold } from "../visual/hold";
 import { calls, openWindow, steerFor } from "./support/app";
+import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import {
   alertText,
@@ -28,10 +29,6 @@ const table = (page: Page) => page.locator('[data-region="LC-R3"]');
 const toolbar = (page: Page) => page.locator('[data-region="LC-R1"]');
 const rowOf = (page: Page, title: string) =>
   page.locator(ROW).filter({ hasText: title });
-const sent = async (page: Page, name: string): Promise<unknown[]> =>
-  (await calls(page))
-    .filter((c) => c.kind === "invoke" && c.name === name)
-    .map((c) => c.args);
 /** The core derives `unnamed_speakers` from speaker rows, so a call that says 2 needs two such rows. */
 function nameNoOne(w: World, id: string, n = 2): void {
   const base = w.call_details.find((d) => d.call.id === W.PAST_CALL)!; // never one of the calls this seeds

@@ -3,10 +3,9 @@
 // world. Baselines come from the update-screenshots workflow only.
 import { expect, test, type Page } from "@playwright/test";
 
-import { openWindow } from "../e2e/support/app";
+import { coreReady, openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { fakeReady } from "./hold";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const quiet = (w: World) => {
@@ -26,7 +25,7 @@ async function shortcutsReady(page: Page) {
 async function open(page: Page) {
   await openWindow(page, "main", { world: quiet });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-  await fakeReady(page);
+  await coreReady(page);
   await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
   await expect(page.getByRole("tab", { name: "Summary", selected: true })).toBeVisible();
 }

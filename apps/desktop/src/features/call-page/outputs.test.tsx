@@ -148,7 +148,8 @@ describe("OutputSection", () => {
     expect(html).toContain(">Edit<");
     expect(html).not.toContain("Version");
     expect(renderToString(<OutputSection {...props({ ...text, version_count: 2 })} />)).toContain("Version");
-    expect(renderToString(<OutputSection {...props(text)} writing />)).toMatch(/disabled[^>]*>(<[^>]*>)*Regenerate|Regenerate/);
+    const writingTree = rendered(OutputSection, { ...props(text), writing: true });
+    expect(find(writingTree, (p) => p.label === "Regenerate").props.disabled).toBe(true);
   });
 
   it("marks a section the user edited and tells that a regeneration kept the edits", async () => {

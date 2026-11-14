@@ -135,7 +135,8 @@ describe("CallToolbar", () => {
     const type = items.find((i) => "label" in i && i.children) as { children: Array<{ label: string; checked?: boolean; onSelect?: () => void }> };
     type.children[0]!.onSelect?.();
     expect(calls).toEqual(["rename", "sensitive", "finder", `type:${fake.world.call_types.call_types[0]!.id}`]);
-    expect(type.children.some((c) => c.checked)).toBe(call_has_type(call, type.children, fake.world.call_types.call_types));
+    const selectedType = fake.world.call_types.call_types.find((candidate) => candidate.id === call.call_type)!;
+    expect(type.children.filter((child) => child.checked).map((child) => child.label)).toEqual([selectedType.label]);
   });
 
   it("a sensitive call's item reads Sensitive and is checked, and Delete Call… runs the host's alert once registered", async () => {
@@ -148,7 +149,6 @@ describe("CallToolbar", () => {
     expect(removed).toBe(1);
   });
 });
-const call_has_type = (call: { call_type: string }, children: Array<{ checked?: boolean }>, types: Array<{ id: string }>) => types.some((t, i) => t.id === call.call_type && children[i]?.checked);
 
 describe("CallBanners", () => {
   it("offers the notification prompt after the first recorded call, and Notify Me asks for the permission", async () => {

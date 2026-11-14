@@ -60,10 +60,7 @@ export function windowsHandlers(fake: Core.FakeCore): Core.Handlers {
     if (target) emit("nav:request", target);
     return shared.ack;
   },
-  window_report_view: (a, { fake }) => {
-    fake.viewedCall = a.call_id ?? null;
-    return shared.ack;
-  },
+  window_report_view: () => shared.ack,
   // The Edit menu's Fix Term… is native: the fake has no menu to enable.
   window_set_fix_term_enabled: () => ({}),
   window_announce: (a) => {

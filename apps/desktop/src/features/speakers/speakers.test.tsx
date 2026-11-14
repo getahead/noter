@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, SpeakerView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
-import { NewPersonForm, PersonPicker } from "./PersonPicker";
+import { NewPersonForm } from "./NewPersonForm";
+import { PersonPicker } from "./PersonPicker";
 import { SpeakerRenamePopover } from "./SpeakerRenamePopover";
 
 const chip = (id: string, name: string): PersonChip => ({

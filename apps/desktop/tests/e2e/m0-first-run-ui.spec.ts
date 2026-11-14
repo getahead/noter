@@ -12,6 +12,7 @@ import type { ModelBundle } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import { confirmSystemAudio, startSelfTest } from "./support/self-test";
 import { expect, test } from "./support/fixtures";
 
@@ -24,9 +25,6 @@ const permissionRow = (page: Page, name: string) =>
   page.locator('[data-component="cpt-noter-component-ui-permission-check-row"]').filter({ hasText: name });
 const selfTest = (page: Page) => page.locator('[data-component="cpt-noter-component-ui-self-test-panel"]');
 const button = (page: Page, name: string) => page.getByRole("button", { name, exact: true });
-/** Arguments of every `name` command the window sent, in order. */
-const sent = async (page: Page, name: string): Promise<unknown[]> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 /** Noter is in front again after the user was in System Settings (the window's `focus`). */
 const backInNoter = (page: Page) => page.evaluate(() => void dispatchEvent(new Event("focus")));

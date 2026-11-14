@@ -8,6 +8,7 @@ import type { Locator, Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { calls, coreReady, openWindow } from "./support/app";
+import { sent } from "./support/call-page";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";
 
@@ -20,8 +21,6 @@ const rowOf = (page: Page, text: string | RegExp) => page.locator(ROW).filter({ 
 const byId = (page: Page, id: string) => page.locator(`[data-item-id="${id}"]`); // an editing row holds its text in a field
 const strip = (page: Page) => page.locator(STRIP);
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
-const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
-  (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args as Record<string, unknown>);
 /** The change a mutation of `itemId` logged last, as the core's History lists it (item_review's ItemMutation carries the same id). */
 async function lastChange(page: Page, itemId: string): Promise<string> {
   const read = () => page.evaluate(
