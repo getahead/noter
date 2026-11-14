@@ -3,6 +3,16 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { Slider, sliderKey } from "./slider";
+import { find, rendered } from "../testing";
+
+const hookState = vi.hoisted(() => ({ value: null as string | null, setDraft: vi.fn<(value: string | null) => void>() }));
+vi.mock("react", async (load) => {
+  const react = await load<typeof import("react")>();
+  return {
+    ...react,
+    useState: (initial: string | null) => [hookState.value ?? initial, (value: string | null) => { hookState.value = value; hookState.setDraft(value); }],
+  };
+});
 
 describe("slider", () => {
   it("is a slider with value text, paired with a number field", () => {
@@ -24,9 +34,10 @@ describe("slider", () => {
     expect(sliderKey("Home", false, s)).toBeNull();
   });
 
-  it("reports the new value to the owner from the keys and the slider; the field waits for Return or blur", async () => {
+  it("reports the new value to the owner from the keys, slider and committed number field", async () => {
+    hookState.value = null;
+    hookState.setDraft.mockClear();
     const onAction = vi.fn();
-    const { rendered } = await import("../testing");
     const [range, field] = rendered(Slider, { value: 18, onAction }).props.children as ReactElement<Record<string, (e: unknown) => void>>[];
     const preventDefault = vi.fn();
     range.props.onKeyDown({ key: "ArrowRight", shiftKey: true, preventDefault });
@@ -37,8 +48,20 @@ describe("slider", () => {
     expect(onAction).toHaveBeenLastCalledWith(40);
     const input = (field.props.children as unknown as ReactElement<Record<string, (e: unknown) => void>>).props;
     input.onChange({ target: { value: "41" } }); // a draft: nothing is sent while typing
-    input.onKeyDown({ key: "Enter" }); // outside a live root the draft state is not kept, so nothing to apply
+    expect(hookState.setDraft).toHaveBeenCalledWith("41");
     expect(onAction).toHaveBeenCalledTimes(2);
+    hookState.value = "41"; // the unit renderer calls the component once; use the next render to model React state.
+    const updatedField = find(rendered(Slider, { value: 18, onAction }), (p) => p.type === "number").props as Record<string, (e: unknown) => void>;
+    updatedField.onKeyDown({ key: "Enter" });
+    expect(onAction).toHaveBeenLastCalledWith(41);
+    const blurDraft = find(rendered(Slider, { value: 18, onAction }), (p) => p.type === "number").props as Record<string, (e: unknown) => void>;
+    blurDraft.onChange({ target: { value: "42" } });
+    expect(hookState.setDraft).toHaveBeenLastCalledWith("42");
+    hookState.value = "42";
+    const blurredField = find(rendered(Slider, { value: 18, onAction }), (p) => p.type === "number").props as Record<string, (e: unknown) => void>;
+    blurredField.onBlur({});
+    expect(onAction).toHaveBeenLastCalledWith(42);
+    expect(hookState.setDraft).toHaveBeenLastCalledWith(null);
   });
 });
 

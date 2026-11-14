@@ -1,6 +1,22 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
+const hookHarness = vi.hoisted(() => ({ active: false, values: [] as unknown[], setters: [] as ((value: unknown) => void)[] }));
+vi.mock("react", async (load) => {
+  const react = await load<typeof import("react")>();
+  return {
+    ...react,
+    useState: (initial: unknown) => {
+      if (!hookHarness.active) return react.useState(initial);
+      const index = hookHarness.values.length;
+      const setter = vi.fn<(value: unknown) => void>();
+      hookHarness.values.push(initial);
+      hookHarness.setters.push(setter);
+      return [hookHarness.values[index], setter];
+    },
+  };
+});
+
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, SegmentView, SpeakerView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
@@ -121,6 +137,17 @@ describe("SpeakerNamingPanel", () => {
     const active = rendered(NameRow, { p: props(), speaker: spk("s4", 4), people: null, line: null, onSkip: () => {}, sampleActive: true, onSample: claim });
     (find(active, (p) => p.label === "Play Sample").props as { onAction: () => void }).onAction();
     expect(claim).toHaveBeenCalledOnce();
+  });
+  it("clears Playing when the core refuses sample playback", async () => {
+    hookHarness.active = true;
+    hookHarness.values = [];
+    hookHarness.setters = [];
+    const b = { ...bridge(), act: async () => ({ status: "error" }) } as unknown as Bridge;
+    const tree = rendered(NameRow, { p: props({ bridge: b }), speaker: spk("s3", 3), people: null, line: null, onSkip: () => {} });
+    (find(tree, (p) => p.label === "Play Sample").props as { onAction: () => void }).onAction();
+    await vi.waitFor(() => expect(hookHarness.setters[4]).toHaveBeenLastCalledWith(null));
+    expect(hookHarness.setters[4]).toHaveBeenNthCalledWith(1, { callId: "c1", since: 0, toMs: 6000 });
+    hookHarness.active = false;
   });
   it("Name, a picked chip, the picker and Hide reach the core and the row's state", async () => {
     const sent: unknown[] = [];
