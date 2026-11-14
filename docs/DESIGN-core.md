@@ -1439,20 +1439,20 @@ Lines: `EngineCommandLine { id, cmd }` from the core, `EngineEventLine { seq, at
 | Schema | `ask-answer` | `AskAnswerOutput`: answer with [n] markers and citations; `found: false` instead of a guess | stable |
 | Schema | `reconcile` | `ReconcileJudgementOutput`: yes, no or unsure with evidence, for low-confidence jobs | stable |
 
-#### LLM runtime interface (internal)
+#### LLM router API (internal)
 
 - [ ] `p2` - **ID**: `cpt-noter-interface-llm-runtime`
 
 - **Contracts**: PRD › LLM orchestration › Adapters
-- **Technology**: Rust trait inside `noter-llm`
+- **Technology**: Inherent Rust methods on `Llm` inside `noter-llm`; provider polymorphism stays behind the private `RuntimeAdapter` trait
 - **Location**: planned `crates/noter-llm/src/runtime.rs`
 
 | Method | Path | Description | Stability |
 |--------|------|-------------|-----------|
-| Trait method | `availability` | Per runtime choice: available, reason, models | unstable |
-| Trait method | `run_once` | Skill, packet, schema, effort, budget cap, tools allowed → validated JSON, usage, cost, session id | unstable |
-| Trait method | `open_session`, `send_turn`, `close_session` | Warm streaming session for live ticks; reset after 15 turns | unstable |
-| Trait method | `resume` | Follow-up in a recorded session (post-call questions) | unstable |
+| Method | `availability` | Per runtime choice: available, reason, models | unstable |
+| Method | `run_once` | Skill, packet, schema, effort, budget cap, tools allowed → validated JSON, usage, cost, session id | unstable |
+| Method | `open_session`, `send_turn`, `close_session` | Warm streaming session for live ticks; reset after 15 turns | unstable |
+| Method | `resume` | Follow-up in a recorded session (post-call questions) | unstable |
 
 ### 3.4 Internal Dependencies
 
