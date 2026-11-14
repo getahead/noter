@@ -137,10 +137,29 @@ function namingState(world: World, callId: string) {
   return { callId, speakers, segments, sections };
 }
 
+function isSpeakerChange(row: ChangeRow): boolean {
+  return row.entity.kind === "speaker" || row.field === "speakers" || (row.entity.kind === "call" && row.summary.startsWith("Named "));
+}
+
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
 function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after", emit: HandlerCtx<"change_undo">["emit"], fake: FakeCore): void {
   rows.forEach((r) => {
-    if (r.field === "naming" && r[value]) {
+    const call = r.entity.kind === "call" && r.field === "title" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
+    if (call) {
+      call.title = r[value] ?? "";
+      call.rev += 1;
+      emit("entity:changed", { type: "call", call });
+    }
+    const output = r.entity.kind === "summary" && r.field === "body" ? world.outputs.find((o) => o.sections.some((s) => s.summary_id === r.entity.id)) : undefined;
+    const summary = output?.sections.find((s) => s.summary_id === r.entity.id);
+    if (summary) {
+      const body = r[value] ?? "";
+      summary.body_md = body;
+      summary.user_edited = versionsOf(summary).some((version) => version.body_md === body && version.kind === "user_edit");
+      if (summary.rev !== null) summary.rev += 1;
+      emit("entity:changed", { type: "section", call_id: output!.call_id, section: summary });
+    }
+    if (isSpeakerChange(r) && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
       for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
         if (!speakers) continue;
@@ -183,13 +202,13 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
     if (item) bump(Object.assign(item, r.field === "status" && r[value]?.startsWith("{")
-      ? JSON.parse(r[value]!) : { [r.field as string]: r[value] }));
+      ? JSON.parse(r[value]!) : { [r.field === "review_state" ? "review" : r.field as string]: r[value] }));
   });
 }
 
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 function editedLater(world: World, r: ChangeRow): boolean {
-  if (r.field === "naming" && r.after) {
+  if (isSpeakerChange(r) && r.after) {
     const state = JSON.parse(r.after) as ReturnType<typeof namingState>;
     return JSON.stringify(namingState(world, state.callId)) !== r.after;
   }
@@ -198,7 +217,7 @@ function editedLater(world: World, r: ChangeRow): boolean {
   const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
   return !!item && (r.field === "status" && r.after?.startsWith("{")
     ? Object.entries(JSON.parse(r.after)).some(([key, value]) => item[key as keyof ItemView] !== value)
-    : String((item as Record<string, unknown>)[r.field as string] ?? "") !== (r.after ?? ""));
+    : String((item as Record<string, unknown>)[r.field === "review_state" ? "review" : r.field as string] ?? "") !== (r.after ?? ""));
 }
 
 function call(world: World, id: string): CallRow {
@@ -209,6 +228,17 @@ function call(world: World, id: string): CallRow {
 
 function callRef(c: CallRow): CallRef {
   return { id: c.id, title: c.title, started_at: c.started_at, call_type: c.call_type };
+}
+
+// @cpt-flow:cpt-noter-flow-core-speakers-audio-delete:p1
+function removeAudio(world: World, calls: CallRow[], emit: HandlerCtx<"audio_delete">["emit"]): CallRow[] {
+  const removed = [...new Set(calls)].filter((c) => !c.audio_deleted);
+  removed.forEach((c) => {
+    Object.assign(c, { audio_deleted: true, audio_deleted_at: now(), audio_kept_until: null, rev: c.rev + 1 });
+    logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, summary: "Deleted the audio of a call", undoable: false });
+    emit("entity:changed", { type: "call", call: c });
+  });
+  return removed;
 }
 
 function itemStatus(item: ItemView, includeReview = false): string {
@@ -222,7 +252,8 @@ function todayNow(world: World): number {
 function itemChanged(world: World, item: ItemView, emit: (e: "entity:changed", p: { type: "item"; item: ItemView }) => void, summary: string, field: string | null, before: string | null) {
   bump(item);
   emit("entity:changed", { type: "item", item });
-  return { item, change_id: logChange(world, { entity: { kind: "item", id: item.id, label: item.text }, field, before, after: field === "status" && before?.startsWith("{") ? itemStatus(item, "review" in JSON.parse(before)) : field ? String((item as Record<string, unknown>)[field] ?? "") : null, summary }) };
+  const value = field === "review_state" ? item.review : field ? (item as Record<string, unknown>)[field] : null;
+  return { item, change_id: logChange(world, { entity: { kind: "item", id: item.id, label: item.text }, field, before, after: field === "status" && before?.startsWith("{") ? itemStatus(item, "review" in JSON.parse(before)) : value == null ? null : String(value), summary }) };
 }
 
 // @cpt-flow:cpt-noter-flow-core-items-today-dashboard:p1
@@ -325,12 +356,13 @@ function handoffView(world: World, item: ItemView, state: HandoffView["state"] =
     repo,
     unmapped_key: repo ? null : (item.linked_issue?.split("-")[0] ?? null),
     launch: { path: !repo ? "none" : target === "codex" ? "terminal" : "claude_cli_link", needs_automation: false, automation_denied: false },
-    default_action: own ? "open" : "copy_prompt",
+    default_action: item.owner && !own ? "copy_prompt" : "open",
     last: item.handoff,
   };
 }
 const handoffEdits = new Map<string, string>();
 const handoffRevs = new Map<string, number>();
+handoffRevs.set("itm_replay", 1);
 const handoffTargets = new Map<string, HandoffView["target"]>();
 const handoffGenerating = new Set<string>();
 
@@ -683,7 +715,7 @@ export const defaultHandlers: Handlers = {
     if (a.scope.type === "whole_call") {
       for (const section of namedSections(world, a.call_id, [[oldName, name]])) emit("entity:changed", { type: "section", call_id: a.call_id, section });
     }
-    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
+    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
     return { speakers: t.speakers, change_id };
   },
   transcript_fix_term: (a, { world, fake }) => {
@@ -723,7 +755,7 @@ export const defaultHandlers: Handlers = {
     });
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
     for (const section of namedSections(world, a.call_id, names)) emit("entity:changed", { type: "section", call_id: a.call_id, section });
-    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, field: "naming", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
+    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
   },
   transcript_span: (a, { world }) => {
     const t = world.transcripts.find((x) => x.call_id === a.span.call_id);
@@ -783,21 +815,14 @@ export const defaultHandlers: Handlers = {
     const found = a.call_ids.map((id) => call(world, id));
     // A capturing call keeps its audio, like the real core: nothing is removed when one is named.
     if (found.some((c) => c.status === "recording" || c.status === "paused")) throw coreError("invalid_input", "call_ids", { type: "validation", field: "call_ids", rule: "invalid_format" });
-    const calls = [...new Set(found)].filter((c) => !c.audio_deleted);
-    calls.forEach((c) => {
-      c.audio_deleted = true;
-      c.audio_deleted_at = Date.now();
-      c.audio_kept_until = null;
-      logChange(world, { entity: { kind: "call", id: c.id, label: c.title }, summary: "Deleted the audio of a call", undoable: false });
-      emit("entity:changed", { type: "call", call: c });
-    });
+    const calls = removeAudio(world, found, emit);
     return { calls: calls.length, freed_mb: calls.length * 58 };
   },
-  audio_delete_older: (a, { world }) => {
+  audio_delete_older: (a, { world, emit }) => {
     if (a.older_than_days < 1) throw coreError("invalid_input", "days", { type: "validation", field: "older_than_days", rule: "out_of_range" });
     const cutoff = world.now - a.older_than_days * 86_400_000;
-    const calls = world.calls.filter((c) => !c.audio_deleted && c.status !== "recording" && c.status !== "paused" && c.started_at < cutoff);
-    calls.forEach((c) => Object.assign(c, { audio_deleted: true, audio_deleted_at: Date.now(), audio_kept_until: null }));
+    const candidates = world.calls.filter((c) => c.status !== "recording" && c.status !== "paused" && c.started_at < cutoff);
+    const calls = removeAudio(world, candidates, emit);
     return { calls: calls.length, freed_mb: calls.length * 58 };
   },
 
@@ -930,9 +955,27 @@ export const defaultHandlers: Handlers = {
     );
     return pageRows(a.page, rows);
   },
+  // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
   item_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
-    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
+    const evidence = item.spans.map((span) => {
+      const segments = world.transcripts.find((t) => t.call_id === span.call_id)?.segments ?? [];
+      const minutes = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1_000) % 60).padStart(2, "0")}`;
+      const at = item.call.started_at + span.t0_ms;
+      return {
+        id: `evd_span_${item.id}_${span.t0_ms}`,
+        source: "call" as const,
+        reference: `${minutes(span.t0_ms)}–${minutes(span.t1_ms)}`,
+        url: null,
+        span,
+        summary: segments.filter((segment) => (!span.channel || segment.channel === span.channel) && segment.t1_ms > span.t0_ms && segment.t0_ms < span.t1_ms).map((segment) => segment.text).join(" "),
+        confidence: "high" as const,
+        dated_at: at,
+        collected_at: at,
+        closed_item: false,
+      };
+    });
+    return { item, evidence, history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
   },
   item_set_done: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);
@@ -948,14 +991,15 @@ export const defaultHandlers: Handlers = {
     checkRev(item.rev, a.rev);
     const before = item.review;
     item.review = a.decision === "accept" ? "accepted" : a.decision === "reject" ? "rejected" : "suggested";
-    return itemChanged(world, item, emit, `Review: ${item.review}`, "review", before);
+    return itemChanged(world, item, emit, `Review: ${item.review}`, "review_state", before);
   },
   items_review_all: (a, { world }) => {
+    call(world, a.call_id);
     const items = world.items.filter((i) => i.call.id === a.call_id && i.review === "suggested" && (!a.kinds.length || a.kinds.includes(i.kind)));
     const batch_id = items.length ? newId("bat") : null;
     items.forEach((i) => {
       bump(Object.assign(i, { review: "accepted" as const }));
-      logChange(world, { entity: { kind: "item", id: i.id, label: i.text }, field: "review", before: "suggested", after: "accepted", summary: "Accepted suggested items", batch_id });
+      logChange(world, { entity: { kind: "item", id: i.id, label: i.text }, field: "review_state", before: "suggested", after: "accepted", summary: "Accepted suggested items", batch_id });
     });
     return { items, batch_id, skipped: 0 };
   },
@@ -1127,10 +1171,11 @@ export const defaultHandlers: Handlers = {
   },
 
   // ── Handoff ──────────────────────────────────────────────────────────
+  // @cpt-flow:cpt-noter-flow-core-handoff-prompt:p1
   handoff_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
     requireEngineering(item);
-    return handoffView(world, item, handoffGenerating.has(item.id) ? { type: "generating" } : { type: "ready" });
+    return handoffView(world, item, handoffGenerating.has(item.id) ? { type: "generating" } : handoffRevs.has(item.id) ? { type: "ready" } : { type: "not_generated" });
   },
   // Returns at once with `generating`; the finished view arrives through `entity:changed`.
   handoff_generate: (a, { world, fake, emit }) => {
@@ -1443,7 +1488,7 @@ export const defaultHandlers: Handlers = {
     // After a partial undo the rows edited later are still applied: redo the undone ones.
     const undone = rows.filter((r) => r.status === "undone");
     if (!undone.length) throw coreError("not_undone");
-    const redoable = undone.filter((r) => r.redoable && (r.field !== "naming" ||
+    const redoable = undone.filter((r) => r.redoable && (!isSpeakerChange(r) ||
       JSON.stringify(namingState(world, (JSON.parse(r.before!) as ReturnType<typeof namingState>).callId)) === r.before));
     if (!redoable.length) throw coreError("edited_later");
     redoable.forEach((r) => Object.assign(r, { status: "applied", undoable: true, redoable: false }));
@@ -1498,12 +1543,15 @@ export const defaultHandlers: Handlers = {
   }),
 
   // ── People ───────────────────────────────────────────────────────────
-  people_list: (a, { world }) => ({
-    people: world.people.filter((p) => !a.query || p.display_name.toLowerCase().includes(a.query.toLowerCase())),
-    unnamed: world.transcripts.flatMap((t) =>
-      t.speakers.flatMap((s) => (s.label.type === "unnamed" ? [{ call: callRef(call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, suggestion: s.suggestion }] : [])),
-    ),
-  }),
+  people_list: (a, { world }) => {
+    const query = a.query?.toLowerCase();
+    return {
+      people: world.people.filter((p) => !query || [p.display_name, ...p.aliases].some((name) => name.toLowerCase().includes(query))),
+      unnamed: world.transcripts.flatMap((t) =>
+        t.speakers.flatMap((s) => (s.label.type === "unnamed" ? [{ call: callRef(call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, suggestion: s.suggestion }] : [])),
+      ),
+    };
+  },
   person_get: (a, { world }) => {
     const p = person(world, a.person_id);
     const calls = world.calls.filter((c) => c.participants.some((x) => x.id === p.id));

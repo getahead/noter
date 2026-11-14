@@ -40,21 +40,32 @@ describe("cpt-noter-seq-core-review-undo", () => {
     expect(ok(await main.changeUndo({ target: handle }))).toEqual({ undone: 1, skipped_edited_later: 0 });
     const undone = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} })).rows.find((r) => r.id === done.change_id)!;
     expect(undone).toMatchObject({ status: "undone", redoable: true });
-    if (s.target === "stdio") {
-      expect((await callRev()).title).toBe(before.title);
-      await until(() => changed.all.some((e) => e.type === "call" && e.call.id === PAST_CALL && e.call.title === before.title), "entity:changed with the old title");
-      expect((await changesOf(PAST_CALL))?.find((r) => r.id === done.change_id)?.status).toBe("undone");
-    }
+    expect((await callRev()).title).toBe(before.title);
+    await until(() => changed.all.some((e) => e.type === "call" && e.call.id === PAST_CALL && e.call.title === before.title), "entity:changed with the old title");
+    if (s.target === "stdio") expect((await changesOf(PAST_CALL))?.find((r) => r.id === done.change_id)?.status).toBe("undone");
 
     // Redo later, with the same handle: the title is back, revisions advanced, a new row links to the original.
     expect(ok(await main.changeRedo({ target: handle }))).toEqual({ undone: 1, skipped_edited_later: 0 });
+    const after = await callRev();
+    expect(after.title).toBe("Reviewed title");
+    expect(after.rev).toBeGreaterThan(before.rev + 1);
     if (s.target === "stdio") {
-      const after = await callRev();
-      expect(after.title).toBe("Reviewed title");
-      expect(after.rev).toBeGreaterThan(before.rev + 1);
       const log = (await changesOf(PAST_CALL))!;
       expect(log.some((r) => r.redo_of === done.change_id && r.status === "applied" && r.after === "Reviewed title")).toBe(true);
     }
+
+    const outputs = ok(await main.outputsGet({ call_id: PAST_CALL }));
+    const summary = outputs.sections.find((section) => section.kind === "summary")!;
+    const originalBody = summary.body_md;
+    const versionCount = summary.version_count;
+    const sectionEvents = await s.events("entity:changed");
+    const edited = ok(await main.outputEdit({ call_id: PAST_CALL, summary_id: summary.summary_id!, rev: summary.rev!, body_md: "Undoable summary edit" }));
+    expect(ok(await main.changeUndo({ target: { type: "change", change_id: edited.change_id } })).undone).toBe(1);
+    const undoneOutput = ok(await main.outputsGet({ call_id: PAST_CALL })).sections.find((section) => section.kind === "summary")!;
+    expect(undoneOutput).toMatchObject({ body_md: originalBody, user_edited: summary.user_edited, version_count: versionCount + 1 });
+    expect(sectionEvents.all.some((e) => e.type === "section" && e.call_id === PAST_CALL && e.section.body_md === originalBody)).toBe(true);
+    expect(ok(await main.changeRedo({ target: { type: "change", change_id: edited.change_id } })).undone).toBe(1);
+    expect(ok(await main.outputsGet({ call_id: PAST_CALL })).sections.find((section) => section.kind === "summary")).toMatchObject({ body_md: "Undoable summary edit", user_edited: true, version_count: versionCount + 1 });
 
     // Export through the scripted save panel: the file exists once the answer arrives and has the line.
     const exported = ok(await main.historyExport({ scope: { type: "call", call_id: PAST_CALL }, format: "markdown" }));

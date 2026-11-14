@@ -78,16 +78,18 @@ describe("load and generate (cpt-noter-flow-ui-handoff-prepare)", () => {
 
   it("Cancel keeps the core's previous state over a completion that was already on its way", async () => {
     await ready();
-    await A.load(bridge, ID);
-    await A.generate(bridge, ID, true);
-    await A.cancel(bridge, ID);
-    const kept = A.viewOf(bridge, ID)!;
+    const freshId = "itm_cancel_not_generated";
+    fake.world.items.push({ ...fake.world.items.find((item) => item.id === ID)!, id: freshId });
+    await A.load(bridge, freshId);
+    await A.generate(bridge, freshId, true);
+    await A.cancel(bridge, freshId);
+    const kept = A.viewOf(bridge, freshId)!;
     expect(kept.state.type).toBe("not_generated"); // nothing was written before: the core's previous state
     // the late completion lands in the store, but the drawer keeps showing what Cancel returned
-    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, handoff: { ...s.entities.handoff, [ID]: { ...kept, state: { type: "ready" }, rev: 9, prompt_md: "late" } } } }));
-    expect(A.viewOf(bridge, ID)?.state.type).toBe("not_generated");
-    await A.generate(bridge, ID, true);
-    expect(L.localOf(ID).restored).toBeUndefined();
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, handoff: { ...s.entities.handoff, [freshId]: { ...kept, state: { type: "ready" }, rev: 9, prompt_md: "late" } } } }));
+    expect(A.viewOf(bridge, freshId)?.state.type).toBe("not_generated");
+    await A.generate(bridge, freshId, true);
+    expect(L.localOf(freshId).restored).toBeUndefined();
   });
 });
 

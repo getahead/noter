@@ -28,6 +28,8 @@ describe("transcript_rename_speaker", () => {
     const done = ok(await main.transcriptRenameSpeaker({ call_id: LIVE_CALL, speaker_id: "spk_3", person: anna, scope: { type: "whole_call" } }));
     expect(done.change_id).toBeTruthy();
     expect(done.speakers.find((x) => x.id === "spk_3")).toMatchObject({ label: { type: "person", person: { id: "per_anna" } }, named_by: "you" });
+    const history = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
+    expect(history.rows.find((row) => row.id === done.change_id)).toMatchObject({ id: done.change_id, actor: { type: "you" } });
   });
 
   it("a new person is created from the name", async () => {
@@ -95,9 +97,15 @@ describe("audio_delete and audio_delete_older", () => {
 
   it("deletes by age and refuses less than one day", async () => {
     expect(refused(await main.audioDeleteOlder({ older_than_days: 0 })).code).toBe("invalid_input");
+    const changed = await s.events("entity:changed");
+    const before = await row(PAST_CALL);
     const done = ok(await main.audioDeleteOlder({ older_than_days: 1 }));
     expect(done.calls).toBeGreaterThanOrEqual(1);
-    expect((await row(PAST_CALL)).audio_deleted).toBe(true);
+    const after = await row(PAST_CALL);
+    expect(after).toMatchObject({ audio_deleted: true, audio_kept_until: null });
+    expect(after.rev).toBeGreaterThan(before.rev);
+    expect(changed.all.some((e) => e.type === "call" && e.call.id === PAST_CALL && e.call.audio_deleted)).toBe(true);
+    expect(ok(await main.historyList({ target: { type: "call", call_id: PAST_CALL }, actor: "all", job_id: null, from: null, to: null, page: {} })).rows.some((r) => r.summary === "Deleted the audio of a call" && !r.undoable)).toBe(true);
     expect((await row(LIVE_CALL)).audio_deleted).toBe(false);
     expect(ok(await main.audioDeleteOlder({ older_than_days: 1 })).calls).toBe(0);
   });

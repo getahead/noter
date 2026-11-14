@@ -25,12 +25,13 @@ const make = async (name = `Conf Person ${++n}`) => ok(await main.personCreate({
 describe("people_list", () => {
   it("lists people with You and the unnamed queue, and finds a person by a name part", async () => {
     const made = await make("Zinaida Quill");
+    const aliased = ok(await main.personUpdate({ person_id: made.id, rev: made.rev, patch: { aliases: ["ZQAlias"] } })).person;
     const all = ok(await main.peopleList({ query: null }));
     expect(all.people.some((p) => p.is_you)).toBe(true);
     expect(all.people.some((p) => p.id === made.id)).toBe(true);
     expect(Array.isArray(all.unnamed)).toBe(true);
-    const found = ok(await main.peopleList({ query: "quill" })).people;
-    expect(found.map((p) => p.id)).toContain(made.id);
+    const found = ok(await main.peopleList({ query: "zqalias" })).people;
+    expect(found.map((p) => p.id)).toContain(aliased.id);
     expect(ok(await main.peopleList({ query: "no such person xyz" })).people).toEqual([]);
   });
 });

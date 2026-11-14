@@ -38,6 +38,19 @@ async function ready(item: string): Promise<HandoffView> {
 }
 
 describe("handoff and repository commands (2.19)", () => {
+  it("starts ungenerated, and cancel leaves the prompt ungenerated", async () => {
+    open();
+    const core = s.core("main");
+    const source = ok(await core.itemGet({ item_id: "itm_virt" })).item;
+    const item_id = `itm_handoff_state_${Date.now()}`;
+    await s.change((world) => world.items.push({ ...source, id: item_id, owner: null, handoff: null }));
+    const initial = ok(await core.handoffGet({ item_id }));
+    expect(initial).toMatchObject({ state: { type: "not_generated" }, rev: null, prompt_md: null, default_action: "open" });
+    expect(ok(await core.handoffGenerate({ item_id, regenerate: false })).state).toEqual({ type: "generating" });
+    expect(ok(await core.handoffCancel({ item_id })).state).toEqual({ type: "not_generated" });
+    expect(ok(await core.handoffGet({ item_id })).prompt_md).toBeNull();
+  });
+
   it("handoff_generate answers generating at once and the ready prompt arrives through entity:changed", async () => {
     open();
     const view = await ready("itm_replay");

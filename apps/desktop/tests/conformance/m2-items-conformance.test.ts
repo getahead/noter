@@ -37,9 +37,11 @@ describe("items_list and item_get", () => {
 
   it("item_get answers the item with its evidence and history, and not_found for a stranger", async () => {
     const detail = ok(await main.itemGet({ item_id: "itm_spec" }));
-    expect(detail.item).toMatchObject({ id: "itm_spec", kind: "action_item", review: "accepted" });
-    expect(Array.isArray(detail.evidence)).toBe(true);
-    expect(Array.isArray(detail.history)).toBe(true);
+    expect(detail.item).toMatchObject({ id: "itm_spec", kind: "action_item", review: "accepted", text: "Drawer redesign spec by Friday" });
+    expect(detail.evidence).toHaveLength(detail.item.spans.length);
+    expect(detail.evidence[0]).toMatchObject({ source: "call", span: detail.item.spans[0], reference: "19:58–20:10", summary: expect.any(String), confidence: "high" });
+    expect(detail.evidence[0]?.summary.length).toBeGreaterThan(0);
+    expect(detail.history).toEqual([]);
     expect(refused(await main.itemGet({ item_id: "itm_nobody" })).code).toBe("not_found");
   });
 
@@ -79,8 +81,11 @@ describe("item mutations", () => {
     const result = ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] }));
     expect(result.items.length).toBeGreaterThan(0);
     expect(result.items.every((i: ItemView) => i.review === "accepted")).toBe(true);
+    const changes = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
+    expect(changes.rows.find((row) => row.entity.id === result.items[0].id)?.field).toBe("review_state");
     expect(result).toHaveProperty("skipped");
     expect(ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] })).items).toEqual([]);
+    expect(refused(await main.itemsReviewAll({ call_id: "call_nobody", kinds: [] })).code).toBe("not_found");
   });
 
   it("item_edit changes the text and refuses an empty one", async () => {
@@ -119,8 +124,12 @@ describe("item mutations", () => {
 describe("today_get", () => {
   it("answers the whole Today view", async () => {
     const today = ok(await main.todayGet({}));
-    for (const key of ["banners", "calendar", "date", "done_today", "due_without_call", "first_use"]) expect(today).toHaveProperty(key);
-    expect(Array.isArray(today.banners)).toBe(true);
+    expect(today.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(today.calendar).toBe("granted");
+    expect(today.review_calls.map((call) => call.id)).toContain(LIVE_CALL);
+    expect(today.done_today).toEqual([]);
+    expect(today.due_without_call.every((item) => item.review === "accepted" && item.due !== null && item.due <= today.date)).toBe(true);
+    expect(today.banners.every((banner) => ["self_test_not_passed", "recording_interrupted_by_quit", "audio_access_never_granted"].includes(banner.type))).toBe(true);
   });
 });
 
@@ -154,7 +163,7 @@ describe("call_tags_set and tags_list", () => {
 describe("share_copy and calls_export", () => {
   it("share_copy answers the copy and its counts, and refuses a call that is gone", async () => {
     const done = ok(await main.shareCopy({ call_id: PAST_CALL, scope: everyone, format: "slack" }));
-    expect(done.text.length).toBeGreaterThan(0);
+    expect(done.text).toContain("Rotate the staging Jira token");
     expect(done.sections).toBeGreaterThan(0);
     expect(done).toMatchObject({ sensitive: false });
     expect(refused(await main.shareCopy({ call_id: "call_nobody", scope: everyone, format: "markdown" })).code).toBe("not_found");
