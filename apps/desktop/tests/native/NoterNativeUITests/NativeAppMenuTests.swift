@@ -97,20 +97,7 @@ final class NativeAppMenuTests: NoterTestCase {
         let copySlack = app.menuItems["Copy for Slack"]
         XCTAssertTrue(copySlack.waitForExistence(timeout: 5) && copySlack.isEnabled, "Copy for Slack becomes enabled for a ready call page")
         attachScreenshot("app-menu-edit-call-context")
-        let pasteboard = NSPasteboard.general
-        let beforeClick = pasteboard.changeCount
-        copySlack.click()
-        let copiedFeedback = app.staticTexts["Copied for Slack"]
-        XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "Edit > Copy for Slack runs the existing share handler")
-        XCTAssertTrue(waitUntil(5) { pasteboard.changeCount > beforeClick }, "the menu click writes a clipboard result")
-        XCTAssertEqual(pasteboard.changeCount, beforeClick + 1, "the menu click invokes the share handler exactly once")
-        XCTAssertTrue(waitUntil(10) { !copiedFeedback.exists }, "the click confirmation clears before testing the shortcut")
-        let beforeShortcut = pasteboard.changeCount
-        app.typeKey("c", modifierFlags: [.command, .shift])
-        XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "Shift-Command-C reaches the same Copy for Slack handler")
-        XCTAssertTrue(waitUntil(5) { pasteboard.changeCount > beforeShortcut }, "the native accelerator writes a clipboard result")
-        XCTAssertEqual(pasteboard.changeCount, beforeShortcut + 1, "the accelerator invokes the share handler exactly once")
-        attachScreenshot("app-menu-edit-copy-slack-confirmed")
+        app.typeKey(.escape, modifierFlags: [])
 
         let noter = app.menuBars.menuBarItems["Noter"]
         noter.click()
@@ -129,36 +116,92 @@ final class NativeAppMenuTests: NoterTestCase {
         attachScreenshot("first-run-native-titlebar")
     }
 
-    func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_reviews_focused_suggestions_of_each_kind() {
-        launch("menu-review")
+    func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_action_item() {
+        let main = openMenuReviewCall()
+        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Accepted"))
+        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Accepted outcome")
+        let suggestion = main.staticTexts["Replay buffer for websocket reconnects"]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested action item is visible")
+        suggestion.click()
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        XCTAssertTrue(app.menuItems["Accept Item"].waitForExistence(timeout: 5) && app.menuItems["Accept Item"].isEnabled, "Accept Item enables for the focused action item")
+        XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused action item")
+        attachScreenshot("app-menu-edit-focused-action")
+        app.menuItems["Accept Item"].click()
+        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused action item produces one Accepted outcome")
+    }
+
+    func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_rejects_focused_decision() {
+        let main = openMenuReviewCall()
+        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Rejected"))
+        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Rejected outcome")
+        let suggestion = main.staticTexts["Drawer events go through the notification service."]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested decision is visible")
+        suggestion.click()
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        XCTAssertTrue(app.menuItems["Accept Item"].waitForExistence(timeout: 5) && app.menuItems["Accept Item"].isEnabled, "Accept Item enables for the focused decision")
+        XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused decision")
+        attachScreenshot("app-menu-edit-focused-decision")
+        app.menuItems["Reject Item"].click()
+        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused decision produces one Rejected outcome")
+    }
+
+    func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
+        let main = openMenuReviewCall()
+        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Accepted"))
+        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Accepted outcome")
+        let suggestion = main.staticTexts["Who owns the acceptance criteria for the reconnect?"]
+        XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested question is visible")
+        suggestion.click()
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        XCTAssertTrue(app.menuItems["Accept Item"].waitForExistence(timeout: 5) && app.menuItems["Accept Item"].isEnabled, "Accept Item enables for the focused question")
+        XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
+        attachScreenshot("app-menu-edit-focused-question")
+        app.menuItems["Accept Item"].click()
+        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused question produces one Accepted outcome")
+    }
+
+    func test_cpt_noter_dod_ui_main_window_shell_navigation__native_menu_copy_for_slack_writes_once() throws {
+        let pasteboardName = NSPasteboard.Name(rawValue: "org.getahead.noter.native-uitests")
+        let pasteboard = NSPasteboard(name: pasteboardName)
+        pasteboard.clearContents()
+        let testHome = try XCTUnwrap(self.home)
+        let writeLog = testHome.appendingPathComponent("native-clipboard-writes.txt")
+        app.launchEnvironment["NOTER_TEST_NATIVE_CLIPBOARD"] = "1"
+        app.launchEnvironment["NOTER_TEST_CLIPBOARD_LOG"] = writeLog.path
+
+        launch("idle")
         let main = app.windows["Noter"]
         XCTAssertTrue(main.waitForExistence(timeout: 10))
         app.typeKey("w", modifierFlags: .command)
         let last = openMenu().menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Open Last Summary — '" )).firstMatch
-        XCTAssertTrue(last.waitForExistence(timeout: 10))
+        XCTAssertTrue(last.waitForExistence(timeout: 10), "the native status menu offers the ready summary")
         last.click()
         XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable })
 
-        for (text, decision, state) in [
-            ("Replay buffer for websocket reconnects", "menu.accept_item", "Accepted"),
-            ("Drawer events go through the notification service.", "menu.reject_item", "Rejected"),
-            ("Who owns the acceptance criteria for the reconnect?", "menu.accept_item", "Accepted"),
-        ] {
-            XCTAssertTrue(waitUntil(state == "Rejected" ? 12 : 6) { !main.staticTexts[state].exists }, "no earlier \(state) outcome remains to satisfy this item's assertion")
-            let suggestion = main.staticTexts[text]
-            XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the \(text) suggestion is visible")
-            suggestion.click()
-            let edit = app.menuBars.menuBarItems["Edit"]
-            edit.click()
-            let accept = app.menuItems["Accept Item"]
-            let reject = app.menuItems["Reject Item"]
-            XCTAssertTrue(accept.waitForExistence(timeout: 5) && accept.isEnabled, "Accept Item enables for focused suggested rows of every kind")
-            XCTAssertTrue(reject.waitForExistence(timeout: 5) && reject.isEnabled, "Reject Item enables for focused suggested rows of every kind")
-            attachScreenshot("app-menu-edit-focused-\(text == "Replay buffer for websocket reconnects" ? "action" : text.hasPrefix("Who owns") ? "question" : "decision")")
-            app.menuItems[decision == "menu.accept_item" ? "Accept Item" : "Reject Item"].click()
-            XCTAssertTrue(waitUntil(10) { main.staticTexts[state].exists }, "the selected \(text) row produces its own \(state) outcome")
-            XCTAssertTrue(waitUntil(state == "Rejected" ? 12 : 6) { !main.staticTexts[state].exists }, "this item's \(state) outcome clears before another item is reviewed")
-        }
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        let copySlack = app.menuItems["Copy for Slack"]
+        XCTAssertTrue(copySlack.waitForExistence(timeout: 5) && copySlack.isEnabled, "Copy for Slack is enabled for the focused ready call")
+        attachScreenshot("app-menu-edit-copy-slack-menu-click")
+        copySlack.click()
+        let copiedFeedback = app.staticTexts["Copied for Slack"]
+        XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "the native menu dispatches to the existing share handler")
+        XCTAssertTrue(waitUntil(5) { Self.clipboardWriteCount(at: writeLog) == 1 }, "the menu action writes once to the private pasteboard")
+        XCTAssertEqual(Self.clipboardWriteCount(at: writeLog), 1, "the menu action dispatches one clipboard write")
+        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend sync"), "the private pasteboard contains the selected call's Slack payload")
+        attachScreenshot("app-menu-edit-copy-slack-click-confirmed")
+        XCTAssertTrue(waitUntil(10) { !copiedFeedback.exists }, "the click confirmation clears before testing the accelerator")
+
+        app.typeKey("c", modifierFlags: [.command, .shift])
+        XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "Shift-Command-C dispatches to the same share handler")
+        XCTAssertTrue(waitUntil(5) { Self.clipboardWriteCount(at: writeLog) == 2 }, "the accelerator writes once to the private pasteboard")
+        XCTAssertEqual(Self.clipboardWriteCount(at: writeLog), 2, "menu click and accelerator each dispatch one clipboard write")
+        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend sync"), "the accelerator refreshes the private pasteboard payload")
+        attachScreenshot("app-menu-edit-copy-slack-shortcut-confirmed")
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accept_all_batches_every_suggested_kind() {
@@ -190,9 +233,25 @@ final class NativeAppMenuTests: NoterTestCase {
         app.typeKey(.escape, modifierFlags: [])
     }
 
+    private func openMenuReviewCall() -> XCUIElement {
+        launch("menu-review")
+        let main = app.windows["Noter"]
+        XCTAssertTrue(main.waitForExistence(timeout: 10), "the main window opens for the fresh menu-review fixture")
+        app.typeKey("w", modifierFlags: .command)
+        let last = openMenu().menuItems.matching(NSPredicate(format: "title BEGINSWITH 'Open Last Summary — '" )).firstMatch
+        XCTAssertTrue(last.waitForExistence(timeout: 10), "the native status menu offers Backend sync")
+        last.click()
+        XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable }, "the ready summary arrives in the main window")
+        return main
+    }
+
+    private static func clipboardWriteCount(at path: URL) -> Int {
+        (try? String(contentsOf: path, encoding: .utf8))?.split(whereSeparator: \.isNewline).count ?? 0
+    }
+
     private func attachScreenshot(_ name: String) {
         let environment = ProcessInfo.processInfo.environment
-        let build = environment["GITHUB_SHA"] ?? environment["NOTER_BUILD_SHA"] ?? "unset"
+        let build = environment["NOTER_BUILD_SHA"] ?? environment["TEST_RUNNER_NOTER_BUILD_SHA"] ?? environment["GITHUB_SHA"] ?? "unset"
         let globalAppearance = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?["AppleInterfaceStyle"] as? String
         let appearance = globalAppearance == "Dark" ? "Dark" : "Light"
         let display = CGMainDisplayID()

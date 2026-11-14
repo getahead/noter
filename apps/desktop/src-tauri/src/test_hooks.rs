@@ -14,6 +14,29 @@ use crate::Booted;
 use crate::native::{MacOps, Windows};
 use crate::surfaces::TauriSurfaces;
 
+#[cfg(target_os = "macos")]
+const NATIVE_TEST_CLIPBOARD: &str = "org.getahead.noter.native-uitests";
+
+#[cfg(target_os = "macos")]
+fn no_test_save_panel(_: &noter_native::PanelRequest) -> Option<PathBuf> {
+    None
+}
+
+#[cfg(target_os = "macos")]
+fn write_native_test_clipboard(text: &noter_native::ClipboardText) -> Result<(), String> {
+    noter_native::clipboard_write_to(NATIVE_TEST_CLIPBOARD, text)?;
+    if let Some(path) = std::env::var_os("NOTER_TEST_CLIPBOARD_LOG") {
+        use std::io::Write;
+        let mut log = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(|error| error.to_string())?;
+        writeln!(log, "write").map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
 /// Kept for the app's lifetime: it feeds the scripted engine's meters.
 static HARNESS: OnceLock<Arc<Harness>> = OnceLock::new();
 
@@ -32,6 +55,22 @@ pub fn boot<R: Runtime>(
                 ..options?
             };
             tauri::async_runtime::block_on(Harness::start_with(options, events, move |deps| {
+                #[cfg(target_os = "macos")]
+                let deps = if std::env::var_os("NOTER_TEST_NATIVE_CLIPBOARD").as_deref()
+                    == Some(std::ffi::OsStr::new("1"))
+                {
+                    let windows: Arc<dyn Windows> = host.clone();
+                    CoreDeps {
+                        native_ops: Arc::new(MacOps::with(
+                            windows,
+                            no_test_save_panel,
+                            write_native_test_clipboard,
+                        )),
+                        ..deps
+                    }
+                } else {
+                    deps
+                };
                 let deps = CoreDeps {
                     app_version: env!("CARGO_PKG_VERSION").into(),
                     shortcuts,
