@@ -539,7 +539,7 @@ impl Core {
 
     fn write_items_file(&self, call_id: &str) -> Result<(), CoreError> {
         let items = self.items_of_call(call_id)?;
-        let dir = self.data_dir.join("audio").join(call_id);
+        let dir = self.audio_dir.join(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
         let tmp = dir.join("items.json.tmp");
         let mut file = std::fs::OpenOptions::new()

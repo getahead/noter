@@ -12,6 +12,8 @@ design: docs/DESIGN-core.md
 
 # Feature: Engine capture, live ASR and capture-first restart
 
+> **Change log (v0.3):** Added recovery reads for unfinalized audio, continuation preservation and finalizer draining on shutdown.
+
 <!-- toc -->
 
 - [1. Feature Context](#1-feature-context)
@@ -267,7 +269,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
-The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring.
+The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring. When a stop was missed or finalization was interrupted, archive and replay recover available AAC parts and preserve the saved timeline duration. A completed recording followed by Continue Recording retains both the earlier M4A and new parts. Shutdown and live stdin EOF wait for queued stop finalization.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-session`

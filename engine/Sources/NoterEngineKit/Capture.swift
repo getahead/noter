@@ -420,7 +420,11 @@ final class CaptureSession: @unchecked Sendable {
                     .map { dir.appendingPathComponent("\(channel.rawValue).\($0).aac") }
                     .filter { FileManager.default.fileExists(atPath: $0.path) }
                 let out = dir.appendingPathComponent("\(channel.rawValue).m4a")
-                guard !parts.isEmpty, Self.remux(parts, to: out) else { return nil }
+                let previous = FileManager.default.fileExists(atPath: out.path) ? out : nil
+                guard !parts.isEmpty || previous != nil else { return nil }
+                guard Self.remux(parts, appending: previous, to: out) else {
+                    return previous.map { _ in "\(relative)/\(channel.rawValue).m4a" }
+                }
                 parts.forEach { try? FileManager.default.removeItem(at: $0) }
                 return "\(relative)/\(channel.rawValue).m4a"
             }
@@ -454,6 +458,53 @@ final class CaptureSession: @unchecked Sendable {
         }
         done.wait()
         return result.value
+    }
+
+    /// Appends new crash-safe AAC parts to the last completed recording without discarding it.
+    static func remux(_ parts: [URL], appending previous: URL?, to out: URL) -> Bool {
+        guard let previous else { return remux(parts, to: out) }
+        guard !parts.isEmpty else { return true }
+        let temporary = out.deletingLastPathComponent().appendingPathComponent(".\(UUID().uuidString).m4a")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        let done = DispatchSemaphore(value: 0)
+        let succeeded = Box(false)
+        Task {
+            defer { done.signal() }
+            let composition = AVMutableComposition()
+            var cursor = CMTime.zero
+            for url in [previous] + parts {
+                let asset = AVURLAsset(url: url)
+                let tracks: [AVAssetTrack]
+                let duration: CMTime
+                do {
+                    tracks = try await asset.loadTracks(withMediaType: .audio)
+                    duration = try await asset.load(.duration)
+                } catch { return }
+                guard let source = tracks.first,
+                    let target = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+                else { return }
+                do {
+                    try target.insertTimeRange(CMTimeRange(start: .zero, duration: duration), of: source, at: cursor)
+                    cursor = CMTimeAdd(cursor, duration)
+                } catch { return }
+            }
+            guard let export = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetAppleM4A) else { return }
+            export.outputURL = temporary
+            export.outputFileType = .m4a
+            await export.export()
+            succeeded.value = export.status == .completed
+        }
+        done.wait()
+        guard succeeded.value else { return false }
+        do {
+            _ = try FileManager.default.replaceItemAt(out, withItemAt: temporary)
+            return true
+        } catch {
+            if !FileManager.default.fileExists(atPath: out.path) {
+                return (try? FileManager.default.moveItem(at: temporary, to: out)) != nil
+            }
+            return false
+        }
     }
 }
 

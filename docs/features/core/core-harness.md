@@ -2,7 +2,7 @@
 title: "Feature: noter-core-harness and real-core conformance"
 description: "A test binary that runs the real CoreApi without Tauri over JSON Lines, with a fixture database, a scripted engine and a scripted runtime, so the conformance suite and the UI E2E flows count against the real core from M0."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M0
 lane: core
@@ -11,6 +11,8 @@ design: docs/DESIGN-core.md
 ---
 
 # Feature: noter-core-harness and real-core conformance
+
+> **Change log (v0.2):** The fixture seeds engine-named audio files and the scripted stop writes physical recordings.
 
 <!-- toc -->
 
@@ -203,7 +205,7 @@ The scripted runtime arrives with the LLM runtime in M2 (decision D8); in M0 the
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-harness-conformance`
 
-The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playwright flows run against the harness for every M0 command, so that the E2E gate counts them; the CI step that builds the binary and sets `NOTER_CORE_CMD` is the owner's (DevOps), this feature only provides the binary and its contract.
+The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playwright flows run against the harness for every M0 command, so that the E2E gate counts them; the CI step that builds the binary and sets `NOTER_CORE_CMD` is the owner's (DevOps), this feature only provides the binary and its contract. Kept-audio calls are seeded with engine-named M4A channel files and a timeline; scripted stops write and report equivalent files. Delete, discard and export assertions verify physical file outcomes.
 
 **Implements**:
 - `cpt-noter-flow-core-harness-session`

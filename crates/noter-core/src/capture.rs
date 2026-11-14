@@ -991,7 +991,7 @@ impl Core {
         let meta = self.change_meta(ctx, "Discarded recording".into(), "capture_discard");
         let id = call_id.as_str().to_string();
         self.store().delete("call", "calls", vec![id], meta)?;
-        if let Err(e) = std::fs::remove_dir_all(self.audio_dir.join(call_id.as_str())) {
+        if let Err(e) = std::fs::remove_dir_all(self.call_dir(&call_id)) {
             if e.kind() != std::io::ErrorKind::NotFound {
                 self.log(crate::object(json!({
                     "level": "warn", "module": "capture", "message": "discarded audio stays"

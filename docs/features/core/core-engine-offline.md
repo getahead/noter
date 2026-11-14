@@ -2,7 +2,7 @@
 title: "Feature: Engine offline pass and embeddings"
 description: "Large v3 and constrained VBx archive processing, speaker embeddings and local text embeddings over engine stdio."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: engine
@@ -11,6 +11,8 @@ design: docs/DESIGN-core.md
 ---
 
 # Feature: Engine offline pass and embeddings
+
+> **Change log (v0.2):** Speaker embedding scratch files are removed after failed as well as successful requests.
 
 <!-- toc -->
 
@@ -200,7 +202,7 @@ The system **MUST** implement the offline pass through the existing stdio protoc
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-embeddings`
 
-The system **MUST** correlate speaker and text embeddings, validate their dimensions and counts, reject unsafe paths, use files for bulk results and keep extraction local. The core encrypts speaker embeddings before retaining them; person matching is M3.
+The system **MUST** correlate speaker and text embeddings, validate their dimensions and counts, reject unsafe paths, use files for bulk results and keep extraction local. The core encrypts speaker embeddings before retaining them; plaintext speaker scratch output is removed on both successful and failed requests; person matching is M3.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-offline-embeddings`

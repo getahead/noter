@@ -213,6 +213,26 @@ async fn deleting_audio_keeps_the_transcript_reports_the_freed_space_and_cannot_
 }
 
 #[tokio::test]
+async fn audio_delete_uses_the_engine_container_as_its_call_folder_root() {
+    let data = tempfile::tempdir().unwrap();
+    let container = tempfile::tempdir().unwrap();
+    let events = Arc::new(Events::default());
+    let deps = CoreDeps::new(Arc::new(FixedClock), events)
+        .with_models_dir(container.path().join("models"));
+    let core = Core::open(data.path(), deps).unwrap();
+    core.store()
+        .insert_batch(vec![call("external", 40, "ready", false)])
+        .unwrap();
+    let recording = container.path().join("audio/external/mic.m4a");
+    std::fs::create_dir_all(recording.parent().unwrap()).unwrap();
+    std::fs::write(&recording, b"recording").unwrap();
+
+    delete(&core, &["external"]).await.unwrap();
+
+    assert!(!recording.exists());
+}
+
+#[tokio::test]
 async fn deleting_audio_also_removes_parts_and_legacy_formats() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open(dir.path());

@@ -2,7 +2,7 @@
 title: "Feature: Handoff launcher and repositories"
 description: "On-demand versioned prompts, repository mappings and native launch with pre-filled text and no automatic send."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -11,6 +11,8 @@ design: docs/DESIGN-core.md
 ---
 
 # Feature: Handoff launcher and repositories
+
+> **Change log (v0.2):** Deleting a call removes its persisted handoff prompt files.
 
 <!-- toc -->
 
@@ -232,7 +234,7 @@ The system **MUST** generate only on demand through the router, return generatin
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-handoff-launch`
 
-The system **MUST** resolve mappings, expose missing paths and the actual launch plan, honor target switches, save the full prompt to a file and try the designed link/terminal order with a pre-filled prompt. Copy remains available when opening cannot work. Successful use accepts suggestions and logs the exact prompt version and edited flag for the later Handoff metric; failure must not claim successful use.
+The system **MUST** resolve mappings, expose missing paths and the actual launch plan, honor target switches, save the full prompt to a file and try the designed link/terminal order with a pre-filled prompt. Copy remains available when opening cannot work. Successful use accepts suggestions and logs the exact prompt version and edited flag for the later Handoff metric; failure must not claim successful use. Deleting the owning call also removes its persisted handoff prompt files and prompt version rows.
 
 **Implements**:
 - `cpt-noter-flow-core-handoff-repositories`

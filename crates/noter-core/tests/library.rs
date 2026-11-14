@@ -762,9 +762,103 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());
     seed(&core);
+    core.store()
+        .insert_batch(vec![
+            row(
+                "items",
+                &[
+                    ("id", json!("itm_delete")),
+                    ("rev", json!(1)),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("action_item")),
+                    ("text", json!("Delete the staging export")),
+                    ("lang", json!("en")),
+                    ("status", json!("open")),
+                    ("review_state", json!("accepted")),
+                    ("created_by", json!("user")),
+                ],
+            ),
+            row(
+                "chunks",
+                &[
+                    ("id", json!("chunk_delete")),
+                    ("call_id", json!("call_a")),
+                    ("t0_ms", json!(0)),
+                    ("t1_ms", json!(1000)),
+                    ("text", json!("staging export secretneedle")),
+                    ("text_norm", json!("staging export secretneedle")),
+                    ("token_count", json!(3)),
+                ],
+            ),
+            row(
+                "item_spans",
+                &[
+                    ("item_id", json!("itm_delete")),
+                    ("call_id", json!("call_a")),
+                    ("t0_ms", json!(0)),
+                    ("t1_ms", json!(1000)),
+                ],
+            ),
+            row(
+                "speaker_constraints",
+                &[
+                    ("id", json!("spc_delete")),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("must_link")),
+                    ("a_t0_ms", json!(0)),
+                    ("a_t1_ms", json!(100)),
+                    ("b_t0_ms", json!(200)),
+                    ("b_t1_ms", json!(300)),
+                ],
+            ),
+            row(
+                "call_participants",
+                &[
+                    ("id", json!("cp_delete")),
+                    ("call_id", json!("call_a")),
+                    ("person_id", json!("per_you")),
+                ],
+            ),
+            row(
+                "summaries",
+                &[
+                    ("id", json!("sum_delete")),
+                    ("rev", json!(1)),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("summary")),
+                    ("current_version_id", json!("sv_delete")),
+                ],
+            ),
+            row(
+                "summary_versions",
+                &[
+                    ("id", json!("sv_delete")),
+                    ("summary_id", json!("sum_delete")),
+                    ("n", json!(1)),
+                    ("kind", json!("generated")),
+                    ("body_md", json!("Secret summary needle")),
+                    ("lang", json!("en")),
+                    ("from_pass", json!("live")),
+                    ("created_at", json!(NOW)),
+                ],
+            ),
+        ])
+        .unwrap();
     std::fs::create_dir_all(dir.path().join("audio/call_a")).unwrap();
     std::fs::write(dir.path().join("audio/call_a/mic.m4a"), b"x").unwrap();
     std::fs::create_dir_all(dir.path().join("audio/call_b")).unwrap();
+    let indexed = Connection::open(dir.path().join("noter.db")).unwrap();
+    for (table, needle) in [("items_fts", "staging"), ("chunks_fts", "secretneedle")] {
+        let hits: u32 = indexed
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE {table} MATCH ?1"),
+                [needle],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hits, 1, "{table} fixture must be indexed before deletion");
+    }
+    drop(indexed);
     let args = CallsDeleteArgs {
         call_ids: vec![
             CallId::new("call_a"),
@@ -780,7 +874,19 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
         ["call_c"]
     );
     let c = Connection::open(dir.path().join("noter.db")).unwrap();
-    for table in ["segments", "speakers", "marks", "gaps", "call_tags"] {
+    for table in [
+        "segments",
+        "speakers",
+        "marks",
+        "gaps",
+        "call_tags",
+        "items",
+        "item_spans",
+        "speaker_constraints",
+        "call_participants",
+        "summaries",
+        "chunks",
+    ] {
         let n: u32 = c
             .query_row(
                 &format!("SELECT count(*) FROM {table} WHERE call_id = 'call_a'"),
@@ -790,6 +896,32 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
             .unwrap();
         assert_eq!(n, 0, "{table}");
     }
+    let versions: u32 = c
+        .query_row(
+            "SELECT count(*) FROM summary_versions WHERE summary_id = 'sum_delete'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(versions, 0, "summary_versions");
+    for (table, needle) in [("items_fts", "staging"), ("chunks_fts", "secretneedle")] {
+        let hits: u32 = c
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE {table} MATCH ?1"),
+                [needle],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hits, 0, "{table} retains deleted call text");
+    }
+    let scrubbed: (Option<String>, Option<String>, Option<Vec<u8>>) = c
+        .query_row(
+            "SELECT before, after, delta FROM changes WHERE reason = 'calls_delete' LIMIT 1",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(scrubbed, (None, None, None));
     let log = changes(dir.path(), "calls_delete");
     assert_eq!(log.len(), 2);
     assert!(log
@@ -810,6 +942,39 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
         .await
         .unwrap_err();
     assert_eq!(gone.code, ErrorCode::NotFound);
+}
+
+#[tokio::test]
+async fn delete_removes_call_audio_from_the_configured_models_container() {
+    let data = tempfile::tempdir().unwrap();
+    let container = tempfile::tempdir().unwrap();
+    let events = Arc::new(Events::default());
+    let deps = CoreDeps::new(Arc::new(FixedClock), events)
+        .with_models_dir(container.path().join("models"));
+    let core = Core::open(data.path(), deps).unwrap();
+    core.store()
+        .insert_batch(vec![call(
+            "call_external",
+            NOW - DAY,
+            Some(NOW),
+            "planning",
+            "ready",
+        )])
+        .unwrap();
+    let recording = container.path().join("audio/call_external/mic.m4a");
+    std::fs::create_dir_all(recording.parent().unwrap()).unwrap();
+    std::fs::write(&recording, b"recording").unwrap();
+
+    core.calls_delete(
+        &main_window(),
+        CallsDeleteArgs {
+            call_ids: vec![CallId::new("call_external")],
+        },
+    )
+    .await
+    .unwrap();
+
+    assert!(!recording.exists());
 }
 
 #[tokio::test]

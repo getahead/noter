@@ -734,6 +734,77 @@ async fn open_writes_the_prompt_file_launches_and_hands_the_item_off() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn deleting_a_call_removes_its_handoff_prompt_file_and_versions() {
+    let w = world("");
+    w.ready("itm_eng").await;
+    w.map_repo("VSTOR").await;
+    w.core.handoff_open(&ctx(), id("itm_eng")).await.unwrap();
+    let file = w.dir.path().join("handoffs/itm_eng.md");
+    assert!(file.exists());
+
+    w.core
+        .calls_delete(
+            &ctx(),
+            CallsDeleteArgs {
+                call_ids: vec![CallId::new("call_a")],
+            },
+        )
+        .await
+        .unwrap();
+
+    assert!(!file.exists());
+    let count = w
+        .core
+        .store()
+        .read(|c| {
+            c.query_row("SELECT COUNT(*) FROM prompt_versions", [], |r| {
+                r.get::<_, i64>(0)
+            })
+        })
+        .unwrap();
+    assert_eq!(count, 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn failed_call_delete_keeps_its_handoff_prompt_file() {
+    let w = world("");
+    w.ready("itm_eng").await;
+    w.map_repo("VSTOR").await;
+    w.core.handoff_open(&ctx(), id("itm_eng")).await.unwrap();
+    let file = w.dir.path().join("handoffs/itm_eng.md");
+    noter_db::rusqlite::Connection::open(w.dir.path().join("noter.db"))
+        .unwrap()
+        .execute_batch(
+            "CREATE TRIGGER fail_call_delete BEFORE DELETE ON calls BEGIN
+             SELECT RAISE(ABORT, 'forced call delete failure'); END;",
+        )
+        .unwrap();
+
+    let error = w
+        .core
+        .calls_delete(
+            &ctx(),
+            CallsDeleteArgs {
+                call_ids: vec![CallId::new("call_a")],
+            },
+        )
+        .await
+        .unwrap_err();
+
+    assert_eq!(error.code, ErrorCode::Internal);
+    assert!(
+        file.exists(),
+        "failed database deletion preserves prompt file"
+    );
+    let calls = w
+        .core
+        .store()
+        .read(|c| c.query_row("SELECT COUNT(*) FROM calls", [], |r| r.get::<_, i64>(0)))
+        .unwrap();
+    assert_eq!(calls, 1);
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_failed_launch_claims_nothing_and_the_link_falls_back_to_the_terminal() {
     let w = world("");
     w.ready("itm_eng").await;

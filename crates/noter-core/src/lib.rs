@@ -529,7 +529,7 @@ impl Core {
             held: Mutex::new(Vec::new()),
             audio_dir,
             playback: playback::Playback::new(),
-            transcript: transcript::Transcript::new(data_dir.to_path_buf()),
+            transcript: transcript::Transcript::new(),
             postcall: postcall::Sections::default(),
             handoffs: noter_handoff::Generations::default(),
             sources: knowledge::Sources::default(),

@@ -238,7 +238,7 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
   it("other path: Export to a folder writes the requested files, and a cancelled panel writes none", async () => {
     s = openScenario({ alsoRecord: exercised });
     const main = s.core("main");
-    const include = { summary_and_items: true, transcript: true, audio: false };
+    const include = { summary_and_items: true, transcript: true, audio: true };
     await cancelNextSavePanel(s, "calls_export");
     expect((await main.callsExport({ call_ids: [PAST_CALL], include })).status).toBe("error");
     const done = ok(await main.callsExport({ call_ids: [PAST_CALL], include }));
@@ -248,6 +248,7 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
       const files = readdirSync(done.path);
       expect(files).toHaveLength(done.files);
       expect(files.some((f) => f.endsWith(".md"))).toBe(true);
+      expect(files.some((f) => f.endsWith("-mic.m4a"))).toBe(true);
       expect(readFileSync(`${done.path}/${files.find((f) => f.endsWith(".md"))}`, "utf8").length).toBeGreaterThan(0);
     }
   });

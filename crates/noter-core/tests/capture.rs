@@ -1829,6 +1829,10 @@ async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
         .await;
 
     // Discard: nothing is kept.
+    let call_audio = r._dir.path().join("audio").join(call_id.as_str());
+    std::fs::create_dir_all(&call_audio).unwrap();
+    std::fs::write(call_audio.join("mic.m4a"), b"recording").unwrap();
+    std::fs::write(call_audio.join("sys.m4a"), b"recording").unwrap();
     let stops = r.stops();
     let discard = {
         let core = r.core.clone();
@@ -1843,6 +1847,10 @@ async fn nothing_heard_for_five_minutes_offers_keep_or_discard() {
     assert_eq!(idle.phase, CapturePhase::Idle);
     assert_eq!(idle.call_id, None);
     assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+    assert!(
+        !call_audio.exists(),
+        "discard removes the physical recording folder"
+    );
     assert_eq!(
         r.query::<i64>("SELECT count(*) FROM changes WHERE entity_type = 'call' AND undoable = 0 AND field IS NULL AND delta IS NULL AND reason = 'capture_discard'"),
         1

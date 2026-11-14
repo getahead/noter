@@ -453,25 +453,33 @@ impl<L: EngineLauncher> EngineClient<L> {
             out_path: out_path.clone(),
         };
         // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-request
-        self.offline_request(key, None, cmd, |answer| {
-            // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-resolve
-            let Answer::Done(path) = answer else {
-                return Err(OfflineError::BadResult("not a speaker embedding".into()));
-            };
-            if path != out_path {
-                return Err(OfflineError::BadResult(format!("{path}: not {out_path}")));
+        let result = self
+            .offline_request(key, None, cmd, |answer| {
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-resolve
+                let Answer::Done(path) = answer else {
+                    return Err(OfflineError::BadResult("not a speaker embedding".into()));
+                };
+                if path != out_path {
+                    return Err(OfflineError::BadResult(format!("{path}: not {out_path}")));
+                }
+                let read = read_inside(&root, &out_path);
+                // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-resolve
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-return
+                vector(&out_path, floats(&out_path, &read?)?, SPEAKER_DIMS)
+                // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-return
+            })
+            .await;
+        // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-clean
+        // Remove the plaintext scratch output on success and every failure path.
+        if let Err(error) = std::fs::remove_file(root.join(&out_path)) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                return Err(OfflineError::BadResult(format!(
+                    "could not remove speaker embedding scratch output: {error}"
+                )));
             }
-            let read = read_inside(&root, &out_path);
-            // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-resolve
-            // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-clean
-            // The core encrypts what it keeps; the plain scratch file goes now.
-            let _ = std::fs::remove_file(root.join(&out_path));
-            // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-clean
-            // @cpt-begin:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-return
-            vector(&out_path, floats(&out_path, &read?)?, SPEAKER_DIMS)
-            // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-return
-        })
-        .await
+        }
+        // @cpt-end:cpt-noter-flow-core-engine-offline-embeddings:p1:inst-embed-clean
+        result
     }
 
     /// bge-m3 embeddings of `texts`, one 1024-value row per text in input order: one query
