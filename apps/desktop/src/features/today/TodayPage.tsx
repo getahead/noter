@@ -1,7 +1,8 @@
 // Today projects core-ranked cards, due work, proposals and completed items through the shared Items rows.
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type KeyboardEvent } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import type { UiPrefs } from "../../core/bindings";
 import { useWindow } from "../../app/use-window";
 import { useAfter } from "../../app/use-after";
 import { openReview } from "../items/review-banner";
@@ -9,7 +10,7 @@ import { ActionItemRow } from "../items/ActionItemRow";
 import { Disclosure } from "../../ui/primitives/disclosure";
 import { moveFocus } from "../../ui/primitives/roving";
 import { positionOf, restorePosition } from "./position";
-import { t } from "../../i18n/format";
+import { t, untilNextDay } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Link } from "../../ui/primitives/link";
@@ -21,6 +22,26 @@ import { openSpan } from "../items/evidence";
 import { ProposalRow } from "./ProposalRow";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 import "./today.css";
+
+// @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-date
+/** Refresh the Today projection when its configured calendar day rolls over or the window returns. */
+export function watchTodayDate(refresh: () => void, prefs: UiPrefs | undefined, focusTarget: Pick<Window, "addEventListener" | "removeEventListener"> = window) {
+  let timer: ReturnType<typeof setTimeout>;
+  const schedule = () => {
+    timer = setTimeout(() => {
+      refresh();
+      schedule();
+    }, untilNextDay(Date.now(), prefs));
+  };
+  const onFocus = () => refresh();
+  schedule();
+  focusTarget.addEventListener("focus", onFocus);
+  return () => {
+    clearTimeout(timer);
+    focusTarget.removeEventListener("focus", onFocus);
+  };
+}
+// @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-date
 
 // @cpt-component:cpt-noter-component-screen-today:p1
 // @cpt-dod:cpt-noter-dod-ui-today-dashboard:p1
@@ -34,6 +55,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   const ask = useWindow(bridge, (s) => s.commands["today:calendar"]);
   // the same read again when what it shows can have changed: capture, setup or environment, and an item or call
   const ready = useWindow(bridge, (s) => s.status === "READY"); // the snapshot is the window's first command
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const live = useWindow(bridge, (s) => s.whole.capture?.phase === "recording" || s.whole.capture?.phase === "paused");
   const capture = useWindow(bridge, (s) => s.whole.capture?.version);
   const env = useWindow(bridge, (s) => s.whole.environment);
@@ -45,6 +67,10 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-state-ui-today-calendar:p1:inst-date
   // @cpt-begin:cpt-noter-flow-ui-today-tick:p1:inst-refresh
   useEffect(() => void (ready && loadToday(bridge)), [bridge, ready, capture, env, settings, items, calls]);
+  useEffect(() => {
+    if (!ready) return;
+    return watchTodayDate(() => void loadToday(bridge), prefs);
+  }, [bridge, ready, prefs?.time_zone]);
   // @cpt-end:cpt-noter-flow-ui-today-tick:p1:inst-refresh
   // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-date
   // @cpt-end:cpt-noter-state-ui-today-calendar:p1:inst-settings
@@ -99,11 +125,18 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       }
     }
   };
+  const clearFocusedRowOnExit = (event: FocusEvent<HTMLDivElement>) => {
+    const next = event.relatedTarget;
+    if (next && !event.currentTarget.contains(next as Node)) {
+      position.focused = null;
+      position.group = undefined;
+    }
+  };
   // @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-return
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-return
   // @cpt-begin:cpt-noter-algo-ui-today-project:p1:inst-layout
   return (
-    <div ref={root} onKeyDown={rowKey} onFocus={(event) => {
+    <div ref={root} onKeyDown={rowKey} onBlur={clearFocusedRowOnExit} onFocus={(event) => {
       const row = (event.target as HTMLElement).closest<HTMLElement>("[data-item-id]");
       if (row) {
         position.focused = row.dataset.itemId!;
@@ -119,8 +152,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       {review && (
         <section data-region="TD-R8" className="td-review">
           <div>
-            <strong>{t("today.to_review")}</strong>
-            {review.count > 0 && <> {t("today.review_items", { count: review.count })} {t("today.review_from", { count: review.calls.length })}</>}
+            <strong>{review.count > 0 ? t("today.review_summary", { items: t("today.review_items", { count: review.count }), calls: t("today.review_from", { count: review.calls.length }) }) : t("today.to_review")}</strong>
             {review.unnamed > 0 && <>{review.count > 0 ? " · " : " "}{t("today.unnamed", { count: review.unnamed })}</>}
           </div>
           <div className="td-review__links">

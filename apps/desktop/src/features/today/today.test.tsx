@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
+import { t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
@@ -12,14 +13,41 @@ import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showP
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
 import { positionOf } from "./position";
-import { TodayPage } from "./TodayPage";
+import { TodayPage, watchTodayDate } from "./TodayPage";
 import { TodayToolbar } from "./TodayToolbar";
 import { clockOf } from "./clock";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 
 let bridge: Bridge;
 let fake: FakeCore;
+
+describe("Today review catalogue", () => {
+  it("keeps the heading and both counts in one reorderable message", () => {
+    expect(t("today.review_summary" as never, { items: "1 suggested item", calls: "from 2 calls" })).toBe("To review: 1 suggested item from 2 calls");
+  });
+});
+
+it("refreshes Today at the configured midnight and when its window regains focus", () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-11-08T23:59:30.000Z"));
+  const handlers = new Map<string, EventListener>();
+  const target = {
+    addEventListener: (name: string, handler: EventListener) => handlers.set(name, handler),
+    removeEventListener: (name: string, handler: EventListener) => { if (handlers.get(name) === handler) handlers.delete(name); },
+  };
+  const refresh = vi.fn();
+  const stop = watchTodayDate(refresh, { time_zone: "UTC" } as never, target as unknown as Window);
+  vi.advanceTimersByTime(29_999);
+  expect(refresh).not.toHaveBeenCalled();
+  vi.advanceTimersByTime(1);
+  expect(refresh).toHaveBeenCalledOnce();
+  handlers.get("focus")?.(new Event("focus"));
+  expect(refresh).toHaveBeenCalledTimes(2);
+  stop();
+  expect(handlers.has("focus")).toBe(false);
+});
 afterEach(async () => {
+  vi.useRealTimers();
   await bridge?.close();
   holdToday(undefined);
   resetCache();
@@ -286,6 +314,10 @@ it("Today row keys tick, open typed evidence, and preserve the last focused item
   expect(focus).toHaveBeenCalledOnce();
   (tree.props.onFocus as (e: unknown) => void)({ target: { closest: () => target } });
   expect(positionOf(bridge).focused).toBe(item.id);
+  (tree.props.onBlur as (e: unknown) => void)({ relatedTarget: {}, currentTarget: { contains: () => true } });
+  expect(positionOf(bridge).focused).toBe(item.id);
+  (tree.props.onBlur as (e: unknown) => void)({ relatedTarget: {}, currentTarget: { contains: () => false } });
+  expect(positionOf(bridge).focused).toBeNull();
   key({ ...event("Enter"), metaKey: true });
   key({ ...event("Enter"), target: { ...target, matches: () => false } });
   key(event("Escape"));

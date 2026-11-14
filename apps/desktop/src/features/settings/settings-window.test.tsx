@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { Settings } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
+import { t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { checkForUpdate, loadHotkeys, loadSettings, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
 import { AudioPane } from "./AudioPane";
@@ -144,7 +145,8 @@ describe("panes", () => {
     await vi.waitFor(() => expect(stored()).toMatchObject({ audio: { retention: "days7" }, privacy: { behaviour_metrics: true } }));
     const html = renderToString(<PrivacyPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Local only");
-    expect(html).toContain("In force:");
+    expect(html).toContain("In force: Local only");
+    expect(t("settings.privacy.in_force", { mode: "Local only" })).toBe("In force: Local only");
   });
 
   it("Privacy: Manage on Person Pages is disabled and names the later version; it sends no command", async () => {

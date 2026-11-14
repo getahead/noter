@@ -117,7 +117,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
 
   const body = () => {
     if (state === "pending") return <p className="np-dim">{t("outputs.waiting")}</p>;
-    if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading.toLowerCase() })}</p>;
+    if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading })}</p>;
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
     if (state === "failed")
@@ -202,7 +202,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
       {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-preserve */}
       {section.regenerated_with_edits && state === "ready" && !draft && (
         <div className="pc-sec__notice">
-          {t("outputs.regenerated", { n: edits })} · <button type="button" className="np-link" onClick={() => void compare()}>{comparing ? t("outputs.hide_diff") : t("outputs.show_diff")}</button>
+          {t("outputs.regenerated", { count: edits })} · <button type="button" className="np-link" onClick={() => void compare()}>{comparing ? t("outputs.hide_diff") : t("outputs.show_diff")}</button>
         </div>
       )}
       {state === "ready" && section.kind !== "summary" && section.writer?.runtime === "local" && <div className="pc-sec__notice">{t("outputs.written_local_after_timeout")}</div>}
