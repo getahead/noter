@@ -380,8 +380,8 @@ enum ExportPayload {
         scope: ShareScope,
     },
     Transcript {
+        call_id: CallId,
         base: String,
-        segments: Vec<SegmentView>,
     },
     Audio {
         name: String,
@@ -446,7 +446,11 @@ fn srt(segments: &[SegmentView]) -> String {
         .collect()
 }
 
-fn write_payload(folder: &Path, payload: ExportPayload) -> Result<u32, CoreError> {
+fn write_payload(
+    store: &noter_db::Store,
+    folder: &Path,
+    payload: ExportPayload,
+) -> Result<u32, CoreError> {
     match payload {
         ExportPayload::Markdown {
             name,
@@ -457,7 +461,8 @@ fn write_payload(folder: &Path, payload: ExportPayload) -> Result<u32, CoreError
             std::fs::write(folder.join(name), shared.markdown).map_err(export_io_error)?;
             Ok(1)
         }
-        ExportPayload::Transcript { base, segments } => {
+        ExportPayload::Transcript { call_id, base } => {
+            let segments = store.read(|c| segments_of(c, &call_id, None))?;
             let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
             std::fs::write(folder.join(format!("{base}.srt")), srt(&segments))
                 .map_err(export_io_error)?;
@@ -621,11 +626,12 @@ impl Core {
         // Bounded queue: only one call's content is rendered and written at a time.
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         let destination = folder.clone();
+        let store = self.store_handle();
         let writer = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&destination).map_err(export_io_error)?;
             let mut count = 0;
             while let Some(payload) = rx.blocking_recv() {
-                count += write_payload(&destination, payload)?;
+                count += write_payload(&store, &destination, payload)?;
             }
             Ok::<_, CoreError>(count)
         });
@@ -643,11 +649,9 @@ impl Core {
                     .map_err(|_| internal("the export writer stopped"))?;
                 }
                 if call.transcript {
-                    let id = call.id.clone();
-                    let segments = self.store().read(|c| segments_of(c, &id, None))?;
                     tx.send(ExportPayload::Transcript {
+                        call_id: call.id.clone(),
                         base: call.base.clone(),
-                        segments,
                     })
                     .await
                     .map_err(|_| internal("the export writer stopped"))?;
