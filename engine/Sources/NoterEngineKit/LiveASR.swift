@@ -36,8 +36,8 @@ final class LiveASR: @unchecked Sendable {
     static let rate = 16_000
     /// shortcut: an energy VAD (speech above -50 dBFS per 100 ms); a model VAD comes with live
     /// diarization (FluidAudio) if noisy rooms cut utterances wrong.
-    static let speechDb: Float = -50
-    static let pauseMs = 700
+    static let speechDb = SpeechSegments.speechDb
+    static let pauseMs = SpeechSegments.pauseMs
     /// A hypothesis decodes the whole utterance so far: past 10 s its p95 went over 2 s (Q4 replay).
     static let maxUtteranceMs = 10_000
     static let hypothesisEveryMs = 1_000
@@ -127,7 +127,7 @@ final class LiveASR: @unchecked Sendable {
         var (jobs, facts) = ([Job](), [EngineEvent]())
         lock.withLock {
             // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-vad
-            guard Levels.db(samples) > Self.speechDb else {
+            guard SpeechSegments.isSpeech(samples) else {
                 if var u = open.removeValue(forKey: channel) {
                     u.audio += samples
                     open[channel] = u
@@ -183,24 +183,16 @@ final class LiveASR: @unchecked Sendable {
     static func openTail(_ samples: [Float], fromCallStart: Bool) -> [Float] {
         let (w, n) = (rate / 10, samples.count / (rate / 10))
         let base = samples.count - n * w
-        let speech = (0..<n).map { k in Levels.db(Array(samples[base + k * w..<base + (k + 1) * w])) > speechDb }
-        guard let last = speech.lastIndex(of: true), (n - 1 - last) * 100 < pauseMs else { return [] }
-        var (first, quiet, paused) = (last, 0, false)
-        for k in stride(from: last, through: 0, by: -1) {
-            if speech[k] {
-                (first, quiet) = (k, 0)
-            } else {
-                quiet += 1
-                if quiet * 100 >= pauseMs {
-                    paused = true
-                    break
-                }
-            }
-        }
-        guard paused || fromCallStart else { return [] }
-        let windows = maxUtteranceMs / 100
-        first += (n - first) / windows * windows
-        return first < n ? Array(samples[(base + first * w)...]) : []
+        let ranges = SpeechSegments.utterances(
+            Array(samples[base...]), rate: rate, cuts: [], maxUtteranceMs: maxUtteranceMs)
+        guard let last = ranges.last,
+            last.count < maxUtteranceMs * rate / 1000,
+            samples.count - (base + last.upperBound) < pauseMs * rate / 1000
+        else { return [] }
+        let pauseBeforeTail = (ranges.first?.lowerBound ?? 0) >= pauseMs * rate / 1000
+            || zip(ranges, ranges.dropFirst()).contains { $1.lowerBound - $0.upperBound >= pauseMs * rate / 1000 }
+        guard fromCallStart || pauseBeforeTail else { return [] }
+        return Array(samples[(base + last.lowerBound)...])
     }
 
     /// Ends the utterance of `channel` (caller holds the lock).

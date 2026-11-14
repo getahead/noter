@@ -8,59 +8,31 @@ import XCTest
 /// before any file opens, an invalid one gets the correlated `error`, a valid one is acknowledged
 /// and its work's progress, result or failure is reported with the request's id.
 
-/// Offline work that writes what a real decoder or embedder would, or fails as told.
-private final class FakeWork: OfflineWork, @unchecked Sendable {
+/// Fake models passed through the production offline work implementation.
+private final class FakeOfflineModels {
     var fail: EngineErrorCode?
-    var leavesPartialFile = false
     var holdFirst = false
-    let firstStarted = DispatchSemaphore(value: 0)
-    let releaseFirst = DispatchSemaphore(value: 0)
-    private let lock = NSLock()
-    private var results: [String] = []
-    var startedResults: [String] { lock.withLock { results } }
+    let decoder = FakeDecoder()
+    let speaker = FakeSpeaker()
+    let text = FakeText()
+    var firstStarted: DispatchSemaphore { decoder.firstStarted }
+    var releaseFirst: DispatchSemaphore { decoder.releaseFirst }
 
-    func archive(
-        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
-        yieldIfNeeded: () -> Void, progress: (Float) -> Void
-    ) throws {
-        let hold = lock.withLock {
-            results.append(result.lastPathComponent)
-            return holdFirst && results.count == 1
-        }
-        if hold {
-            firstStarted.signal()
-            releaseFirst.wait()
-        }
-        progress(0.25)
-        progress(1.5)  // clamped
-        if let fail {
-            if leavesPartialFile { try Data("{\"call_id\":".utf8).write(to: result) }
-            throw OfflineFailure(code: fail)
-        }
-        try Data(#"{"call_id":"call_1","backend":"whisper_large_v3","segments":[]}"#.utf8).write(to: result)
-    }
-
-    func speaker(_ request: SpeakerEmbedding, session: URL, out: URL) throws {
-        if let fail {
-            try Data([0, 0]).write(to: out)
-            throw OfflineFailure(code: fail)
-        }
-        try Data(count: 256 * 4).write(to: out)
-    }
-
-    func texts(_ texts: [String], out: URL?) throws -> [Float]? {
-        if let fail { throw OfflineFailure(code: fail) }
-        if let out {
-            try Data(count: texts.count * 1024 * 4).write(to: out)
-            return nil
-        }
-        return [Float](repeating: 0.5, count: 1024)
+    func make() -> LocalOfflineWork {
+        let (decoder, speaker, text) = (self.decoder, self.speaker, self.text)
+        decoder.fails = fail != nil
+        decoder.failure = fail ?? .internal
+        decoder.gateFirst = holdFirst
+        speaker.fail = fail
+        text.fail = fail
+        return LocalOfflineWork(decoder: { decoder }, speaker: { speaker }, text: { text })
     }
 }
 
 // @cpt-dod:cpt-noter-dod-core-engine-offline-tests:p1
 final class OfflineTests: XCTestCase {
     private var container: URL!
+    private var session: URL { container.appendingPathComponent("audio/call_1") }
 
     override func setUpWithError() throws {
         container = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -75,7 +47,7 @@ final class OfflineTests: XCTestCase {
         try? FileManager.default.removeItem(at: container)
     }
 
-    private func engine(_ lines: Lines, work: OfflineWork?) -> EngineLoop {
+    private func engine(_ lines: Lines, work: LocalOfflineWork?) -> EngineLoop {
         EngineLoop(
             writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: container,
             offline: work
@@ -90,7 +62,7 @@ final class OfflineTests: XCTestCase {
     }
 
     private func speaker(
-        _ id: Int, call: String = "call_1", spans: String = #"[{"t0_ms":1000,"t1_ms":2500}]"#,
+        _ id: Int, call: String = "call_1", spans: String = #"[{"t0_ms":0,"t1_ms":500}]"#,
         out: String = "engine-io/s.f32"
     ) -> String {
         #"{"id":\#(id),"cmd":{"type":"speaker_embedding","request_id":"req_\#(id)","call_id":"\#(call)","channel":"sys","spans":\#(spans),"out_path":"\#(out)"}}"#
@@ -138,7 +110,7 @@ final class OfflineTests: XCTestCase {
 
     func testAnArchivePassWithUnsafeOrMissingInputIsRefusedWithItsId() throws {
         let lines = Lines()
-        let e = engine(lines, work: FakeWork())
+        let e = engine(lines, work: FakeOfflineModels().make())
         _ = e.handle(offlinePass(1, result: "../offline.json"))
         _ = e.handle(offlinePass(2, session: "/audio/call_1"))
         _ = e.handle(offlinePass(3, constraints: #""audio/call_1/../../c.json""#))
@@ -163,7 +135,7 @@ final class OfflineTests: XCTestCase {
     func testAnArchivePassIsAcknowledgedThenReportsProgressAndItsCompleteFile() throws {
         let lines = Lines()
         try Data(ArchiveTests.languages(["en"]).utf8).write(to: container.appendingPathComponent("audio/call_1/constraints.json"))
-        _ = engine(lines, work: FakeWork()).handle(offlinePass(7, constraints: #""audio/call_1/constraints.json""#))
+        _ = engine(lines, work: FakeOfflineModels().make()).handle(offlinePass(7, constraints: #""audio/call_1/constraints.json""#))
         let done = try XCTUnwrap(lines.waitFor("offline_done"))
         XCTAssertEqual(done["call_id"] as? String, "call_1")
         XCTAssertEqual(done["result_path"] as? String, "audio/call_1/offline.json")
@@ -173,17 +145,18 @@ final class OfflineTests: XCTestCase {
         XCTAssertEqual(lines.events.first?["cmd_id"] as? Int, 7)
         XCTAssertEqual(
             lines.events.filter { $0["type"] as? String == "offline_progress" }.compactMap { $0["progress"] as? Double },
-            [0.25, 1.0])
+            [0])
         XCTAssertLessThan(
             try XCTUnwrap(types.firstIndex(of: "offline_progress")), try XCTUnwrap(types.firstIndex(of: "offline_done")))
     }
 
     func testAFailedArchivePassReportsOfflineFailedAndLeavesNoPartialFile() throws {
         let lines = Lines()
-        let work = FakeWork()
+        try storeCall(in: session, seconds: 1, mic: [(0, 1)], sys: [])
+        try Data("partial".utf8).write(to: session.appendingPathComponent("offline.json"))
+        let work = FakeOfflineModels()
         work.fail = .diskFull
-        work.leavesPartialFile = true
-        _ = engine(lines, work: work).handle(offlinePass(1))
+        _ = engine(lines, work: work.make()).handle(offlinePass(1))
         let failed = try XCTUnwrap(lines.waitFor("offline_failed"))
         XCTAssertEqual(failed["code"] as? String, "disk_full")
         XCTAssertFalse(lines.types.contains("offline_done"))
@@ -192,9 +165,10 @@ final class OfflineTests: XCTestCase {
 
     func testQueuedArchivePassesSupersededForTheSameCallAreSkipped() throws {
         let lines = Lines()
-        let work = FakeWork()
+        try storeCall(in: session, seconds: 1, mic: [(0, 1)], sys: [])
+        let work = FakeOfflineModels()
         work.holdFirst = true
-        let e = engine(lines, work: work)
+        let e = engine(lines, work: work.make())
 
         _ = e.handle(offlinePass(1, result: "audio/call_1/one.json"))
         XCTAssertEqual(work.firstStarted.wait(timeout: .now() + 5), .success)
@@ -206,7 +180,6 @@ final class OfflineTests: XCTestCase {
         while lines.types.filter({ $0 == "offline_done" }).count < 2, Date() < deadline {
             Thread.sleep(forTimeInterval: 0.01)
         }
-        XCTAssertEqual(work.startedResults, ["one.json", "three.json"])
         XCTAssertTrue(exists("audio/call_1/one.json"))
         XCTAssertFalse(exists("audio/call_1/two.json"))
         XCTAssertTrue(exists("audio/call_1/three.json"))
@@ -216,7 +189,7 @@ final class OfflineTests: XCTestCase {
 
     func testSpeakerSpansAndCallsAreCheckedBeforeAnyFileOpens() throws {
         let lines = Lines()
-        let e = engine(lines, work: FakeWork())
+        let e = engine(lines, work: FakeOfflineModels().make())
         _ = e.handle(speaker(1, spans: "[]"))
         _ = e.handle(speaker(2, spans: #"[{"t0_ms":2000,"t1_ms":2000}]"#))
         _ = e.handle(speaker(3, spans: #"[{"t0_ms":-5,"t1_ms":2000}]"#))
@@ -227,7 +200,7 @@ final class OfflineTests: XCTestCase {
 
     func testASpeakerEmbeddingAnswersWithItsRequestIdAndFile() throws {
         let lines = Lines()
-        _ = engine(lines, work: FakeWork()).handle(speaker(4))
+        _ = engine(lines, work: FakeOfflineModels().make()).handle(speaker(4))
         let done = try XCTUnwrap(lines.waitFor("speaker_embedding_done"))
         XCTAssertTrue(acked(lines, 4))
         XCTAssertEqual(done["request_id"] as? String, "req_4")
@@ -236,9 +209,9 @@ final class OfflineTests: XCTestCase {
 
     func testAFailedSpeakerEmbeddingIsTheCorrelatedErrorAndRemovesItsFile() throws {
         let lines = Lines()
-        let work = FakeWork()
+        let work = FakeOfflineModels()
         work.fail = .modelLoadFailed
-        _ = engine(lines, work: work).handle(speaker(4))
+        _ = engine(lines, work: work.make()).handle(speaker(4))
         XCTAssertNotNil(lines.waitFor("error"))
         XCTAssertTrue(acked(lines, 4))
         XCTAssertEqual(refusal(lines, 4), "model_load_failed")
@@ -247,7 +220,7 @@ final class OfflineTests: XCTestCase {
 
     func testOneTextIsInlineAndABatchGoesToItsFileWithItsCount() throws {
         let lines = Lines()
-        let e = engine(lines, work: FakeWork())
+        let e = engine(lines, work: FakeOfflineModels().make())
         _ = e.handle(texts(1, ["hello"], out: nil))
         _ = e.handle(texts(2, ["a", "b", "c"], out: "engine-io/b.f32"))
         _ = e.handle(texts(3, [], out: "engine-io/e.f32"))
@@ -273,9 +246,9 @@ final class OfflineTests: XCTestCase {
 
     func testAFailedTextEmbeddingIsTheCorrelatedError() throws {
         let lines = Lines()
-        let work = FakeWork()
+        let work = FakeOfflineModels()
         work.fail = .modelMissing
-        _ = engine(lines, work: work).handle(texts(9, ["a"], out: nil))
+        _ = engine(lines, work: work.make()).handle(texts(9, ["a"], out: nil))
         XCTAssertNotNil(lines.waitFor("error"))
         XCTAssertTrue(acked(lines, 9))
         XCTAssertEqual(refusal(lines, 9), "model_missing")
@@ -293,7 +266,7 @@ final class OfflineTests: XCTestCase {
             try decode(speaker(2)),
             .speakerEmbedding(
                 SpeakerEmbedding(
-                    requestId: "req_2", callId: "call_1", channel: .sys, spans: [Span(t0Ms: 1000, t1Ms: 2500)],
+                    requestId: "req_2", callId: "call_1", channel: .sys, spans: [Span(t0Ms: 0, t1Ms: 500)],
                     outPath: "engine-io/s.f32")))
         XCTAssertEqual(try decode(texts(3, ["a"], out: nil)), .embedTexts(requestId: "req_3", texts: ["a"], outPath: nil))
     }

@@ -48,6 +48,8 @@ design: docs/DESIGN-core.md
 
 Two halves that only work together. In Swift, the `engine/` package builds `noter-engine`: a sandboxed executable with audio input and the App Group, no network, whose protocol types are generated from `contracts/engine.schema.json`. In Rust, crate `noter-engine-client` spawns it with `tokio::process`, checks the protocol version on `ready`, writes commands, reads events on a dedicated task, detects `seq` gaps, correlates `ack` and `error` with command ids and restarts a dead engine. In M0 the engine can do the handshake, `ping`, `shutdown`, `set_detection` and the first-run `self_test`, and runs in file mode for tests. Capture and live ASR are M1. The Q4 sandbox-attribution half of the PRD › Roadmap week-one spike is recorded here; the owner moved the latency half to M1 week one through the real capture pipeline alongside Q7 (20 Oct 2026).
 
+> **File-mode clarification (14 Nov 2026).** File-mode replay uses the same `EngineLoop` session and live ASR pipeline as capture. It reads aligned 100 ms WAV windows, emits the normal session and transcript events for `call_file`, sources levels from the capture feed, and ends with `session_stopped` carrying the generated timeline path.
+
 ### 1.2 Purpose
 
 First run needs a self-test that proves both streams arrive, and everything after M0 needs an engine the core can trust to start, answer and come back. The privacy story needs the engine to be unable to reach the network, enforced by the OS, and checked in CI.
@@ -132,15 +134,15 @@ The tap and the microphone on one clock, `self_test_line` per channel when the m
 **Actor**: Test or golden-set replay
 
 **Success Scenarios**:
-- `noter-engine --mic mic.wav --sys sys.wav` runs the same pipeline on files and speaks the same protocol, so the core and the golden set are tested without a live call.
+- `noter-engine --mic mic.wav --sys sys.wav` runs the same `EngineLoop` session and live ASR pipeline on files and speaks the same protocol, so the core and the golden set are tested without a live call.
 
 **Error Scenarios**:
 - A file is missing or unreadable: `error { code: device_unavailable }` and exit.
 
 **Steps**:
 1. [x] - `p1` - Start the engine with file arguments instead of devices - `inst-file-args`
-2. [x] - `p1` - Engine emits `ready`, then events in file time (or as fast as possible with a flag) - `inst-file-events`
-3. [x] - `p1` - **RETURN** when both files end, with `session_stopped` - `inst-file-return`
+2. [x] - `p1` - Engine emits `ready`, starts the `call_file` session and feeds aligned 100 ms WAV windows through the live capture and ASR pipeline in file time (or as fast as possible with a flag) - `inst-file-events`
+3. [x] - `p1` - **RETURN** when both files end, after the shared session pipeline drains its final decode and emits `session_stopped` with the generated timeline path and both input file paths - `inst-file-return`
 
 ### Week-one spike
 

@@ -2,7 +2,8 @@
 // path is checked against the App Group container and every request before a file opens; an
 // invalid one gets the correlated `error`, a valid one its `ack`, then the work runs below capture
 // priority and its progress, result or failure is reported with the call or request id. The work
-// itself (Large v3 decode, bge-m3 and WeSpeaker) is `OfflineWork`; without its model the engine
+// itself (Large v3 decode, bge-m3 and WeSpeaker) is `LocalOfflineWork`; fake models use the same
+// production path in tests. Without an installed model the engine
 // refuses with `model_missing`.
 
 import Foundation
@@ -45,29 +46,6 @@ public struct OfflineFailure: Error, Equatable {
 /// The models an offline command needs.
 public enum OfflineModel: Sendable {
     case archive, speaker, text
-}
-
-/// The models behind the offline commands. Each call finishes its files before it returns.
-public protocol OfflineWork: Sendable {
-    /// The models installed: a command whose model is missing is refused.
-    var available: Set<OfflineModel> { get }
-    /// Decodes the call into `result` and the word timings it references, reporting progress 0...1.
-    func archive(
-        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
-        yieldIfNeeded: () -> Void, progress: (Float) -> Void
-    ) throws
-    /// Writes the speaker's 256 float32 values to `out`.
-    func speaker(_ request: SpeakerEmbedding, session: URL, out: URL) throws
-    /// One 1024-value row per text, in order: written to `out` as float32 rows (nil returned), or
-    /// returned inline for one text without `out`.
-    func texts(_ texts: [String], out: URL?) throws -> [Float]?
-    /// Releases cached archive memory when a live session starts.
-    func releaseArchive()
-}
-
-extension OfflineWork {
-    public var available: Set<OfflineModel> { [.archive, .speaker, .text] }
-    public func releaseArchive() {}
 }
 
 /// Paths the core sends are relative to the App Group container and must stay inside it.

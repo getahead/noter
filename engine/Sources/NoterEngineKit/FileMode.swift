@@ -35,52 +35,40 @@ public enum Arguments: Equatable {
 // @cpt-flow:cpt-noter-flow-core-engine-foundation-file-mode:p2
 public struct FileMode {
     public static let callId = "call_file"
-    let mic: URL
-    let sys: URL
-    let realtime: Bool
 
-    public init(mic: URL, sys: URL, realtime: Bool) {
-        self.mic = mic
-        self.sys = sys
-        self.realtime = realtime
-    }
+    public init() {}
 
-    /// Replays the pair and returns the exit code: `ready`, levels in file time (or as fast as
-    /// possible), then `session_stopped`; a file that cannot be read is `device_unavailable`.
-    /// `afterReady` runs once `ready` is out (the caller starts answering commands then).
-    /// `models` are the installed model folders, as in live mode, so a self-test over the
-    /// replayed files is judged the same way.
+    /// Replays the pair through the same engine session used by live capture.
     public func run(
-        writer: EventWriter, engineVersion: String, sandboxed: Bool = false, models: [String] = [],
+        writer: EventWriter, engine: EngineLoop, audio: FileAudioSource,
         afterReady: () -> Void = {}
     ) -> Int32 {
-        let audio = FileAudioSource(mic: mic, sys: sys, realtime: realtime)
+        let sessionDir = "engine-io/file-mode-\(UUID().uuidString)"
         do {
             try audio.validate()
         } catch {
             writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "\(error)"))
             return 1
         }
-        // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
-        writer.emit(
-            .ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models, sandboxed: sandboxed))
+        engine.start()
         afterReady()
-        var micDb: Float = -160
         do {
-            _ = try audio.play { chunk in
-                if chunk.channel == .mic {
-                    micDb = Levels.db(chunk.samples)
-                } else {
-                    writer.emit(.levels(callId: FileMode.callId, micDb: micDb, sysDb: Levels.db(chunk.samples)))
-                }
+            // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
+            let command = #"{"id":1,"cmd":{"type":"start_session","call_id":"call_file","session_dir":"\#(sessionDir)","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":{"array":[]},"backend":"whisper_turbo","glossary":{"array":[]},"speaker_priors":{"object":{}},"enrolled_embeddings_path":null,"resume_from_ms":null}}"#
+            guard engine.handle(command), engine.isCapturing else {
+                return 1
             }
+            try audio.waitUntilFinished()
+            // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
         } catch {
+            _ = engine.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_file"}}"#)
+            engine.flushStops()
             writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "\(error)"))
             return 1
         }
-        // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return
-        writer.emit(.sessionStopped(callId: FileMode.callId, timelinePath: "", micPath: mic.path, sysPath: sys.path))
+        _ = engine.handle(#"{"id":2,"cmd":{"type":"stop","call_id":"call_file"}}"#)
+        engine.flushStops()
         return 0
         // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return
     }

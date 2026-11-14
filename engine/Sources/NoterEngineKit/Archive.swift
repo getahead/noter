@@ -233,28 +233,7 @@ enum Archive {
     /// Speech cut into utterances: 100 ms windows above the live VAD's level, ended by a pause,
     /// a gap in the call (`cuts`, sample indexes) or 30 s.
     static func utterances(_ samples: [Float], cuts: [Int]) -> [Range<Int>] {
-        let (window, pause, longest) = (rate / 10, LiveASR.pauseMs * rate / 1000, maxUtteranceMs * rate / 1000)
-        let bounds = [0] + cuts.filter { $0 > 0 && $0 < samples.count }.sorted() + [samples.count]
-        var out: [Range<Int>] = []
-        for (from, to) in zip(bounds, bounds.dropFirst()) where to > from {
-            var (start, end): (Int?, Int) = (nil, from)
-            for at in stride(from: from, to: to, by: window) {
-                let next = min(at + window, to)
-                if Levels.db(Array(samples[at..<next])) > LiveASR.speechDb {
-                    let s = start ?? at
-                    (start, end) = (s, next)
-                    if end - s >= longest {
-                        out.append(s..<end)
-                        start = nil
-                    }
-                } else if let s = start, next - end >= pause {
-                    out.append(s..<end)
-                    start = nil
-                }
-            }
-            if let s = start { out.append(s..<end) }
-        }
-        return out
+        SpeechSegments.utterances(samples, rate: rate, cuts: cuts, maxUtteranceMs: maxUtteranceMs)
     }
 
     /// The languages an utterance may be in, the likeliest first: the channel's last one, then the

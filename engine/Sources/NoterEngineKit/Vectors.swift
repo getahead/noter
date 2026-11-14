@@ -89,7 +89,7 @@ private final class Loaded<T>: @unchecked Sendable {
 // @cpt-dod:cpt-noter-dod-core-engine-offline-embeddings:p1
 /// The offline commands on the installed models. Archive models stay loaded between passes and
 /// are released when capture starts; the embedding models stay loaded.
-public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
+public final class LocalOfflineWork: @unchecked Sendable {
     private let decoder: Loaded<ArchiveDecoder>?
     private let speakerModel: Loaded<SpeakerModel>?
     private let textModel: Loaded<TextModel>?

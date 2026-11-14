@@ -10,9 +10,11 @@ import XCTest
 /// A speaker model that answers `vector` and records the audio it was given.
 final class FakeSpeaker: SpeakerModel, @unchecked Sendable {
     var vector = [Float](repeating: 0.25, count: 256)
+    var fail: EngineErrorCode?
     private(set) var heard: [Float] = []
 
     func embed(_ samples: [Float]) throws -> [Float] {
+        if let fail { throw OfflineFailure(code: fail) }
         heard = samples
         return vector
     }
@@ -22,9 +24,11 @@ final class FakeSpeaker: SpeakerModel, @unchecked Sendable {
 final class FakeText: TextModel, @unchecked Sendable {
     var dims = 1024
     var broken: Set<String> = []
+    var fail: EngineErrorCode?
 
     func embed(_ text: String) throws -> [Float] {
-        [Float](repeating: broken.contains(text) ? .nan : Float(text.count), count: dims)
+        if let fail { throw OfflineFailure(code: fail) }
+        return [Float](repeating: broken.contains(text) ? .nan : Float(text.count), count: dims)
     }
 }
 
@@ -53,6 +57,11 @@ final class VectorTests: XCTestCase {
     }
 
     // MARK: speaker
+
+    func testProductionSpeakerFrameWeightsMapModelFramesToSpeakingFrames() {
+        XCTAssertEqual(CoreMLSpeakerModel.weights([true, false], frames: 4), [1, 1, 0, 0])
+        XCTAssertEqual(CoreMLSpeakerModel.weights([], frames: 4), [0, 0, 0, 0])
+    }
 
     func testASpeakerVectorHearsOnlyItsChannelAndSpansInCallTime() throws {
         // The mic is quiet, the system channel loud; the call paused 2.5-12.5 s.

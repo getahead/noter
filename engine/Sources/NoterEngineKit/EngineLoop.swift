@@ -22,7 +22,7 @@ public final class EngineLoop: @unchecked Sendable {
     private let stops = DispatchQueue(label: "ai.noter.engine.stop")
     private let processes: @Sendable () -> [ProcessAudio]
     /// The offline models (archive decode, embeddings); nil refuses offline commands.
-    let offline: OfflineWork?
+    let offline: LocalOfflineWork?
     /// Below the live transcript and capture: archive work never delays a session.
     let offlineQueue = DispatchQueue(label: "ai.noter.engine.offline", qos: .utility)
     /// The archive pass on its own: it waits out a captured call, embeddings do not wait for it.
@@ -54,7 +54,7 @@ public final class EngineLoop: @unchecked Sendable {
         player: Player = FilePlayer(),
         processes: @escaping @Sendable () -> [ProcessAudio] = { [] },
         transcriber: (() throws -> Transcriber)? = nil,
-        offline: OfflineWork? = nil,
+        offline: LocalOfflineWork? = nil,
         source: @escaping (StartSession?) -> AudioSource?
     ) {
         self.writer = writer
@@ -167,8 +167,11 @@ public final class EngineLoop: @unchecked Sendable {
             guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
             guard let audio = source(start) else { throw LiveAudioSource.Failure(description: "no audio source") }
+            let fileModeRing = (audio is FileAudioSource)
+                ? ContainerPath.resolve(start.sessionDir, in: container)?.appendingPathComponent(CaptureRing.fileName) : nil
             let capture = try CaptureSession(
-                start: start, container: container, writer: writer, now: now, encoder: encoder, asrQueue: asrQueue)
+                start: start, container: container, writer: writer, now: now, encoder: encoder, asrQueue: asrQueue,
+                fileModeRing: fileModeRing)
             audio.observeDevices { capture.deviceChanged($0) }
             try audio.start { capture.feed($0) }
             // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
@@ -231,11 +234,17 @@ public final class EngineLoop: @unchecked Sendable {
             self.session = nil
             // The last words (after a model still loading) and the files can take seconds to
             // finish: off the command thread, so `ping` is still answered meanwhile.
-            let (capture, writer) = (session.capture, self.writer)
+            let (capture, writer, inputPaths) = (session.capture, self.writer, (session.audio as? FileAudioSource)?.inputPaths)
             stops.async {
                 capture.asr.finish()
                 // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-return-session
-                writer.emit(capture.stop())
+                let stopped = capture.stop()
+                if let inputPaths, case let .sessionStopped(callId, timelinePath, _, _) = stopped {
+                    writer.emit(.sessionStopped(
+                        callId: callId, timelinePath: timelinePath, micPath: inputPaths.mic, sysPath: inputPaths.sys))
+                } else {
+                    writer.emit(stopped)
+                }
                 // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-return-session
             }
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
