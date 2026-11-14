@@ -672,7 +672,7 @@ Every model call has to pick a runtime by task, privacy and availability, honour
 
 ##### Responsibility scope
 
-Crate `noter-llm`, which also holds the egress gate (`cpt-noter-component-core-privacy`). One `LlmRuntime` interface (`cpt-noter-interface-llm-runtime`) with adapters for Claude Code (API key or own account), Codex (API key or own account) and Ollama. Applies the routing policy table of the PRD, the agent registry and the per-task runtime settings; checks CLI versions at startup; keeps warm streaming sessions for live ticks and resets them every 15 ticks; validates output against the skill schema, retries once with the failure explained, then falls back to the simpler schema; logs every run in `llm_runs`, with cost for API-key runs. Every request passes the egress gate first.
+Crate `noter-llm`, which also holds the egress gate (`cpt-noter-component-core-privacy`). One `Llm` router API (`cpt-noter-interface-llm-runtime`) dispatches to adapters for Claude Code (API key or own account), Codex (API key or own account) and Ollama. The router applies the routing policy table of the PRD, the agent registry and the per-task runtime settings; checks CLI versions at startup; keeps warm streaming sessions for live ticks and resets them every 15 ticks; validates output against the skill schema, retries once with the failure explained, then falls back to the simpler schema; logs every run in `llm_runs`, with cost for API-key runs. Every request passes the egress gate first.
 
 Spawns every run in an empty Noter-owned working directory and locks it down, own-account runs included (`--bare` cannot use a subscription login):
 
@@ -1439,20 +1439,20 @@ Lines: `EngineCommandLine { id, cmd }` from the core, `EngineEventLine { seq, at
 | Schema | `ask-answer` | `AskAnswerOutput`: answer with [n] markers and citations; `found: false` instead of a guess | stable |
 | Schema | `reconcile` | `ReconcileJudgementOutput`: yes, no or unsure with evidence, for low-confidence jobs | stable |
 
-#### LLM runtime interface (internal)
+#### LLM router API (internal)
 
 - [ ] `p2` - **ID**: `cpt-noter-interface-llm-runtime`
 
 - **Contracts**: PRD › LLM orchestration › Adapters
-- **Technology**: Rust trait inside `noter-llm`
+- **Technology**: Inherent Rust methods on `Llm` inside `noter-llm`; provider polymorphism stays behind the private `RuntimeAdapter` trait
 - **Location**: planned `crates/noter-llm/src/runtime.rs`
 
 | Method | Path | Description | Stability |
 |--------|------|-------------|-----------|
-| Trait method | `availability` | Per runtime choice: available, reason, models | unstable |
-| Trait method | `run_once` | Skill, packet, schema, effort, budget cap, tools allowed → validated JSON, usage, cost, session id | unstable |
-| Trait method | `open_session`, `send_turn`, `close_session` | Warm streaming session for live ticks; reset after 15 turns | unstable |
-| Trait method | `resume` | Follow-up in a recorded session (post-call questions) | unstable |
+| Method | `availability` | Per runtime choice: available, reason, models | unstable |
+| Method | `run_once` | Skill, packet, schema, effort, budget cap, tools allowed → validated JSON, usage, cost, session id | unstable |
+| Method | `open_session`, `send_turn`, `close_session` | Warm streaming session for live ticks; reset after 15 turns | unstable |
+| Method | `resume` | Follow-up in a recorded session (post-call questions) | unstable |
 
 ### 3.4 Internal Dependencies
 

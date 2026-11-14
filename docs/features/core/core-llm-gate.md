@@ -107,7 +107,7 @@ Post-call and handoff can call a model without creating another path for user te
 - Audit persistence fails: no cloud packet is released.
 
 **Steps**:
-1. [x] - `p1` - Receive the skill, version, input packet, output schema, task settings, budget and cancellation handle through `LlmRuntime` - `inst-run-input`
+1. [x] - `p1` - Receive the skill, version, input packet, output schema, task settings, budget and cancellation handle through the inherent `Llm` router methods - `inst-run-input`
 2. [x] - `p1` - Read runtime availability, privacy mode, call sensitivity and source classes; select with `cpt-noter-algo-core-llm-gate-route` - `inst-run-route`
 3. [x] - `p1` - Allocate an `llm_run_id`, record runtime, task, skill version and prompt hash in `llm_runs`; never store the packet in operational logs - `inst-run-record`
 4. [x] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
