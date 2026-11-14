@@ -14,7 +14,7 @@ use noter_protocol::*;
 use serde_json::json;
 
 use crate::settings::invalid;
-use crate::transcript::segments_of;
+use crate::transcript::segments_by_id;
 use crate::{internal, object, Core};
 
 /// Change rows with these reasons (people and topic merges too) are one action: the `change_id`
@@ -501,9 +501,9 @@ impl Core {
         let wanted = args.segment_id.clone();
         let segment = self
             .store()
-            .read(move |c| segments_of(c, &call, None))?
+            .read(move |c| segments_by_id(c, &call, std::slice::from_ref(&wanted)))?
             .into_iter()
-            .find(|s| s.id == wanted)
+            .next()
             .ok_or_else(|| not_found("segment"))?;
         // @cpt-end:cpt-noter-flow-core-speakers-audio-term:p1:inst-term-publish
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-term:p1:inst-term-reconcile
@@ -571,15 +571,12 @@ impl Core {
         changed: &[SegmentId],
     ) -> Result<Vec<SpeakerView>, CoreError> {
         let id = call_id.as_str().to_string();
+        let changed = changed.to_vec();
         let (speakers, segments) = self.store().read(move |c| {
-            let all = segments_of(c, &CallId::new(&id), None)?;
-            Ok((crate::library::speakers_of(c, &id)?, all))
+            let segments = segments_by_id(c, &CallId::new(&id), &changed)?;
+            Ok((crate::library::speakers_of(c, &id)?, segments))
         })?;
         self.refresh_live_speakers(call_id, &speakers);
-        let segments: Vec<SegmentView> = segments
-            .into_iter()
-            .filter(|s| changed.contains(&s.id))
-            .collect();
         let files = self
             .write_transcript_file(call_id)
             .and_then(|()| self.write_constraints_file(call_id));

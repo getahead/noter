@@ -281,6 +281,8 @@ The system **MUST** ship the signed Rust binary as a stdio child, serve protocol
 
 The system **MUST** answer reads from shared retrieval and item/person services, preserve evidence ids, return empty screen chips in v1 and enforce source policy on every nested read. Cloud tool results pass the run's redaction map and commit a tool_result audit row before release. Failed audit writes return no body. Read-only services use the core's read pool; the binary never joins records itself.
 
+Item reads apply the caller's query, ordering and limit in SQL before assembling evidence or span text; transcript spans constrain the SQL read to overlapping rows.
+
 **Implements**:
 - `cpt-noter-flow-core-mcp-read`
 - `cpt-noter-algo-core-mcp-release-result`

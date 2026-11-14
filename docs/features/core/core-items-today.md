@@ -178,6 +178,8 @@ The user can review what a call produced, check the words behind an item, tick w
 - Whole call, one section or selected items copy in the chosen format with owners, dates and review labels; export writes a folder containing the requested content.
 - A sensitive call may be explicitly copied, with `sensitive` reported to the UI.
 
+For multi-call export, retain only each call id, output name and requested content kind until the save panel is accepted. Render and write one call at a time on a blocking worker so the async runtime and memory use do not scale with all selected transcripts.
+
 **Error Scenarios**:
 - Unwritten outputs: `outputs_not_ready`; suggested items excluded by the request's review guard: `unreviewed_in_scope`; cancelled panel: `cancelled`.
 
@@ -234,6 +236,8 @@ The user can review what a call produced, check the words behind an item, tick w
 **Input**: Known attendees, upcoming or live call, Today settings and current item/call rows.
 
 **Output**: Ranked open work, questions and awaiting handoffs with source-call references.
+
+Assemble complete item list views with batched owner, carried-call and span reads; preserve every matching row and its existing order.
 
 **Steps**:
 1. [x] - `p1` - Resolve known participants through `people` rows joined by the speaker's `person_id` and match the attendee against display names or aliases; never match an attendee against the engine `speakers.label`; read the last two calls with the same people - `inst-carry-match`

@@ -296,6 +296,8 @@ The system **MUST** answer `transcript_subscribe` with a snapshot and `last_seq`
 
 The system **MUST** answer `transcript_span` from the call's current pass and write `transcript.jsonl` atomically at call end.
 
+When a span is requested, filter overlapping segments in SQL so unrelated rows are not materialized before the response is built.
+
 **Implements**:
 - `cpt-noter-flow-core-live-transcript-span`
 - `cpt-noter-algo-core-live-transcript-file`

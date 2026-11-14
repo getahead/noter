@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use chacha20poly1305::aead::{Aead, Generate, KeyInit};
 use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
-use noter_db::rusqlite::{params, Connection, OptionalExtension};
+use noter_db::rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use noter_protocol::engine::EngineSpan;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::CommandCtx;
@@ -676,27 +676,37 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-people-profile-match:p1:inst-match-return
     }
 
-    /// The suggestion for an unnamed speaker: the best profile at or above the threshold.
-    pub(crate) fn suggest_for(&self, speaker: &str) -> Option<PersonChip> {
-        let now = self.deps.clock.now().0;
-        let id = speaker.to_string();
-        let (blob, profiles) = rd(self.store(), move |c| {
-            let blob: Option<Vec<u8>> = c
-                .query_row("SELECT centroid FROM speakers WHERE id = ?1", [&id], |r| {
-                    r.get(0)
-                })
-                .optional()
-                .map_err(internal)?
-                .flatten();
-            Ok((blob, live_profiles(c, now).map_err(internal)?))
-        })
-        .ok()?;
-        let blob = blob?;
-        if profiles.is_empty() {
-            return None;
+    /// Suggestions for an unnamed queue, with one profile/key load for the whole request.
+    pub(crate) fn suggestions_for(&self, speakers: &[String]) -> Vec<Option<PersonChip>> {
+        if speakers.is_empty() {
+            return vec![];
         }
-        let key = self.voice_key(false).ok().flatten()?;
-        let mut mine = Self::open_blob(&key, &blob)?;
+        let now = self.deps.clock.now().0;
+        let ids = speakers.to_vec();
+        let (blobs, profiles) = match rd(self.store(), move |c| {
+            let marks = crate::util::marks(ids.len());
+            let blobs = c
+                .prepare(&format!(
+                    "SELECT id, centroid FROM speakers WHERE id IN ({marks})"
+                ))
+                .map_err(internal)?
+                .query_map(params_from_iter(ids.iter()), |r| {
+                    Ok((r.get::<_, String>(0)?, r.get::<_, Option<Vec<u8>>>(1)?))
+                })
+                .map_err(internal)?
+                .collect::<Result<HashMap<_, _>, _>>()
+                .map_err(internal)?;
+            Ok((blobs, live_profiles(c, now).map_err(internal)?))
+        }) {
+            Ok(data) => data,
+            Err(_) => return vec![None; speakers.len()],
+        };
+        if profiles.is_empty() {
+            return vec![None; speakers.len()];
+        }
+        let Some(key) = self.voice_key(false).ok().flatten() else {
+            return vec![None; speakers.len()];
+        };
         let mut vectors = Wiped(Vec::new());
         let mut owners = Vec::new();
         for row in &profiles {
@@ -705,19 +715,41 @@ impl Core {
                 owners.push(&row.person);
             }
         }
-        let best = vectors
-            .0
+        let mut matches = HashMap::new();
+        for (speaker, blob) in blobs {
+            let best = blob
+                .as_deref()
+                .and_then(|blob| Self::open_blob(&key, blob))
+                .and_then(|mut mine| {
+                    let best = vectors
+                        .0
+                        .iter()
+                        .zip(&owners)
+                        .map(|(v, p)| (cosine(&mine, v), *p))
+                        .filter(|(score, _)| *score >= THRESHOLD)
+                        .max_by(|a, b| a.0.total_cmp(&b.0))
+                        .map(|(_, person)| person.clone());
+                    mine.fill(0.0);
+                    best
+                });
+            matches.insert(speaker, best);
+        }
+        let people: std::collections::BTreeSet<String> =
+            matches.values().filter_map(Clone::clone).collect();
+        let chips = self
+            .store()
+            .read(|c| crate::people::chips_of(c, &people))
+            .unwrap_or_default();
+        speakers
             .iter()
-            .zip(owners)
-            .map(|(v, p)| (cosine(&mine, v), p))
-            .filter(|(c, _)| *c >= THRESHOLD)
-            .max_by(|a, b| a.0.total_cmp(&b.0));
-        mine.fill(0.0);
-        let person = best?.1.clone();
-        self.store()
-            .read(move |c| crate::people::chip_of(c, &person))
-            .ok()
-            .flatten()
+            .map(|speaker| {
+                matches
+                    .get(speaker)
+                    .and_then(Option::as_ref)
+                    .and_then(|person| chips.get(person))
+                    .cloned()
+            })
+            .collect()
     }
 
     /// Commits one match after rechecking everything it relies on; `false` when a deletion,

@@ -365,13 +365,39 @@ struct Facts {
 }
 
 /// A file of an export: its name, and its text or the audio file it copies.
-enum Content {
-    Text(String),
-    Copy(PathBuf),
+struct ExportCall {
+    id: CallId,
+    base: String,
+    markdown: bool,
+    transcript: bool,
+    audio: Vec<(String, PathBuf)>,
+}
+
+enum ExportPayload {
+    Markdown {
+        name: String,
+        outputs: CallOutputs,
+        scope: ShareScope,
+    },
+    Transcript {
+        base: String,
+        segments: Vec<SegmentView>,
+    },
+    Audio {
+        name: String,
+        from: PathBuf,
+    },
 }
 
 fn not_found() -> CoreError {
     CoreError::new(ErrorCode::NotFound, "this call no longer exists")
+}
+
+fn export_io_error(error: std::io::Error) -> CoreError {
+    CoreError::new(
+        ErrorCode::Internal,
+        format!("cannot write the export: {error}"),
+    )
 }
 
 fn slug(title: &str, id: &str) -> String {
@@ -420,16 +446,29 @@ fn srt(segments: &[SegmentView]) -> String {
         .collect()
 }
 
-fn write_all(folder: &Path, files: &[(String, Content)]) -> std::io::Result<()> {
-    std::fs::create_dir_all(folder)?;
-    for (name, content) in files {
-        let to = folder.join(name);
-        match content {
-            Content::Text(text) => std::fs::write(&to, text)?,
-            Content::Copy(from) => drop(std::fs::copy(from, &to)?),
+fn write_payload(folder: &Path, payload: ExportPayload) -> Result<u32, CoreError> {
+    match payload {
+        ExportPayload::Markdown {
+            name,
+            outputs,
+            scope,
+        } => {
+            let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
+            std::fs::write(folder.join(name), shared.markdown).map_err(export_io_error)?;
+            Ok(1)
+        }
+        ExportPayload::Transcript { base, segments } => {
+            let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
+            std::fs::write(folder.join(format!("{base}.srt")), srt(&segments))
+                .map_err(export_io_error)?;
+            std::fs::write(folder.join(format!("{base}.json")), json).map_err(export_io_error)?;
+            Ok(2)
+        }
+        ExportPayload::Audio { name, from } => {
+            std::fs::copy(from, folder.join(name)).map_err(export_io_error)?;
+            Ok(1)
         }
     }
-    Ok(())
 }
 
 impl Core {
@@ -533,7 +572,7 @@ impl Core {
             item_ids: vec![],
             include_unreviewed: true,
         });
-        let mut files: Vec<(String, Content)> = vec![];
+        let mut calls = Vec::with_capacity(args.call_ids.len());
         for id in &args.call_ids {
             let facts = self.call_facts(id.as_str())?;
             let base = slug(&facts.title, id.as_str());
@@ -547,18 +586,7 @@ impl Core {
             }
             // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
             // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-export
-            if want.summary_and_items {
-                let outputs = self.outputs_for_share(id)?;
-                let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
-                files.push((format!("{base}.md"), Content::Text(shared.markdown)));
-            }
-            // A scope names sections and items: the transcript and audio are not part of it.
-            if args.scope.is_none() && want.transcript {
-                let segments = self.store().read(|c| segments_of(c, id, None))?;
-                let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
-                files.push((format!("{base}.srt"), Content::Text(srt(&segments))));
-                files.push((format!("{base}.json"), Content::Text(json)));
-            }
+            let mut audio = vec![];
             if args.scope.is_none() && want.audio {
                 for track in ["mic", "sys"] {
                     let from = self
@@ -566,10 +594,17 @@ impl Core {
                         .join(id.as_str())
                         .join(format!("{track}.m4a"));
                     if from.is_file() {
-                        files.push((format!("{base}-{track}.m4a"), Content::Copy(from)));
+                        audio.push((track.into(), from));
                     }
                 }
             }
+            calls.push(ExportCall {
+                id: id.clone(),
+                base,
+                markdown: want.summary_and_items,
+                transcript: args.scope.is_none() && want.transcript,
+                audio,
+            });
             // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-export
         }
         // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-panel
@@ -583,14 +618,64 @@ impl Core {
         };
         // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-panel
         // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-return
-        // shortcut: a file that is already there is overwritten, and a failed write leaves the
-        // files before it; stage in a temporary folder when exports grow large.
-        write_all(&folder, &files).map_err(|e| {
-            CoreError::new(ErrorCode::Internal, format!("cannot write the export: {e}"))
-        })?;
+        // Bounded queue: only one call's content is rendered and written at a time.
+        let (tx, mut rx) = tokio::sync::mpsc::channel(1);
+        let destination = folder.clone();
+        let writer = tokio::task::spawn_blocking(move || {
+            std::fs::create_dir_all(&destination).map_err(export_io_error)?;
+            let mut count = 0;
+            while let Some(payload) = rx.blocking_recv() {
+                count += write_payload(&destination, payload)?;
+            }
+            Ok::<_, CoreError>(count)
+        });
+        let mut failed = None;
+        for call in calls {
+            let send = async {
+                if call.markdown {
+                    let outputs = self.outputs_for_share(&call.id)?;
+                    tx.send(ExportPayload::Markdown {
+                        name: format!("{}.md", call.base),
+                        outputs,
+                        scope: scope.clone(),
+                    })
+                    .await
+                    .map_err(|_| internal("the export writer stopped"))?;
+                }
+                if call.transcript {
+                    let id = call.id.clone();
+                    let segments = self.store().read(|c| segments_of(c, &id, None))?;
+                    tx.send(ExportPayload::Transcript {
+                        base: call.base.clone(),
+                        segments,
+                    })
+                    .await
+                    .map_err(|_| internal("the export writer stopped"))?;
+                }
+                for (track, from) in call.audio {
+                    tx.send(ExportPayload::Audio {
+                        name: format!("{}-{track}.m4a", call.base),
+                        from,
+                    })
+                    .await
+                    .map_err(|_| internal("the export writer stopped"))?;
+                }
+                Ok::<_, CoreError>(())
+            }
+            .await;
+            if let Err(error) = send {
+                failed = Some(error);
+                break;
+            }
+        }
+        drop(tx);
+        let files = writer.await.map_err(internal)??;
+        if let Some(error) = failed {
+            return Err(error);
+        }
         Ok(ExportResult {
             path: folder.display().to_string(),
-            files: files.len() as u32,
+            files,
         })
         // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-return
     }

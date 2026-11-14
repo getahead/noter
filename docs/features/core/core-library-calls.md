@@ -188,6 +188,8 @@ After M1 the user can record calls and find them again. The list and the call re
 
 **Output**: A `CallRow` complete for the Library view.
 
+Compute call-independent settings once per page and reuse them while assembling its rows. `calls_list` gathers languages, shown-pass unnamed speakers, tags, item counts and participant chips with bounded set-based reads over that page, preserving each row's existing order and scope.
+
 **Steps**:
 1. [x] - `p1` - Copy the stored fields (title, type, start, duration, privacy, status, archive status, audio retention and deletion) - `inst-row-fields`
 2. [x] - `p1` - Derive languages from the call's segments and count unnamed speakers - `inst-row-derive`

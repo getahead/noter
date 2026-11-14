@@ -2,6 +2,7 @@
 //! and deleting calls for good, over the rows capture writes (`calls`, `segments`, `speakers`,
 //! `marks`, `gaps`, `call_tags`).
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use noter_db::rusqlite::types::Value as Sql;
@@ -140,38 +141,58 @@ fn retention_days(c: &Connection) -> noter_db::rusqlite::Result<u32> {
 /// An item a call still has open: not done or handed off, and not rejected in review.
 const OPEN_ITEM: &str = "i.status = 'open' AND i.review_state != 'rejected'";
 
+#[derive(Default)]
+struct RowDetails {
+    languages: Vec<Lang>,
+    unnamed_speakers: u32,
+    tags: Vec<String>,
+    open_items: u32,
+    participants: Vec<PersonChip>,
+    review_waiting: u32,
+}
+
 // @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
-fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<CallRow> {
+fn assemble(
+    c: &Connection,
+    s: Stored,
+    now: i64,
+    retention_days: u32,
+) -> noter_db::rusqlite::Result<CallRow> {
+    let details = details_of(c, &s.id)?;
+    assemble_with_details(s, now, retention_days, details)
+}
+
+fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDetails> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     let mut languages = c.prepare(
         "SELECT lang FROM segments WHERE call_id = ?1 AND lang IS NOT NULL
          GROUP BY lang ORDER BY min(t0_ms), lang",
     )?;
     let languages = languages
-        .query_map([&s.id], |r| r.get::<_, String>(0).map(lang_of))?
+        .query_map([call_id], |r| r.get::<_, String>(0).map(lang_of))?
         .collect::<Result<Vec<_>, _>>()?;
     let unnamed_speakers: u32 = c.query_row(
         &format!(
             "SELECT count(*) FROM speakers
              WHERE call_id = ?1 AND person_id IS NULL AND n IS NOT NULL AND pass = {SHOWN_PASS}"
         ),
-        [&s.id],
+        [call_id],
         |r| r.get(0),
     )?;
     let mut tags = c.prepare("SELECT tag FROM call_tags WHERE call_id = ?1 ORDER BY tag_norm")?;
     let tags = tags
-        .query_map([&s.id], |r| r.get::<_, String>(0))?
+        .query_map([call_id], |r| r.get::<_, String>(0))?
         .collect::<Result<Vec<_>, _>>()?;
     let open_items: u32 = c.query_row(
         &format!("SELECT count(*) FROM items i WHERE i.call_id = ?1 AND {OPEN_ITEM}"),
-        [&s.id],
+        [call_id],
         |r| r.get(0),
     )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
     let participants = c
         .prepare("SELECT person_id FROM call_participants WHERE call_id = ?1 ORDER BY person_id")?
-        .query_map([&s.id], |r| {
+        .query_map([call_id], |r| {
             crate::people::chip_of(c, &r.get::<_, String>(0)?)
         })?
         .collect::<Result<Vec<_>, _>>()?
@@ -180,10 +201,136 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         .collect();
     let review_waiting: u32 = c.query_row(
         "SELECT count(*) FROM items WHERE call_id = ?1 AND review_state = 'suggested'",
-        [&s.id],
+        [call_id],
         |r| r.get(0),
     )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
+    Ok(RowDetails {
+        languages,
+        unnamed_speakers,
+        tags,
+        open_items,
+        participants,
+        review_waiting,
+    })
+}
+
+// @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
+fn details_for_calls(
+    c: &Connection,
+    call_ids: &[String],
+) -> noter_db::rusqlite::Result<HashMap<String, RowDetails>> {
+    const BATCH: usize = 400;
+    let mut details: HashMap<String, RowDetails> = call_ids
+        .iter()
+        .map(|id| (id.clone(), RowDetails::default()))
+        .collect();
+
+    for ids in call_ids.chunks(BATCH) {
+        let marks = crate::util::marks(ids.len());
+        let query = format!(
+            "SELECT call_id, lang FROM segments WHERE call_id IN ({marks}) AND lang IS NOT NULL
+             GROUP BY call_id, lang ORDER BY call_id, min(t0_ms), lang"
+        );
+        for row in c
+            .prepare(&query)?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                Ok((r.get::<_, String>(0)?, lang_of(r.get(1)?)))
+            })?
+        {
+            let (id, lang) = row?;
+            details.entry(id).or_default().languages.push(lang);
+        }
+
+        let shown_pass = SHOWN_PASS.replace("?1", "s.call_id");
+        let query = format!(
+            "SELECT s.call_id, count(*) FROM speakers s
+             WHERE s.call_id IN ({marks}) AND s.person_id IS NULL AND s.n IS NOT NULL
+               AND s.pass = {shown_pass}
+             GROUP BY s.call_id"
+        );
+        for row in c
+            .prepare(&query)?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, u32>(1)?))
+            })?
+        {
+            let (id, count) = row?;
+            details.entry(id).or_default().unnamed_speakers = count;
+        }
+
+        let query = format!(
+            "SELECT call_id, tag FROM call_tags WHERE call_id IN ({marks})
+             ORDER BY call_id, tag_norm"
+        );
+        for row in c
+            .prepare(&query)?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            })?
+        {
+            let (id, tag) = row?;
+            details.entry(id).or_default().tags.push(tag);
+        }
+
+        let query = format!(
+            "SELECT call_id,
+                    sum(CASE WHEN status = 'open' AND review_state != 'rejected' THEN 1 ELSE 0 END),
+                    sum(CASE WHEN review_state = 'suggested' THEN 1 ELSE 0 END)
+             FROM items WHERE call_id IN ({marks}) GROUP BY call_id"
+        );
+        for row in c
+            .prepare(&query)?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, u32>(1)?,
+                    r.get::<_, u32>(2)?,
+                ))
+            })?
+        {
+            let (id, open_items, review_waiting) = row?;
+            let row = details.entry(id).or_default();
+            row.open_items = open_items;
+            row.review_waiting = review_waiting;
+        }
+
+        let query = format!(
+            "SELECT cp.call_id, p.id, p.display_name, p.short_name, p.is_you
+             FROM call_participants cp JOIN people p ON p.id = cp.person_id
+             WHERE cp.call_id IN ({marks}) ORDER BY cp.call_id, cp.person_id"
+        );
+        for row in c
+            .prepare(&query)?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                let display_name: String = r.get(2)?;
+                Ok((
+                    r.get::<_, String>(0)?,
+                    PersonChip {
+                        id: PersonId::new(r.get::<_, String>(1)?),
+                        display_name: display_name.clone(),
+                        short_name: r.get(3)?,
+                        initials: crate::people::initials_of(&display_name),
+                        is_you: r.get(4)?,
+                    },
+                ))
+            })?
+        {
+            let (id, chip) = row?;
+            details.entry(id).or_default().participants.push(chip);
+        }
+    }
+
+    Ok(details)
+}
+// @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
+
+fn assemble_with_details(
+    s: Stored,
+    now: i64,
+    retention_days: u32,
+    details: RowDetails,
+) -> noter_db::rusqlite::Result<CallRow> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     let row = CallRow {
         id: CallId::new(s.id),
@@ -196,10 +343,10 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
             (s.ended_at.unwrap_or(now) - s.started_at).clamp(0, u32::MAX.into()) as u32,
         ),
         platform: s.platform,
-        participants,
-        unnamed_speakers,
-        languages,
-        tags,
+        participants: details.participants,
+        unnamed_speakers: details.unnamed_speakers,
+        languages: details.languages,
+        tags: details.tags,
         privacy: word(s.privacy_class)?,
         status: word(s.status)?,
         outputs: word(s.outputs_status)?,
@@ -207,9 +354,9 @@ fn assemble(c: &Connection, s: Stored, now: i64) -> noter_db::rusqlite::Result<C
         audio_kept_until: s.audio_retention_until.map(TimestampMs),
         audio_deleted: s.audio_deleted,
         audio_deleted_at: s.audio_deleted_at.map(TimestampMs),
-        audio_retention_days: retention_days(c)?,
-        open_items,
-        review_waiting,
+        audio_retention_days: retention_days,
+        open_items: details.open_items,
+        review_waiting: details.review_waiting,
     };
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-fields
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-return
@@ -361,6 +508,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-validate
         let (key, down) = order_of(args.sort);
         self.store().read(|c| {
+            let retention_days = retention_days(c)?;
             // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-select
             let total: u32 = c.query_row(
                 &format!("SELECT count(*) FROM calls c WHERE {}", w.sql),
@@ -406,9 +554,14 @@ impl Core {
                 _ => None,
             };
             // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
+            let call_ids = rows.iter().map(|(s, _)| s.id.clone()).collect::<Vec<_>>();
+            let mut details = details_for_calls(c, &call_ids)?;
             let rows = rows
                 .into_iter()
-                .map(|(s, _)| assemble(c, s, now))
+                .map(|(s, _)| {
+                    let row_details = details.remove(&s.id).unwrap_or_default();
+                    assemble_with_details(s, now, retention_days, row_details)
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
             // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-return
@@ -435,7 +588,7 @@ impl Core {
                 return Ok(None);
             };
             let (mode_used, audio_not_stored) = (word(s.mode_used.clone())?, s.audio_not_stored);
-            let call = assemble(c, s, now)?;
+            let call = assemble(c, s, now, retention_days(c)?)?;
             let speakers = speakers_of(c, &id)?;
             let call_id = CallId::new(&id);
             let marks = crate::transcript::marks_of(c, &call_id)?;
@@ -529,7 +682,7 @@ impl Core {
             .store()
             .read(|c| {
                 select_call(c, &id)?
-                    .map(|s| assemble(c, s, now))
+                    .map(|s| assemble(c, s, now, retention_days(c)?))
                     .transpose()
             })?
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
@@ -547,8 +700,12 @@ impl Core {
     /// The call as the Library shows it, `None` when it is gone.
     pub(crate) fn call_row(&self, id: &str) -> Result<Option<CallRow>, CoreError> {
         let now = self.deps.clock.now().0;
-        self.store()
-            .read(|c| select_call(c, id)?.map(|s| assemble(c, s, now)).transpose())
+        self.store().read(|c| {
+            let retention_days = retention_days(c)?;
+            select_call(c, id)?
+                .map(|s| assemble(c, s, now, retention_days))
+                .transpose()
+        })
     }
 
     // @cpt-flow:cpt-noter-flow-core-library-calls-types:p2
