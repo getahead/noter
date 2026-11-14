@@ -230,6 +230,7 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     const steer = await openWindow(page, "first-run", { world: (w) => W.firstRun(w, { modelsReady: false }), holdDownloadAt: 40 });
     await expect(step(page, "Models")).toHaveAttribute("aria-current", "step");
     await button(page, "Pause").click();
+    await expect(button(page, "Resume")).toBeVisible(); // the pause command finished before injecting the next failure
     await steer.failNext("models_download", "disk_full", { type: "disk_space", free_mb: 1400, needed_mb: 2100 });
     await button(page, "Resume").click(); // the disk is full now
 
