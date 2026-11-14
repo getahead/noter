@@ -32,7 +32,8 @@ final class MenuBarTests: NoterTestCase {
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
         XCTAssertFalse(accessibilityTreeContains("Marked ", in: callWindow), "there is no mark feedback before Mark Moment is clicked")
         item("Mark Moment", in: menu).click()
-        XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("Marked ", in: callWindow) }, "Mark Moment adds visible feedback to the call window")
+        let markedButton = callWindow.buttons.matching(NSPredicate(format: "label CONTAINS 'Marked '")).firstMatch
+        XCTAssertTrue(markedButton.waitForExistence(timeout: 5), "Mark Moment shows its timestamp on the call window")
         let reopened = openMenu()
         item("Pause", in: reopened).click()
         let paused = openMenu()
@@ -146,13 +147,16 @@ final class MenuBarTests: NoterTestCase {
     func test_cpt_noter_flow_ui_menu_bar_start__open_items_open_only_their_windows() {
         launch("idle")
         startRecording()
-        item("Open Call Screen", in: openMenu()).click()
-        XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
         let main = window("Noter")
         XCTAssertTrue(main.waitForExistence(timeout: 5))
+        // Close the main window while it is the foreground window; the non-activating call panel
+        // must not receive Command-W in its place.
         app.typeKey("w", modifierFlags: .command)
-        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing hides the main window while leaving the call panel open")
+        XCTAssertTrue(waitUntil(5) { !main.isHittable }, "closing hides the main window")
         XCTAssertTrue(statusItem.waitForExistence(timeout: 5), "closing the main window leaves the menu bar extra available")
+        item("Open Call Screen", in: openMenu()).click()
+        XCTAssertTrue(callWindow.waitForExistence(timeout: 5))
+        XCTAssertFalse(main.isHittable, "opening the call panel does not restore the main window")
         let menu = openMenu()
         XCTAssertFalse(main.isHittable, "opening the menu does not itself restore the main window")
         let openNoter = item("Open Noter", in: menu)
