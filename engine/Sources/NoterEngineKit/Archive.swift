@@ -1,4 +1,4 @@
-// The archive pass (`cpt-noter-algo-core-engine-offline-decode`): each stored channel is read
+// The archive pass (`cpt-noter-algo-core-engine-offline-decode-v2`): each stored channel is read
 // against `timeline.json`, cut into utterances by the live transcript's energy VAD (at pauses, the
 // call's gaps and 30 s), language-identified among the call's languages, decoded by Large v3 and
 // filtered as the live transcript is; an utterance of an unsure language is decoded again in the
@@ -215,10 +215,8 @@ enum SessionAudio {
         try file.read(into: buffer, frameCount: AVAudioFrameCount(last - first))
         guard let data = buffer.floatChannelData else { return [] }
         let (n, channels) = (Int(buffer.frameLength), Int(buffer.format.channelCount))
-        let mono =
-            channels == 1
-            ? Array(UnsafeBufferPointer(start: data[0], count: n))
-            : (0..<n).map { i in (0..<channels).reduce(Float(0)) { $0 + data[$1][i] } / Float(channels) }
+        let planes = (0..<channels).map { Array(UnsafeBufferPointer(start: data[$0], count: n)) }
+        let mono = Mix.mono(planes)
         return Mix.resample(mono, from: rate, to: Double(Archive.rate))
     }
 }
@@ -276,10 +274,11 @@ enum Archive {
     /// Decodes the call's stored channels into `result`, every segment's words beside it in
     /// `<result>.words/`; on failure neither is left. `progress` hears 0...1 between utterances.
     /// Without `diarizer` the system channel keeps its live label.
-    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
+    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode-v2:p1
     static func run(
-        _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints, decoder: ArchiveDecoder,
-        diarizer: (clustering: Clustering, speaker: SpeakerModel)? = nil, progress: (Float) -> Void
+        _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints,
+        decoder: () throws -> ArchiveDecoder, diarizer: (clustering: Clustering, speaker: SpeakerModel)? = nil,
+        yieldIfNeeded: () -> Void = {}, progress: (Float) -> Void
     ) throws {
         let wordsDir = result.deletingPathExtension().appendingPathExtension("words")
         let wordsPath = (pass.resultPath as NSString).deletingPathExtension + ".words"
@@ -287,42 +286,34 @@ enum Archive {
             progress(0)
             try? FileManager.default.removeItem(at: wordsDir)
             try FileManager.default.createDirectory(at: wordsDir, withIntermediateDirectories: true)
-            // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
+            // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-timeline
             let time = CallTime(session: session)
             let channels = [Channel.mic, .sys].compactMap { ch in SessionAudio.url(ch, in: session).map { (ch, $0) } }
             guard !channels.isEmpty else { throw OfflineFailure(code: .badCommand) }
-            // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
+            // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-timeline
             let glossary = Glossary(c.glossary)
             var segments: [Segment] = []
             for (i, (channel, url)) in channels.enumerated() {
-                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
+                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-timeline
                 let samples = try SessionAudio.read(url)
                 let utterances = utterances(samples, cuts: time.cuts.map { $0 * rate / 1000 })
-                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
-                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-channel
+                // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-timeline
+                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-channel
                 // The two channels stay apart: the microphone is the user, the system channel starts as
                 // its live label. Who else spoke into the user's microphone is the core's (M3).
                 let label = channel == .mic ? "you" : "spk_1"
-                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-channel
+                // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-channel
                 var last: String?
                 for (k, range) in utterances.enumerated() {
                     defer { progress((Float(i) + Float(k + 1) / Float(utterances.count)) / Float(channels.count)) }
+                    yieldIfNeeded()
                     let audio = Array(samples[range])
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
+                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-language
                     let (allowed, order) = languages(c, label: label, last: last)
-                    let probabilities = try decoder.languages(audio)
-                    let (lang, langP) = LiveASR.language(probabilities, among: allowed)
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
-                    var (best, bestLang, bestP) = (try decoder.decode(audio, language: lang), lang, langP)
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
-                    if langP < alternativeBelow, let other = order.first(where: { $0 != lang }) {
-                        let again = try decoder.decode(audio, language: other)
-                        if again.avgLogprob > best.avgLogprob { (best, bestLang, bestP) = (again, other, probabilities[other] ?? 0) }
-                    }
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
+                    let (best, bestLang, bestP) = try decode(
+                        audio, allowed: allowed, order: order, decoder: decoder)
+                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-language
+                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-asr
                     let decoded = Decoded(
                         text: best.text, lang: bestLang, langP: bestP, avgLogprob: best.avgLogprob, noSpeechP: best.noSpeechP)
                     guard LiveASR.keep(decoded) else { continue }
@@ -342,25 +333,42 @@ enum Archive {
                             state: "confirmed", lang: bestLang, langP: bestP, speakerLabel: label,
                             text: text.trimmingCharacters(in: .whitespacesAndNewlines), wordsPath: "\(wordsPath)/\(id).json",
                             avgLogprob: best.avgLogprob, noSpeechP: best.noSpeechP, corrections: corrections, crosstalkLabels: []))
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
+                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-asr
                 }
-                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
                 if channel == .sys, let diarizer {
-                    try Diarization.label(&segments, samples: samples, time: time, constraints: c, diarizer)
+                    try Diarization.label(
+                        &segments, samples: samples, time: time, constraints: c, diarizer, yieldIfNeeded: yieldIfNeeded)
                 }
-                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+                // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
             }
             segments.sort { ($0.t0Ms, $0.channel == .mic ? 0 : 1) < ($1.t0Ms, $1.channel == .mic ? 0 : 1) }
             voices(&segments, c)
             overlap(&segments)
-            // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-return
+            // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-return
             try JSONEncoder().encode(ArchiveResult(callId: pass.callId, backend: pass.backend, segments: segments))
                 .write(to: result, options: .atomic)
-            // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-return
+            // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-return
         } catch {
             try? FileManager.default.removeItem(at: wordsDir)
             throw error
         }
+    }
+
+    private static func decode(
+        _ audio: [Float], allowed: [String], order: [String], decoder makeDecoder: () throws -> ArchiveDecoder
+    ) throws -> (best: Transcript, language: String, probability: Float) {
+        let decoder = try makeDecoder()
+        let probabilities = try decoder.languages(audio)
+        let (language, probability) = LiveASR.language(probabilities, among: allowed)
+        var (best, bestLanguage, bestProbability) = (try decoder.decode(audio, language: language), language, probability)
+        if probability < alternativeBelow, let other = order.first(where: { $0 != language }) {
+            let again = try decoder.decode(audio, language: other)
+            if again.avgLogprob > best.avgLogprob {
+                (best, bestLanguage, bestProbability) = (again, other, probabilities[other] ?? 0)
+            }
+        }
+        return (best, bestLanguage, bestProbability)
     }
 
     /// The system channel's voices: its clusters (or its live label), split where the user said
@@ -399,22 +407,22 @@ enum Archive {
             named.dropFirst().forEach { join(named[0], $0) }
         }
         sys.forEach { segments[$0].speakerLabel = find(segments[$0].speakerLabel) }
-        // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-overlap
+        // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-overlap
         var speech: [String: Int] = [:]
         sys.forEach { speech[segments[$0].speakerLabel, default: 0] += segments[$0].t1Ms - segments[$0].t0Ms }
         for i in sys where speech[segments[i].speakerLabel, default: 0] < labelledSpeechMs { segments[i].speakerLabel = "" }
-        // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-overlap
+        // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-overlap
     }
 
     /// Speech on both channels at once: each side carries both candidate labels.
     static func overlap(_ segments: inout [Segment]) {
-        // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-overlap
+        // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-overlap
         let all = segments
         for (i, s) in all.enumerated() {
             let others = all.filter { $0.channel != s.channel && $0.t0Ms < s.t1Ms && s.t0Ms < $0.t1Ms }.map(\.speakerLabel)
             guard !others.isEmpty else { continue }
             segments[i].crosstalkLabels = ([s.speakerLabel] + others).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
         }
-        // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-overlap
+        // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-overlap
     }
 }

@@ -10,6 +10,8 @@ public protocol SpeakerModel: AnyObject, Sendable {
     func embed(_ samples: [Float]) throws -> [Float]
     /// One speaker of a 10 s window (`Diarization.window`): the frames of `speaking` they talk in.
     func embed(window: [Float], speaking: [Bool]) throws -> [Float]
+    /// All local speakers in one window, sharing the window's filterbank features.
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]]
 }
 
 extension SpeakerModel {
@@ -20,6 +22,10 @@ extension SpeakerModel {
             speaking.indices.filter { speaking[$0] }.flatMap { f in
                 window[min(window.count, f * size / n)..<min(window.count, (f + 1) * size / n)]
             })
+    }
+
+    public func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        try speakers.map { try embed(window: window, speaking: $0) }
     }
 }
 
@@ -67,6 +73,8 @@ private final class Loaded<T>: @unchecked Sendable {
         }
     }
 
+    func clear() { lock.withLock { model = nil } }
+
     static func load(_ make: () throws -> T) throws -> T {
         do {
             return try make()
@@ -79,10 +87,10 @@ private final class Loaded<T>: @unchecked Sendable {
 }
 
 // @cpt-dod:cpt-noter-dod-core-engine-offline-embeddings:p1
-/// The offline commands on the installed models. Large v3 loads for each pass, so it never stays
-/// beside the live model through a call; the embedding models stay once loaded.
+/// The offline commands on the installed models. Large v3 stays loaded between passes and is
+/// released when capture starts; the embedding models stay loaded.
 public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
-    private let decoder: (() throws -> ArchiveDecoder)?
+    private let decoder: Loaded<ArchiveDecoder>?
     private let speakerModel: Loaded<SpeakerModel>?
     private let textModel: Loaded<TextModel>?
     private let clustering: (() throws -> Clustering)?
@@ -91,7 +99,7 @@ public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
         decoder: (() throws -> ArchiveDecoder)? = nil, speaker: (() throws -> SpeakerModel)? = nil,
         text: (() throws -> TextModel)? = nil, clustering: (() throws -> Clustering)? = nil
     ) {
-        self.decoder = decoder
+        self.decoder = decoder.map(Loaded.init)
         speakerModel = speaker.map(Loaded.init)
         textModel = text.map(Loaded.init)
         self.clustering = clustering
@@ -101,16 +109,20 @@ public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
         Set([decoder.map { _ in .archive }, speakerModel.map { _ in .speaker }, textModel.map { _ in .text }].compactMap { $0 })
     }
 
+    public func releaseArchive() { decoder?.clear() }
+
+
     // @cpt-dod:cpt-noter-dod-core-engine-offline-archive:p1
     public func archive(
-        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints, progress: (Float) -> Void
+        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
+        yieldIfNeeded: () -> Void, progress: (Float) -> Void
     ) throws {
         guard let decoder else { throw OfflineFailure(code: .modelMissing) }
         // Clustering loads for each pass like Large v3; it needs WeSpeaker beside its own models.
         let diarizer = try clustering.flatMap { make in try speakerModel.map { (try Loaded.load(make), try $0.get()) } }
         try Archive.run(
-            pass, session: session, result: result, constraints: constraints, decoder: Loaded.load(decoder),
-            diarizer: diarizer, progress: progress)
+            pass, session: session, result: result, constraints: constraints, decoder: { try decoder.get() },
+            diarizer: diarizer, yieldIfNeeded: yieldIfNeeded, progress: progress)
     }
 
     // @cpt-algo:cpt-noter-algo-core-engine-offline-vectors:p1

@@ -40,6 +40,7 @@ final class PitchSegmentation: SegmentationModel, @unchecked Sendable {
 /// turn's length so no two are equal.
 final class PitchSpeaker: SpeakerModel, @unchecked Sendable {
     private(set) var turns = 0
+    private(set) var windows = 0
 
     func embed(_ samples: [Float]) throws -> [Float] {
         turns += 1
@@ -47,6 +48,11 @@ final class PitchSpeaker: SpeakerModel, @unchecked Sendable {
         v[voice(samples[...])] = 1
         v[200] = Float(samples.count % 97) / 1_000
         return v
+    }
+
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        windows += 1
+        return try speakers.map { try embed(window: window, speaking: $0) }
     }
 }
 
@@ -106,7 +112,7 @@ final class DiarizationTests: XCTestCase {
             decoder: { FakeDecoder() }, speaker: { self.speaker },
             clustering: { Clustering(segmentation: self.segmentation, plda: identityPLDA()) })
         let out = container.appendingPathComponent(pass.resultPath)
-        try work.archive(pass, session: session, result: out, constraints: c) { _ in }
+        try work.archive(pass, session: session, result: out, constraints: c, yieldIfNeeded: {}) { _ in }
         return try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: out)).segments
             .map { "\($0.channel.rawValue):\($0.speakerLabel)" }
     }
@@ -122,6 +128,22 @@ final class DiarizationTests: XCTestCase {
             "one label per voice; the microphone stays the user")
         XCTAssertEqual(segmentation.windows, 2, "the system channel in 10 s windows")
         XCTAssertEqual(speaker.turns, 4, "one vector per speaker of a window")
+        XCTAssertEqual(speaker.windows, 2, "one shared filterbank per window")
+    }
+
+    func testOfflineDiarizationChecksCaptureAtEachSilentWindow() throws {
+        try store(seconds: 20, sys: [])
+        segmentation.silent = true
+        var yields = 0
+        let work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: { Clustering(segmentation: self.segmentation, plda: identityPLDA()) })
+        try work.archive(
+            pass, session: session, result: container.appendingPathComponent(pass.resultPath), constraints: .none,
+            yieldIfNeeded: { yields += 1 }) { _ in }
+
+        XCTAssertEqual(segmentation.windows, 2)
+        XCTAssertEqual(yields, 2, "capture is checked even when a window contains no turns")
     }
 
     func testACannotLinkKeepsTwoTurnsOfOneVoiceApart() throws {

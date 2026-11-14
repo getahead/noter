@@ -126,23 +126,31 @@ enum Diarization {
         let runs: [Range<Int>]
     }
 
-    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
+    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
     /// The system channel's segments labelled by voice, `spk_1`, `spk_2`… in order of first words;
     /// with no speech turn they keep the live label.
     static func label(
         _ segments: inout [Segment], samples: [Float], time: CallTime, constraints c: OfflineConstraints,
-        _ models: (clustering: Clustering, speaker: SpeakerModel)
+        _ models: (clustering: Clustering, speaker: SpeakerModel), yieldIfNeeded: () -> Void = {}
     ) throws {
-        let turns = try turns(samples, models.clustering.segmentation)
+        let turns = try turns(samples, models.clustering.segmentation, yieldIfNeeded: yieldIfNeeded)
         guard !turns.isEmpty else { return }
         let rate = Archive.rate
         let runs = turns.map {
             $0.runs.map { (t0: time.call($0.lowerBound * 1000 / rate), t1: time.call($0.upperBound * 1000 / rate, end: true)) }
         }
-        let vectors = try turns.map { t in
-            let from = t.window * window
-            let heard = try models.speaker.embed(window: Array(samples[from..<min(from + window, samples.count)]), speaking: t.alone)
-            return try Vectors.checked(heard, Vectors.speakerDims).map(Double.init)
+        var vectors = Array(repeating: [Double](), count: turns.count)
+        for windowIndex in Set(turns.map(\.window)).sorted() {
+            yieldIfNeeded()
+            let indices = turns.indices.filter { turns[$0].window == windowIndex }
+            let from = windowIndex * window
+            let audio = Array(samples[from..<min(from + window, samples.count)])
+            let embedded = try models.speaker.embed(window: audio, speakers: indices.map { turns[$0].alone })
+            guard embedded.count == indices.count else { throw OfflineFailure(code: .internal) }
+            for (index, vector) in zip(indices, embedded) {
+                vectors[index] = try Vectors.checked(vector, Vectors.speakerDims).map(Double.init)
+            }
         }
         func overlap(_ k: Int, _ t0: Int, _ t1: Int) -> Int { runs[k].reduce(0) { $0 + max(0, min(t1, $1.t1) - max(t0, $1.t0)) } }
         func inside(_ s: Span) -> [Int] { turns.indices.filter { overlap($0, s.t0Ms, s.t1Ms) > 0 } }
@@ -169,9 +177,10 @@ enum Diarization {
     }
 
     /// The speakers of each window with enough speech alone, as the segmentation hears them.
-    static func turns(_ samples: [Float], _ model: SegmentationModel) throws -> [Turn] {
+    static func turns(_ samples: [Float], _ model: SegmentationModel, yieldIfNeeded: () -> Void = {}) throws -> [Turn] {
         var out: [Turn] = []
         for (w, start) in stride(from: 0, to: samples.count, by: window).enumerated() {
+            yieldIfNeeded()
             let end = min(start + window, samples.count)
             let frames = try model.speakers(Array(samples[start..<end]))
             let at = { (f: Int) in min(end, start + f * window / max(frames.count, 1)) }
@@ -207,13 +216,14 @@ enum Diarization {
         }
         return assign(vectors, centroids: centroids, cannot: cannot)
     }
-    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+    // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
 
     /// Centroid-linkage clustering of the normalised vectors (Lance-Williams on squared
     /// distances), joining while the closest two are within `threshold`: the clusters in order of
     /// first member.
-    /// shortcut: O(n³) in turns, under a second for the ~1,000 turns of an hour; a nearest-
-    /// neighbour cache when calls get much longer.
+    /// Each active cluster caches its nearest neighbour. After a merge, only the merged
+    /// cluster and rows whose cached neighbour was removed need a full nearest-neighbour scan;
+    /// all other rows compare the newly computed distance once.
     static func ahc(_ x: [[Double]], threshold: Double) -> [Int] {
         let x = x.map { scaled($0, to: 1) }
         let n = x.count
@@ -221,10 +231,22 @@ enum Diarization {
             x.map { b in zip(a, b).reduce(0.0) { (sum: Double, p: (Double, Double)) -> Double in sum + (p.0 - p.1) * (p.0 - p.1) } }
         }
         var (size, parent, alive) = (Array(repeating: 1.0, count: n), Array(0..<n), Array(repeating: true, count: n))
+        var nearest = Array(repeating: -1, count: n)
+        var nearestDistance = Array(repeating: Double.infinity, count: n)
+        func refresh(_ i: Int) {
+            var (best, neighbor) = (Double.infinity, -1)
+            for j in 0..<n where alive[j] && i != j {
+                if d[i][j] < best { (best, neighbor) = (d[i][j], j) }
+            }
+            (nearest[i], nearestDistance[i]) = (neighbor, best)
+        }
+        for i in 0..<n where alive[i] { refresh(i) }
         while true {
             var (bi, bj, best) = (0, 0, Double.infinity)
-            for i in 0..<n where alive[i] {
-                for j in (i + 1)..<n where alive[j] && d[i][j] < best { (bi, bj, best) = (i, j, d[i][j]) }
+            for i in 0..<n where alive[i] && nearest[i] >= 0 {
+                if nearestDistance[i] < best {
+                    (bi, bj, best) = (min(i, nearest[i]), max(i, nearest[i]), nearestDistance[i])
+                }
             }
             guard best.squareRoot() <= threshold else { break }
             let (ni, nj): (Double, Double) = (size[bi], size[bj])
@@ -236,6 +258,13 @@ enum Diarization {
                 d[k][bi] = d[bi][k]
             }
             (size[bi], alive[bj], parent[bj]) = (ni + nj, false, bi)
+            for i in 0..<n where alive[i] {
+                if i == bi || nearest[i] == bi || nearest[i] == bj {
+                    refresh(i)
+                } else if d[i][bi] < nearestDistance[i] || (d[i][bi] == nearestDistance[i] && bi < nearest[i]) {
+                    (nearest[i], nearestDistance[i]) = (bi, d[i][bi])
+                }
+            }
         }
         func root(_ i: Int) -> Int { parent[i] == i ? i : root(parent[i]) }
         var ids: [Int: Int] = [:]

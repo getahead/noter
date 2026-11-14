@@ -5,20 +5,20 @@ import Foundation
 public final class EngineLoop: @unchecked Sendable {
     let writer: EventWriter
     private let engineVersion: String
-    private let models: [String]
+    let models: [String]
     private let sandboxed: Bool
-    private let source: (StartSession?) -> AudioSource?
-    private let play: @Sendable ([Float]) -> Void
+    let source: (StartSession?) -> AudioSource?
+    let play: @Sendable ([Float]) -> Void
     let container: URL?
     private let now: () -> Int64
     private let encoder: (URL) throws -> AudioEncoder
-    private let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
+    let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
     private let decoder = JSONDecoder()
     private let player: Player
     /// The speech model, loaded on first use; nil without one installed.
-    private let model: ModelCache?
+    let model: ModelCache?
     /// Above builds and other background work: the live transcript is what the user watches.
-    private let asrQueue = DispatchQueue(label: "ai.noter.engine.asr", qos: .userInitiated)
+    let asrQueue = DispatchQueue(label: "ai.noter.engine.asr", qos: .userInitiated)
     private let stops = DispatchQueue(label: "ai.noter.engine.stop")
     private let processes: @Sendable () -> [ProcessAudio]
     /// The offline models (archive decode, embeddings); nil refuses offline commands.
@@ -27,6 +27,8 @@ public final class EngineLoop: @unchecked Sendable {
     let offlineQueue = DispatchQueue(label: "ai.noter.engine.offline", qos: .utility)
     /// The archive pass on its own: it waits out a captured call, embeddings do not wait for it.
     let archiveQueue = DispatchQueue(label: "ai.noter.engine.archive", qos: .utility)
+    let archivePassLock = NSLock()
+    var latestArchivePass: [String: UInt64] = [:]
     /// The call being captured and its audio; commands arrive on one thread.
     private var session: (capture: CaptureSession, audio: AudioSource)?
     private var replaying = false
@@ -46,7 +48,7 @@ public final class EngineLoop: @unchecked Sendable {
     /// `offline` runs the archive pass and the embeddings.
     public init(
         writer: EventWriter, engineVersion: String, models: [String], sandboxed: Bool,
-        container: URL? = nil, now: @escaping () -> Int64 = { Int64(Date().timeIntervalSince1970 * 1000) },
+        container: URL? = nil, now: @escaping () -> Int64 = EngineClock.epochMilliseconds,
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
         play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
         player: Player = FilePlayer(),
@@ -160,6 +162,7 @@ public final class EngineLoop: @unchecked Sendable {
             writer.emit(.error(cmdId: id, code: .badCommand, message: "a session runs already"))
             return
         }
+        offline?.releaseArchive()
         do {
             guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
@@ -282,114 +285,6 @@ public final class EngineLoop: @unchecked Sendable {
         }
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-play
-
-    // @cpt-flow:cpt-noter-flow-core-engine-foundation-self-test:p1
-    // @cpt-flow:cpt-noter-flow-core-engine-capture-self-test:p1
-    private func selfTest(timeout: TimeInterval, playClip: Bool) {
-        let deadline = Date().addingTimeInterval(timeout)
-        let state = SelfTestState()
-        let done = DispatchSemaphore(value: 0)
-        let writer = self.writer
-        // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
-        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
-        let audio = source(nil)
-        do {
-            try audio?.start { chunk in
-                guard let events = state.feed(chunk) else { return }
-                events.forEach(writer.emit)
-                if let levels = state.levelsDue() { writer.emit(levels) }
-                if state.bothArrived { done.signal() }
-            }
-        } catch {
-            FileHandle.standardError.write(Data("noter-engine: self-test audio: \(error)\n".utf8))
-        }
-        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
-        // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
-        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
-        if playClip, audio != nil {
-            state.clipStarted()
-            play(Clip.samples())
-            // The tap is listened to until the clip is over, however soon both channels arrive.
-            Thread.sleep(until: min(deadline, Date().addingTimeInterval(Clip.seconds + 0.3)))
-        }
-        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
-        _ = done.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow))
-        audio?.stop()
-        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
-        // The core waits for the result only a little past the window, and a cold model can take
-        // longer to load: lines come from a model already loaded; otherwise it starts loading now.
-        if let model, !models.isEmpty {
-            if let transcriber = model.ready {
-                asrQueue.sync {
-                    for channel in [Channel.mic, .sys] where Date() < deadline {
-                        let heard = state.heard(channel)
-                        guard !heard.isEmpty, let d = try? transcriber.decode(heard, languages: []), LiveASR.keep(d) else { continue }
-                        writer.emit(.selfTestLine(channel: channel, text: d.text.trimmingCharacters(in: .whitespacesAndNewlines)))
-                    }
-                }
-            } else {
-                asrQueue.async { _ = try? model.get() }
-            }
-        }
-        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
-        // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-return-self-test
-        // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-return-self-test-capture
-        writer.emit(state.finish(modelsPresent: !models.isEmpty))
-        // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-return-self-test-capture
-        // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-return-self-test
-    }
-}
-
-/// The self-test's state, shared with the audio callbacks.
-private final class SelfTestState: @unchecked Sendable {
-    private let lock = NSLock()
-    private var monitor = SelfTestMonitor()
-    private var finished = false
-    private var mic: Float = -160
-    private var sys: Float = -160
-    private var lastLevels: Date?
-    /// Up to 10 s per channel at 16 kHz, for the self-test lines.
-    private var audio: [Channel: [Float]] = [:]
-
-    /// The events a chunk causes, or nil once the result is out.
-    func feed(_ chunk: AudioChunk) -> [EngineEvent]? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard !finished else { return nil }
-        if chunk.channel == .mic { mic = Levels.db(chunk.samples) } else { sys = Levels.db(chunk.samples) }
-        if audio[chunk.channel, default: []].count < 160_000 {
-            audio[chunk.channel, default: []] += Mix.resample(chunk.samples, from: chunk.sampleRate, to: 16_000)
-        }
-        return monitor.feed(chunk)
-    }
-
-    // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-levels-lines
-    /// Levels at most every 100 ms.
-    func levelsDue() -> EngineEvent? {
-        lock.lock()
-        defer { lock.unlock() }
-        guard !finished, lastLevels.map({ Date().timeIntervalSince($0) >= 0.1 }) ?? true else { return nil }
-        lastLevels = Date()
-        return .levels(callId: nil, micDb: mic, sysDb: sys)
-    }
-    // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-levels-lines
-
-    func heard(_ channel: Channel) -> [Float] { lock.withLock { audio[channel] ?? [] } }
-
-    func clipStarted() { lock.withLock { monitor.clipStarted() } }
-
-    var bothArrived: Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        return monitor.bothArrived
-    }
-
-    func finish(modelsPresent: Bool) -> EngineEvent {
-        lock.lock()
-        defer { lock.unlock() }
-        finished = true
-        return monitor.result(modelsPresent: modelsPresent)
-    }
 }
 
 /// The speech model, loaded once per engine on first use; sessions and self-tests share it.

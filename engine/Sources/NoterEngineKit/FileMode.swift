@@ -54,9 +54,9 @@ public struct FileMode {
         writer: EventWriter, engineVersion: String, sandboxed: Bool = false, models: [String] = [],
         afterReady: () -> Void = {}
     ) -> Int32 {
-        let audio: (mic: WAVAudio, sys: WAVAudio)
+        let audio = FileAudioSource(mic: mic, sys: sys, realtime: realtime)
         do {
-            audio = (try WAV.read(mic), try WAV.read(sys))
+            try audio.validate()
         } catch {
             writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "\(error)"))
             return 1
@@ -65,9 +65,13 @@ public struct FileMode {
         writer.emit(
             .ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models, sandboxed: sandboxed))
         afterReady()
-        for (m, s) in FileAudioSource.windows(mic: audio.mic, sys: audio.sys) {
-            writer.emit(.levels(callId: FileMode.callId, micDb: Levels.db(m), sysDb: Levels.db(s)))
-            if realtime { Thread.sleep(forTimeInterval: 0.1) }
+        var micDb: Float = -160
+        _ = audio.play { chunk in
+            if chunk.channel == .mic {
+                micDb = Levels.db(chunk.samples)
+            } else {
+                writer.emit(.levels(callId: FileMode.callId, micDb: micDb, sysDb: Levels.db(chunk.samples)))
+            }
         }
         // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return

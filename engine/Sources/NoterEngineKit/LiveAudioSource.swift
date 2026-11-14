@@ -243,7 +243,7 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
 
-    private static func epochMs() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+    private static func epochMs() -> Int64 { EngineClock.epochMilliseconds() }
 
     private static func address(
         _ selector: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal

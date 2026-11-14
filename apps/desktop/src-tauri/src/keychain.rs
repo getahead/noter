@@ -34,3 +34,28 @@ impl SecretStore for Keychain {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn a_missing_key_can_be_set_read_and_removed_twice() {
+        let account = format!(
+            "noter-test-{}-{}",
+            std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        );
+        let store = Keychain;
+        let secret = Secret::new("test-secret".to_owned());
+
+        let _ = store.remove(&account);
+        assert!(store.get(&account).unwrap().is_none());
+        store.set(&account, &secret).unwrap();
+        assert_eq!(store.get(&account).unwrap().unwrap().expose(), "test-secret");
+        store.remove(&account).unwrap();
+        assert!(store.get(&account).unwrap().is_none());
+        store.remove(&account).unwrap();
+    }
+}

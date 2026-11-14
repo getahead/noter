@@ -135,15 +135,30 @@ final class CoreMLSpeakerModel: SpeakerModel, @unchecked Sendable {
 
     /// pyannote's way: the whole window through FBank, the speaker's frames weighted 1.
     func embed(window: [Float], speaking: [Bool]) throws -> [Float] {
-        let weights = (0..<Self.frames).map { f in !speaking.isEmpty && speaking[f * speaking.count / Self.frames] ? Float(1) : 0 }
-        return try vector(window[...], weights: weights[...])
+        try vector(filterbank(window[...]), weights: weights(speaking)[...])
+    }
+
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        let features = try filterbank(window[...])
+        return try speakers.map { try vector(features, weights: weights($0)[...]) }
+    }
+
+    private func weights(_ speaking: [Bool]) -> [Float] {
+        (0..<Self.frames).map { f in !speaking.isEmpty && speaking[f * speaking.count / Self.frames] ? 1 : 0 }
+    }
+
+    private func filterbank(_ audio: ArraySlice<Float>) throws -> MLMultiArray {
+        guard let features = try fbank.prediction(
+            from: MLDictionaryFeatureProvider(dictionary: ["audio": array([1, 1, Self.window], audio)])
+        ).featureValue(for: "fbank_features")?.multiArrayValue else { throw OfflineFailure(code: .internal) }
+        return features
     }
 
     private func vector(_ audio: ArraySlice<Float>, weights: ArraySlice<Float>) throws -> [Float] {
-        guard let features = try fbank.prediction(
-            from: MLDictionaryFeatureProvider(dictionary: ["audio": array([1, 1, Self.window], audio)])
-        ).featureValue(for: "fbank_features")?.multiArrayValue
-        else { throw OfflineFailure(code: .internal) }
+        try vector(filterbank(audio), weights: weights)
+    }
+
+    private func vector(_ features: MLMultiArray, weights: ArraySlice<Float>) throws -> [Float] {
         let v = try floats(
             embedding.prediction(
                 from: MLDictionaryFeatureProvider(dictionary: ["fbank_features": features, "weights": array([1, Self.frames], weights)])),

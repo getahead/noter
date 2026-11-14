@@ -34,6 +34,7 @@ design: docs/DESIGN-core.md
   - [Embedding requests](#embedding-requests)
   - [Tests and gate](#tests-and-gate)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. Changelog](#7-changelog)
 
 <!-- /toc -->
 
@@ -45,7 +46,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features.
+The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features. Offline work yields to live capture at window boundaries, drops queued archive requests superseded for the same call, and releases its cached archive model when a live session starts. Within one diarization window, all local speakers are embedded from the same filterbank result.
 
 > **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering implements the owner's D-32 answer, option 2 (1 Nov, #279): pinned pyannote community-1 segmentation and WeSpeaker CoreML models with VBx and the user's constraints in the engine, no FluidAudio binary; every pinned file is CC-BY-4.0 and needs attribution (`.plans/backend/m2-diarization-licences.md`); the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
 
@@ -82,12 +83,13 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Run an archive pass
 
-- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive-v2`
 
 **Actor**: Engine supervisor, for the archive job
 
 **Success Scenarios**:
 - A stopped call with stored audio is processed with user constraints; progress arrives and the finished result file is returned once complete.
+- If capture starts during an archive pass, the pass yields at its next diarization-window boundary and resumes after capture ends; queued passes superseded for that call do not start.
 
 **Error Scenarios**:
 - Missing audio or model, malformed constraints, failed decode or disk failure returns the protocol's correlated error or `offline_failed`; the live transcript remains usable.
@@ -95,8 +97,8 @@ The live transcript can improve after the call without losing the user's speaker
 **Steps**:
 1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
 2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
-3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
-4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; capture work takes priority if it starts - `inst-archive-progress`
+3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode-v2` at low priority with the requested archive backend - `inst-archive-start`
+4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; if capture starts, yield at the next diarization-window boundary and resume after capture ends - `inst-archive-progress`
 5. [x] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
 6. [x] - `p1` - **IF** asynchronous processing fails, emit `offline_failed { call_id, code }`; never report an incomplete file as done - `inst-archive-fail`
 7. [x] - `p1` - Supervisor correlates the result with the current call job, discards stale completions from cancelled or superseded work and returns it to the pipeline - `inst-archive-correlate`
@@ -127,7 +129,10 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Decode and cluster with corrections
 
+Previous revision, retained as a trace alias for `cpt-noter-algo-core-engine-offline-decode-v2`.
+
 - [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode`
+- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode-v2`
 
 **Input**: Stopped-call mic and system audio, timeline, glossary and persisted must-link and cannot-link constraints.
 
@@ -138,7 +143,7 @@ The live transcript can improve after the call without losing the user's speaker
 2. [x] - `p1` - Split speech with VAD and identify language per utterance using the configured languages and speaker priors - `inst-decode-language`
 3. [x] - `p1` - Run full Large v3 with beam size 5 and temperature fallback, then apply glossary and hallucination filters - `inst-decode-asr`
 4. [x] - `p1` - Re-decode low-probability mixed-language utterances with the alternative language and keep the better-scoring result - `inst-decode-alternative`
-5. [x] - `p1` - Run offline pyannote segmentation, WeSpeaker embeddings and VBx across the system channel, enforcing must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
+5. [x] - `p1` - Run offline pyannote segmentation, WeSpeaker embeddings and VBx across the system channel; embed every local speaker in a window from one shared filterbank result and enforce must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
 6. [x] - `p1` - Mark overlapping spans with both candidate labels and low ASR confidence; leave voices with under three seconds of speech unnamed - `inst-decode-overlap`
 7. [x] - `p1` - Preserve the microphone channel's user or guest attribution and the two-channel split; do not infer cross-call person identity here - `inst-decode-channel`
 8. [x] - `p1` - **RETURN** the complete result; the core maps archive clusters to live labels by time overlap and applies corrections when installing it - `inst-decode-return`
@@ -188,8 +193,8 @@ Abandoning a request invalidates its completion at the supervisor; it adds no en
 The system **MUST** implement the offline pass through the existing stdio protocol, decode both channels with full Large v3 and constrained VBx, preserve timing and gaps, and publish progress and complete result files without replacing the core's live rows itself.
 
 **Implements**:
-- `cpt-noter-flow-core-engine-offline-archive`
-- `cpt-noter-algo-core-engine-offline-decode`
+- `cpt-noter-flow-core-engine-offline-archive-v2`
+- `cpt-noter-algo-core-engine-offline-decode-v2`
 - `cpt-noter-state-core-engine-offline-request`
 
 **Constraints**: `cpt-noter-constraint-core-engine-offline`
@@ -221,7 +226,7 @@ The system **MUST** correlate speaker and text embeddings, validate their dimens
 The system **MUST** pass Swift unit and file-mode golden-call tests, Rust supervisor tests for correlation, unsafe paths, malformed vectors, engine exit and late completions, and engine-schema conformance tests. Real-core post-call E2E covers consumption; this feature owns no IPC command or story denominator. `just gate` passes.
 
 **Implements**:
-- `cpt-noter-flow-core-engine-offline-archive`
+- `cpt-noter-flow-core-engine-offline-archive-v2`
 - `cpt-noter-flow-core-engine-offline-embeddings`
 
 **Touches**:
@@ -239,3 +244,7 @@ Open: the file-mode golden-call tests in English, Russian and German need `evals
 - [x] `just gate` passes.
 
 > **Open (TL-17).** The first and fifth criteria are measured on `evals/golden` on the Mac runner, the owner's item (diarization DER thresholds proposed to the owner, none set); the conformance half of the fifth is in.
+
+## 7. Changelog
+
+- **0.2 (14 Nov 2026)**: Define capture yielding at diarization-window boundaries, stale queued archive suppression, archive-model release at session start, and one shared filterbank result per diarization window.
