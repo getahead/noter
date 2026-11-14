@@ -42,6 +42,26 @@ describe("InlineBanner (cpt-noter-dod-ui-primitives-feedback)", () => {
   });
 });
 
+describe("inline banner states (cpt-noter-state-ui-primitives-inline-banner)", () => {
+  it("renders the owner-provided working state and returns to shown when loading ends", () => {
+    const working = renderToString(<InlineBanner banner={b("retry", "error", { actions: [{ label: "Retry", loading: true }] })} />);
+    const shown = renderToString(<InlineBanner banner={b("retry", "error", { actions: [{ label: "Retry", loading: false }] })} />);
+    expect(working).toContain('data-state="working"');
+    expect(shown).toContain('data-state="shown"');
+  });
+
+  it("opens and closes the production slot list, then reflects dismissed and resolved inputs", () => {
+    const banners = [b("first", "error"), b("next", "warning")];
+    const shown = slotView(banners, new Set(), false);
+    const stacked = slotView(banners, new Set(), true);
+    expect(shown.list).toEqual([]);
+    expect(stacked.list.map((banner) => banner.id)).toEqual(["next"]);
+    expect(slotView(banners, new Set(), false).list).toEqual([]); // closing More returns to shown
+    expect(slotView(banners, new Set(["first"]), false).first?.id).toBe("next");
+    expect(slotView([], new Set(), false).first).toBeNull(); // owner removed the resolved banner
+  });
+});
+
 describe("slotView (cpt-noter-flow-ui-primitives-banner)", () => {
   const all = [b("i", "info"), b("e", "error"), b("w", "warning"), b("e2", "error")];
 

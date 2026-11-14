@@ -1,6 +1,5 @@
-// Banner slot logic of the inline banner (docs/features/ui/primitives.md): which banner a slot shows,
-// what waits behind **+N More**, dismissal, and the banner's state machine. Pure, so the slot component
-// and the unit tests share it.
+// Pure banner-slot logic (docs/features/ui/primitives.md): ordering, visibility and dismissal bookkeeping.
+// The component owns its rendered state; this module keeps the slot calculations easy to test.
 
 export type Severity = "error" | "warning" | "degraded" | "info" | "success";
 /** Most severe first. */
@@ -39,47 +38,4 @@ export function restoreDismissed(dismissed: ReadonlySet<string>, id: string): Re
   const next = new Set(dismissed);
   next.delete(id);
   return next;
-}
-
-// @cpt-state:cpt-noter-state-ui-primitives-inline-banner:p1
-export type BannerState = "SHOWN" | "WORKING" | "STACKED" | "DISMISSED" | "RESOLVED";
-/** action: the owner's command runs; failed: it failed and the cause remains; more/less: **+N More** opens/closes;
- *  dismiss: × or Esc on ×; resolved: the core reports the fix and the owner removes the banner. */
-export type BannerEvent = "action" | "failed" | "more" | "less" | "dismiss" | "resolved";
-
-const NEXT: Partial<Record<BannerState, Partial<Record<BannerEvent, BannerState>>>> = {
-  SHOWN: {
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-working
-    action: "WORKING",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-working
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
-    more: "STACKED",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-dismissed
-    dismiss: "DISMISSED",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-dismissed
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-resolved
-    resolved: "RESOLVED",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-resolved
-  },
-  WORKING: {
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-shown
-    failed: "SHOWN",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-shown
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-resolved
-    resolved: "RESOLVED",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-resolved
-  },
-  STACKED: {
-    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
-    less: "SHOWN",
-    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
-  },
-};
-
-/** The next state; an event that is no transition of `state`, or a dismiss of a banner that cannot be dismissed
- *  (warning, error, degraded), leaves it as it is. */
-export function bannerNext(state: BannerState, event: BannerEvent, dismissible: boolean): BannerState {
-  if (event === "dismiss" && !dismissible) return state;
-  return NEXT[state]?.[event] ?? state;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bannerNext, orderBanners, pruneDismissed, restoreDismissed, visibleBanners, type BannerState, type Severity } from "./banners";
+import { orderBanners, pruneDismissed, restoreDismissed, visibleBanners, type Severity } from "./banners";
 
 const b = (id: string, severity: Severity) => ({ id, severity });
 
@@ -33,32 +33,6 @@ describe("dismissal", () => {
     const dismissed = new Set(["a", "gone"]);
     expect([...pruneDismissed(dismissed, [b("a", "info")])]).toEqual(["a"]);
     expect(pruneDismissed(dismissed, [b("a", "info"), b("gone", "info")])).toBe(dismissed);
-  });
-});
-
-describe("bannerNext (cpt-noter-state-ui-primitives-inline-banner)", () => {
-  const cases: [BannerState, Parameters<typeof bannerNext>[1], BannerState][] = [
-    ["SHOWN", "action", "WORKING"],
-    ["WORKING", "failed", "SHOWN"],
-    ["SHOWN", "more", "STACKED"],
-    ["STACKED", "less", "SHOWN"],
-    ["SHOWN", "dismiss", "DISMISSED"],
-    ["SHOWN", "resolved", "RESOLVED"],
-    ["WORKING", "resolved", "RESOLVED"],
-  ];
-  it.each(cases)("goes from %s on %s to %s", (from, event, to) => {
-    expect(bannerNext(from, event, true)).toBe(to);
-  });
-
-  it("keeps a banner that cannot be dismissed (warning, error, degraded)", () => {
-    expect(bannerNext("SHOWN", "dismiss", false)).toBe("SHOWN");
-  });
-
-  it("ignores events that are not transitions of the current state", () => {
-    expect(bannerNext("WORKING", "action", true)).toBe("WORKING");
-    expect(bannerNext("WORKING", "dismiss", true)).toBe("WORKING");
-    expect(bannerNext("DISMISSED", "more", true)).toBe("DISMISSED");
-    expect(bannerNext("RESOLVED", "failed", true)).toBe("RESOLVED");
   });
 });
 
