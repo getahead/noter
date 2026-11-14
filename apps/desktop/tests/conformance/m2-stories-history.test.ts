@@ -57,11 +57,15 @@ describe("cpt-noter-seq-core-review-undo", () => {
     const outputs = ok(await main.outputsGet({ call_id: PAST_CALL }));
     const summary = outputs.sections.find((section) => section.kind === "summary")!;
     const originalBody = summary.body_md;
+    const versionCount = summary.version_count;
     const sectionEvents = await s.events("entity:changed");
     const edited = ok(await main.outputEdit({ call_id: PAST_CALL, summary_id: summary.summary_id!, rev: summary.rev!, body_md: "Undoable summary edit" }));
     expect(ok(await main.changeUndo({ target: { type: "change", change_id: edited.change_id } })).undone).toBe(1);
-    expect(ok(await main.outputsGet({ call_id: PAST_CALL })).sections.find((section) => section.kind === "summary")?.body_md).toBe(originalBody);
+    const undoneOutput = ok(await main.outputsGet({ call_id: PAST_CALL })).sections.find((section) => section.kind === "summary")!;
+    expect(undoneOutput).toMatchObject({ body_md: originalBody, user_edited: summary.user_edited, version_count: versionCount + 1 });
     expect(sectionEvents.all.some((e) => e.type === "section" && e.call_id === PAST_CALL && e.section.body_md === originalBody)).toBe(true);
+    expect(ok(await main.changeRedo({ target: { type: "change", change_id: edited.change_id } })).undone).toBe(1);
+    expect(ok(await main.outputsGet({ call_id: PAST_CALL })).sections.find((section) => section.kind === "summary")).toMatchObject({ body_md: "Undoable summary edit", user_edited: true, version_count: versionCount + 1 });
 
     // Export through the scripted save panel: the file exists once the answer arrives and has the line.
     const exported = ok(await main.historyExport({ scope: { type: "call", call_id: PAST_CALL }, format: "markdown" }));

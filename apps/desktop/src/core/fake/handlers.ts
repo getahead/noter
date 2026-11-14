@@ -151,9 +151,8 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
     const summary = output?.sections.find((s) => s.summary_id === r.entity.id);
     if (summary) {
       const body = r[value] ?? "";
-      versionsOf(summary).push({ body_md: body, kind: "user_edit" });
       summary.body_md = body;
-      summary.user_edited = value === "before" ? false : true;
+      summary.user_edited = versionsOf(summary).some((version) => version.body_md === body && version.kind === "user_edit");
       if (summary.rev !== null) summary.rev += 1;
       emit("entity:changed", { type: "section", call_id: output!.call_id, section: summary });
     }
