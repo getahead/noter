@@ -1911,9 +1911,8 @@ async fn the_fixture_calls_are_seeded_as_capture_rows() {
     assert_eq!(changes, 0, "capture rows carry no change rows (D-22)");
 }
 
-/// A replayed call: on every `start_session`, the first and each capture-first restart, the
-/// engine reports the session, then levels every 200 ms. The supervisor runs one session and
-/// does not read these call ids; the harness answers the first `start_session` with the real one.
+/// A replayed call: the harness answers the fresh session with its real call id; a restarted
+/// session uses this script's event, then receives levels every 200 ms.
 const REPLAYED_CALL: &str = r#"
 {"on": "start_session", "after_ms": 0, "event": {"type": "session_started", "call_id": "call_replayed", "mic_device": "Scripted Microphone", "output_device": "Scripted Speakers"}}
 {"on": "start_session", "after_ms": 200, "event": {"type": "levels", "call_id": "call_replayed", "mic_db": -30.0, "sys_db": -30.0}}
@@ -1994,7 +1993,7 @@ async fn q7_an_engine_killed_during_a_replayed_call_comes_back_with_one_gap_of_a
 
     let (kill, _) = r.call("main", "harness.engine_kill", json!({})).await;
     assert!(kill.get("ok").is_some(), "{kill}");
-    let gaps = tokio::time::timeout(Duration::from_secs(10), async {
+    let gaps = match tokio::time::timeout(Duration::from_secs(10), async {
         loop {
             let gaps = r.restart_gaps(&call_id);
             if !gaps.is_empty() {
@@ -2004,7 +2003,13 @@ async fn q7_an_engine_killed_during_a_replayed_call_comes_back_with_one_gap_of_a
         }
     })
     .await
-    .expect("the restarted engine records its gap");
+    {
+        Ok(gaps) => gaps,
+        Err(_) => {
+            let snapshot = r.ok("main", "app_snapshot", json!({})).await;
+            panic!("the restarted engine records its gap; current state: {snapshot}");
+        }
+    };
     assert_eq!(gaps.len(), 1, "one gap per restart: {gaps:?}");
     let (t0, t1) = gaps[0];
     assert!(t0 <= t1, "the gap has ordered timestamps: {t0}..{t1}");
