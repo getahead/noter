@@ -660,26 +660,11 @@ impl Core {
         let prompt_files = self.store().read(|c| {
             let mut paths = Vec::new();
             for id in &ids {
-                let mut q = c.prepare("SELECT pv.file_path FROM prompt_versions pv JOIN items i ON i.id = pv.item_id WHERE i.call_id = ?1")?;
-                paths.extend(q.query_map([id], |r| r.get::<_, String>(0))?.collect::<Result<Vec<_>, _>>()?);
+                let mut q = c.prepare("SELECT i.call_id, pv.file_path FROM prompt_versions pv JOIN items i ON i.id = pv.item_id WHERE i.call_id = ?1")?;
+                paths.extend(q.query_map([id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?.collect::<Result<Vec<_>, _>>()?);
             }
             Ok(paths)
         })?;
-        for relative in prompt_files {
-            let path = Path::new(&relative);
-            if !path.starts_with("handoffs")
-                || !path
-                    .components()
-                    .all(|part| matches!(part, std::path::Component::Normal(_)))
-            {
-                return Err(internal("stored handoff prompt path is invalid"));
-            }
-            if let Err(error) = std::fs::remove_file(self.data_dir.join(path)) {
-                if error.kind() != std::io::ErrorKind::NotFound {
-                    return Err(internal(error));
-                }
-            }
-        }
         // @cpt-begin:cpt-noter-flow-core-library-calls-delete:p1:inst-delete-run
         // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-for
         // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-tx
@@ -697,6 +682,26 @@ impl Core {
             })));
         }
         // @cpt-end:cpt-noter-algo-core-library-calls-delete:p1:inst-del-tx
+        let deleted_ids: std::collections::HashSet<_> =
+            deleted.iter().map(|(id, _)| id.as_str()).collect();
+        for (id, relative) in prompt_files {
+            if !deleted_ids.contains(id.as_str()) {
+                continue;
+            }
+            let path = Path::new(&relative);
+            if !path.starts_with("handoffs")
+                || !path
+                    .components()
+                    .all(|part| matches!(part, std::path::Component::Normal(_)))
+            {
+                return Err(internal("stored handoff prompt path is invalid"));
+            }
+            if let Err(error) = std::fs::remove_file(self.data_dir.join(path)) {
+                if error.kind() != std::io::ErrorKind::NotFound {
+                    return Err(internal(error));
+                }
+            }
+        }
         for (id, _) in &deleted {
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-files
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-catch
