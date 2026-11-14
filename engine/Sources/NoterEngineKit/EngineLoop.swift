@@ -175,6 +175,9 @@ public final class EngineLoop: @unchecked Sendable {
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
             writer.emit(.sessionStarted(callId: start.callId, micDevice: audio.devices.mic, outputDevice: audio.devices.output))
             // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-session-started
+            if !audio.microphoneAvailable {
+                writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "no microphone; capturing system audio only"))
+            }
             // @cpt-begin:cpt-noter-flow-core-engine-capture-recover:p1:inst-capture-first
             // The taps run already; the model loads behind them (what was said meanwhile is decoded
             // then), and after a restart the ring's unconfirmed tail is decoded behind the load.

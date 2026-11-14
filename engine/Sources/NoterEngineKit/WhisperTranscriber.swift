@@ -22,8 +22,8 @@ public final class WhisperTranscriber: Transcriber, @unchecked Sendable {
     public func decode(_ samples: [Float], languages: [String]) throws -> Decoded {
         try Self.blocking { [whisper] in
             // Language ID among the session's languages; one language given is taken as is.
-            let probabilities: [String: Float] =
-                languages.count == 1 ? [languages[0]: 1] : try await whisper.detectLangauge(audioArray: samples).langProbs
+            let logProbabilities = languages.count == 1 ? [:] : try await whisper.detectLangauge(audioArray: samples).langProbs
+            let probabilities = Self.languageProbabilities(languages, logProbabilities)
             let (lang, langP) = LiveASR.language(probabilities, among: languages)
             let options = DecodingOptions(
                 language: lang, temperatureFallbackCount: 2, usePrefillPrompt: true, detectLanguage: false,
@@ -36,6 +36,10 @@ public final class WhisperTranscriber: Transcriber, @unchecked Sendable {
         }
     }
     // @cpt-end:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-lang-id
+
+    static func languageProbabilities(_ languages: [String], _ logProbabilities: [String: Float]) -> [String: Float] {
+        languages.count == 1 ? [languages[0]: 1] : logProbabilities.mapValues { exp($0) }
+    }
 
     /// Runs async WhisperKit work on the caller's thread (the decode queue).
     /// WhisperKit is not `Sendable`; the decode queue is its only user, one call at a time.

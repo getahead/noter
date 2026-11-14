@@ -318,8 +318,9 @@ final class CaptureSession: @unchecked Sendable {
         lock.withLock {
             guard live, pausedAt == nil else { return }
             let to = Double(CaptureRing.rate)
-            let count = resampled[chunk.channel, default: Resampled()].count(chunk.samples.count, from: chunk.sampleRate, to: to)
-            let samples = Mix.resample(chunk.samples, from: chunk.sampleRate, to: to, count: count)
+            var resampler = resampled[chunk.channel, default: Resampled()]
+            let samples = resampler.process(chunk.samples, from: chunk.sampleRate, to: to)
+            resampled[chunk.channel] = resampler
             // @cpt-begin:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-return-zero
             if chunk.channel == .sys,
                 let fact = zeros.feed(

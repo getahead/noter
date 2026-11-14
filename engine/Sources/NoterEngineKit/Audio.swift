@@ -41,19 +41,52 @@ public enum Mix {
     }
 }
 
-/// One channel's samples in and out of `Mix.resample` since its rate last changed: each chunk
-/// gets the output count the whole stream is owed, so call time stays exact.
+/// One channel's filtered samples at a new rate. Its low-pass history and output phase survive
+/// chunk boundaries, while cumulative rounding keeps the stream's duration exact.
+// @cpt-algo:cpt-noter-algo-core-engine-capture-live-asr:p1
 struct Resampled {
+    private static let taps = 127
     private var rate = 0.0
     private var input = 0
     private var output = 0
+    private var history: [Float] = []
 
-    mutating func count(_ samples: Int, from: Double, to: Double) -> Int {
-        if from != rate { (rate, input, output) = (from, 0, 0) }
-        input += samples
-        let owed = Int(Double(input) * to / from) - output
-        output += owed
-        return owed
+    mutating func process(_ samples: [Float], from: Double, to: Double) -> [Float] {
+        if from != rate { (rate, input, output, history) = (from, 0, 0, []) }
+        guard from > to, !samples.isEmpty else {
+            return from == to ? samples : Mix.resample(samples, from: from, to: to)
+        }
+        let base = input - history.count
+        history += samples
+        input += samples.count
+        let end = Int(Double(input) * to / from)
+        let cutoff = min(1, to / from) / 2
+        let coefficients = (0..<Self.taps).map { tap -> Double in
+            let x = Double(tap - Self.taps / 2)
+            let window = 0.5 + 0.5 * cos(.pi * x / Double(Self.taps / 2))
+            let angle = 2 * .pi * cutoff * x
+            return (tap == Self.taps / 2 ? 2 * cutoff : sin(angle) / (.pi * x)) * window
+        }
+        let norm = coefficients.reduce(0, +)
+        let result = (output..<end).map { out -> Float in
+            let at = Double(out) * from / to
+            let center = Int(at)
+            var value = 0.0
+            for (tap, coefficient) in coefficients.enumerated() {
+                let index = center - tap
+                let sample: Float
+                if index < 0 || index < base {
+                    sample = 0
+                } else {
+                    sample = history[index - base]
+                }
+                value += Double(sample) * coefficient
+            }
+            return Float(value / norm)
+        }
+        output = end
+        history = Array(history.suffix(Self.taps))
+        return result
     }
 }
 
@@ -77,6 +110,7 @@ public protocol AudioSource: AnyObject, Sendable {
     func stop()
     /// The microphone and the output device by name, for `session_started`.
     var devices: (mic: String, output: String) { get }
+    var microphoneAvailable: Bool { get }
     /// Leaves a running app out of the system channel from now on (`exclude_process`).
     func exclude(bundleId: String) throws
     /// `handler` hears of every microphone swap, before audio from the new device arrives.
@@ -85,6 +119,7 @@ public protocol AudioSource: AnyObject, Sendable {
 
 extension AudioSource {
     public var devices: (mic: String, output: String) { ("", "") }
+    public var microphoneAvailable: Bool { true }
     public func exclude(bundleId: String) throws {}
     public func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {}
 }

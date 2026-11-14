@@ -44,7 +44,7 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
             self.onChunk = onChunk
             do {
                 try createTap()
-                try openDevice(mic: try Self.wantedMic(preferredMic)) {}
+                try openDevice(mic: try? Self.wantedMic(preferredMic)) {}
             } catch {
                 close()
                 throw error
@@ -97,6 +97,9 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         return (mic.flatMap(Self.name(uid:)) ?? "", Self.defaultOutputName() ?? "")
     }
 
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
+    public var microphoneAvailable: Bool { lock.withLock { micUID != nil } }
+
     private func check(_ status: OSStatus, _ what: String) throws {
         if status != noErr { throw Failure(description: "could not \(what) (OSStatus \(status))") }
     }
@@ -122,24 +125,18 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         (self.tap, tapDescription) = (tap, description)
     }
 
-    /// The aggregate of `mic` and the tap, started after `beforeStart`. Caller holds the lock.
-    private func openDevice(mic: String, beforeStart: () -> Void) throws {
-        guard let micDevice = Self.device(uid: mic), let tapUID = tapDescription?.uuid.uuidString, let onChunk
-        else { throw Failure(description: "no microphone \(mic)") }
+    /// The aggregate of the optional mic and tap, started after `beforeStart`. Caller holds the lock.
+    private func openDevice(mic: String?, beforeStart: () -> Void) throws {
+        guard let tapUID = tapDescription?.uuid.uuidString, let onChunk else {
+            throw Failure(description: "no system audio tap")
+        }
+        let micDevice = try Self.microphoneDevice(mic, lookup: Self.device(uid:))
         let deliver = Self.handOff(on: delivery, onChunk)
-        let aggregate: [String: Any] = [
-            kAudioAggregateDeviceNameKey: "Noter capture",
-            kAudioAggregateDeviceUIDKey: UUID().uuidString,
-            kAudioAggregateDeviceIsPrivateKey: true,
-            kAudioAggregateDeviceMainSubDeviceKey: mic,
-            kAudioAggregateDeviceSubDeviceListKey: [[kAudioSubDeviceUIDKey: mic]],
-            kAudioAggregateDeviceTapAutoStartKey: true,
-            kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: tapUID, kAudioSubTapDriftCompensationKey: true]],
-        ]
+        let aggregate = Self.aggregateDescription(tapUID: tapUID, microphoneUID: mic)
         var device = AudioObjectID(kAudioObjectUnknown)
         try check(AudioHardwareCreateAggregateDevice(aggregate as CFDictionary, &device), "create the capture device")
         (self.device, micUID) = (device, mic)
-        let micBuffers = Self.inputBuffers(micDevice)
+        let micBuffers = Self.microphoneBufferCount(micDevice, count: Self.inputBuffers)
         let rate = try Self.sampleRate(device)
         var proc: AudioDeviceIOProcID?
         try check(
@@ -156,6 +153,34 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         self.proc = proc
         beforeStart()
         try check(AudioDeviceStart(device, proc), "start the capture")
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
+    static func aggregateDescription(tapUID: String, microphoneUID: String?) -> [String: Any] {
+        var aggregate: [String: Any] = [
+            kAudioAggregateDeviceNameKey: "Noter capture",
+            kAudioAggregateDeviceUIDKey: UUID().uuidString,
+            kAudioAggregateDeviceIsPrivateKey: true,
+            kAudioAggregateDeviceTapAutoStartKey: true,
+            kAudioAggregateDeviceTapListKey: [[kAudioSubTapUIDKey: tapUID, kAudioSubTapDriftCompensationKey: true]],
+        ]
+        if let microphoneUID {
+            aggregate[kAudioAggregateDeviceMainSubDeviceKey] = microphoneUID
+            aggregate[kAudioAggregateDeviceSubDeviceListKey] = [[kAudioSubDeviceUIDKey: microphoneUID]]
+        }
+        return aggregate
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
+    static func microphoneDevice(_ uid: String?, lookup: (String) -> AudioObjectID?) throws -> AudioObjectID? {
+        guard let uid else { return nil }
+        guard let device = lookup(uid) else { throw Failure(description: "no microphone \(uid)") }
+        return device
+    }
+
+    // @cpt-flow:cpt-noter-flow-core-engine-capture-session:p1
+    static func microphoneBufferCount(_ device: AudioObjectID?, count: (AudioObjectID) -> Int) -> Int {
+        device.map(count) ?? 0
     }
 
     /// Caller holds the lock.
@@ -201,14 +226,15 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
     /// The microphone went away or the default input moved: capture goes on with the new one.
     private func devicesChanged() {
-        guard let mic = try? Self.wantedMic(preferredMic) else { return }
+        let mic = try? Self.wantedMic(preferredMic)
         lock.withLock {
             guard device != kAudioObjectUnknown, mic != micUID else { return }
             let lost = Self.epochMs()
             closeDevice()
             do {
                 try openDevice(mic: mic) { [onDevice, delivery] in
-                    let change = DeviceChange(name: Self.name(uid: mic) ?? mic, lostAtMs: lost, backAtMs: Self.epochMs())
+                    let name = mic.flatMap(Self.name(uid:)) ?? "No microphone"
+                    let change = DeviceChange(name: name, lostAtMs: lost, backAtMs: Self.epochMs())
                     delivery.async { onDevice?(change) }  // after the old device's chunks
                 }
             } catch {

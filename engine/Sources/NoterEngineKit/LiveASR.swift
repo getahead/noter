@@ -256,7 +256,9 @@ final class LiveASR: @unchecked Sendable {
         }
         // Language ID once per utterance for its hypotheses; the confirmation decides on all of it.
         let (transcriber, languages, glossary) = lock.withLock {
-            let session = lastLang[channel].map { last in [last] + self.languages.filter { $0 != last } } ?? self.languages
+            let session = self.languages.isEmpty
+                ? []
+                : lastLang[channel].map { last in [last] + self.languages.filter { $0 != last } } ?? self.languages
             return (self.transcriber, confirmed ? session : utteranceLang[u.id].map { [$0] } ?? session, self.glossary)
         }
         let samples = confirmed ? Array(u.audio.prefix(u.speechSamples)) : u.audio
@@ -266,6 +268,7 @@ final class LiveASR: @unchecked Sendable {
                 utteranceLang[u.id] = nil
                 if let d, Self.keep(d) { lastLang[channel] = d.lang }
             } else if let d, utteranceLang[u.id] == nil { utteranceLang[u.id] = d.lang }
+            if confirmed, d != nil { (stallSince, stallReported) = (nil, false) }
         }
         guard let d, Self.keep(d) else { return }
         // @cpt-begin:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-confirm
@@ -278,7 +281,6 @@ final class LiveASR: @unchecked Sendable {
             text: text.trimmingCharacters(in: .whitespacesAndNewlines), wordsPath: nil, avgLogprob: d.avgLogprob,
             noSpeechP: d.noSpeechP, corrections: corrections, crosstalkLabels: [])
         // @cpt-end:cpt-noter-algo-core-engine-capture-live-asr:p1:inst-confirm
-        lock.withLock { (stallSince, stallReported) = (nil, false) }
         writer.emit(.segment(segment))
     }
 
@@ -290,9 +292,9 @@ final class LiveASR: @unchecked Sendable {
         "untertitel der amaraorg community", "untertitelung des zdf 2020",
     ]
 
-    /// The utterance's language among the session's (none: any) from language ID's log
-    /// probabilities. WhisperKit gives only its top language; one outside the session is not
-    /// taken: the first session language is (the channel's last one, which leads the list).
+    /// The utterance's language among the session's (none: any) from language ID's probabilities.
+    /// WhisperKit gives only its top language; one outside the session is not taken: the first
+    /// session language is the channel's last one, which leads the list.
     static func language(_ probabilities: [String: Float], among languages: [String]) -> (lang: String, p: Float) {
         let allowed = languages.isEmpty ? probabilities : probabilities.filter { languages.contains($0.key) }
         if let top = allowed.max(by: { $0.value < $1.value }) { return (top.key, top.value) }
