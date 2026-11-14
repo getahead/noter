@@ -3,11 +3,14 @@
 //! `-secret-boundary` for API keys, state `-key` without removal): `accounts_get` and
 //! `api_key_set` on the scripted runtime with the in-memory Keychain stand-in (TL-13).
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
 use noter_core::{
-    Adapters, Clock, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted, Secret, SecretStore,
+    Adapters, Core, CoreDeps, EventEmitter, MemorySecrets, Scripted, Secret, SecretStore,
 };
 use noter_llm::{Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind};
 use noter_protocol::error::RuntimeUnavailableReason;
@@ -49,14 +52,6 @@ impl Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        NOW
-    }
-}
-
 struct World {
     core: Core,
     events: Arc<Events>,
@@ -71,7 +66,7 @@ fn open(dir: &Path, script: Option<&str>) -> World {
     let deps = CoreDeps {
         llm: Adapters::scripted(&scripted),
         secrets: secrets.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW.0)), events.clone())
     };
     let core = Core::open(dir, deps).expect("core opens");
     World {

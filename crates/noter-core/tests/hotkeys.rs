@@ -1,13 +1,14 @@
 //! FEATURE cpt-noter-feature-core-settings: app hotkeys registered at launch, set, cleared and
 //! reset, with chords checked against missing modifiers, reserved chords and conflicts.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
-use noter_core::{
-    Clock, Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS,
-};
+use noter_core::{Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use noter_db::rusqlite::Connection;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
@@ -30,14 +31,6 @@ impl Events {
             .into_iter()
             .map(|(n, _)| n)
             .collect()
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
     }
 }
 
@@ -83,7 +76,7 @@ fn open_with(dir: &Path, shortcuts: Arc<Shortcuts>) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
     let deps = CoreDeps {
         shortcuts,
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone())
     };
     (Core::open(dir, deps).expect("core opens"), events)
 }
@@ -467,7 +460,10 @@ async fn only_the_settings_window_sets_hotkeys() {
 
 #[test]
 fn the_default_registrar_registration_smoke_test_accepts_a_chord() {
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_790_000_000_000)),
+        Arc::new(Events::default()),
+    );
     assert!(deps.shortcuts.register("Ctrl+Alt+Super+R").is_ok());
     deps.shortcuts.unregister("Ctrl+Alt+Super+R");
 }

@@ -2,11 +2,14 @@
 //! `person_update`, `people_merge` and `person_delete` over the people tables.
 
 mod common;
+#[path = "common/test_support.rs"]
+mod test_support;
 use common::{call, count, exec, item, part, person, row, speaker, text};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_db::Insert;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -37,17 +40,9 @@ impl Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
-
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
     (Core::open(dir, deps).expect("core opens"), events)
 }
 

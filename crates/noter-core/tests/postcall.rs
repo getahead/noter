@@ -2,10 +2,13 @@
 //! live transcript section by section through the router (the scripted runtime here), and the
 //! outputs commands read, edit, compare and undo them. Paused tokio time throughout.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
-use noter_core::{Adapters, Clock, Core, CoreDeps, EventEmitter, Scripted};
+use noter_core::{Adapters, Core, CoreDeps, EventEmitter, Scripted};
 use noter_db::Insert;
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -23,14 +26,6 @@ use serde_json::{json, Value};
 
 const NOW: i64 = 1_790_000_000_000;
 const CALL: &str = "call_pc";
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
 
 #[derive(Default)]
 struct Events(Mutex<Vec<(&'static str, Value)>>);
@@ -70,7 +65,7 @@ async fn open(script: &str) -> (Arc<Core>, Arc<Events>, tempfile::TempDir) {
     let scripted = Scripted::parse(script).unwrap();
     let deps = CoreDeps {
         llm: Adapters::scripted(&scripted),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone())
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
@@ -179,7 +174,7 @@ async fn postcall_applies_the_enabled_name_pseudonym_policy_to_its_cloud_packet(
     let scripted = Scripted::parse("").unwrap();
     let deps = CoreDeps {
         llm: Adapters::scripted(&scripted),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone())
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();

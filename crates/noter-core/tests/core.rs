@@ -1,9 +1,12 @@
 //! FEATURE cpt-noter-feature-core-ipc-host: the composition root, app snapshot, banners,
 //! whole-state versions and UI logs without content.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
 use noter_core::{Clock, Core, CoreDeps, EventEmitter};
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
@@ -26,17 +29,9 @@ impl Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
-    }
-}
-
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone());
     (Core::open(dir, deps).expect("core opens"), events)
 }
 
@@ -302,7 +297,10 @@ async fn core_log_records_keep_only_the_allow_list() {
 async fn a_broken_database_is_a_boot_error() {
     let dir = tempfile::tempdir().unwrap();
     std::fs::write(dir.path().join("noter.db"), vec![0x5a; 8192]).unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_790_000_000_000)),
+        Arc::new(Events::default()),
+    );
     let err = Core::open(dir.path(), deps).err().expect("boot fails");
     assert!(err.to_string().contains("database"), "{err}");
     // The log names the kind of failure, never the error's text.
@@ -312,7 +310,10 @@ async fn a_broken_database_is_a_boot_error() {
         (json!("storage"), json!("corrupt"))
     );
     assert!(line.get("message").is_none());
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_790_000_000_000)),
+        Arc::new(Events::default()),
+    );
     let file = dir.path().join("plain-file");
     std::fs::write(&file, b"x").unwrap();
     let err = Core::open(&file, deps).err().expect("not a folder");
@@ -345,7 +346,10 @@ async fn the_snapshot_carries_the_app_version_the_host_gives() {
     let dir = tempfile::tempdir().unwrap();
     let deps = CoreDeps {
         app_version: "0.2.0".into(),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(Events::default()),
+        )
     };
     let core = Core::open(dir.path(), deps).unwrap();
     let snap = core

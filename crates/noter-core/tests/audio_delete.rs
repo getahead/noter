@@ -1,10 +1,13 @@
 //! FEATURE cpt-noter-feature-core-speakers-audio (slice 3): `audio_delete` and
 //! `audio_delete_older`: stored audio goes, the transcript stays, the change is not undoable.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_db::Insert;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
@@ -24,17 +27,9 @@ impl EventEmitter for Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
-
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
     (Core::open(dir, deps).expect("core opens"), events)
 }
 
@@ -219,7 +214,7 @@ async fn audio_delete_uses_the_engine_container_as_its_call_folder_root() {
     let events = Arc::new(Events::default());
     let deps = CoreDeps {
         models_dir: Some(container.path().join("models")),
-        ..CoreDeps::new(Arc::new(FixedClock), events)
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events)
     };
     let core = Core::open(data.path(), deps).unwrap();
     core.store()

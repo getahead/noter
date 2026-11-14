@@ -13,13 +13,14 @@ use noter_core_harness::boot::{Harness, Options};
 use noter_core_harness::{serve_with, Output};
 use noter_engine_client::scripted::Script;
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream, Lines as LineReader};
-use tokio::task::JoinHandle;
+use tokio::io::AsyncWriteExt;
+
+#[path = "common/runner.rs"]
+mod runner;
+use runner::Runner as WireRunner;
 
 struct Runner {
-    input: DuplexStream,
-    output: LineReader<BufReader<DuplexStream>>,
-    served: Option<JoinHandle<std::io::Result<()>>>,
+    wire: Option<WireRunner>,
     next: u64,
     core: Arc<Core>,
     data_dir: PathBuf,
@@ -44,9 +45,7 @@ async fn start_with(options: Options) -> Runner {
     let core = harness.core();
     let served = tokio::spawn(serve_with(core.clone(), harness, core_in, out));
     let mut runner = Runner {
-        input,
-        output: BufReader::new(output).lines(),
-        served: Some(served),
+        wire: Some(WireRunner::new(input, output, served)),
         next: 1,
         core,
         data_dir: PathBuf::new(),
@@ -58,12 +57,11 @@ async fn start_with(options: Options) -> Runner {
 
 impl Runner {
     async fn line(&mut self) -> Value {
-        let line = tokio::time::timeout(Duration::from_secs(5), self.output.next_line())
+        self.wire
+            .as_mut()
+            .expect("runner wire is open")
+            .line()
             .await
-            .expect("a line within 5 s")
-            .unwrap()
-            .expect("the harness is still writing");
-        serde_json::from_str(&line).unwrap()
     }
 
     /// Sends one request and returns its answer, with the event lines written before it.
@@ -71,10 +69,11 @@ impl Runner {
         let id = self.next;
         self.next += 1;
         let req = json!({ "id": id, "window": window, "cmd": cmd, "args": args });
-        self.input
-            .write_all(format!("{req}\n").as_bytes())
-            .await
-            .unwrap();
+        self.wire
+            .as_mut()
+            .expect("runner wire is open")
+            .send(req)
+            .await;
         let mut events = vec![];
         loop {
             let line = self.line().await;
@@ -106,10 +105,11 @@ impl Runner {
         let id = self.next;
         self.next += 1;
         let req = json!({ "id": id, "window": window, "cmd": cmd, "args": args, "channel": true });
-        self.input
-            .write_all(format!("{req}\n").as_bytes())
-            .await
-            .unwrap();
+        self.wire
+            .as_mut()
+            .expect("runner wire is open")
+            .send(req)
+            .await;
         loop {
             let line = self.line().await;
             if line["id"] == id {
@@ -120,17 +120,17 @@ impl Runner {
     }
 
     async fn finish(mut self) {
-        self.input.shutdown().await.unwrap();
-        while self.output.next_line().await.unwrap().is_some() {}
-        self.served.take().unwrap().await.unwrap().unwrap();
+        self.wire
+            .take()
+            .expect("runner wire is open")
+            .finish()
+            .await;
     }
 }
 
 impl Drop for Runner {
     fn drop(&mut self) {
-        if let Some(served) = self.served.take() {
-            served.abort();
-        }
+        drop(self.wire.take());
         let _ = std::fs::remove_dir_all(&self.data_dir);
     }
 }
@@ -408,10 +408,11 @@ async fn the_scripted_engine_lets_the_self_test_pass() {
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
-    r.input
-        .write_all(format!("{req}\n").as_bytes())
-        .await
-        .unwrap();
+    r.wire
+        .as_mut()
+        .expect("runner wire is open")
+        .send(req)
+        .await;
     let mut seen = vec![];
     loop {
         let line = r.line().await;
@@ -978,10 +979,11 @@ async fn push_reaches_the_running_self_test_as_an_engine_fact() {
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
-    r.input
-        .write_all(format!("{req}\n").as_bytes())
-        .await
-        .unwrap();
+    r.wire
+        .as_mut()
+        .expect("runner wire is open")
+        .send(req)
+        .await;
     // The held script cannot report its own result, so this injected event controls the outcome.
     let push = r
         .call(
@@ -1046,10 +1048,11 @@ async fn engine_fact_reaches_a_running_engine_and_kill_is_accepted() {
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "settings", "cmd": "self_test_run", "args": { "play_clip": false }, "channel": true });
-    r.input
-        .write_all(format!("{req}\n").as_bytes())
-        .await
-        .unwrap();
+    r.wire
+        .as_mut()
+        .expect("runner wire is open")
+        .send(req)
+        .await;
     let mut delivered = json!(false);
     for _ in 0..50 {
         let (fact, _) = r.call("main", "harness.engine_fact", fact.clone()).await;
@@ -2085,10 +2088,11 @@ async fn pushed_hypotheses_gaps_and_marks_reach_the_open_channel() {
         let id = r.next;
         r.next += 1;
         let req = json!({ "id": id, "window": "main", "cmd": "harness.push", "args": { "cmd": "transcript_subscribe", "body": { "event": event } } });
-        r.input
-            .write_all(format!("{req}\n").as_bytes())
-            .await
-            .unwrap();
+        r.wire
+            .as_mut()
+            .expect("runner wire is open")
+            .send(req)
+            .await;
     }
     let mut seen: Vec<String> = vec![];
     let all = |seen: &[String]| {
@@ -2150,10 +2154,11 @@ async fn a_pushed_hypothesis_replaces_the_repeating_one_and_ended_closes_the_str
     let id = r.next;
     r.next += 1;
     let req = json!({ "id": id, "window": "main", "cmd": "harness.push", "args": { "cmd": "transcript_subscribe", "body": { "event": { "type": "ended", "reason": "lagged" } } } });
-    r.input
-        .write_all(format!("{req}\n").as_bytes())
-        .await
-        .unwrap();
+    r.wire
+        .as_mut()
+        .expect("runner wire is open")
+        .send(req)
+        .await;
     loop {
         let line = r.line().await;
         if line["message"]["event"]["type"] == "ended" {

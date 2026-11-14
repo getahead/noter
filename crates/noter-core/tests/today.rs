@@ -1,13 +1,16 @@
 //! FEATURE cpt-noter-feature-core-items-today (slice 2): call tags, the carry-forward query and
 //! Today. Calendar reads go through a scripted `NativeServices`.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
 use noter_core::{
-    BoxFuture, CalendarAttendee, CalendarEvent, Clock, Core, CoreDeps, EnvironmentReading,
-    EventEmitter, NativeServices,
+    BoxFuture, CalendarAttendee, CalendarEvent, Core, CoreDeps, EnvironmentReading, EventEmitter,
+    NativeServices,
 };
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -40,14 +43,6 @@ impl Events {
             .partition(|(e, _)| *e == name);
         *all = kept;
         taken.into_iter().map(|(_, p)| p).collect()
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
     }
 }
 
@@ -88,7 +83,7 @@ impl NativeServices for Calendar {
 
 fn open_with(dir: &Path, native: Option<Calendar>) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let mut deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let mut deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
     if let Some(native) = native {
         deps.native = Arc::new(native);
     }

@@ -1,10 +1,13 @@
 //! FEATURE cpt-noter-feature-core-settings: typed sections with one revision, ignored apps
 //! and the glossary, each change logged and broadcast whole.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_db::rusqlite::Connection;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
@@ -27,17 +30,9 @@ impl Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
-    }
-}
-
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone());
     (Core::open(dir, deps).expect("core opens"), events)
 }
 
@@ -557,7 +552,10 @@ async fn an_unreadable_settings_revision_stops_the_boot() {
     )
     .unwrap();
     drop(c);
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_790_000_000_000)),
+        Arc::new(Events::default()),
+    );
     let err = Core::open(dir.path(), deps).err().expect("boot fails");
     assert!(err.to_string().contains("stored settings"));
 }

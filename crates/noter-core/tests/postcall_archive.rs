@@ -2,12 +2,15 @@
 //! suggested items with their evidence, the merge regeneration, the archive pass and the
 //! Summary-ready notification. The scripted runtime and the scripted engine answer; paused time.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
-    Adapters, Clock, Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement,
-    Scripted, Surfaces, TrayModel,
+    Adapters, Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Scripted,
+    Surfaces, TrayModel,
 };
 use noter_db::Insert;
 use noter_engine_client::scripted::{Script, ScriptedEngine};
@@ -19,14 +22,6 @@ use serde_json::{json, Value};
 
 const NOW: i64 = 1_790_000_000_000;
 const CALL: &str = "call_pc";
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
 
 #[derive(Default)]
 struct Events(Mutex<Vec<(&'static str, Value)>>);
@@ -106,7 +101,7 @@ async fn open_with_offline_script(
     let mut deps = CoreDeps {
         llm: Adapters::scripted(&scripted),
         surfaces: posted.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone())
     };
     let mut engine = ScriptedEngine::new();
     if let Some(offline_script) = offline_script {
