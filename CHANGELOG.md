@@ -1,5 +1,42 @@
 # Changelog
 
+## [0.22.11](https://github.com/getahead/noter/compare/v0.22.10...v0.22.11) (2026-11-14)
+
+
+### Bug fixes
+
+* **core:** improve scoped retrieval evidence quality ([#808](https://github.com/getahead/noter/issues/808)) ([d68dfc0](https://github.com/getahead/noter/commit/d68dfc0edbea0e7a789c931c6cd184201b236caa))
+* **core:** isolate capture diagnostics and notices ([#791](https://github.com/getahead/noter/issues/791)) ([2b772e4](https://github.com/getahead/noter/commit/2b772e43e666578131eb08d611b2e8162449ab8a)), closes [#604](https://github.com/getahead/noter/issues/604) [#606](https://github.com/getahead/noter/issues/606) [#614](https://github.com/getahead/noter/issues/614) [#619](https://github.com/getahead/noter/issues/619)
+* **core:** keep folder sync and source lifecycle current ([#812](https://github.com/getahead/noter/issues/812)) ([81b988a](https://github.com/getahead/noter/commit/81b988a2296793d22f10639a75a790f97026c482))
+* **core:** make account probes and sign-in tests reliable ([#811](https://github.com/getahead/noter/issues/811)) ([4b00db6](https://github.com/getahead/noter/commit/4b00db654f05515676eea92c99c5296a0e1e60ef))
+* **core:** order deferred job completion ([#818](https://github.com/getahead/noter/issues/818)) ([f72a4dc](https://github.com/getahead/noter/commit/f72a4dc41efde9fa8c7d0c906bf0d1515962dfef)), closes [#586](https://github.com/getahead/noter/issues/586) [#603](https://github.com/getahead/noter/issues/603) [#625](https://github.com/getahead/noter/issues/625)
+* **core:** preserve archive and transcript state across stops ([#793](https://github.com/getahead/noter/issues/793)) ([2762169](https://github.com/getahead/noter/commit/2762169d242cfc98fd7c7d992f8c4a50056dbf05))
+* **core:** preserve capture state across engine restarts ([#804](https://github.com/getahead/noter/issues/804)) ([07c3176](https://github.com/getahead/noter/commit/07c3176ef8a46a26d5723bb59215144eaf1e9df6))
+* **core:** preserve recoverable call recordings and deletion ([#800](https://github.com/getahead/noter/issues/800)) ([16327c0](https://github.com/getahead/noter/commit/16327c05d0392b54d01642459da2d5b6b78625a7))
+* **core:** prevent presenting deadlocks and stabilize native recovery ([#809](https://github.com/getahead/noter/issues/809)) ([540f64c](https://github.com/getahead/noter/commit/540f64c6c91aad5a9c3eb50d1d4d90208891bad4))
+* **core:** protect model context, handoff evidence, and exports ([#802](https://github.com/getahead/noter/issues/802)) ([008d5ef](https://github.com/getahead/noter/commit/008d5efb58482d42d2fbde0473cb69c4bd8b9a6b))
+* **engine:** preserve capture quality across sessions ([#814](https://github.com/getahead/noter/issues/814)) ([50c00e1](https://github.com/getahead/noter/commit/50c00e16103f92d848c1bdf0785c6036cd9409f2))
+* **fake:** align history, handoff, and audio behavior ([#813](https://github.com/getahead/noter/issues/813)) ([195868c](https://github.com/getahead/noter/commit/195868c37a1fd5b4a6e19dce4942afb0c2952c64))
+* **history:** show accurate authors and complete history efficiently ([#795](https://github.com/getahead/noter/issues/795)) ([3b32c11](https://github.com/getahead/noter/commit/3b32c11b379b0c6dfdd8d3044973bf594cff31de))
+* **host:** place native call surfaces within display bounds ([#805](https://github.com/getahead/noter/issues/805)) ([78edf2d](https://github.com/getahead/noter/commit/78edf2dce64307fd1566c170b38547079be64b34)), closes [#489](https://github.com/getahead/noter/issues/489) [#490](https://github.com/getahead/noter/issues/490) [#686](https://github.com/getahead/noter/issues/686) [#707](https://github.com/getahead/noter/issues/707) [#751](https://github.com/getahead/noter/issues/751)
+* **host:** repair native quit and window lifecycle ([#801](https://github.com/getahead/noter/issues/801)) ([a260883](https://github.com/getahead/noter/commit/a260883f8dd0b70b769ed54ae889d43175888509))
+* **ui:** correct output views and sharing interactions ([#803](https://github.com/getahead/noter/issues/803)) ([cea3073](https://github.com/getahead/noter/commit/cea3073f7dc818976f39a993fe953ea54e9b6788))
+* **ui:** correct transcript lines, terms and focus ([#796](https://github.com/getahead/noter/issues/796)) ([4f31b52](https://github.com/getahead/noter/commit/4f31b52454bffe9a7c6adfb9da86a0a2277fbfcf))
+* **ui:** keep call flow failures visible ([#816](https://github.com/getahead/noter/issues/816)) ([6130d87](https://github.com/getahead/noter/commit/6130d87316ce5d7ec7b0ce99fb0131d089921802))
+* **ui:** keep Calls paging and selection consistent ([#798](https://github.com/getahead/noter/issues/798)) ([4ab9328](https://github.com/getahead/noter/commit/4ab9328e9a36eabda3fe8eb28c1e17d8a60eb600))
+* **ui:** keep item review flow current ([#790](https://github.com/getahead/noter/issues/790)) ([b6a76c1](https://github.com/getahead/noter/commit/b6a76c127fbc2876c91cdfdf5c8ca6ce7924473f))
+* **ui:** keep speaker identity consistent across naming flows ([#806](https://github.com/getahead/noter/issues/806)) ([3958f2a](https://github.com/getahead/noter/commit/3958f2a2bb00ac3c14af1bb2881b1141110387d3))
+* **ui:** recover Settings and first-run failures ([#797](https://github.com/getahead/noter/issues/797)) ([ce5d09c](https://github.com/getahead/noter/commit/ce5d09c13e5f9241eb7c5c8c1d81b090ed34e93b))
+* **ui:** restore accessible announcements and focus ([#794](https://github.com/getahead/noter/issues/794)) ([aa6dcc9](https://github.com/getahead/noter/commit/aa6dcc97c203da285b2e026e8460ed1a6af67d13))
+* **ui:** restore bridge streams and fake capture parity ([#792](https://github.com/getahead/noter/issues/792)) ([e7b24c8](https://github.com/getahead/noter/commit/e7b24c884b742ed1e290406b95da5ea1387ccd71)), closes [#710](https://github.com/getahead/noter/issues/710) [#715](https://github.com/getahead/noter/issues/715) [#728](https://github.com/getahead/noter/issues/728) [#732](https://github.com/getahead/noter/issues/732) [#733](https://github.com/getahead/noter/issues/733) [#734](https://github.com/getahead/noter/issues/734)
+* **ui:** route shared keyboard and help tag behavior ([#810](https://github.com/getahead/noter/issues/810)) ([830af5a](https://github.com/getahead/noter/commit/830af5a74e0d632a77f0d37d70cbf037aab0dabe))
+
+
+### Performance
+
+* **engine:** reduce offline archive and file replay work ([#821](https://github.com/getahead/noter/issues/821)) ([fe6e263](https://github.com/getahead/noter/commit/fe6e263d9c48ba51b52394aaed16d13c861054dd))
+* **ui:** streamline formatters and transcript updates ([#815](https://github.com/getahead/noter/issues/815)) ([b96caac](https://github.com/getahead/noter/commit/b96caac27b861261c1d1fab978b41fd92e163893))
+
 ## [0.22.10](https://github.com/getahead/noter/compare/v0.22.9...v0.22.10) (2026-11-13)
 
 
