@@ -232,32 +232,53 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
             w.app.capture = idle;
             let backend = CallId::new("call_backend");
             for id in ["itm_replay", "itm_notif", "itm_reconnect_q"] {
-                let item = w.items.iter_mut().find(|item| item.id.as_str() == id)
+                let item = w
+                    .items
+                    .iter_mut()
+                    .find(|item| item.id.as_str() == id)
                     .ok_or_else(|| format!("menu-review scenario: missing {id}"))?;
                 item.call.id = backend.clone();
                 item.call.title = "Backend sync".into();
                 item.review = ReviewState::Suggested;
                 item.status = ItemStatus::Open;
             }
-            let by_id = |id: &str| w.items.iter().find(|item| item.id.as_str() == id).cloned().unwrap();
+            let by_id = |id: &str| {
+                w.items
+                    .iter()
+                    .find(|item| item.id.as_str() == id)
+                    .cloned()
+                    .unwrap()
+            };
             let action_item = by_id("itm_replay");
             let decision = by_id("itm_notif");
             let question = by_id("itm_reconnect_q");
-            let call = w.calls.iter_mut().find(|call| call.id == backend)
+            let call = w
+                .calls
+                .iter_mut()
+                .find(|call| call.id == backend)
                 .ok_or("menu-review scenario: missing Backend sync call")?;
             call.status = CallStatus::Ready;
             call.outputs = OutputsStatus::Ready;
             call.open_items = 3;
             call.review_waiting = 3;
-            let detail = w.call_details.iter_mut().find(|detail| detail.call.id == backend)
+            let detail = w
+                .call_details
+                .iter_mut()
+                .find(|detail| detail.call.id == backend)
                 .ok_or("menu-review scenario: missing Backend sync details")?;
             detail.call.status = CallStatus::Ready;
             detail.call.outputs = OutputsStatus::Ready;
             detail.call.open_items = 3;
             detail.call.review_waiting = 3;
-            let outputs = w.outputs.iter_mut().find(|outputs| outputs.call_id == backend)
+            let outputs = w
+                .outputs
+                .iter_mut()
+                .find(|outputs| outputs.call_id == backend)
                 .ok_or("menu-review scenario: missing Backend sync outputs")?;
-            let action_index = outputs.sections.iter().position(|section| section.kind == SectionKind::ActionItems)
+            let action_index = outputs
+                .sections
+                .iter()
+                .position(|section| section.kind == SectionKind::ActionItems)
                 .ok_or("menu-review scenario: missing Action Items section")?;
             outputs.sections[action_index].items = vec![action_item];
             let mut decisions = outputs.sections[action_index].clone();

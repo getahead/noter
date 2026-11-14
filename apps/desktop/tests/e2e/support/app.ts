@@ -109,6 +109,7 @@ type Callback = (x: unknown) => void;
 type Answer = { ok: unknown } | { error: unknown };
 interface PageIpc {
   __noterCalls?: Call[];
+  __noterEmits?: Array<{ event: string; payload: unknown }>;
   __noterDeliver?: (doc: string, id: number, x: unknown) => void;
   __noterInvoke: (doc: string, cmd: string, args: unknown, channel: number | null) => Promise<Answer>;
   __noterListen: (doc: string, event: string, handler: number) => Promise<void>;
@@ -135,14 +136,17 @@ function tauriIpcStandIn(): void {
       return id;
     },
     unregisterCallback: (id: number) => callbacks.delete(id),
-    async invoke(cmd: string, payload: { args?: unknown; channel?: { id: number }; event?: string; handler?: number; eventId?: number }) {
+    async invoke(cmd: string, payload: { args?: unknown; channel?: { id: number }; event?: string; payload?: unknown; handler?: number; eventId?: number }) {
       if (cmd === "plugin:event|listen") {
         if (payload.event !== "shell:menu-action") calls.push({ kind: "listen", name: payload.event! });
         await w.__noterListen(doc, payload.event!, payload.handler!);
         return payload.handler;
       }
       if (cmd === "plugin:event|unlisten") return w.__noterUnlisten(doc, payload.eventId!);
-      if (cmd === "plugin:event|emit") return;
+      if (cmd === "plugin:event|emit") {
+        (w.__noterEmits ??= []).push({ event: payload.event!, payload: payload.payload });
+        return;
+      }
       const call: Call = { kind: "invoke", name: cmd, args: structuredClone(payload.args), completed: false };
       calls.push(call);
       const answer = await w.__noterInvoke(doc, cmd, payload.args, payload.channel?.id ?? null);

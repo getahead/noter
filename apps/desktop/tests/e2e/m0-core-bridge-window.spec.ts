@@ -20,6 +20,10 @@ test.describe("cpt-noter-seq-core-window-open", () => {
       await expect(frame(page)).toHaveAttribute("data-window", label);
       await expect(frame(page)).toHaveAttribute("aria-busy", "false");
       await expect(page.getByRole("alert")).toHaveCount(0);
+      if (label === "main") {
+        const hostEvents = await page.evaluate(() => (globalThis as unknown as { __noterEmits?: Array<{ event: string; payload: unknown }> }).__noterEmits ?? []);
+        expect(hostEvents).toContainEqual({ event: "shell:menu-context", payload: { sidebarVisible: true } });
+      }
 
       const log = await calls(page);
       const snapshot = log.findIndex((c) => c.kind === "invoke" && c.name === "app_snapshot");
