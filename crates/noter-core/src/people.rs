@@ -42,7 +42,7 @@ pub(crate) fn short_of(name: &str) -> String {
     }
 }
 
-fn initials_of(name: &str) -> String {
+pub(crate) fn initials_of(name: &str) -> String {
     name.split_whitespace()
         .filter_map(|w| w.chars().next())
         .take(2)
@@ -142,6 +142,40 @@ pub(crate) fn chip_of(c: &Connection, person_id: &str) -> Db<Option<PersonChip>>
     .optional()
 }
 
+pub(crate) fn chips_of(
+    c: &Connection,
+    people: &BTreeSet<String>,
+) -> Db<HashMap<String, PersonChip>> {
+    const BATCH: usize = 400;
+    let mut chips = HashMap::new();
+    for ids in people.iter().collect::<Vec<_>>().chunks(BATCH) {
+        let marks = crate::util::marks(ids.len());
+        for row in c
+            .prepare(&format!(
+                "SELECT id, display_name, short_name, is_you FROM people WHERE id IN ({marks})"
+            ))?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                let id: String = r.get(0)?;
+                let display_name: String = r.get(1)?;
+                Ok((
+                    id.clone(),
+                    PersonChip {
+                        id: PersonId::new(id),
+                        display_name: display_name.clone(),
+                        short_name: r.get(2)?,
+                        initials: initials_of(&display_name),
+                        is_you: r.get(3)?,
+                    },
+                ))
+            })?
+        {
+            let (id, chip) = row?;
+            chips.insert(id, chip);
+        }
+    }
+    Ok(chips)
+}
+
 // @cpt-algo:cpt-noter-algo-core-people-page:p1
 /// Every person (or `only` one) with aliases, last call and open-item count, in grouped queries.
 fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
@@ -171,30 +205,45 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
             })
         })?
         .collect::<Result<_, _>>()?;
+    let person_filter = if only.is_some() {
+        " WHERE person_id = ?1"
+    } else {
+        ""
+    };
     let mut aliases: HashMap<String, Vec<String>> = HashMap::new();
     for row in c
-        .prepare("SELECT person_id, alias FROM person_aliases ORDER BY rowid")?
-        .query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?)))?
+        .prepare(&format!(
+            "SELECT person_id, alias FROM person_aliases{person_filter} ORDER BY rowid"
+        ))?
+        .query_map(params_from_iter(only), |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+        })?
     {
         let (person, alias) = row?;
         aliases.entry(person).or_default().push(alias);
     }
     let mut last: HashMap<String, i64> = c
-        .prepare(
+        .prepare(&format!(
             "SELECT p.person_id, max(c.started_at) FROM
                (SELECT person_id, call_id FROM call_participants
                 UNION SELECT person_id, call_id FROM speakers WHERE person_id IS NOT NULL) p
-             JOIN calls c ON c.id = p.call_id GROUP BY p.person_id",
-        )?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+             JOIN calls c ON c.id = p.call_id {person_filter} GROUP BY p.person_id",
+        ))?
+        .query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<Result<_, _>>()?;
     let mut open: HashMap<String, u32> = c
         .prepare(&format!(
             "SELECT i.owner_person_id, count(*) FROM items i
              WHERE i.owner_person_id IS NOT NULL AND i.kind = 'action_item' AND {OPEN}
-             GROUP BY i.owner_person_id"
+               {}
+             GROUP BY i.owner_person_id",
+            if only.is_some() {
+                "AND i.owner_person_id = ?1"
+            } else {
+                ""
+            }
         ))?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<Result<_, _>>()?;
     for p in &mut people {
         let id = p.id.as_str();
@@ -472,8 +521,13 @@ impl Core {
                 unnamed: unnamed_of(c)?,
             })
         })?;
-        for u in &mut list.unnamed {
-            u.suggestion = self.suggest_for(u.speaker_id.as_str());
+        let speakers: Vec<String> = list
+            .unnamed
+            .iter()
+            .map(|u| u.speaker_id.as_str().to_string())
+            .collect();
+        for (u, suggestion) in list.unnamed.iter_mut().zip(self.suggestions_for(&speakers)) {
+            u.suggestion = suggestion;
         }
         Ok(list)
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-people

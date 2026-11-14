@@ -570,6 +570,10 @@ impl Core {
         &self.store
     }
 
+    pub(crate) fn store_handle(&self) -> Arc<Store> {
+        Arc::clone(&self.store)
+    }
+
     /// The LLM router: every model call goes through it and its egress gate.
     pub fn llm(&self) -> &Llm {
         &self.llm

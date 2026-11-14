@@ -26,6 +26,7 @@ design: docs/DESIGN-core.md
   - [Relay a live source lookup](#relay-a-live-source-lookup)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Authenticate and authorize a socket request](#authenticate-and-authorize-a-socket-request)
+  - [Bound item reads before transcript evidence assembly](#bound-item-reads-before-transcript-evidence-assembly)
   - [Release a result through the egress gate](#release-a-result-through-the-egress-gate)
   - [Stage without applying primary changes](#stage-without-applying-primary-changes)
   - [Close a run and revoke access](#close-a-run-and-revoke-access)
@@ -130,7 +131,7 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 1. [x] - `p1` - Receive a typed MCP call; forward `CoreSocketRequest` with method, request id, context and params over the Unix socket - `inst-read-forward`
 2. [x] - `p1` - Run `cpt-noter-algo-core-mcp-authorize`; reject before any data lookup if token or policy is invalid - `inst-read-authorize`
 3. [x] - `p1` - Dispatch `search_calls` or `search_documents` to shared retrieval; call search defaults to eight hits and caps at 30 (keyword retrieval for now: `keyword_only` is true until the query is embedded) - `inst-read-search`
-4. [x] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply the run's filters to all related rows - `inst-read-entities`
+4. [x] - `p1` - Dispatch `get_transcript_span`, `get_person`, `get_decisions` or `get_open_items` to the core's existing read services; resolve person id or normalized name/alias and apply filters before assembling the newest 50 item matches and their evidence - `inst-read-entities`
 5. [x] - `p1` - For `get_screen_context`, return empty v1 chips; never capture a screen as a tool side effect - `inst-read-screen`
 6. [x] - `p1` - Run `cpt-noter-algo-core-mcp-release-result` for the entire assembled result, including person recent-call and open-item fields - `inst-read-gate`
 7. [x] - `p1` - **RETURN** `CoreSocketResponse` with the original request id and exactly one result or error; map it back to MCP without changing evidence ids - `inst-read-return`
@@ -191,6 +192,19 @@ There are no new tables or API schemas here. `McpRunContext` is the protocol typ
 4. [x] - `p1` - Check the run's tool allow-list and current privacy; disallow live source tools for ticks or any mode other than Cloud allowed - `inst-auth-tool`
 5. [x] - `p1` - Resolve each referenced entity under those restrictions; reject missing references with −32002 and forbidden references with −32001, without disclosing their content - `inst-auth-entity`
 6. [x] - `p1` - **RETURN** trusted context to the core dispatcher; no client-held context can authorize a broader read - `inst-auth-return`
+
+### Bound item reads before transcript evidence assembly
+
+- [ ] `p4` - **ID**: `cpt-noter-algo-core-mcp-bounded-item-read`
+
+**Input**: Item read filters, cloud privacy scope and matching item rows.
+
+**Output**: At most 50 newest matching items with evidence resolved only for those rows.
+
+**Steps**:
+1. [ ] - `p1` - Apply query, owner, topic, date and cloud privacy filters in the item query - `inst-item-read-filter`
+2. [ ] - `p1` - Order by newest item row and limit the selected rows to 50 before loading spans or transcript evidence - `inst-item-read-limit`
+3. [ ] - `p1` - Resolve evidence for selected rows and preserve the existing output fields and ordering - `inst-item-read-evidence`
 
 ### Release a result through the egress gate
 
@@ -281,6 +295,8 @@ The system **MUST** ship the signed Rust binary as a stdio child, serve protocol
 
 The system **MUST** answer reads from shared retrieval and item/person services, preserve evidence ids, return empty screen chips in v1 and enforce source policy on every nested read. Cloud tool results pass the run's redaction map and commit a tool_result audit row before release. Failed audit writes return no body. Read-only services use the core's read pool; the binary never joins records itself.
 
+Item reads apply the caller's query, ordering and limit in SQL before assembling evidence or span text; transcript spans constrain the SQL read to overlapping rows.
+
 **Implements**:
 - `cpt-noter-flow-core-mcp-read`
 - `cpt-noter-algo-core-mcp-release-result`
@@ -335,6 +351,7 @@ The network-monitor test attributes configured source-host traffic to lookup row
 - [x] A real core and scripted CLI exercise initialization, tools/list, all stable tools and socket round trips; listed schemas match the exported protocol schemas.
 - [x] Missing, wrong, expired or another run's token is rejected; spoofing cloud false or another call id cannot disclose sensitive evidence. Missing entities and malformed params return the documented JSON-RPC codes.
 - [x] Search defaults to eight call hits and caps at 30; all read tools exclude sensitive calls and sources for cloud runs, including recent calls and items nested under a person.
+- [ ] Decision and open-item reads apply their text, owner, topic, date, privacy and recency filters before loading transcript evidence; they return at most 50 newest matches without assembling evidence for discarded rows.
 - [x] A refined Ask lookup uses the same pseudonyms as its initial packet and writes a linked tool_result audit row before returning; forced audit failure releases no text.
 - [x] Staging a pin or correction returns a reference while the original record is unchanged; fabricated evidence and stale before values cannot apply a mutation.
 - [ ] A matrix over privacy mode, sensitive context and task type permits live lookup only for eligible Ask/post-call Cloud allowed runs; every actual forwarding has a preceding lookup row. Network-monitor tests verify this on macOS (relay implemented and tested against the scripted McpSource (#372); the network-monitor attribution on macOS is the owner's release test; the matrix and the lookup-row-before-forward check are covered by `cargo test -p noter-mcp`, #372).

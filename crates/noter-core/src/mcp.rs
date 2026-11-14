@@ -1647,6 +1647,57 @@ mod tests {
         assert!(read(false, "get_person", json!({ "name": "Sam" })).contains("p_s"));
     }
 
+    #[test]
+    fn mcp_decision_query_loads_evidence_only_for_matching_rows() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Core::open(
+            dir.path(),
+            crate::CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet)),
+        )
+        .unwrap();
+        let conn = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+        conn.execute_batch(
+            "INSERT INTO calls (id, rev, started_at, title, call_type, status, mode_used, privacy_class)
+             VALUES ('c_perf', 1, 1, 'Perf', 'planning', 'ready', 'local_only', 'normal');",
+        )
+        .unwrap();
+        for (n, text) in (0..60)
+            .map(|n| (n, format!("unrelated {n}")))
+            .chain((60..62).map(|n| (n, format!("needle {n}"))))
+        {
+            let id = format!("i_perf_{n}");
+            conn.execute(
+                "INSERT INTO items (id, rev, call_id, kind, text, lang, status, review_state, created_by)
+                 VALUES (?1, 1, 'c_perf', 'decision', ?2, 'en', 'open', 'accepted', 'llm')",
+                noter_db::rusqlite::params![id, text],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO item_spans (item_id, call_id, t0_ms, t1_ms) VALUES (?1, 'c_perf', 0, 10)",
+                [&id],
+            )
+            .unwrap();
+        }
+        let trusted = Trusted {
+            run_id: "r".into(),
+            call: None,
+            live: false,
+            cloud: false,
+            runtime: RuntimeChoice::Local,
+            model: "test".into(),
+            cancel: watch::channel(false).1,
+        };
+
+        tools::reset_perf_evidence_loads();
+        let result = core
+            .read_tool(&trusted, "get_decisions", json!({ "query": "NEEDLE" }))
+            .unwrap();
+
+        assert_eq!(result["items"].as_array().unwrap().len(), 2);
+        assert_eq!(result["items"][0]["item_id"], "i_perf_61");
+        assert_eq!(tools::perf_evidence_loads(), 2);
+    }
+
     /// The release step rechecks what the read assembled: a call marked sensitive in between,
     /// and any field that names audio, voice profiles, credentials or a redaction map.
     #[test]

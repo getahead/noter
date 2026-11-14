@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
-use noter_db::rusqlite::{Connection, OptionalExtension};
+use noter_db::rusqlite::{params_from_iter, types::Value as Sql, Connection, OptionalExtension};
 use noter_db::Insert;
 use noter_protocol::engine::{EngineEvent, EngineEventLine, EngineSegment, EngineSegmentState};
 use noter_protocol::ipc::{CommandCtx, Sink};
@@ -746,7 +746,55 @@ pub(crate) fn segments_of(
     call_id: &CallId,
     span: Option<(Option<AudioChannel>, OffsetMs, OffsetMs)>,
 ) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
-    let mut stmt = c.prepare(
+    let mut args = vec![Sql::Text(call_id.as_str().to_string())];
+    let mut span_clause = String::new();
+    if let Some((channel, t0, t1)) = span {
+        if let Some(channel) = channel {
+            span_clause.push_str(&format!(" AND s.channel = ?{}", args.len() + 1));
+            args.push(Sql::Text(match channel {
+                AudioChannel::Mic => "mic".into(),
+                AudioChannel::Sys => "sys".into(),
+            }));
+        }
+        span_clause.push_str(&format!(
+            " AND s.t1_ms > ?{} AND s.t0_ms < ?{}",
+            args.len() + 1,
+            args.len() + 2
+        ));
+        args.push(Sql::Integer(t0.0.into()));
+        args.push(Sql::Integer(t1.0.into()));
+    }
+    segments_query(c, call_id, &span_clause, args)
+}
+
+/// The requested segments of a call's current pass, in transcript order.
+pub(crate) fn segments_by_id(
+    c: &Connection,
+    call_id: &CallId,
+    ids: &[SegmentId],
+) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
+    if ids.is_empty() {
+        return Ok(vec![]);
+    }
+    let clause = format!(
+        " AND s.id IN ({})",
+        (0..ids.len())
+            .map(|n| format!("?{}", n + 2))
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let mut args = vec![Sql::Text(call_id.as_str().to_string())];
+    args.extend(ids.iter().map(|id| Sql::Text(id.as_str().to_string())));
+    segments_query(c, call_id, &clause, args)
+}
+
+fn segments_query(
+    c: &Connection,
+    call_id: &CallId,
+    extra_clause: &str,
+    args: Vec<Sql>,
+) -> noter_db::rusqlite::Result<Vec<SegmentView>> {
+    let mut stmt = c.prepare(&format!(
         "SELECT s.id, s.channel, s.t0_ms, s.t1_ms, s.text, s.lang, s.lang_p, s.avg_logprob,
                 p.id, COALESCE((SELECT display_name FROM people WHERE id = p.person_id), p.name, p.label), p.n, p.named_by, s.pass, p.person_id, s.corrections,
                 s.crosstalk_with
@@ -754,10 +802,11 @@ pub(crate) fn segments_of(
          WHERE s.call_id = ?1 AND s.pass = (CASE WHEN EXISTS
                (SELECT 1 FROM segments WHERE call_id = ?1 AND pass = 'archive')
                THEN 'archive' ELSE 'live' END)
+         {extra_clause}
          ORDER BY s.t0_ms, s.rowid",
-    )?;
+    ))?;
     let mut crosstalk: Vec<Vec<String>> = vec![];
-    let rows = stmt.query_map([call_id.as_str()], |r| {
+    let rows = stmt.query_map(params_from_iter(args), |r| {
         let channel: AudioChannel = word(&r.get::<_, String>(1)?).unwrap_or(AudioChannel::Mic);
         let label: Option<String> = r.get(9)?;
         let named_by: Option<String> = r.get(11)?;
@@ -811,9 +860,6 @@ pub(crate) fn segments_of(
         }
     }
     // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-rechunk
-    if let Some((channel, t0, t1)) = span {
-        all.retain(|s| channel.map_or(true, |c| c == s.channel) && s.t1_ms > t0 && s.t0_ms < t1);
-    }
     Ok(all)
 }
 

@@ -489,6 +489,25 @@ async fn export_writes_one_file_per_kind_per_call_and_reports_the_count() {
 }
 
 #[tokio::test]
+async fn export_streams_transcripts_for_each_selected_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    std::fs::create_dir_all(&out).unwrap();
+    let (core, _) = open(dir.path(), Some(out.clone()));
+    world(&core);
+
+    let result = export(&core, &["call_a", "call_sens"], (false, true, false))
+        .await
+        .unwrap();
+
+    assert_eq!(result.files, 4);
+    let files = names(&out);
+    assert_eq!(files.len(), 4, "{files:?}");
+    assert!(files.iter().any(|name| name.contains("call_a")));
+    assert!(files.iter().any(|name| name.contains("call_sens")));
+}
+
+#[tokio::test]
 async fn export_scope_keeps_every_format_inside_the_selection() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");

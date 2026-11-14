@@ -199,6 +199,8 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 
 **Output**: `PeopleList` or `PersonPage` complete for its view.
 
+Read only the requested person's aggregate rows for a person page. For `people_list`, load opted-in encrypted profiles and the voice key once per request, then reuse them for unnamed-speaker suggestions; never retain decrypted profile vectors beyond the request.
+
 **Steps**:
 1. [x] - `p1` - DB: SELECT people and matching `person_aliases`, with last call and open-item counts in grouped queries - `inst-page-people`
 2. [x] - `p1` - DB: SELECT unnamed speakers with their call, segment count, playable sample when audio remains and identity suggestion; group only by established speaker links, not label text - `inst-page-unnamed`

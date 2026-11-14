@@ -1,8 +1,9 @@
 //! FEATURE cpt-noter-feature-core-items-today (slice 1): the items service. Reads join owners,
 //! calls and spans in the core; every intent is one logged change under a `rev` guard.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
+use noter_db::rusqlite::functions::FunctionFlags;
 use noter_db::rusqlite::types::Value as Sql;
 use noter_db::rusqlite::{params_from_iter, Connection, OptionalExtension, Row};
 use noter_db::{Logged, Mutation};
@@ -136,8 +137,6 @@ fn spans_of(c: &Connection, item_id: &str) -> Db<Vec<TimeSpan>> {
 }
 
 fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
-    let kind: ItemKind = word(s.kind.clone())?;
-    let status: ItemStatus = word(s.status.clone())?;
     let owner = s.owner.as_deref().map(|p| owner_chip(c, p)).transpose()?;
     let carried_from = s
         .carried_from
@@ -159,6 +158,18 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
         })
         .transpose()?
         .flatten();
+    let spans = spans_of(c, &s.id)?;
+    assemble_with(s, owner, carried_from, spans)
+}
+
+fn assemble_with(
+    s: Stored,
+    owner: Option<PersonChip>,
+    carried_from: Option<CallRef>,
+    spans: Vec<TimeSpan>,
+) -> Db<ItemView> {
+    let kind: ItemKind = word(s.kind.clone())?;
+    let status: ItemStatus = word(s.status.clone())?;
     let owed = match (&owner, kind) {
         (Some(o), ItemKind::ActionItem) if o.is_you => Owed::ByYou,
         (Some(_), ItemKind::ActionItem) => Owed::ToYou,
@@ -174,7 +185,7 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
         _ => None,
     };
     Ok(ItemView {
-        spans: spans_of(c, &s.id)?,
+        spans,
         id: ItemId::new(s.id),
         rev: Rev(s.rev),
         call: s.call,
@@ -201,6 +212,114 @@ fn assemble(c: &Connection, s: Stored) -> Db<ItemView> {
     })
 }
 
+/// Batch-load the per-item evidence and chips used by list views. Chunking stays below SQLite's
+/// bind limit even when a Today backlog contains many thousands of items.
+// @cpt-algo:cpt-noter-algo-core-items-today-carry:p1
+fn assemble_many(c: &Connection, rows: Vec<Stored>) -> Db<Vec<ItemView>> {
+    const BATCH: usize = 400;
+    let owners: BTreeSet<String> = rows.iter().filter_map(|s| s.owner.clone()).collect();
+    let carried: BTreeSet<String> = rows.iter().filter_map(|s| s.carried_from.clone()).collect();
+    let item_ids: Vec<String> = rows.iter().map(|s| s.id.clone()).collect();
+
+    let mut chips = HashMap::new();
+    for ids in owners.iter().collect::<Vec<_>>().chunks(BATCH) {
+        let marks = crate::util::marks(ids.len());
+        for row in c
+            .prepare(&format!(
+                "SELECT id, display_name, short_name, is_you FROM people WHERE id IN ({marks})"
+            ))?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                let id: String = r.get(0)?;
+                let display_name: String = r.get(1)?;
+                Ok((
+                    id.clone(),
+                    PersonChip {
+                        id: PersonId::new(id),
+                        display_name: display_name.clone(),
+                        short_name: r.get(2)?,
+                        initials: crate::people::initials_of(&display_name),
+                        is_you: r.get(3)?,
+                    },
+                ))
+            })?
+        {
+            let (id, chip) = row?;
+            chips.insert(id, chip);
+        }
+    }
+
+    let mut carried_refs = HashMap::new();
+    for ids in carried.iter().collect::<Vec<_>>().chunks(BATCH) {
+        let marks = crate::util::marks(ids.len());
+        for row in c
+            .prepare(&format!(
+                "SELECT id, title, started_at, call_type FROM calls WHERE id IN ({marks})"
+            ))?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                let id: String = r.get(0)?;
+                Ok((
+                    id.clone(),
+                    CallRef {
+                        id: CallId::new(id),
+                        title: r.get(1)?,
+                        started_at: TimestampMs(r.get(2)?),
+                        call_type: CallTypeId(r.get(3)?),
+                    },
+                ))
+            })?
+        {
+            let (id, call) = row?;
+            carried_refs.insert(id, call);
+        }
+    }
+
+    let mut spans: HashMap<String, Vec<TimeSpan>> = HashMap::new();
+    for ids in item_ids.chunks(BATCH) {
+        let marks = crate::util::marks(ids.len());
+        for row in c
+            .prepare(&format!(
+                "SELECT item_id, call_id, channel, t0_ms, t1_ms FROM item_spans
+                 WHERE item_id IN ({marks}) ORDER BY t0_ms"
+            ))?
+            .query_map(params_from_iter(ids.iter()), |r| {
+                let item_id: String = r.get(0)?;
+                Ok((
+                    item_id,
+                    TimeSpan {
+                        call_id: CallId::new(r.get::<_, String>(1)?),
+                        channel: r.get::<_, Option<String>>(2)?.map(word).transpose()?,
+                        t0_ms: OffsetMs(r.get(3)?),
+                        t1_ms: OffsetMs(r.get(4)?),
+                    },
+                ))
+            })?
+        {
+            let (id, span) = row?;
+            spans.entry(id).or_default().push(span);
+        }
+    }
+
+    rows.into_iter()
+        .map(|s| {
+            let owner = s.owner.as_ref().map(|id| {
+                chips.get(id).cloned().unwrap_or_else(|| PersonChip {
+                    id: PersonId::new(id),
+                    display_name: id.clone(),
+                    short_name: id.clone(),
+                    initials: String::new(),
+                    is_you: false,
+                })
+            });
+            let carried_from = s
+                .carried_from
+                .as_ref()
+                .and_then(|id| carried_refs.get(id).cloned());
+            let item_spans = spans.remove(&s.id).unwrap_or_default();
+            assemble_with(s, owner, carried_from, item_spans)
+        })
+        .collect()
+}
+
 /// Complete items matching a `WHERE` clause over `i` (items) and `c` (their calls), oldest
 /// first: the shared read behind Today's carry-forward, due and done sections.
 pub(crate) fn items_where(c: &Connection, clause: &str, args: Vec<Sql>) -> Db<Vec<ItemView>> {
@@ -211,7 +330,42 @@ pub(crate) fn items_where(c: &Connection, clause: &str, args: Vec<Sql>) -> Db<Ve
         ))?
         .query_map(params_from_iter(args), stored)?
         .collect::<Result<Vec<_>, _>>()?;
-    rows.into_iter().map(|s| assemble(c, s)).collect()
+    assemble_many(c, rows)
+}
+
+/// Query the newest matching items before loading their spans and evidence.
+// @cpt-algo:cpt-noter-algo-core-mcp-bounded-item-read:p1
+pub(crate) fn items_where_newest(
+    c: &Connection,
+    clause: &str,
+    mut args: Vec<Sql>,
+    text_query: Option<&str>,
+    limit: usize,
+) -> Db<Vec<ItemView>> {
+    let text_clause = if let Some(query) = text_query {
+        c.create_scalar_function(
+            "noter_unicode_lower",
+            1,
+            FunctionFlags::SQLITE_DETERMINISTIC,
+            |ctx| {
+                let value: String = ctx.get(0)?;
+                Ok(value.to_lowercase())
+            },
+        )?;
+        args.push(Sql::Text(query.to_owned()));
+        " AND instr(noter_unicode_lower(i.text), noter_unicode_lower(?)) > 0"
+    } else {
+        ""
+    };
+    args.push(Sql::Integer(limit.min(i64::MAX as usize) as i64));
+    let rows = c
+        .prepare(&format!(
+            "SELECT {COLUMNS} FROM items i JOIN calls c ON c.id = i.call_id
+             WHERE {clause}{text_clause} ORDER BY i.rowid DESC LIMIT ?"
+        ))?
+        .query_map(params_from_iter(args), stored)?
+        .collect::<Result<Vec<_>, _>>()?;
+    assemble_many(c, rows)
 }
 
 fn clock(ms: u32) -> String {

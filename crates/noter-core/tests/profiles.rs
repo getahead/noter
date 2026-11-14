@@ -3,10 +3,13 @@
 
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::testing;
-use noter_core::{Clock, Core, CoreDeps, EventEmitter, MemorySecrets};
+use noter_core::{
+    Clock, Core, CoreDeps, EventEmitter, KeychainLocked, MemorySecrets, Secret, SecretStore,
+};
 use noter_db::Insert;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -38,6 +41,37 @@ struct Rig {
     core: Core,
     clock: Arc<Moving>,
     secrets: Arc<MemorySecrets>,
+}
+
+#[derive(Default)]
+struct CountingSecrets {
+    inner: MemorySecrets,
+    gets: AtomicUsize,
+}
+
+impl SecretStore for CountingSecrets {
+    fn get(&self, account: &str) -> Result<Option<Secret>, KeychainLocked> {
+        self.gets.fetch_add(1, AtomicOrdering::SeqCst);
+        self.inner.get(account)
+    }
+
+    fn set(&self, account: &str, secret: &Secret) -> Result<(), KeychainLocked> {
+        self.inner.set(account, secret)
+    }
+
+    fn remove(&self, account: &str) -> Result<(), KeychainLocked> {
+        self.inner.remove(account)
+    }
+}
+
+fn open_counting(dir: &Path) -> (Core, Arc<CountingSecrets>) {
+    let secrets = Arc::new(CountingSecrets::default());
+    let deps = CoreDeps::new(
+        Arc::new(Moving(AtomicI64::new(NOW))),
+        Arc::new(Events::default()),
+    )
+    .with_secrets(secrets.clone());
+    (Core::open(dir, deps).expect("core opens"), secrets)
 }
 
 fn open(dir: &Path) -> Rig {
@@ -245,6 +279,39 @@ fn world(dir: &Path, core: &Core, anna: &[f32], boris: &[f32], new_a: &[f32], ne
     ] {
         set_centroid(dir, core, id, v);
     }
+}
+
+#[tokio::test]
+async fn people_list_reads_the_voice_key_once_for_all_suggestions() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, secrets) = open_counting(dir.path());
+    world(
+        dir.path(),
+        &core,
+        &voice(3, 0.2),
+        &voice(40, 0.1),
+        &voice(3, 0.2),
+        &voice(40, 0.1),
+    );
+    core.voice_profile_create(&ctx(), args("per_anna", Some("old_anna")))
+        .await
+        .unwrap();
+    secrets.gets.store(0, AtomicOrdering::SeqCst);
+
+    let list = core
+        .people_list(&ctx(), PeopleListArgs { query: None })
+        .await
+        .unwrap();
+
+    assert_eq!(list.unnamed.len(), 2);
+    assert_eq!(
+        list.unnamed
+            .iter()
+            .filter(|speaker| speaker.suggestion.is_some())
+            .count(),
+        1
+    );
+    assert_eq!(secrets.gets.load(AtomicOrdering::SeqCst), 1);
 }
 
 #[tokio::test]
