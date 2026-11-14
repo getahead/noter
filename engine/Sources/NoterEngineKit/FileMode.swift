@@ -66,12 +66,17 @@ public struct FileMode {
             .ready(protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models, sandboxed: sandboxed))
         afterReady()
         var micDb: Float = -160
-        _ = audio.play { chunk in
-            if chunk.channel == .mic {
-                micDb = Levels.db(chunk.samples)
-            } else {
-                writer.emit(.levels(callId: FileMode.callId, micDb: micDb, sysDb: Levels.db(chunk.samples)))
+        do {
+            _ = try audio.play { chunk in
+                if chunk.channel == .mic {
+                    micDb = Levels.db(chunk.samples)
+                } else {
+                    writer.emit(.levels(callId: FileMode.callId, micDb: micDb, sysDb: Levels.db(chunk.samples)))
+                }
             }
+        } catch {
+            writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: "\(error)"))
+            return 1
         }
         // @cpt-end:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-events
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-file-mode:p1:inst-file-return

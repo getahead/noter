@@ -212,7 +212,11 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
         stopped = false
         lock.unlock()
         Thread.detachNewThread { [self] in
-            self.play(onChunk)
+            do {
+                try self.play(onChunk)
+            } catch {
+                FileHandle.standardError.write(Data("noter-engine: file audio: \(error)\n".utf8))
+            }
         }
     }
 
@@ -230,12 +234,13 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
 
     /// Delivers every 100 ms window of both files; returns how many windows it delivered.
     @discardableResult
-    func play(_ onChunk: (AudioChunk) -> Void) -> Int {
-        guard let microphone = try? AVAudioFile(forReading: mic), let system = try? AVAudioFile(forReading: sys) else { return 0 }
+    func play(_ onChunk: (AudioChunk) -> Void) throws -> Int {
+        let microphone = try AVAudioFile(forReading: mic)
+        let system = try AVAudioFile(forReading: sys)
         var count = 0
         while !isStopped {
-            let m = Self.readWindow(microphone)
-            let s = Self.readWindow(system)
+            let m = try Self.readWindow(microphone)
+            let s = try Self.readWindow(system)
             guard m.frames > 0 || s.frames > 0 else { break }
             onChunk(AudioChunk(channel: .mic, samples: m.samples, sampleRate: m.rate))
             onChunk(AudioChunk(channel: .sys, samples: s.samples, sampleRate: s.rate))
@@ -245,13 +250,18 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
         return count
     }
 
-    private static func readWindow(_ file: AVAudioFile) -> (samples: [Float], rate: Double, frames: Int) {
+    private static func readWindow(_ file: AVAudioFile) throws -> (samples: [Float], rate: Double, frames: Int) {
         let rate = file.processingFormat.sampleRate
-        let frames = AVAudioFrameCount(max(1, Int(rate / 10)))
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames),
-            (try? file.read(into: buffer, frameCount: frames)) != nil,
-            let channels = buffer.floatChannelData
-        else { return ([], rate, 0) }
+        let remaining = file.length - file.framePosition
+        guard remaining > 0 else { return ([], rate, 0) }
+        let frames = AVAudioFrameCount(min(max(1, Int(rate / 10)), Int(remaining)))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames) else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: file.url.path])
+        }
+        try file.read(into: buffer, frameCount: frames)
+        guard let channels = buffer.floatChannelData else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: file.url.path])
+        }
         let n = Int(buffer.frameLength)
         let channelCount = Int(buffer.format.channelCount)
         let planes = (0..<channelCount).map { channel in Array(UnsafeBufferPointer(start: channels[channel], count: n)) }

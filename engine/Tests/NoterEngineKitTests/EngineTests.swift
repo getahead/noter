@@ -133,9 +133,14 @@ final class ChunkTests: XCTestCase {
     func testFileChunksCarryTheFileSampleRate() throws {
         let mic = try wav("mic", seconds: 0.2, amplitude: 0.3)
         var chunks: [AudioChunk] = []
-        FileAudioSource(mic: mic, sys: mic, realtime: false).play { chunks.append($0) }
+        try FileAudioSource(mic: mic, sys: mic, realtime: false).play { chunks.append($0) }
         XCTAssertEqual(chunks.count, 4)
         XCTAssertTrue(chunks.allSatisfy { $0.sampleRate == 16_000 && $0.samples.count == 1_600 })
+    }
+
+    func testFilePlaybackReportsUnreadableInputInsteadOfTreatingItAsEndOfFile() {
+        let missing = URL(fileURLWithPath: "/nonexistent.wav")
+        XCTAssertThrowsError(try FileAudioSource(mic: missing, sys: missing, realtime: false).play { _ in })
     }
 
     func testInterleavedStereoIsDownmixedToMono() {
