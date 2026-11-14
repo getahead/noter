@@ -1,5 +1,8 @@
 // Credential row (DESIGN 3.2): one API key as a row (Settings) or a field form (first run), and one own
 // account as its frame (the sign-in arrives in M3). The key itself is never shown or held.
+import { useEffect, useRef } from "react";
+
+import { focusFirstAvailable } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AccountProvider, AccountView, KeyView } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
@@ -39,6 +42,18 @@ export interface KeyRowProps {
 /** Row variant: name, use line, state tag, the Keychain line and **Add…** / **Replace…** / **Remove…**. */
 export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove, locked }: KeyRowProps) {
   const state = keyRowState(view);
+  const removeId = view.provider === "anthropic" ? "credential-remove-anthropic" : "credential-remove-codex";
+  const addId = view.provider === "anthropic" ? "credential-add-anthropic" : "credential-add-codex";
+  const returnFocus = useRef(false);
+  const previousState = useRef(state);
+  useEffect(() => {
+    const previous = previousState.current;
+    previousState.current = state;
+    if (returnFocus.current && previous !== "not_set" && state === "not_set") {
+      returnFocus.current = false;
+      focusFirstAvailable(document, [addId]);
+    }
+  }, [addId, state]);
   // while the Keychain is locked every key action waits (DESIGN › Credential row › States)
   const busy = state === "verifying" || state === "keychain_locked" || !!locked;
   return (
@@ -53,11 +68,11 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
       <div className="st-cred__actions">
         {saved && <InlineStatus text={t("settings.keys.saved")} onExpire={onSavedExpire ?? (() => {})} />}
         {state === "not_set" ? (
-          <PushButton label={t("settings.keys.add")} size="small" disabled={locked} onAction={onAdd} />
+          <PushButton id={addId} label={t("settings.keys.add")} size="small" disabled={locked} onAction={onAdd} />
         ) : (
           <>
             <PushButton label={t("settings.keys.replace")} size="small" disabled={busy} onAction={onReplace} />
-            <PushButton label={t("settings.keys.remove")} size="small" disabled={busy} onAction={onRemove} />
+            <PushButton id={removeId} label={t("settings.keys.remove")} size="small" disabled={busy} onAction={() => { returnFocus.current = document.activeElement?.id === removeId; onRemove(); }} />
           </>
         )}
       </div>
@@ -69,6 +84,18 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
 export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: KeyView; onRemove: () => void }) {
   const draft = useKeyDraft(bridge, view.provider);
   const stored = view.status.type === "configured";
+  const fieldId = view.provider === "anthropic" ? "fr-key-anthropic" : "fr-key-codex";
+  const removeId = view.provider === "anthropic" ? "first-run-key-remove-anthropic" : "first-run-key-remove-codex";
+  const returnFocus = useRef(false);
+  const previousStored = useRef(stored);
+  useEffect(() => {
+    const wasStored = previousStored.current;
+    previousStored.current = stored;
+    if (returnFocus.current && wasStored && !stored) {
+      returnFocus.current = false;
+      focusFirstAvailable(document, [fieldId]);
+    }
+  }, [fieldId, stored]);
   return (
     <div className="st-cred st-cred--field" data-component={COMPONENT} data-variant="field" data-state={stored ? "configured" : draft.state.toLowerCase()}>
       <label className="fr-sublabel" htmlFor={`fr-key-${view.provider}`}>
@@ -77,10 +104,10 @@ export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: 
       {stored ? (
         <div className="st-keyfield">
           <span className="st-cred__dots">{t("settings.keys.keychain")}</span>
-          <PushButton label={t("settings.keys.remove_short")} size="small" onAction={onRemove} />
+          <PushButton id={removeId} label={t("settings.keys.remove_short")} size="small" onAction={() => { returnFocus.current = document.activeElement?.id === removeId; onRemove(); }} />
         </div>
       ) : (
-        <KeyField id={`fr-key-${view.provider}`} label={t(KEY_NAME[view.provider])} placeholder={t(view.provider === "anthropic" ? "first_run.assistants.key_placeholder_anthropic" : "first_run.assistants.key_placeholder_codex")} draft={draft} verifiedText={t("settings.keys.keychain")} />
+        <KeyField id={fieldId} label={t(KEY_NAME[view.provider])} placeholder={t(view.provider === "anthropic" ? "first_run.assistants.key_placeholder_anthropic" : "first_run.assistants.key_placeholder_codex")} draft={draft} verifiedText={t("settings.keys.keychain")} />
       )}
     </div>
   );

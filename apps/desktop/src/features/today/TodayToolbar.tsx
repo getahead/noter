@@ -11,6 +11,7 @@ import { record, showCall } from "./actions";
 import { useToday } from "./cache";
 import { useRecordingClock } from "./clock";
 import { recordBlock } from "./model";
+import { hotkeyCaps } from "../settings/hotkey-rows";
 
 const longDate = (d: string) => new Intl.DateTimeFormat(locale(), { dateStyle: "full" }).format(new Date(`${d}T12:00:00`));
 
@@ -20,6 +21,8 @@ export function TodayToolbar({ bridge, base }: PageToolbarProps) {
   const capture = useWindow(bridge, (s) => s.whole.capture);
   const setup = useWindow(bridge, (s) => s.whole.setup);
   const env = useWindow(bridge, (s) => s.whole.environment);
+  const hotkeys = useWindow(bridge, (s) => s.whole.hotkeys);
+  const recordKey = hotkeyCaps(hotkeys, "start_stop", "⌃⌥⌘R");
   const recording = useWindow(bridge, (s) => s.commands["today:record"]);
   const clock = useRecordingClock(capture);
   const block = recordBlock(setup, env);
@@ -35,7 +38,7 @@ export function TodayToolbar({ bridge, base }: PageToolbarProps) {
         label={t("today.record")}
         icon="record"
         cls="td-recbtn"
-        help={block ? t(block === "model_missing" ? "today.record_model_missing" : "today.record_disk_full") : t("today.record_help")}
+        help={block ? t(block === "model_missing" ? "today.record_model_missing" : "today.record_disk_full") : recordKey ? t("today.record_help", { key: recordKey }) : t("today.record_help_unbound")}
         disabled={block !== null}
         loading={recording?.state === "WAITING"}
         onAction={() => void record(bridge)}

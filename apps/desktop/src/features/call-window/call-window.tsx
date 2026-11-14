@@ -17,9 +17,10 @@ import { cx } from "../../ui/primitives/attrs";
 import { IconButton } from "../../ui/primitives/icon-button";
 import type { MenuItem } from "../../ui/primitives/menu";
 import { dbToLevel } from "../first-run/self-test";
-import { capsOf } from "../settings/accelerator";
+import { capsOf, spokenChord } from "../settings/accelerator";
 import { elapsedSeconds } from "../shell/live-row";
-import { modeIndicator } from "../shell/mode-indicator";
+import { modeChangeAnnouncement, modeIndicator, type ModeState } from "../shell/mode-indicator";
+import { MODE_MSG } from "../shell/mode-indicator-view";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
 import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, stopped, windowState, type BannerHandlers, type Seen } from "./model";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
@@ -32,6 +33,7 @@ const DEFAULT_KEYS: Partial<Record<HotkeyAction, string>> = {
   mark_moment: "⌃⌥⌘M",
   pause: "⌃⌥⌘P",
   start_stop: "⌃⌥⌘R",
+  open_call_screen: "⌃⌥⌘N",
   hide_for_presenting: "⌃⌥⌘0",
 };
 const live = (c: CaptureState | undefined) => !!c && (c.phase === "recording" || c.phase === "paused" || c.phase === "failed");
@@ -89,6 +91,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const hotkeys = useWindow(bridge, (s) => s.whole.hotkeys?.bindings);
   const commands = useWindow(bridge, (s) => s.commands);
   const levels = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels);
+  const mode = modeIndicator({ mode: privacy, degraded, sensitiveCall: cap?.sensitive ?? false });
+  const previousMode = useRef<ModeState | null>(null);
+  const modeEvent = useRef(0);
 
   // the second sources the user kept, for one call
   const [kept, setKept] = useState<{ call: string | null; ids: ReadonlySet<string> }>({ call: null, ids: new Set() });
@@ -100,6 +105,10 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const [now, setNow] = useState(() => Date.now());
 
   const callId = cap?.call_id ?? null;
+  const key = (action: HotkeyAction) => {
+    const b = hotkeys?.find((h) => h.action === action);
+    return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
+  };
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden
@@ -139,10 +148,16 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     [bridge],
   );
   useEffect(() => failureAnnouncements(degraded, callId).forEach((a) => void announce(a)), [announce, degraded, callId]);
+  useEffect(() => {
+    const previous = previousMode.current;
+    previousMode.current = mode.state;
+    const event = modeChangeAnnouncement(previous, mode.state, t(MODE_MSG[mode.state].voice), String(++modeEvent.current));
+    if (event) void announce(event);
+  }, [announce, mode.state]);
   const prev = useRef<Seen | null>(null);
   useEffect(() => {
     if (!cap) return;
-    captureAnnouncements(prev.current, cap, noticeSpoken).forEach((a) => void announce(a));
+    captureAnnouncements(prev.current, cap, noticeSpoken, spokenChord(key("open_call_screen"))).forEach((a) => void announce(a));
     prev.current = { phase: cap.phase, notice: noticeSpoken?.type ?? null };
   }, [announce, cap, noticeSpoken]);
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-store-capture
@@ -165,10 +180,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const navigate = (target: NavTarget) => void bridge.core.windowNavigate({ target });
   const openInNoter = () => navigate({ type: "call_page", call_id: callId, tab: "summary" });
   const busy = (cmd: CommandName) => commands[cmd]?.state === "WAITING";
-  const key = (action: HotkeyAction) => {
-    const b = hotkeys?.find((h) => h.action === action);
-    return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
-  };
 
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-user-action
   // @cpt-begin:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-match-action
@@ -315,11 +326,6 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   );
   const status = indicatorStatus(cap, degraded);
   const clock = callTime(elapsedSeconds(cap, receivedAt, Math.max(now, receivedAt)));
-  const mode = modeIndicator({
-    mode: privacy,
-    degraded,
-    sensitiveCall: cap.sensitive,
-  });
   const title = cap.title ?? "";
   const speakers = tr.data?.speakers ?? [];
   const twoDisplays = displays > 1;

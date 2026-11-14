@@ -19,7 +19,7 @@ import { DisplayPicker } from "../../ui/setup/display-picker";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
-import { askAlert } from "../../ui/dialogs/alerts";
+import { useAlert } from "../../ui/dialogs/host";
 import { installCli, installKey, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
 import { removeAlert } from "../settings/keys";
@@ -229,6 +229,7 @@ function AudioStorage({ wizard, w }: { wizard: Wizard; w: WizardState }) {
 
 // Step 6's key fields and own-account rows belong to cpt-noter-feature-ui-accounts (M2, M3): this is its frame.
 export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
+  const askAlert = useAlert();
   const accounts = useSelect(bridge.store, (s) => s.whole.accounts);
   const installState = useSelect(bridge.store, (s) => s.commands[installKey("ollama")]?.state);
   const local = accounts?.local.running ?? false;

@@ -144,11 +144,22 @@ export function createAnnouncer(env: AnnouncerEnv) {
 
 /** Writes into the window's live region: cleared now, filled a moment later, so a repeated identical text is still a change. */
 export function writeLive(doc: Pick<Document, "querySelector">) {
+  const pending = new Map<Politeness, { texts: string[] }>();
   return (politeness: Politeness, text: string): void => {
     const el = doc.querySelector(`[data-live="${politeness}"]`);
     if (!el) return;
+    const queued = pending.get(politeness);
+    if (queued) {
+      queued.texts.push(text);
+      return;
+    }
     el.textContent = "";
-    setTimeout(() => (el.textContent = text), 50);
+    const texts = [text];
+    pending.set(politeness, { texts });
+    setTimeout(() => {
+      el.textContent = texts.join(" ");
+      pending.delete(politeness);
+    }, 50);
   };
 }
 
@@ -171,8 +182,11 @@ export function announcerFor(
   return a;
 }
 
-export const useAnnounce = (bridge: Bridge) =>
-  announcerFor(bridge, {
-    isKey: () => document.hasFocus(),
-    live: writeLive(document),
+export const useAnnounce = (bridge: Bridge) => {
+  const doc = globalThis.document;
+  if (!doc) return async (_event: AnnounceEvent) => {};
+  return announcerFor(bridge, {
+    isKey: () => doc.hasFocus(),
+    live: writeLive(doc),
   });
+};

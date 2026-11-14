@@ -13,12 +13,32 @@ import { ToolbarHost } from "./toolbar";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
 import { slots } from "../call-page/slots";
 
+const { effects, refs } = vi.hoisted(() => ({
+  effects: [] as (() => void)[],
+  refs: [] as { current: unknown }[],
+}));
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  return {
+    ...react,
+    useEffect: (effect: () => void) => void effects.push(effect),
+    useRef: (value: unknown) => {
+      const ref = react.useRef(value);
+      refs.push(ref);
+      return ref;
+    },
+  };
+});
+
 vi.mock("../../core/tauri-transport", () => ({ nativeAsk: vi.fn().mockResolvedValue(true) }));
 
 let bridge: Bridge | null = null;
 afterEach(async () => {
   await bridge?.close();
   bridge = null;
+  effects.length = 0;
+  refs.length = 0;
+  vi.unstubAllGlobals();
 });
 
 async function open(mutate: (w: World["app"]) => void = () => {}, label: "main" | "settings" = "main") {
@@ -30,6 +50,21 @@ async function open(mutate: (w: World["app"]) => void = () => {}, label: "main" 
 }
 
 describe("MainWindow (cpt-noter-component-shell-main-window)", () => {
+  it("announces a privacy mode transition in the main window live region", async () => {
+    const writes: string[] = [];
+    const live = { set textContent(value: string) { writes.push(value); }, get textContent() { return ""; } };
+    vi.stubGlobal("document", { hasFocus: () => true, querySelector: () => live });
+    vi.useFakeTimers();
+    await open((a) => { a.degraded.states = [{ type: "switched_to_local" } as never]; });
+    const effect = effects.find((run) => run.toString().includes("modeChangeAnnouncement"));
+    expect(effect).toBeDefined();
+    refs.find((ref) => ref.current === null)!.current = "CLOUD_REDACTED";
+    effect!();
+    vi.advanceTimersByTime(50);
+    expect(writes).toEqual(["", "switched to local"]);
+    vi.useRealTimers();
+  });
+
   it("gives the call page Delete Call…: the dialogs host's alert, then calls_delete", async () => {
     slots.deleteCall = null;
     await open();

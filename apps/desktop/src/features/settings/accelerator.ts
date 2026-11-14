@@ -34,6 +34,18 @@ export function capsOf(accelerator: string | null): string {
   return [...mods, GLYPHS[key] ?? key].join("");
 }
 
+/** A shortcut in the words VoiceOver should speak, rather than macOS key-cap glyphs. */
+// @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-strings:p1
+export function spokenChord(caps: string): string {
+  const modifiers = [
+    ["⌃", "Control"], ["⌥", "Option"], ["⇧", "Shift"], ["⌘", "Command"],
+  ] as const;
+  const prefix = modifiers.filter(([glyph]) => caps.includes(glyph)).map(([, word]) => word);
+  const key = caps.replace(/[⌃⌥⇧⌘]/g, "");
+  const word = ({ "↩": "Return", "⇥": "Tab", "←": "Left Arrow", "→": "Right Arrow", "↑": "Up Arrow", "↓": "Down Arrow" } as Record<string, string>)[key] ?? key;
+  return [...prefix, word].filter(Boolean).join("-");
+}
+
 /** The caps of a modifier set (card keys), such as ⌃⌥⌘. */
 export const modifierCaps = (m: Modifiers & { shift?: boolean }): string =>
   [m.control && "⌃", m.option && "⌥", m.shift && "⇧", m.command && "⌘"].filter(Boolean).join("");

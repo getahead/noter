@@ -7,7 +7,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { calls, coreReady, openWindow } from "./support/app";
+import { coreReady, openWindow } from "./support/app";
 import { banner, body, navigate, openSummary, section, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import * as O from "./support/outputs-world";
@@ -231,11 +231,17 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
     });
     await coreReady(page);
     await navigate(page, "summary");
+    await page.locator('[data-live="polite"]').evaluate((region) => {
+      const writes: string[] = [];
+      (window as Window & { __announcementWrites?: string[] }).__announcementWrites = writes;
+      new MutationObserver(() => {
+        if (region.textContent) writes.push(region.textContent);
+      }).observe(region, { childList: true, characterData: true, subtree: true });
+    });
     await section(page, /^Summary/).getByRole("button", { name: "Try Again" }).click();
-    await expect(async () => {
-      const said = (await calls(page)).filter((c) => c.kind === "invoke" && c.name === "window_announce" && JSON.stringify(c.args).includes("Summary ready"));
-      expect(said).toHaveLength(1);
-    }).toPass();
+    const polite = page.locator('[data-live="polite"]');
+    await expect(polite).toHaveText("Summary ready");
+    await expect.poll(() => page.evaluate(() => (window as Window & { __announcementWrites?: string[] }).__announcementWrites)).toEqual(["Summary ready"]);
   });
 
   test("UI — empty path: the next call is recording — opening the finished call's Summary still reads its outputs while the live call goes on", async ({ page }) => {

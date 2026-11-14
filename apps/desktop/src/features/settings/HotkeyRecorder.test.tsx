@@ -2,14 +2,27 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { find, rendered } from "../../ui/testing";
-import { HotkeyRecorder } from "./HotkeyRecorder";
+import { HotkeyRecorder, hotkeyConflictDescription, hotkeyRecorderLabel } from "./HotkeyRecorder";
 
 describe("HotkeyRecorder", () => {
   it("shows the chord as key caps on a field named with its row and chord", () => {
     const html = renderToString(<HotkeyRecorder id="hk-a" label="Catch me up" caps="⌃⌥⌘C" />);
-    expect(html).toContain('aria-label="Catch me up: ⌃⌥⌘C. Click to record a new shortcut"');
+    expect(html).toContain('aria-label="Catch me up: shortcut Control-Option-Command-C"');
     expect(html).toContain('data-state="idle"');
     expect(html).toContain("Clear shortcut");
+  });
+
+  it("describes the field's recording state and exposes a conflict as its description", () => {
+    const html = renderToString(<HotkeyRecorder id="hk-a" label="Catch me up" caps="⌃⌥⌘C" conflict="Used by VoiceOver" />);
+    expect(html).toContain('aria-label="Catch me up: shortcut Control-Option-Command-C"');
+    expect(html).toContain('aria-describedby="hk-ac"');
+    expect(html).toContain('id="hk-ac"');
+  });
+
+  it("announces the instructions while recording instead of the idle chord label", () => {
+    expect(hotkeyRecorderLabel("Catch me up", "⌃⌥⌘C", true)).toBe("Catch me up: Recording shortcut, type a shortcut");
+    expect(hotkeyConflictDescription("hk-a", "Used by VoiceOver", true)).toBeUndefined();
+    expect(hotkeyConflictDescription("hk-a", "Used by VoiceOver", false)).toBe("hk-ac");
   });
 
   it("reads None and is cleared when the row has no chord", () => {

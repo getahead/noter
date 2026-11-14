@@ -8,6 +8,7 @@ import {
   announcerFor,
   createAnnouncer,
   routeAnnouncement,
+  useAnnounce,
   writeLive,
   type AnnounceKind,
 } from "./announce";
@@ -159,6 +160,18 @@ describe("writeLive", () => {
     expect(writes).toHaveLength(2);
     vi.useRealTimers();
   });
+
+  it("keeps same-tick announcements together in the live region", () => {
+    vi.useFakeTimers();
+    const writes: string[] = [];
+    const el = { set textContent(v: string) { writes.push(v); }, get textContent() { return ""; } };
+    const write = writeLive({ querySelector: () => el } as never);
+    write("polite", "A");
+    write("polite", "B");
+    vi.advanceTimersByTime(50);
+    expect(writes).toEqual(["", "A B"]);
+    vi.useRealTimers();
+  });
 });
 
 describe("announcerFor", () => {
@@ -167,6 +180,21 @@ describe("announcerFor", () => {
     const env = { isKey: () => true, live: vi.fn() };
     expect(announcerFor(bridge, env)).toBe(announcerFor(bridge, env));
   });
+});
+
+it("uses the current document for live announcements", async () => {
+  const bridge = createBridge("main", new FakeCore({ window: "main" }));
+  const writes: string[] = [];
+  const element = { set textContent(value: string) { writes.push(value); }, get textContent() { return ""; } };
+  vi.stubGlobal("document", { hasFocus: () => true, querySelector: () => element });
+  vi.useFakeTimers();
+  await bridge.open();
+  await useAnnounce(bridge)({ kind: "undo", text: "Restored", key: "1" });
+  vi.advanceTimersByTime(50);
+  expect(writes).toEqual(["", "Restored"]);
+  await bridge.close();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 
 describe("LiveRegions", () => {

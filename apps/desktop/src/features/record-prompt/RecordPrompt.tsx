@@ -12,9 +12,11 @@ import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
+import { hotkeyCaps } from "../settings/hotkey-rows";
+import { spokenChord } from "../settings/accelerator";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
 import { announce, answerCallEnd, answerNewMeeting, dismiss, fitPanel, holdNotice, ignoreApp, openDeleteOldAudio, openSystemSettings, startRecording } from "./actions";
-import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptTimer } from "./logic";
+import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, promptAnnouncement, sourceLine, viewKey, type PromptTimer, type Variant } from "./logic";
 import "./record-prompt.css";
 
 // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-fade
@@ -45,6 +47,9 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   const capture = useWindow(bridge, (s) => s.whole.capture) ?? null;
   const detection = useWindow(bridge, (s) => s.whole.detection)?.detection ?? null;
   const env = useWindow(bridge, (s) => s.whole.environment);
+  const hotkeys = useWindow(bridge, (s) => s.whole.hotkeys);
+  const recordChord = hotkeyCaps(hotkeys, "start_stop", "⌃⌥⌘R");
+  const keepChord = hotkeyCaps(hotkeys, "open_call_screen", "⌃⌥⌘N");
 
   const notice = capture?.notice ?? null;
   const key = viewKey(detection, notice);
@@ -78,15 +83,19 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
 
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-render
   const variant = view?.variant;
-  const announceKey = shown ? `${key}:${variant}` : null;
+  const previousAnnouncement = useRef<{ key: string | null; variant: Variant | null }>({ key: null, variant: null });
   useEffect(() => {
-    if (!announceKey || !variant) return;
+    const previous = previousAnnouncement.current;
+    previousAnnouncement.current = { key: shown ? key : null, variant: shown ? variant ?? null : null };
+    if (!shown || !key || !variant) return;
+    const announcement = promptAnnouncement(previous, key, variant);
+    if (!announcement) return;
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-notice:p1:inst-render-notice
-    if (variant === "call-ended") void announce(bridge, t("prompt.announce_ended"), "assertive");
-    else if (variant === "new-meeting") void announce(bridge, t("prompt.announce_meeting", { title: meetingTitle(notice) }), "assertive");
+    if (announcement === "notice" && variant === "call-ended") void announce(bridge, keepChord ? t("prompt.announce_ended", { key: spokenChord(keepChord) }) : t("prompt.announce_ended_unbound"), "assertive");
+    else if (announcement === "notice" && variant === "new-meeting") void announce(bridge, t("prompt.announce_meeting", { title: meetingTitle(notice) }), "assertive");
     // @cpt-end:cpt-noter-flow-ui-record-prompt-notice:p1:inst-render-notice
-    else void announce(bridge, t("prompt.announce_appears"), "polite");
-  }, [announceKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    else if (announcement === "appearance") void announce(bridge, recordChord ? t("prompt.announce_appears", { key: spokenChord(recordChord) }) : t("prompt.announce_appears_unbound"), "polite");
+  }, [announce, bridge, key, keepChord, notice, recordChord, shown, variant]);
   // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-render
 
   // @cpt-begin:cpt-noter-flow-ui-record-prompt-missed-prompt:p1:inst-user-dismiss

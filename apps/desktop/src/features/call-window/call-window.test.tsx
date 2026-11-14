@@ -1,5 +1,22 @@
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { effects, refs } = vi.hoisted(() => ({
+  effects: [] as (() => void)[],
+  refs: [] as { current: unknown }[],
+}));
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  return {
+    ...react,
+    useEffect: (effect: () => void) => void effects.push(effect),
+    useRef: (value: unknown) => {
+      const ref = react.useRef(value);
+      refs.push(ref);
+      return ref;
+    },
+  };
+});
 
 import { App } from "../../app/App";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
@@ -20,6 +37,9 @@ afterEach(async () => {
   await bridge?.close();
   bridge = null;
   sent.length = 0;
+  effects.length = 0;
+  refs.length = 0;
+  vi.unstubAllGlobals();
 });
 
 const MIN = 60_000;
@@ -72,6 +92,33 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     await bridge.close();
     await open({ phase: "idle", call_id: null });
     expect(html()).toBe("");
+  });
+
+  it("sends mode and call-ended announcements through the call-screen bridge", async () => {
+    await open({ phase: "recording", notice: { type: "call_ended", stops_at: 1 } });
+    vi.stubGlobal("document", { hasFocus: () => false, querySelector: () => null });
+    html();
+    const modeEffect = effects.find((effect) => effect.toString().includes("modeChangeAnnouncement"));
+    expect(modeEffect).toBeDefined();
+    refs.find((ref) => ref.current === null)!.current = "LOCAL_ONLY";
+    modeEffect!();
+    const captureEffect = effects.find((effect) => effect.toString().includes("captureAnnouncements"));
+    expect(captureEffect).toBeDefined();
+    captureEffect!();
+    await settle();
+    expect(args("window_announce")).toContainEqual({ text: "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording.", politeness: "assertive" });
+  });
+
+  it("keeps announcement effects safe while the call-window snapshot is still missing", async () => {
+    await open({ phase: "recording", call_id: "call_live" });
+    bridge!.store.setState((state) => {
+      const { callWindow: _callWindow, ...whole } = state.whole;
+      return { ...state, whole };
+    });
+    html();
+    const captureEffect = effects.find((effect) => effect.toString().includes("captureAnnouncements"));
+    expect(captureEffect).toBeDefined();
+    expect(captureEffect!).not.toThrow();
   });
 
   it("shows a person chip per participant from the transcript", async () => {

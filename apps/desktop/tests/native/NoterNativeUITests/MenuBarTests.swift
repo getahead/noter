@@ -102,13 +102,13 @@ final class MenuBarTests: NoterTestCase {
         let pane = app.staticTexts["Hotkeys"].firstMatch
         XCTAssertTrue(pane.waitForExistence(timeout: 5), "Settings did not open")
         pane.click()
-        let field = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Open call screen: ⌃⌥⌘N'")).firstMatch
+        let field = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Open call screen: shortcut Control-Option-Command-N'")).firstMatch
         XCTAssertTrue(field.waitForExistence(timeout: 5))
         let clear = app.buttons.matching(NSPredicate(format: "label == 'Clear shortcut'")).allElementsBoundByIndex
             .min { abs($0.frame.midY - field.frame.midY) < abs($1.frame.midY - field.frame.midY) }
         XCTAssertNotNil(clear, "the row has no Clear shortcut button")
         clear?.click()
-        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Open call screen: None'")).firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Open call screen: shortcut None'")).firstMatch.waitForExistence(timeout: 5))
         XCTAssertTrue(openMenu().exists)
         XCTAssertNil(keyOf("Open Call Screen"), "an item whose hotkey is cleared shows no key")
     }

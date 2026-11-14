@@ -100,6 +100,15 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     expect(clockOf(754)).toBe("12:34");
     expect(clockOf(754.9)).toBe("12:34");
   });
+  it("explains that Record has no keyboard shortcut when its binding is cleared", async () => {
+    await open();
+    await loadToday(bridge);
+    fake.world.hotkeys.bindings.find((binding) => binding.action === "start_stop")!.shortcut = null;
+    bridge.store.setState((state) => ({ ...state, whole: { ...state.whole, capture: { ...state.whole.capture!, phase: "stopped" }, hotkeys: fake.world.hotkeys } }));
+    const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
+    const html = renderToString(<TodayToolbar route={{ section: "today", key: "root" }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
+    expect(html).toContain("no keyboard shortcut assigned");
+  });
   it("says why a refused Record was refused", async () => {
     await open();
     await loadToday(bridge);

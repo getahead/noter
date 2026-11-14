@@ -58,7 +58,10 @@ export function createGlossaryActions(bridge: Bridge, ctx: GlossaryCtx) {
     },
     remove: async () => {
       const list = ctx.selected && (await removeTerm(bridge, ctx.selected));
-      if (list) { ctx.setTerms(list); ctx.setSelected(null); }
+      if (!list) return false;
+      ctx.setTerms(list);
+      ctx.setSelected(null);
+      return true;
     },
   };
 }

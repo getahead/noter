@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CallDetection, CaptureNotice, CaptureState, ModelBundle } from "../../core/bindings";
-import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, sourceLine, viewKey, type PromptInput } from "./logic";
+import { activeRefusal, chooseView, countdownSeconds, createPromptTimer, focusInside, INITIAL_LOCAL, isBrowser, isHeld, localReduce, meetingTitle, modelPercent, promptAnnouncement, sourceLine, viewKey, type PromptInput } from "./logic";
 
 const detection = (o: Partial<CallDetection> = {}): CallDetection => ({ id: "det_teams", app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2", matched_event: null, detected_at: 0, prompt_until: 30_000, blocked: null, ...o });
 const capture = (o: Partial<CaptureState> = {}): CaptureState => ({ phase: "idle", notice: null, ...o }) as CaptureState;
@@ -47,6 +47,13 @@ describe("chooseView (cpt-noter-algo-ui-record-prompt-variant)", () => {
     expect(chooseView(input({ presenting: true }))).toBeNull();
     expect(chooseView({ ...live({ type: "call_ended", stops_at: 1 }), presenting: true })).toBeNull();
     expect(chooseView(live({ type: "nothing_heard", since: 0 }))).toBeNull(); // the call window's notice, not the panel's
+  });
+});
+
+describe("promptAnnouncement", () => {
+  it("does not repeat appearance on a variant change but does announce a newly changed notice", () => {
+    expect(promptAnnouncement({ key: "det:1", variant: "default" }, "det:1", "disk-full")).toBeNull();
+    expect(promptAnnouncement({ key: "det:1", variant: "default" }, "det:1", "call-ended")).toBe("notice");
   });
 });
 

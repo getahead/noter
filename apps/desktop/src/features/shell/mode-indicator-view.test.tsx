@@ -3,12 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 
 import { find, rendered } from "../../ui/testing";
 import { MODE_MSG, ModeIndicator, ModeInfo } from "./mode-indicator-view";
-import { modeIndicator, type ModeState } from "./mode-indicator";
+import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { en } from "../../i18n/en";
 
 const view = (state: ModeState) => modeIndicator({ mode: "cloud_redacted", degraded: [], sensitiveCall: false, ...({ CLOUD_REDACTED: {}, CLOUD: { mode: "cloud_allowed" }, LOCAL_ONLY: { mode: "local_only" }, SENSITIVE_LOCAL: { sensitiveCall: true }, SWITCHED_TO_LOCAL: { degraded: [{ type: "switched_to_local" }] }, NO_ASSISTANT: { degraded: [{ type: "no_assistant" }] } } as Record<ModeState, object>)[state] } as never);
 
 describe("ModeIndicator (cpt-noter-dod-ui-main-window-shell-mode-indicator)", () => {
+  it("announces only a transition after the initial mode", () => {
+    expect(modeChangeAnnouncement(null, "CLOUD_REDACTED", "Cloud with redaction", "1")).toBeNull();
+    expect(modeChangeAnnouncement("CLOUD_REDACTED", "CLOUD_REDACTED", "Cloud with redaction", "2")).toBeNull();
+    expect(modeChangeAnnouncement("CLOUD_REDACTED", "SWITCHED_TO_LOCAL", "Switched to the local model", "3")).toEqual({ kind: "mode_change", text: "Switched to the local model", key: "3" });
+  });
   it("shows glyph and word for each of the six modes, and VoiceOver reads Mode: cloud with redaction", () => {
     const states = Object.keys(MODE_MSG) as ModeState[];
     for (const state of states) {

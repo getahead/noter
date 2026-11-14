@@ -1,6 +1,12 @@
 // The panel for each variant against the real bridge and the fake core: what it draws, and what its buttons send.
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const effects = vi.hoisted(() => [] as (() => void)[]);
+vi.mock("react", async (importOriginal) => {
+  const react = await importOriginal<typeof import("react")>();
+  return { ...react, useEffect: (effect: () => void) => void effects.push(effect) };
+});
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CaptureNotice } from "../../core/bindings";
@@ -10,7 +16,7 @@ import { notNowItems, RecordPrompt } from "./RecordPrompt";
 
 let bridge: Bridge;
 let fake: FakeCore;
-afterEach(() => bridge.close());
+afterEach(() => (effects.length = 0, bridge.close()));
 
 const TEAMS = { app_name: "Microsoft Teams", bundle_id: "com.microsoft.teams2" };
 async function ready(more: (w: FakeCore["world"]) => void = () => {}, detect: { app_name: string; bundle_id: string } | null = TEAMS) {
@@ -64,6 +70,26 @@ describe("Default", () => {
       { source: "record_prompt", sensitive: false, detection_id: "det_com.microsoft.teams2" },
       { source: "record_prompt", sensitive: true, detection_id: "det_com.microsoft.teams2" },
     ]);
+  });
+
+  it("announces prompt appearance with its current record chord", async () => {
+    await ready();
+    const seen = sent();
+    html();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "Noter: Record this call? Press Control-Option-Command-R to record.", politeness: "polite" }]);
+  });
+
+  it("gives button guidance when the record shortcut is cleared", async () => {
+    await ready();
+    fake.world.hotkeys.bindings.find((binding) => binding.action === "start_stop")!.shortcut = null;
+    bridge.store.setState((state) => ({ ...state, whole: { ...state.whole, hotkeys: fake.world.hotkeys } }));
+    const seen = sent();
+    html();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "Noter: Record this call? Use the Record button to start recording.", politeness: "polite" }]);
   });
 
   it("× closes it with reason closed", async () => {
@@ -143,17 +169,31 @@ describe("no panel", () => {
 describe("the notice variants", () => {
   it("call-ended: the countdown with the app, Stop Now and Keep Recording answer the core", async () => {
     await ready(live({ type: "call_ended", stops_at: Date.now() + 10_000 }), null);
+    const seen = sent();
     const out = html();
     expect(out).toContain('data-variant="call-ended"');
     expect(out).toContain('data-state="countdown-running"');
     expect(out).toMatch(/Stopping in \d+ s\./);
-    const seen = sent();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "The call seems to have ended. Noter stops recording in 10 seconds. Press Control-Option-Command-N, then Return, to keep recording.", politeness: "assertive" }]);
     press("Stop Now", "Keep Recording");
     await settle();
     expect(seen.filter(([c]) => c === "capture_answer_call_end").map(([, a]) => a)).toEqual([
       { call_id: "call_live", choice: "stop_now" },
       { call_id: "call_live", choice: "keep_recording" },
     ]);
+  });
+
+  it("gives button guidance when the Keep Recording shortcut is cleared", async () => {
+    await ready(live({ type: "call_ended", stops_at: Date.now() + 10_000 }), null);
+    fake.world.hotkeys.bindings.find((binding) => binding.action === "open_call_screen")!.shortcut = null;
+    bridge.store.setState((state) => ({ ...state, whole: { ...state.whole, hotkeys: fake.world.hotkeys } }));
+    const seen = sent();
+    html();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "The call seems to have ended. Noter stops recording in 10 seconds. Use the Keep Recording button to continue.", politeness: "assertive" }]);
   });
 
   it("call-ended while the core holds the countdown reads Paused while you're here", async () => {
@@ -169,6 +209,9 @@ describe("the notice variants", () => {
     expect(out).toContain('data-variant="new-meeting"');
     expect(out).toContain("A new meeting may have started: 1:1 with Anna K.");
     const seen = sent();
+    effects.find((effect) => effect.toString().includes("promptAnnouncement"))?.();
+    await settle();
+    expect(seen).toContainEqual(["window_announce", { text: "A new meeting may have started: 1:1 with Anna K.", politeness: "assertive" }]);
     press("Keep in This Call", "Start as New Call");
     await settle();
     expect(seen.filter(([c]) => c === "capture_answer_new_meeting").map(([, a]) => a)).toEqual([
