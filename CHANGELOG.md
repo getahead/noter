@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.14](https://github.com/getahead/noter/compare/v0.22.13...v0.22.14) (2026-11-14)
+
+
+### Bug fixes
+
+* **core:** publish local router failover state ([#861](https://github.com/getahead/noter/issues/861)) ([893e584](https://github.com/getahead/noter/commit/893e5849ca057c09efc80dd1c4c1009422f607f0))
+* **core:** restore library and Today call details ([#851](https://github.com/getahead/noter/issues/851)) ([30779ca](https://github.com/getahead/noter/commit/30779ca923a5f18675f7e894963f8520e7afeef3))
+
 ## [0.22.13](https://github.com/getahead/noter/compare/v0.22.12...v0.22.13) (2026-11-14)
 
 
