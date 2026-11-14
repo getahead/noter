@@ -1,14 +1,23 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { effects, refs } = vi.hoisted(() => ({
+const { effects, refs, stateWrites } = vi.hoisted(() => ({
   effects: [] as (() => void)[],
   refs: [] as { current: unknown }[],
+  stateWrites: [] as unknown[],
 }));
 vi.mock("react", async (importOriginal) => {
   const react = await importOriginal<typeof import("react")>();
   return {
     ...react,
+    useState: <T,>(initial: T | (() => T)) => {
+      const [value, setValue] = react.useState(initial);
+      return [value, (next: T | ((previous: T) => T)) => {
+        const resolved = typeof next === "function" ? (next as (previous: T) => T)(value) : next;
+        stateWrites.push(resolved);
+        setValue(resolved);
+      }] as const;
+    },
     useEffect: (effect: () => void) => void effects.push(effect),
     useRef: (value: unknown) => {
       const ref = react.useRef(value);
@@ -39,6 +48,7 @@ afterEach(async () => {
   sent.length = 0;
   effects.length = 0;
   refs.length = 0;
+  stateWrites.length = 0;
   vi.unstubAllGlobals();
 });
 
@@ -213,9 +223,11 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("capture_stop")).toEqual([live]);
     expect(args("capture_mark_moment")).toEqual([live]);
     fake.failNext("capture_mark_moment", "internal");
+    stateWrites.length = 0;
     strip().onMark();
     await settle();
     expect(bridge!.store.getState().commands.capture_mark_moment).toMatchObject({ state: "ERROR", error: { code: "internal", tryAgain: true } });
+    expect(stateWrites.filter((value) => typeof value === "string" && value.startsWith("Marked "))).toEqual([]);
   });
 
   it("offers the header controls: sensitive, Open in Noter, layout, presenting", async () => {
@@ -312,6 +324,8 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     await settle();
     expect(args("capture_continue")).toEqual([live]);
     expect(bridge!.store.getState().commands.capture_continue).toMatchObject({ state: "ERROR", error: { code: "continue_window_closed", tryAgain: false } });
+    expect(fake.world.app.capture.phase).toBe("stopped");
+    expect(args("capture_start")).toEqual([]);
     expect(args("window_hide_call")).toEqual([{}]);
   });
 
