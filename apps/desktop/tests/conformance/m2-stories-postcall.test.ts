@@ -67,10 +67,11 @@ const LINES = ["Let's ship the drawer redesign in 8.0.", "Anna takes the virtual
  * By default the archive pass answers, `archiveAfterMs` after the core asks, with a result
  * recorded for the call's three lines.
  */
-function open(opts: { llm?: object[]; engine?: object[] | null; archiveAfterMs?: number } = {}): void {
+function open(opts: { llm?: object[]; engine?: object[] | null; archiveAfterMs?: number; emptyArchive?: boolean } = {}): void {
   dir = mkdtempSync(join(tmpdir(), "noter-postcall-"));
   const archive = join(dir, "archive.json");
-  writeFileSync(archive, JSON.stringify({ call_id: "call_recorded", backend: "whisper_large_v3", segments: LINES.map((t, i) => heard(i, t)) }));
+  const segments = opts.emptyArchive ? [] : LINES.map((t, i) => heard(i, t));
+  writeFileSync(archive, JSON.stringify({ call_id: "call_recorded", backend: "whisper_large_v3", segments }));
   const engine = opts.engine === null ? null : opts.engine ?? [{ on: "offline_pass", after_ms: opts.archiveAfterMs ?? 0, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }];
   const flags = engine === null ? [] : [`--engine-script ${write("engine.jsonl", engine)}`];
   if (opts.llm) flags.push(`--llm-script ${write("llm.jsonl", opts.llm)}`);
@@ -210,7 +211,7 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
 
   it("cpt-noter-seq-call-page-review-outputs: the sections fill in order, the user edits the summary, the version menu ends with Your Edit and Undo restores the written text", async () => {
     // The first run writes the summary as four lines; a regeneration changes the last one.
-    open({ llm: [...Array(6).fill(postCall("A.\nB.\nC.\nD.")), postCall("A.\nB.\nC.\nD2.")], engine: [] });
+    open({ llm: [...Array(6).fill(postCall("A.\nB.\nC.\nD.")), postCall("A.\nB.\nC.\nD2.")], emptyArchive: true });
     const progress = await s.events("outputs:progress");
     const call = await record();
     await stop(call);
@@ -249,7 +250,7 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
   });
 
   it("cpt-noter-seq-call-page-review-outputs (error, a section failed): the action items fail typed, the others stay ready; Use Local Model writes them and names its writer; regeneration waits while a call records", async () => {
-    open({ llm: [postCall("Planning summary."), postCall(""), { on: "post-call", fail: "timeout" }], engine: [] });
+    open({ llm: [postCall("Planning summary."), postCall(""), { on: "post-call", fail: "timeout" }], emptyArchive: true });
     const call = await record();
     await stop(call);
     const out = await written(call);
@@ -273,7 +274,7 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
   });
 
   it("cpt-noter-seq-notifications-open-outputs: Summary ready names the call; held while the next call records and released at its stop; none while the main window shows the call", async () => {
-    open({ engine: [] });
+    open({ emptyArchive: true });
     // Next call already recording: the planning call's Summary ready waits for the 1:1's stop.
     const planning = await record();
     await stop(planning);
@@ -300,7 +301,7 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
 
   it("cpt-noter-seq-notifications-open-outputs (error, outputs failed): Couldn't write the summary names the call; Try Again writes the outputs", async () => {
     // Every section of the first run fails; the runtime answers again afterwards.
-    open({ llm: Array.from({ length: 6 }, () => ({ on: "post-call", fail: "timeout" })), engine: [] });
+    open({ llm: Array.from({ length: 6 }, () => ({ on: "post-call", fail: "timeout" })), emptyArchive: true });
     const call = await record();
     await stop(call);
     const out = await written(call);
