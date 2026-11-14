@@ -221,3 +221,5 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     expect(renderToString(<App bridge={early} />)).not.toContain("FR-R1");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

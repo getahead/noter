@@ -60,3 +60,5 @@ it("a refresh landing as a read finishes is never dropped, at any microtask offs
     await bridge.close();
   }
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

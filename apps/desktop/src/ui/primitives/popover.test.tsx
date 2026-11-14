@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { closeOnOutside, measure, placeFloating, Popover, returnFocus } from "./popover";
 
 describe("Popover (cpt-noter-dod-ui-primitives-controls)", () => {
@@ -115,3 +115,5 @@ describe("returnFocus", () => {
     expect(restore).toHaveBeenCalledTimes(2);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

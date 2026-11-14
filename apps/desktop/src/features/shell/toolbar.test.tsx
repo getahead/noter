@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { find, rendered } from "../../ui/testing";
 import { MainToolbar, OverflowMenu, type ToolbarProps } from "./toolbar";
@@ -112,3 +112,5 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(actions[0]!.onAction).toHaveBeenCalledOnce();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

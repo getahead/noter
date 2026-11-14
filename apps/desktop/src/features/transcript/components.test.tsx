@@ -465,3 +465,5 @@ describe("useTranscript and TranscriptPanel (hosts)", () => {
     expect(html).toContain("Try Again");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

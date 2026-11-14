@@ -199,3 +199,5 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
     expect(html).toContain(">Replace…<");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

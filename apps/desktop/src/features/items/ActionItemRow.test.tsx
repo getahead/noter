@@ -490,3 +490,5 @@ it("compact rows open their source Transcript in one action", async () => {
   await settle();
   expect(seen).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }]);
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

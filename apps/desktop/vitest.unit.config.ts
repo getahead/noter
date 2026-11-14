@@ -7,9 +7,6 @@ export default defineConfig({
   test: {
     include: ["src/**/*.test.{ts,tsx}", "tests/support/**/*.test.ts"],
     environment: "node",
-    setupFiles: ["./src/test-cleanup.ts"],
-    restoreMocks: true,
-    unstubGlobals: true,
     passWithNoTests: true,
     coverage: {
       provider: "v8",

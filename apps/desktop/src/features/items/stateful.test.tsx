@@ -97,3 +97,5 @@ describe("ItemInspector", () => {
     await settle();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

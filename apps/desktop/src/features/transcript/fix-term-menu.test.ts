@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { followFixTermChoice, watchFixTermMenu } from "./fix-term-menu";
 import { seg } from "./testing";
@@ -65,3 +65,5 @@ describe("followFixTermChoice", () => {
     expect(handled.current).toBe(2);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

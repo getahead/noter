@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandState } from "../../app/store/window-store";
 import type { CallRow, UiPrefs } from "../../core/bindings";
@@ -127,3 +127,5 @@ describe("afterTimer (the skeleton after 300 ms)", () => {
     vi.useRealTimers();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -237,3 +237,5 @@ it("quit recovery opens the saved Transcript and shows the call window after Res
   expect(resume).toHaveBeenCalledWith({ call_id: "call_live" });
   expect(show).toHaveBeenCalled();
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { SegmentView, SpeakerView } from "../../core/bindings";
@@ -78,3 +78,5 @@ describe("selectedRange", () => {
     expect(selectedRange(el(false), sel(false, "x"))).toBeNull();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

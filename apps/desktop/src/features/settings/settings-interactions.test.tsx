@@ -413,3 +413,5 @@ describe("listKeyAction", () => {
     expect(listKeyAction("x", "A", 1, 11)).toBeNull();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

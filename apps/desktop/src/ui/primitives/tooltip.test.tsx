@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HELP_TAG_MS, helpTag, Tooltip } from "./tooltip";
 
 describe("Tooltip (cpt-noter-dod-ui-primitives-controls)", () => {
@@ -79,3 +79,5 @@ describe("Tooltip wiring", () => {
     expect(show).toHaveBeenCalledWith(true);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

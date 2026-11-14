@@ -429,3 +429,5 @@ describe("act on a record (typed errors to named states, no retries)", () => {
     expect(count("banner_dismiss")).toBe(3);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

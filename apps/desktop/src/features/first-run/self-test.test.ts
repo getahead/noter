@@ -168,3 +168,5 @@ describe("against the fake core's self-test stream", () => {
     expect(panel.line?.text).toBeTruthy();
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

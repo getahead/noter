@@ -228,3 +228,5 @@ describe("S2 prompt state corrections", () => {
     expect(versionEntries(versions, true, prefs).map((e) => e.checked)).toEqual([false, false, true]);
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

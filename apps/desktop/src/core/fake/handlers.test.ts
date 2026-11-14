@@ -141,3 +141,5 @@ describe("fake core stream and record parity", () => {
     expect(thread.turns[0]?.answer_md).not.toContain("notification service");
   });
 });
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
