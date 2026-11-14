@@ -328,8 +328,12 @@ final class ModelsTests: XCTestCase {
         let lines = Lines()
         let mic = try wav("mic", seconds: 0.2, amplitude: 0.3)
         let sys = try wav("sys", seconds: 0.2, amplitude: 0.1)
-        _ = FileMode(mic: mic, sys: sys, realtime: false)
-            .run(writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"])
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("engine-io"), withIntermediateDirectories: true)
+        let audio = FileAudioSource(mic: mic, sys: sys, realtime: false)
+        let engine = EngineLoop(writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false, container: root) { _ in audio }
+        _ = FileMode().run(writer: writer(lines), engine: engine, audio: audio)
         XCTAssertEqual(lines.events.first?["models"] as? [String], ["whisper-turbo"])
     }
 }

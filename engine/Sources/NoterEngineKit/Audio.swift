@@ -191,13 +191,17 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
     private let sys: URL
     private let realtime: Bool
     private let lock = NSLock()
+    private let finished = DispatchSemaphore(value: 0)
     private var stopped = false
+    private var playbackError: Error?
 
     public init(mic: URL, sys: URL, realtime: Bool) {
         self.mic = mic
         self.sys = sys
         self.realtime = realtime
     }
+
+    var inputPaths: (mic: String, sys: String) { (mic.path, sys.path) }
 
     func validate() throws {
         _ = try AVAudioFile(forReading: mic)
@@ -215,9 +219,16 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
             do {
                 try self.play(onChunk)
             } catch {
+                lock.withLock { playbackError = error }
                 FileHandle.standardError.write(Data("noter-engine: file audio: \(error)\n".utf8))
             }
+            finished.signal()
         }
+    }
+
+    func waitUntilFinished() throws {
+        finished.wait()
+        if let error = lock.withLock({ playbackError }) { throw error }
     }
 
     public func stop() {

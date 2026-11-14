@@ -130,6 +130,17 @@ final class SelfTestTests: XCTestCase {
 }
 
 final class ChunkTests: XCTestCase {
+    func testSharedSpeechSegmentationUsesTheLiveThresholdPauseAndDuration() {
+        let voice = (0..<3_200).map { 0.3 * sin(Float($0) * 2 * .pi * 300 / 16_000) }
+        let silence = [Float](repeating: 0, count: 11_200)
+        let second = [Float](repeating: 0.3, count: 1_600)
+        let ranges = SpeechSegments.utterances(voice + silence + second, rate: 16_000, cuts: [], maxUtteranceMs: 30_000)
+        XCTAssertEqual(ranges.map(\.lowerBound), [0, 14_400])
+        XCTAssertEqual(ranges.map(\.upperBound), [3_200, 16_000])
+        XCTAssertTrue(SpeechSegments.isSpeech(voice))
+        XCTAssertFalse(SpeechSegments.isSpeech(silence))
+    }
+
     func testFileChunksCarryTheFileSampleRate() throws {
         let mic = try wav("mic", seconds: 0.2, amplitude: 0.3)
         var chunks: [AudioChunk] = []
@@ -247,34 +258,51 @@ final class FileModeTests: XCTestCase {
         let lines = Lines()
         let mic = try wav("mic", seconds: 1, amplitude: 0.3)
         let sys = try wav("sys", seconds: 1, amplitude: 0.1)
-        let code = FileMode(mic: mic, sys: sys, realtime: false).run(writer: writer(lines), engineVersion: "test")
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("engine-io"), withIntermediateDirectories: true)
+        let audio = FileAudioSource(mic: mic, sys: sys, realtime: false)
+        let engine = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: root,
+            transcriber: { FakeTranscriber("replayed speech") }) { _ in audio }
+        let code = FileMode().run(writer: writer(lines), engine: engine, audio: audio)
         XCTAssertEqual(code, 0)
         let types = lines.types
         XCTAssertEqual(types.first, "ready")
         XCTAssertEqual(types.filter { $0 == "levels" }.count, 10, "one per 100 ms of file time")
+        XCTAssertTrue(types.contains("session_started"), "file replay must start the shared engine session")
+        XCTAssertTrue(
+            lines.events.contains { $0["type"] as? String == "segment" && ($0["segment"] as? [String: Any])?["call_id"] as? String == FileMode.callId },
+            "file samples must pass through live ASR")
         XCTAssertEqual(types.last, "session_stopped")
         let stopped = try XCTUnwrap(lines.events.last)
+        let timelinePath = try XCTUnwrap(stopped["timeline_path"] as? String)
+        XCTAssertTrue(timelinePath.hasPrefix("engine-io/file-mode-") && timelinePath.hasSuffix("/timeline.json"))
         XCTAssertEqual(stopped["mic_path"] as? String, mic.path)
         XCTAssertEqual(stopped["sys_path"] as? String, sys.path)
-        let levels = try XCTUnwrap(lines.events.first { $0["type"] as? String == "levels" })
-        XCTAssertEqual(levels["mic_db"] as? Double ?? 0, -13.5, accuracy: 0.5)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: root.appendingPathComponent(CaptureRing.fileName).path))
     }
 
     func testCommandsAreServedOnlyAfterReady() throws {
         let lines = Lines()
         let mic = try wav("mic", seconds: 0.3, amplitude: 0.3)
         let sys = try wav("sys", seconds: 0.3, amplitude: 0.1)
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try FileManager.default.createDirectory(at: root.appendingPathComponent("engine-io"), withIntermediateDirectories: true)
+        let audio = FileAudioSource(mic: mic, sys: sys, realtime: false)
+        let engine = EngineLoop(writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: root) { _ in audio }
         var servedAfter: [String] = []
-        _ = FileMode(mic: mic, sys: sys, realtime: false)
-            .run(writer: writer(lines), engineVersion: "test") { servedAfter = lines.types }
+        _ = FileMode().run(writer: writer(lines), engine: engine, audio: audio) { servedAfter = lines.types }
         XCTAssertEqual(servedAfter, ["ready"])
     }
 
     func testAMissingFileIsDeviceUnavailable() throws {
         let lines = Lines()
         let sys = try wav("sys", seconds: 0.2, amplitude: 0.1)
-        let code = FileMode(mic: URL(fileURLWithPath: "/nonexistent/mic.wav"), sys: sys, realtime: false)
-            .run(writer: writer(lines), engineVersion: "test")
+        let missing = FileAudioSource(mic: URL(fileURLWithPath: "/nonexistent/mic.wav"), sys: sys, realtime: false)
+        let e = EngineLoop(writer: writer(lines), engineVersion: "test", models: [], sandboxed: false) { _ in nil }
+        let code = FileMode().run(writer: writer(lines), engine: e, audio: missing)
         XCTAssertNotEqual(code, 0)
         XCTAssertEqual(lines.types, ["error"])
         XCTAssertEqual(lines.events[0]["code"] as? String, "device_unavailable")

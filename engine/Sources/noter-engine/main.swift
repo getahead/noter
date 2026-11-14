@@ -33,15 +33,17 @@ case let .invalid(why):
     exit(2)
 case let .file(mic, sys, realtime):
     // The speech model too: a replayed call is transcribed as a live one (golden set, Q4 replay).
+    let fileContainer = container ?? FileManager.default.temporaryDirectory.appendingPathComponent("noter-file-mode", isDirectory: true)
+    let audio = FileAudioSource(mic: mic, sys: sys, realtime: realtime)
     let engine = EngineLoop(
-        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
+        writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: fileContainer,
         transcriber: speechModel, offline: offline
-    ) { _ in
-        FileAudioSource(mic: mic, sys: sys, realtime: realtime)
+    ) { start in
+        start == nil ? FileAudioSource(mic: mic, sys: sys, realtime: realtime) : audio
     }
-    let replay = FileMode(mic: mic, sys: sys, realtime: realtime)
+    let replay = FileMode()
     exit(
-        replay.run(writer: writer, engineVersion: version, sandboxed: sandboxed, models: models) {
+        replay.run(writer: writer, engine: engine, audio: audio) {
             Thread.detachNewThread { serve(engine, exitAtEndOfInput: false) }
         })
 case .live:

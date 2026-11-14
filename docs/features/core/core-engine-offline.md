@@ -2,7 +2,7 @@
 title: "Feature: Engine offline pass and embeddings"
 description: "Large v3 and constrained VBx archive processing, speaker embeddings and local text embeddings over engine stdio."
 status: PROPOSED
-version: "0.3"
+version: "0.4"
 date: "2026-10-18"
 milestone: M2
 lane: engine
@@ -12,7 +12,7 @@ design: docs/DESIGN-core.md
 
 # Feature: Engine offline pass and embeddings
 
-> **Change log (v0.3):** Archive decoder, segmentation model and PLDA tensors are reused between passes and released when capture starts.
+> **Change log (v0.4):** Offline commands run through `LocalOfflineWork` with fake models injected at the model protocols; the dispatcher has no second work protocol. CoreML speaker frame weights are validated as a pure production mapping.
 
 <!-- toc -->
 
@@ -221,7 +221,7 @@ The system **MUST** correlate speaker and text embeddings, validate their dimens
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-offline-tests`
 
-The system **MUST** pass Swift unit and file-mode golden-call tests, Rust supervisor tests for correlation, unsafe paths, malformed vectors, engine exit and late completions, and engine-schema conformance tests. Real-core post-call E2E covers consumption; this feature owns no IPC command or story denominator. `just gate` passes.
+The system **MUST** pass Swift unit and file-mode golden-call tests, including offline dispatcher commands through `LocalOfflineWork` with fake model implementations and a unit test of the production frame-weight mapping; Rust supervisor tests for correlation, unsafe paths, malformed vectors, engine exit and late completions; and engine-schema conformance tests. Real-core post-call E2E covers consumption; this feature owns no IPC command or story denominator. `just gate` passes.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-offline-archive`

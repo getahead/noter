@@ -14,6 +14,10 @@ final class FakeDecoder: ArchiveDecoder, @unchecked Sendable {
     var probabilities: [String: Float] = ["en": 0.95]
     var texts: [String: (text: String, avgLogprob: Float)] = ["en": ("hello there", -0.3)]
     var fails = false
+    var failure: EngineErrorCode = .internal
+    var gateFirst = false
+    let firstStarted = DispatchSemaphore(value: 0)
+    let releaseFirst = DispatchSemaphore(value: 0)
     private let lock = NSLock()
     private var calls: [(samples: Int, language: String)] = []
 
@@ -22,8 +26,15 @@ final class FakeDecoder: ArchiveDecoder, @unchecked Sendable {
     func languages(_ samples: [Float]) throws -> [String: Float] { probabilities }
 
     func decode(_ samples: [Float], language: String) throws -> Transcript {
-        if fails { throw OfflineFailure(code: .internal) }
-        lock.withLock { calls.append((samples.count, language)) }
+        let first = lock.withLock { () -> Bool in
+            calls.append((samples.count, language))
+            return gateFirst && calls.count == 1
+        }
+        if first {
+            firstStarted.signal()
+            releaseFirst.wait()
+        }
+        if fails { throw OfflineFailure(code: failure) }
         let (text, score) = texts[language] ?? ("", -5)
         let words = text.split(separator: " ").map(String.init)
         let ms = samples.count * 1000 / 16_000
@@ -276,7 +287,7 @@ final class ArchiveTests: XCTestCase {
 
     // MARK: through the engine
 
-    private func engine(_ lines: Lines, _ work: OfflineWork) -> EngineLoop {
+    private func engine(_ lines: Lines, _ work: LocalOfflineWork) -> EngineLoop {
         EngineLoop(
             writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: container,
             offline: work

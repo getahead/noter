@@ -143,9 +143,11 @@ final class CoreMLSpeakerModel: SpeakerModel, @unchecked Sendable {
         return try speakers.map { try vector(features, weights: weights($0)[...]) }
     }
 
-    private func weights(_ speaking: [Bool]) -> [Float] {
-        (0..<Self.frames).map { f in !speaking.isEmpty && speaking[f * speaking.count / Self.frames] ? 1 : 0 }
+    static func weights(_ speaking: [Bool], frames: Int) -> [Float] {
+        (0..<frames).map { f in !speaking.isEmpty && speaking[f * speaking.count / frames] ? 1 : 0 }
     }
+
+    private func weights(_ speaking: [Bool]) -> [Float] { Self.weights(speaking, frames: Self.frames) }
 
     private func filterbank(_ audio: ArraySlice<Float>) throws -> MLMultiArray {
         guard let features = try fbank.prediction(

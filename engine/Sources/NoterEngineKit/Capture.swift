@@ -219,6 +219,7 @@ final class CaptureSession: @unchecked Sendable {
     private let relative: String
     private let writer: EventWriter
     private let now: () -> Int64
+    private let fileModeRing: URL?
     private let ring: CaptureRing
     private let lock = NSLock()
     private var timeline: Timeline
@@ -240,7 +241,7 @@ final class CaptureSession: @unchecked Sendable {
 
     init(
         start: StartSession, container: URL, writer: EventWriter, now: @escaping () -> Int64,
-        encoder: (URL) throws -> AudioEncoder, asrQueue: DispatchQueue? = nil
+        encoder: (URL) throws -> AudioEncoder, asrQueue: DispatchQueue? = nil, fileModeRing: URL? = nil
     ) throws {
         callId = start.callId
         asr = LiveASR(callId: start.callId, languages: start.languages, glossary: start.glossary, writer: writer, queue: asrQueue)
@@ -253,8 +254,9 @@ final class CaptureSession: @unchecked Sendable {
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
         self.writer = writer
         self.now = now
+        self.fileModeRing = fileModeRing
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        ring = try CaptureRing(url: container.appendingPathComponent(CaptureRing.fileName), callId: callId)
+        ring = try CaptureRing(url: fileModeRing ?? container.appendingPathComponent(CaptureRing.fileName), callId: callId)
         let saved = try? JSONDecoder().decode(
             Timeline.self, from: Data(contentsOf: dir.appendingPathComponent("timeline.json")))
         timeline = start.resumeFromMs == nil ? Timeline(callId: callId) : saved ?? Timeline(callId: callId)
@@ -412,6 +414,10 @@ final class CaptureSession: @unchecked Sendable {
     /// Flushes the files, writes `timeline.json`; the `session_stopped` to send.
     func stop() -> EngineEvent {
         lock.withLock {
+            if let fileModeRing {
+                ring.clear()
+                try? FileManager.default.removeItem(at: fileModeRing)
+            }
             encoders.values.forEach { $0.finish() }
             encoders = [:]
             try? save()
