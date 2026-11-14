@@ -574,6 +574,45 @@ async fn update_guards_the_rev_and_applies_only_present_fields() {
 }
 
 #[tokio::test]
+async fn update_recomputes_legacy_alias_norm_before_matching_alias_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    world(&core);
+    exec(
+        dir.path(),
+        "UPDATE person_aliases SET alias = 'Ｆｉｌｅ', alias_norm = 'ｆｉｌｅ' WHERE id = 'pal_1'",
+    )
+    .unwrap();
+
+    update(
+        &core,
+        "per_dima",
+        1,
+        PersonPatch {
+            aliases: Some(vec!["File".into()]),
+            ..PersonPatch::default()
+        },
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        text(
+            dir.path(),
+            "SELECT id FROM person_aliases WHERE person_id = 'per_dima'"
+        ),
+        Some("pal_1".into())
+    );
+    assert_eq!(
+        text(
+            dir.path(),
+            "SELECT alias_norm FROM person_aliases WHERE id = 'pal_1'"
+        ),
+        Some("file".into())
+    );
+}
+
+#[tokio::test]
 async fn merge_moves_every_reference_and_undo_restores_links_and_revs() {
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());

@@ -687,7 +687,11 @@ impl Core {
                 .map(|r| (text(&r[0]), text(&r[1]), text(&r[2])))
                 .collect();
                 for (alias_id, alias, n) in &held {
-                    match wanted.iter().find(|(_, wanted_norm)| wanted_norm == n) {
+                    let normalized = norm(alias);
+                    match wanted
+                        .iter()
+                        .find(|(_, wanted_norm)| wanted_norm == &normalized)
+                    {
                         None => {
                             db(tx.execute("DELETE FROM person_aliases WHERE id = ?1", [alias_id]))?;
                             log.push(logged(
@@ -700,21 +704,27 @@ impl Core {
                                 ],
                             ));
                         }
-                        Some((spelling, _)) if spelling != alias => {
+                        Some((spelling, wanted_norm)) if spelling != alias || n != wanted_norm => {
+                            let mut changes = Vec::new();
+                            if spelling != alias {
+                                changes.push(("alias", json!(alias), json!(spelling)));
+                            }
+                            if n != wanted_norm {
+                                changes.push(("alias_norm", json!(n), json!(wanted_norm)));
+                            }
                             db(tx.execute(
-                                "UPDATE person_aliases SET alias = ?1 WHERE id = ?2",
-                                params![spelling, alias_id],
+                                "UPDATE person_aliases SET alias = ?1, alias_norm = ?2 WHERE id = ?3",
+                                params![spelling, wanted_norm, alias_id],
                             ))?;
-                            log.push(logged(
-                                "person_aliases",
-                                alias_id,
-                                vec![("alias", json!(alias), json!(spelling))],
-                            ));
+                            log.push(logged("person_aliases", alias_id, changes));
                         }
                         Some(_) => {}
                     }
                 }
-                for (spelling, n) in wanted.iter().filter(|(_, n)| !held.iter().any(|h| &h.2 == n)) {
+                for (spelling, n) in wanted
+                    .iter()
+                    .filter(|(_, n)| !held.iter().any(|h| norm(&h.1) == *n))
+                {
                     let alias_id = new_id("pal");
                     db(tx.execute(
                         "INSERT INTO person_aliases (id, person_id, alias, alias_norm) VALUES (?1, ?2, ?3, ?4)",
@@ -962,27 +972,28 @@ fn merge_tx(
     // @cpt-begin:cpt-noter-algo-core-people-merge:p1:inst-merge-aliases
     let mut seen: BTreeSet<String> = rows(
         tx,
-        "SELECT alias_norm FROM person_aliases WHERE person_id = ?1",
+        "SELECT alias FROM person_aliases WHERE person_id = ?1",
         target,
     )?
     .iter()
-    .map(|r| text(&r[0]))
+    .map(|r| norm(&text(&r[0])))
     .collect();
     seen.insert(norm(&tgt.display_name));
     let source_aliases =
         "SELECT id, alias, alias_norm FROM person_aliases WHERE person_id = ?1 ORDER BY rowid";
     for row in rows(tx, source_aliases, source)? {
         let (id, alias, n) = (text(&row[0]), text(&row[1]), text(&row[2]));
-        if seen.insert(n.clone()) {
+        let normalized = norm(&alias);
+        if seen.insert(normalized.clone()) {
+            let mut changes = vec![("person_id", json!(source), json!(target))];
+            if n != normalized {
+                changes.push(("alias_norm", json!(n), json!(normalized)));
+            }
             db(tx.execute(
-                "UPDATE person_aliases SET person_id = ?1 WHERE id = ?2",
-                params![target, id],
+                "UPDATE person_aliases SET person_id = ?1, alias_norm = ?2 WHERE id = ?3",
+                params![target, normalized, id],
             ))?;
-            log.push(logged(
-                "person_aliases",
-                &id,
-                vec![("person_id", json!(source), json!(target))],
-            ));
+            log.push(logged("person_aliases", &id, changes));
         } else {
             db(tx.execute("DELETE FROM person_aliases WHERE id = ?1", [&id]))?;
             log.push(logged(
