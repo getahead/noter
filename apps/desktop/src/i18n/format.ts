@@ -13,6 +13,29 @@ const INTERFACE_LANG = "en";
 export const locale = () =>
   (typeof navigator === "undefined" ? "" : navigator.language) || "en";
 
+type IntlFormatter = Intl.DateTimeFormat | Intl.ListFormat | Intl.NumberFormat | Intl.PluralRules;
+const formatters = new Map<string, IntlFormatter>();
+const cached = <T extends IntlFormatter>(
+  kind: string,
+  loc: string,
+  options: object,
+  create: () => T,
+): T => {
+  const key = JSON.stringify([kind, loc, options]);
+  let value = formatters.get(key);
+  if (!value) {
+    value = create();
+    formatters.set(key, value);
+  }
+  return value as T;
+};
+const numberFormatter = (loc: string, options: Intl.NumberFormatOptions = {}) =>
+  cached("number", loc, options, () => new Intl.NumberFormat(loc, options));
+const pluralFormatter = (loc: string) =>
+  cached("plural", loc, {}, () => new Intl.PluralRules(loc));
+const listFormatter = (loc: string, options: Intl.ListFormatOptions) =>
+  cached("list", loc, options, () => new Intl.ListFormat(loc, options));
+
 export type Pseudo = "off" | "cyrillic" | "german";
 let pseudo: Pseudo = "off";
 export const setPseudo = (mode: Pseudo): void => void (pseudo = mode);
@@ -77,8 +100,7 @@ export function tParts(key: MsgKey, args: Record<string, Arg> = {}): Part[] {
     typeof m === "string"
       ? m
       : m[
-          new Intl.PluralRules(INTERFACE_LANG).select(Number(args.count)) ===
-          "one"
+          pluralFormatter(INTERFACE_LANG).select(Number(args.count)) === "one"
             ? "one"
             : "other"
         ];
@@ -90,8 +112,7 @@ export function tParts(key: MsgKey, args: Record<string, Arg> = {}): Part[] {
     else if (text) parts.push(lang ? { text, lang } : { text });
   };
   // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
-  const numbers = new Intl.NumberFormat(locale());
-  // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
+  let numbers: Intl.NumberFormat | undefined;
   let last = 0;
   const msg = pseudoize(template);
   for (const p of msg.matchAll(PLACEHOLDER)) {
@@ -99,8 +120,12 @@ export function tParts(key: MsgKey, args: Record<string, Arg> = {}): Part[] {
     last = p.index + p[0].length;
     const v = args[p[1]!];
     if (typeof v === "object") push(v.quoted, v.lang);
-    else push(typeof v === "number" ? numbers.format(v) : (v ?? p[0]));
+    else if (typeof v === "number") {
+      numbers ??= numberFormatter(locale());
+      push(numbers.format(v));
+    } else push(v ?? p[0]);
   }
+  // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
   push(msg.slice(last));
   // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-return-string
   return parts;
@@ -122,15 +147,9 @@ export const quote = (text: string, lang: string): Quoted => ({
 
 // @cpt-begin:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
 /** `o` in the user's zone; a zone this WebView does not know falls back to the system zone. */
-const formatters = new Map<string, Intl.DateTimeFormat>();
 const formatter = (loc: string, o: Intl.DateTimeFormatOptions, timeZone?: string) => {
-  const key = JSON.stringify([loc, o, timeZone]);
-  let value = formatters.get(key);
-  if (!value) {
-    value = new Intl.DateTimeFormat(loc, { ...o, timeZone });
-    formatters.set(key, value);
-  }
-  return value;
+  const options = { ...o, timeZone };
+  return cached("date", loc, options, () => new Intl.DateTimeFormat(loc, options));
 };
 
 export const zoned = (ms: number, o: Intl.DateTimeFormatOptions, prefs: UiPrefs | undefined, loc = locale()): string => {
@@ -165,26 +184,30 @@ export const callTime = (seconds: number): string => {
 /** A short localised duration, e.g. "48 min"; seconds only under a minute. */
 export const duration = (seconds: number): string => {
   const s = Math.round(seconds);
-  const unit = (n: number, unit: string) =>
-    new Intl.NumberFormat(locale(), {
+  const unit = (n: number, unit: string) => {
+    const options: Intl.NumberFormatOptions = {
       style: "unit",
       unit,
       unitDisplay: "short",
-    }).format(n);
+    };
+    return numberFormatter(locale(), options).format(n);
+  };
   if (s < 60) return unit(s, "second");
   const units = [
     [Math.floor(s / 3600), "hour"],
     [Math.floor(s / 60) % 60, "minute"],
   ] as const;
   // Intl.DurationFormat would do this, but Node 22 (CI) lacks it.
-  return new Intl.ListFormat(locale(), { style: "short", type: "unit" }).format(
+  return listFormatter(locale(), { style: "short", type: "unit" }).format(
     units.filter(([n]) => n > 0).map(([n, u]) => unit(n, u)),
   );
 };
 
-export const usd = (amount: number): string =>
-  new Intl.NumberFormat(locale(), {
+export const usd = (amount: number): string => {
+  const options: Intl.NumberFormatOptions = {
     style: "currency",
     currency: "USD",
-  }).format(amount);
+  };
+  return numberFormatter(locale(), options).format(amount);
+};
 // @cpt-end:cpt-noter-algo-ui-accessibility-l10n-format:p1:inst-format-values
