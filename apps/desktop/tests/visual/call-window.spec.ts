@@ -55,7 +55,28 @@ test.describe("cpt-noter-dod-ui-call-window-capture capture notices and the clos
   test("call-ended", async ({ page }) => shot(page, "call-ended", ended));
   test("call-ended, floating", async ({ page }) => shot(page, "call-ended-floating", ended, { layout: "floating" }));
   test("new-meeting", async ({ page }) => shot(page, "new-meeting", meeting));
-  test("nothing-heard", async ({ page }) => shot(page, "nothing-heard", (w) => W.notice(w, { type: "nothing_heard", since: NOW - 5 * W.MIN })));
+  test("nothing-heard: the waiting transcript and recovery notice", async ({ page }) => {
+    await page.setViewportSize(DEDICATED);
+    await openWindow(page, "call-screen", { world: (w) => {
+      w.live_script = [];
+      W.notice(w, { type: "nothing_heard", since: NOW - 5 * W.MIN });
+      const transcript = w.transcripts.find((item) => item.call_id === live)!;
+      Object.assign(transcript, { segments: [], hypotheses: [], marks: [], gaps: [] });
+    } });
+    await expect(page.locator('[data-component="cpt-noter-component-shell-call-window"]')).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await settled(page);
+    const transcript = page.locator('[data-component="cpt-noter-component-ui-transcript-view"]');
+    await expect(transcript).toHaveAttribute("data-state", "waiting-for-speech");
+    await expect(transcript.getByText("Waiting for speech…")).toBeInViewport();
+    await expect(transcript.getByText("You", { exact: true })).toBeInViewport();
+    await expect(transcript.getByText("Others", { exact: true })).toBeInViewport();
+    await expect(transcript.locator('[data-component="cpt-noter-component-ui-transcript-segment-row"]')).toHaveCount(0);
+    await expect(page.getByText("Nothing heard yet")).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Discard Recording" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Keep Recording" })).toBeInViewport();
+    await expect(page).toHaveScreenshot("nothing-heard.png");
+  });
   test("closing-manual", async ({ page }) => shot(page, "closing-manual", (w) => stoppedAt(w, false)));
   test("closing-auto", async ({ page }) => shot(page, "closing-auto", (w) => stoppedAt(w, true)));
 });

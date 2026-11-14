@@ -7,6 +7,7 @@ import { coreReady, openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { actionItemsFailed, outputsOf, sectionOf, writing, writingLocally, written } from "../e2e/support/outputs-world";
+import { freeze } from "./freeze";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const quiet = (w: World) => {
@@ -70,7 +71,7 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await openWindow(page, "main", { world: writing });
     await coreReady(page);
     await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
-    await expect(page.getByText("Writing the outputs · the transcript is ready to read")).toBeVisible();
+    await expect(page.getByText("Writing the outputs · the transcript is ready to read")).toBeInViewport();
     await shot(page, "outputs-writing");
   });
 
@@ -78,7 +79,7 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await openWindow(page, "main", { world: writingLocally });
     await coreReady(page);
     await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
-    await expect(page.getByText("Writing with the local model · up to 10 min · role reviews follow in the background")).toBeVisible();
+    await expect(page.getByText("Writing with the local model · up to 10 min · role reviews follow in the background")).toBeInViewport();
     await shot(page, "outputs-local-writing");
   });
 
@@ -87,7 +88,11 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await coreReady(page);
     await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
     const failed = outputBody(page).locator(".pc-sec").filter({ hasText: "Action items" });
-    await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
+    const retry = failed.getByRole("button", { name: "Try Again" });
+    await expect(failed).toContainText("Couldn't write the action items");
+    await retry.scrollIntoViewIfNeeded();
+    await expect(retry).toBeInViewport();
+    await expect(failed.getByText(/Couldn't write the action items/)).toBeInViewport();
     await expect(outputBody(page)).toContainText("Drawer events will ship behind a flag.");
     await shot(page, "outputs-section-failed");
   });
@@ -96,7 +101,11 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await openWindow(page, "main", { world: (w) => { written(w); Object.assign(sectionOf(w, "open_questions"), { state: { type: "empty" }, items: [] }); } });
     await coreReady(page);
     await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
-    await expect(outputBody(page).locator(".pc-sec").filter({ hasText: "Open questions" })).toContainText(/No open questions|No questions yet|Nothing to show/i);
+    const empty = outputBody(page).locator(".pc-sec").filter({ hasText: "Open questions" });
+    await empty.scrollIntoViewIfNeeded();
+    await expect(empty).toContainText("No open questions in this call");
+    await expect(empty).toBeInViewport();
+    await expect(empty.getByText("No open questions in this call")).toBeInViewport();
     await shot(page, "outputs-empty-section");
   });
 
@@ -106,16 +115,55 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
     await expect(outputBody(page)).toContainText("Edited summary copy.");
     await expect(outputBody(page)).toContainText("Edited");
+    await expect(outputBody(page).locator(".pc-sec").first().getByText("Edited summary copy.")).toBeInViewport();
     await shot(page, "outputs-edited");
   });
 
-  test("regenerating: the confirmation names the selected sections", async ({ page }) => {
-    await open(page);
+  test("regeneration sheet: runtime and selected sections are visible before submit", async ({ page }) => {
+    await open(page, (w) => { quiet(w); written(w); });
     await shortcutsReady(page);
     await page.locator('[data-region="PC-R1"]').getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
-    await expect(page.getByRole("dialog", { name: "Regenerate Outputs" })).toBeVisible();
-    await shot(page, "outputs-regenerating");
+    const dialog = page.getByRole("dialog", { name: "Regenerate Outputs" });
+    await expect(dialog).toBeInViewport();
+    await expect(dialog).toContainText("Runtime and model");
+    await expect(dialog).toContainText("With Current Settings");
+    await expect(dialog.getByRole("checkbox", { name: "Summary" })).toBeChecked();
+    await expect(dialog.getByRole("checkbox", { name: "Decisions, action items and open questions" })).toBeChecked();
+    await expect(dialog.getByRole("checkbox", { name: "Role reviews" })).not.toBeChecked();
+    await expect(dialog.getByText("Summary", { exact: true })).toBeInViewport();
+    await expect(dialog.getByText("Decisions, action items and open questions", { exact: true })).toBeInViewport();
+    await shot(page, "outputs-regeneration-sheet");
+  });
+
+  test("regenerating: accepted work keeps the old summary visible with progress", async ({ page }) => {
+    await page.clock.install();
+    await freeze(page);
+    await open(page, (w) => { quiet(w); written(w); });
+    await shortcutsReady(page);
+    await page.locator('[data-region="PC-R1"]').getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
+    const dialog = page.getByRole("dialog", { name: "Regenerate Outputs" });
+    const selectedItems = dialog.getByRole("checkbox", { name: "Decisions, action items and open questions" });
+    await expect(dialog).toContainText("Runtime and model");
+    await expect(dialog).toContainText("With Current Settings");
+    await expect(dialog.getByRole("checkbox", { name: "Summary" })).toBeChecked();
+    await expect(selectedItems).toBeChecked();
+    await dialog.getByText("Decisions, action items and open questions", { exact: true }).click();
+    await expect(selectedItems).not.toBeChecked();
+    await expect(dialog.getByRole("checkbox", { name: "Summary" })).toBeChecked();
+    await page.clock.pauseAt(await page.evaluate(() => Date.now()));
+    await dialog.getByRole("button", { name: "Regenerate", exact: true }).click();
+
+    const summary = outputBody(page).locator('.pc-sec[data-kind="summary"]');
+    await expect(dialog).toBeHidden();
+    await page.clock.runFor(300);
+    await expect(summary).toHaveAttribute("data-state", "writing");
+    await expect(summary.locator(".pc-md")).toContainText("Backend and QA aligned on the websocket notifications.");
+    await expect(summary).toContainText("Regenerating…");
+    await expect(summary).toBeInViewport();
+    await expect(summary.locator(".pc-md")).toBeInViewport();
+    await shot(page, "outputs-regenerating-in-progress");
   });
 
   test("comparing: the edited summary exposes its before and after diff", async ({ page }) => {
@@ -130,7 +178,7 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
     await page.keyboard.press("Meta+Enter");
     await expect(summary.locator(".pc-md")).toHaveText("Edited comparison copy.");
     await summary.getByRole("button", { name: "Show Diff" }).click();
-    await expect(summary.locator(".pc-diff")).toBeVisible();
+    await expect(summary.locator(".pc-diff")).toBeInViewport();
     await shot(page, "outputs-comparing");
   });
 });

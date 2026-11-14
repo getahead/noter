@@ -56,10 +56,13 @@ test.describe("cpt-noter-dod-ui-items-actions review banner", () => {
       rows.push({ ...structuredClone(rows[1]!), id: "itm_visual_answered", status: "answered_in_call", text: "Answered in the call" });
       outputsOf(w).review_waiting = 1;
     }));
-    await expect(page.locator('[data-region="PC-R3"]').locator('[data-component="cpt-noter-component-ui-action-item-row"]')).toHaveCount(6);
+    const rows = page.locator('[data-region="PC-R3"]').locator('[data-component="cpt-noter-component-ui-action-item-row"]');
+    await expect(rows).toHaveCount(6);
     await expect(page.locator('[data-region="PC-R3"]')).toContainText("Carried from Planning");
     await expect(page.locator('[data-region="PC-R3"]')).toContainText("Closed: VSTOR-42 merged");
     await expect(page.locator('[data-region="PC-R3"]')).toContainText("Answered in the call");
+    await rows.first().scrollIntoViewIfNeeded();
+    for (let i = 0; i < 6; i++) await expect(rows.nth(i)).toBeInViewport();
     await shot(page, "items-action-row-states");
   });
 
@@ -71,7 +74,9 @@ test.describe("cpt-noter-dod-ui-items-actions review banner", () => {
     }));
     const row = page.locator('[data-component="cpt-noter-component-ui-action-item-row"]').first();
     await row.getByRole("checkbox").press("Space");
-    await expect(row.getByRole("group", { name: "Did the handoff land?" })).toBeVisible();
+    const question = row.getByRole("group", { name: "Did the handoff land?" });
+    await expect(question).toBeVisible();
+    await expect(question).toBeInViewport();
     await shot(page, "items-action-handoff-question");
   });
 });

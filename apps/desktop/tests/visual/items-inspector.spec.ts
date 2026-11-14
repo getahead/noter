@@ -82,9 +82,12 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
   test("archive pending: evidence remains on the live transcript", async ({ page }) => {
     await openInspector(page, (w) => archiveWorld("pending")(w));
     await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
-    await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
+    const tab = page.getByRole("tab", { name: "Transcript", selected: true });
+    await expect(tab).toBeVisible();
+    await expect(tab).toBeInViewport();
     await expect(page.getByText("Words changed by the archive pass")).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Show Archive Changes" })).toHaveCount(0);
+    await expect(page.getByText("ship it friday")).toBeInViewport();
     await shot(page, "item-inspector-archive-pending");
   });
 
@@ -96,6 +99,8 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
     const diff = page.locator('[data-component="cpt-noter-component-ui-diff-view"]');
     await expect(diff).toContainText("friday");
     await expect(diff).toContainText("on Friday");
+    await expect(diff).toBeInViewport();
+    await expect(diff.getByText("on Friday")).toBeInViewport();
     await shot(page, "item-inspector-archive-upgraded");
   });
 });
