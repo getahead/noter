@@ -1420,15 +1420,23 @@ async fn a_local_runs_tool_result_passes_without_an_audit_row() {
 mod launch_tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
+    use std::sync::{mpsc, Arc};
+    use std::time::Duration;
 
     use crate::adapters::claude_code::ClaudeCode;
     use crate::adapters::cli::CliConfig;
     use crate::adapters::codex::Codex;
+    use crate::adapters::ollama::OllamaConfig;
     use crate::adapters::{Invocation, RuntimeAdapter};
+    use crate::gate::Adapters;
+    use crate::runtime::{Llm, LlmRuntime, Packet, PacketContext, Privacy, RunRequest, TaskKind};
     use crate::secrets::Secret;
     use crate::tools::McpLaunch;
     use crate::Skill;
-    use noter_protocol::{Effort, RuntimeChoice};
+    use noter_db::Store;
+    use noter_protocol::model::settings::AuditWhat;
+    use noter_protocol::{Effort, PrivacyMode, RuntimeChoice, TimestampMs};
+    use tokio::sync::watch;
 
     /// A CLI that dumps `argv`, `$NOTER_MCP_TOKEN` and the file after `--mcp-config` into `out`,
     /// then answers a valid result for either CLI.
@@ -1552,6 +1560,86 @@ mod launch_tests {
         assert_eq!(
             std::fs::read_to_string(out.join("token")).unwrap(),
             "tok-secret"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cold_cli_probe_does_not_block_the_async_run_worker() {
+        let dir = tempfile::tempdir().unwrap();
+        let started = dir.path().join("probe-started");
+        let release = dir.path().join("probe-release");
+        let claude = dir.path().join("claude");
+        std::fs::write(
+            &claude,
+            format!(
+                "#!/bin/sh\nif [ \"$1\" = --version ]; then touch '{}'; while [ ! -f '{}' ]; do sleep 0.01; done; echo '2.1.296'; exit 0; fi\ncat >/dev/null\necho '{{\"is_error\":false,\"structured_output\":{{\"answer_md\":\"\",\"citations\":[],\"found\":false}},\"usage\":{{}}}}'\n",
+                started.display(),
+                release.display(),
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let codex = dir.path().join("codex");
+        std::fs::write(
+            &codex,
+            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'codex-cli 0.163.0'; exit 0; fi\necho '{}'\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&codex, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let config = |program: PathBuf, signed_in| CliConfig {
+            program,
+            home: dir.path().join("home"),
+            run_root: dir.path().join("runs"),
+            signed_in,
+            models: vec!["test-model".into()],
+        };
+        let adapters = Adapters::real(
+            config(claude, true),
+            config(codex, false),
+            OllamaConfig {
+                url: "http://127.0.0.1:1".into(),
+                models: vec![],
+            },
+        );
+        let path = dir.path().join("noter.db");
+        let store = Arc::new(Store::open(&path, &[noter_db::MIGRATIONS]).unwrap());
+        let llm = Llm::new(store, adapters, || TimestampMs(1_792_000_000_000));
+        let packet = Packet {
+            what: AuditWhat::Outputs,
+            items: vec![],
+            people: vec![],
+            context: PacketContext::default(),
+        };
+        let (_, privacy) = watch::channel(Privacy {
+            mode: PrivacyMode::CloudAllowed,
+            sensitive: false,
+            offline: false,
+        });
+        let mut req = RunRequest::new(Skill::AskAnswer, "test", packet, TaskKind::Ask, privacy);
+        req.settings.configured = Some(RuntimeChoice::ClaudeAccount);
+
+        let (probe_started, probe_rx) = tokio::sync::oneshot::channel();
+        let (ready_tx, ready_rx) = mpsc::channel();
+        let started_path = started.clone();
+        let release_path = release.clone();
+        let controller = std::thread::spawn(move || {
+            while !started_path.exists() {
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            let _ = probe_started.send(());
+            let responsive = ready_rx.recv_timeout(Duration::from_millis(500)).is_ok();
+            std::fs::write(release_path, "release").unwrap();
+            responsive
+        });
+        tokio::spawn(async move {
+            let _ = probe_rx.await;
+            let _ = ready_tx.send(());
+        });
+
+        let _ = llm.run_once(req).await;
+        assert!(
+            controller.join().unwrap(),
+            "a cold CLI version probe blocked the Tokio worker"
         );
     }
 }

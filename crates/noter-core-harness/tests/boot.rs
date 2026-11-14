@@ -2147,12 +2147,8 @@ async fn advance_clock_moves_the_core_clock_so_a_late_browser_sign_in_is_refused
             "login_identity": {"email": "ann@example.com", "plan": "Max"}, "login": login,
         })
     };
-    r.ok(
-        "main",
-        "harness.account_cli",
-        claude(json!({"delay_ms": 300})),
-    )
-    .await;
+    r.ok("main", "harness.account_cli", claude(json!({"hold": true})))
+        .await;
     let start = json!({"provider": "claude", "personal_use_confirmed": true});
     let session = r
         .ok("settings", "account_signin_start", start.clone())
@@ -2165,6 +2161,12 @@ async fn advance_clock_moves_the_core_clock_so_a_late_browser_sign_in_is_refused
         .ok("main", "harness.advance_clock", json!({"ms": 301_000}))
         .await;
     assert_eq!(moved["now"], now + 301_000);
+    r.ok(
+        "main",
+        "harness.account_cli_release",
+        json!({"provider": "claude"}),
+    )
+    .await;
     for _ in 0..250 {
         let view = r.ok("main", "accounts_get", json!({})).await;
         if view["accounts"][0]["status"]["type"] != "signing_in" {

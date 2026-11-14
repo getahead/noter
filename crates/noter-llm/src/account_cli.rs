@@ -23,6 +23,8 @@ pub struct CliStatus {
     pub supported: bool,
     /// Who the CLI is signed in as; `None` when signed out (and for Ollama).
     pub identity: Option<AccountIdentity>,
+    /// False when the auth probe failed or could not be interpreted.
+    pub auth_known: bool,
 }
 
 impl CliStatus {
@@ -33,6 +35,7 @@ impl CliStatus {
             version: None,
             supported: false,
             identity: None,
+            auth_known: false,
         }
     }
 }
@@ -129,6 +132,8 @@ pub struct LoginScript {
     pub outcome: String,
     #[serde(default)]
     pub delay_ms: u64,
+    #[serde(default)]
+    pub hold: bool,
 }
 
 fn page() -> String {
@@ -146,6 +151,7 @@ impl Default for LoginScript {
             code: None,
             outcome: signed_in(),
             delay_ms: 0,
+            hold: false,
         }
     }
 }
@@ -166,6 +172,8 @@ pub struct ToolScript {
     /// Who the CLI is signed in as now.
     #[serde(default)]
     pub identity: Option<AccountIdentity>,
+    #[serde(default = "yes")]
+    pub auth_known: bool,
     /// Who it signs in as when a scripted sign-in succeeds.
     #[serde(default)]
     pub login_identity: Option<AccountIdentity>,
@@ -190,6 +198,7 @@ impl ToolScript {
             version: self.version.clone(),
             supported: self.supported,
             identity: self.identity.clone(),
+            auth_known: self.auth_known,
         }
     }
 }
@@ -207,6 +216,7 @@ pub struct ScriptedAccountCli {
     state: Arc<Mutex<State>>,
     /// One per provider: cancelling Claude's sign-in never touches ChatGPT's.
     cancel: Arc<[Notify; 2]>,
+    release: Arc<[Notify; 2]>,
 }
 
 impl ScriptedAccountCli {
@@ -225,6 +235,10 @@ impl ScriptedAccountCli {
 
     fn cancel_of(&self, provider: AccountProvider) -> &Notify {
         &self.cancel[usize::from(provider == AccountProvider::Chatgpt)]
+    }
+
+    pub fn release(&self, provider: AccountProvider) {
+        self.release[usize::from(provider == AccountProvider::Chatgpt)].notify_one();
     }
 
     fn script(&self, tool: CliTool) -> Option<ToolScript> {
@@ -254,11 +268,17 @@ impl AccountCli for ScriptedAccountCli {
             let this = self.clone();
             let outcome = script.login.clone();
             let identity = script.login_identity.clone();
+            let release = this.release.clone();
             let done: BoxFuture<'static, LoginOutcome> = Box::pin(async move {
-                let wait = tokio::time::sleep(Duration::from_millis(outcome.delay_ms));
+                if outcome.hold {
+                    tokio::select! {
+                        () = this.cancel_of(provider).notified() => return LoginOutcome::Cancelled,
+                        () = release[usize::from(provider == AccountProvider::Chatgpt)].notified() => {}
+                    }
+                }
                 tokio::select! {
                     () = this.cancel_of(provider).notified() => LoginOutcome::Cancelled,
-                    () = wait => match (outcome.outcome.as_str(), identity) {
+                    () = tokio::time::sleep(Duration::from_millis(outcome.delay_ms)) => match (outcome.outcome.as_str(), identity) {
                         ("signed_in", Some(identity)) => {
                             if let Some(s) = lock(&this.state).tools.get_mut(&tool) {
                                 s.identity = Some(identity.clone());
@@ -317,6 +337,7 @@ impl AccountCli for ScriptedAccountCli {
                 version: None,
                 supported: true,
                 identity: None,
+                auth_known: true,
                 login_identity: None,
                 install: InstallScript::default(),
                 login: LoginScript::default(),

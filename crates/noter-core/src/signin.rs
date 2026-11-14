@@ -107,17 +107,17 @@ impl Core {
 
     async fn detect_ended(&self) {
         for provider in ACCOUNTS {
-            let live = self
-                .accounts
-                .connection(provider)
-                .is_some_and(|c| c.ended_at.is_none());
-            if !live {
+            let Some(connection) = self.accounts.connection(provider) else {
                 continue;
-            }
+            };
             let status = self.deps.account_cli.status(tool_of(provider)).await;
             // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
             // @cpt-begin:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
-            if status.installed && status.identity.is_none() {
+            if status.installed
+                && status.auth_known
+                && status.identity.is_none()
+                && connection.ended_at.is_none()
+            {
                 let mut meta = self.account_meta(
                     format!("The {provider:?} sign-in was ended by the provider"),
                     "provider_ended",
@@ -125,7 +125,20 @@ impl Core {
                 meta.undoable = false;
                 let at = self.deps.clock.now();
                 // A write that fails leaves the account looking signed in until the next read.
-                let _ = self.accounts.ended(meta, provider, at);
+                let _ = self
+                    .accounts
+                    .ended(meta, provider, &connection.identity, at);
+            } else if status.installed
+                && status.auth_known
+                && status.identity.as_ref() == Some(&connection.identity)
+                && connection.ended_at.is_some()
+            {
+                let mut meta = self.account_meta(
+                    format!("The {provider:?} sign-in is active again"),
+                    "provider_session_recovered",
+                );
+                meta.undoable = false;
+                let _ = self.accounts.revived(meta, provider, &connection.identity);
             }
             // @cpt-end:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
             // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended

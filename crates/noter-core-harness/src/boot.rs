@@ -1591,7 +1591,7 @@ impl Controls for Harness {
                 }
                 // `{ tool, installed?, path?, version?, supported?, identity?, login_identity?,
                 // install?: { fail?, delay_ms?, version? }, login?: { url?, code?, outcome?,
-                // delay_ms? } }`: replaces what the scripted CLI of `tool` (`claude_code`,
+                // delay_ms?, hold? } }`: replaces what the scripted CLI of `tool` (`claude_code`,
                 // `codex`, `ollama`) is, answers and does (TL-32). Unset fields are the defaults:
                 // not installed, supported, signed out, installs `1.0.0`, signs in at once.
                 "account_cli" => {
@@ -1605,6 +1605,15 @@ impl Controls for Harness {
                 // `{}` → `{ calls }`: the installs and sign-ins the scripted CLIs ran, oldest
                 // first (`install:ClaudeCode`, `login:Claude`).
                 "account_cli_log" => Ok(json!({ "calls": self.account_cli.log() })),
+                // `{ provider }`: let a held scripted browser sign-in finish.
+                "account_cli_release" => {
+                    let provider: AccountProvider = parse(
+                        args["provider"].clone(),
+                        "harness.account_cli_release needs { provider }",
+                    )?;
+                    self.account_cli.release(provider);
+                    Ok(json!({}))
+                }
                 // `{ call_id?, cloud?, tools }` → `{ run_id, token, socket, config }`: a noter-mcp
                 // run registered as the router will, on the core's socket (TL-38).
                 "mcp_run" => {

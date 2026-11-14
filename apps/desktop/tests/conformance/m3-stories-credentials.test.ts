@@ -188,10 +188,8 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-replace-api-key on the real core
 describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core (2.25)", () => {
   it("both providers sign in independently with their own progress", async () => {
     open();
-    // ChatGPT answers at once; Claude's browser step stays open far longer than the scheduling
-    // jitter of a loaded run, so "Claude is still signing in" is not a race (a held login the
-    // test releases needs a harness control: see the PR body).
-    await claudeCli({ delay_ms: 1_500 });
+    // Keep Claude in the browser step until the test explicitly releases it.
+    await claudeCli({ hold: true });
     await codexCli();
     const claude = await signIn("claude");
     const chatgpt = await signIn("chatgpt");
@@ -204,6 +202,7 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     // before the status, so a status read that comes late cannot excuse an early step.
     expect(claude.steps().map((p) => p.step)).toEqual(["waiting_for_browser"]);
     expect(accountStatus(await accounts(), "claude")).toMatchObject({ type: "signing_in" });
+    await control("account_cli_release", { provider: "claude" });
     await ended(claude.steps);
     expect(accountStatus(await accounts(), "claude")).toMatchObject({ type: "signed_in", identity: ANN });
     expect(claude.steps().at(-1)!.step).toBe("done");
@@ -213,13 +212,14 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
 
   it("the five-minute window is one clock: a browser result after it is rejected and binds nothing", async () => {
     open();
-    await claudeCli({ delay_ms: 400 });
+    await claudeCli({ hold: true });
     const run = await signIn("claude");
     const { now } = (await control("advance_clock", { ms: 0 })) as { now: number };
     expect(run.session.expires_at).toBeGreaterThan(now);
     expect(run.session.expires_at - now).toBeLessThanOrEqual(300_000);
     expect(run.session.expires_at - now).toBeGreaterThan(299_000);
     await control("advance_clock", { ms: 301_000 });
+    await control("account_cli_release", { provider: "claude" });
     const end = await ended(run.steps);
     expect(end).toMatchObject({ step: "signed_in", error: "sign_in_timed_out" });
     expect(run.steps().map((p) => p.step)).not.toContain("done");

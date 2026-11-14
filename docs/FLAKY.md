@@ -23,6 +23,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#395](https://github.com/getahead/noter/issues/395) | MCP token revocation after closing a run | 1 / 1 | none yet | open |
 | [#414](https://github.com/getahead/noter/issues/414) | Knowledge token-revocation event count | local | [#423](https://github.com/getahead/noter/pull/423) | open |
 | [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | none yet | open |
+| [#669](https://github.com/getahead/noter/issues/669) | Sign-in deadline tests racing scripted CLI delays | local | explicit hold/release control | open |
 | [#402](https://github.com/getahead/noter/issues/402) | Calls loading skeleton screenshot | 10 / 2 | [#227](https://github.com/getahead/noter/pull/227) | closed |
 | [#403](https://github.com/getahead/noter/issues/403) | Outputs load and command-log races | 14 / 2 | [#377](https://github.com/getahead/noter/pull/377) | closed |
 
