@@ -13,8 +13,9 @@ use noter_protocol::{
     Ack, AudioChannel, CoreError, ErrorCode, NoArgs, Seq, StateVersion, SubscriptionId,
 };
 use serde_json::{json, Value};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, DuplexStream, Lines as LineReader};
-use tokio::task::JoinHandle;
+#[path = "common/runner.rs"]
+mod runner;
+use runner::Runner;
 
 struct Stub {
     lines: Lines,
@@ -86,58 +87,13 @@ impl CoreApi for Stub {
     }
 }
 
-/// A test runner on the other end of the wire.
-struct Runner {
-    input: DuplexStream,
-    output: LineReader<BufReader<DuplexStream>>,
-    served: JoinHandle<std::io::Result<()>>,
-}
-
 fn start() -> Runner {
     let (input, core_in) = tokio::io::duplex(1 << 16);
     let (core_out, output) = tokio::io::duplex(1 << 16);
     let out = Output::new(core_out);
     let stub = Arc::new(Stub { lines: out.lines() });
     let served = tokio::spawn(serve(stub, core_in, out));
-    Runner {
-        input,
-        output: BufReader::new(output).lines(),
-        served,
-    }
-}
-
-impl Runner {
-    async fn send_raw(&mut self, line: &str) {
-        self.input
-            .write_all(format!("{line}\n").as_bytes())
-            .await
-            .unwrap();
-    }
-
-    async fn send(&mut self, req: Value) {
-        self.send_raw(&req.to_string()).await;
-    }
-
-    async fn line(&mut self) -> Value {
-        let line = tokio::time::timeout(Duration::from_secs(5), self.output.next_line())
-            .await
-            .expect("a line within 5 s")
-            .unwrap()
-            .expect("the harness is still writing");
-        serde_json::from_str(&line).unwrap_or_else(|_| panic!("not JSON: {line}"))
-    }
-
-    /// Ends stdin and returns every line written after it.
-    async fn finish(mut self) -> Vec<Value> {
-        self.input.shutdown().await.unwrap();
-        drop(self.input);
-        let mut rest = vec![];
-        while let Some(line) = self.output.next_line().await.unwrap() {
-            rest.push(serde_json::from_str(&line).unwrap());
-        }
-        self.served.await.unwrap().unwrap();
-        rest
-    }
+    Runner::new(input, output, served)
 }
 
 fn request(id: u64, window: &str, cmd: &str, args: Value) -> Value {
@@ -215,7 +171,7 @@ async fn unparsable_line_is_invalid_input_and_serving_continues() {
 #[tokio::test]
 async fn bytes_that_are_not_utf8_are_an_unparsable_line() {
     let mut r = start();
-    r.input.write_all(b"\xff\xfe\n").await.unwrap();
+    r.send_bytes(b"\xff\xfe\n").await;
     assert_eq!(r.line().await["error"]["code"], "invalid_input");
     r.send(request(1, "main", "app_snapshot", json!({}))).await;
     assert_eq!(r.line().await["id"], 1);

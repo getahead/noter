@@ -2,22 +2,17 @@
 //! with the core, its runs go out as `jobs:progress` with complete rows, and the capture guard is
 //! the session manager's one input.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::model::{JobKind, JobProgress, JobRunStatus};
-use noter_protocol::{CallId, TimestampMs};
+use noter_protocol::CallId;
 use serde_json::Value;
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
-    }
-}
 
 #[derive(Default)]
 struct Events(Mutex<Vec<(&'static str, Value)>>);
@@ -47,7 +42,7 @@ async fn the_core_starts_the_scheduler_and_publishes_complete_progress_rows() {
     let core = Arc::new(
         Core::open(
             dir.path(),
-            CoreDeps::new(Arc::new(FixedClock), events.clone()),
+            CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone()),
         )
         .unwrap(),
     );
@@ -87,7 +82,7 @@ async fn the_capture_guard_holds_archive_work_the_core_queued() {
     let core = Arc::new(
         Core::open(
             dir.path(),
-            CoreDeps::new(Arc::new(FixedClock), events.clone()),
+            CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone()),
         )
         .unwrap(),
     );
@@ -147,7 +142,7 @@ async fn the_cores_power_source_holds_archive_work_on_battery_until_mains_return
             dir.path(),
             CoreDeps {
                 power: power.clone(),
-                ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+                ..CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone())
             },
         )
         .unwrap(),

@@ -1,13 +1,16 @@
 //! FEATURE cpt-noter-feature-core-first-run (part 2): resumable, verified model downloads
 //! from the pinned manifest, reaching only the allow-listed hosts (D8 F4).
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
-    allowed_download_url, BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps,
+    allowed_download_url, BoxFuture, BundleFile, BundleSpec, ChunkSink, Core, CoreDeps,
     EnvironmentReading, EventEmitter, FetchError, ModelSource, NativeServices,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -22,14 +25,6 @@ struct Events(Mutex<Vec<&'static str>>);
 impl EventEmitter for Events {
     fn emit(&self, event: &'static str, _payload: Value) {
         self.0.lock().unwrap().push(event);
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
     }
 }
 
@@ -176,7 +171,7 @@ fn open(dir: &Path, source: Bundles, disk_free_mb: u32) -> Setup {
     let deps = CoreDeps {
         native: Arc::new(Disk(disk_free_mb)),
         models: source.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone())
     };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
@@ -728,7 +723,10 @@ async fn starting_while_offline_answers_offline_at_once_and_works_once_online() 
     let deps = CoreDeps {
         native: network.clone(),
         models: source.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(Events::default()),
+        )
     };
     let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
     core.start_first_run();
@@ -755,7 +753,10 @@ fn open_on(dir: &Path, source: Arc<Bundles>, network: Arc<Network>) -> Arc<Core>
     let deps = CoreDeps {
         native: network,
         models: source,
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(Events::default()),
+        )
     };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();

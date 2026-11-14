@@ -2,14 +2,16 @@
 //! through NativeServices, the environment, the login item, the detection rule and
 //! update_install. Models and the self-test come in the next parts.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
-    detection, BoxFuture, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices,
-    Updater,
+    detection, BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices, Updater,
 };
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
@@ -31,14 +33,6 @@ impl Events {
             .into_iter()
             .map(|(n, _)| n)
             .collect()
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
     }
 }
 
@@ -151,7 +145,7 @@ fn open(dir: &Path) -> Setup {
     let deps = CoreDeps {
         native: native.clone(),
         updater: updater.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone())
     };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();

@@ -1,10 +1,13 @@
 //! FEATURE cpt-noter-feature-core-library-calls: the Library list, the call record, edits with a
 //! revision, call types and deleting calls for good, over rows written the way capture writes them.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_db::rusqlite::Connection;
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -39,17 +42,9 @@ impl Events {
     }
 }
 
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
-
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
-    let deps = CoreDeps::new(Arc::new(FixedClock), events.clone());
+    let deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
     (Core::open(dir, deps).expect("core opens"), events)
 }
 
@@ -986,7 +981,7 @@ async fn delete_removes_call_audio_from_the_configured_models_container() {
     let events = Arc::new(Events::default());
     let deps = CoreDeps {
         models_dir: Some(container.path().join("models")),
-        ..CoreDeps::new(Arc::new(FixedClock), events)
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events)
     };
     let core = Core::open(data.path(), deps).unwrap();
     core.store()

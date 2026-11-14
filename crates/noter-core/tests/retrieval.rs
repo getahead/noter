@@ -1,10 +1,13 @@
 //! FEATURE cpt-noter-feature-core-retrieval-ask, slice 1: `search` and `ask_scope_presets` on a
 //! seeded store, and the index rebuild at start, with the scripted engine embedding locally.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::Arc;
 use std::time::Duration;
+use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use noter_core::{Core, CoreDeps, EventEmitter};
 use noter_db::Insert;
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -15,14 +18,6 @@ use serde_json::{json, Value};
 /// 2026-10-31T00:00:00Z.
 const NOW: i64 = 1_793_404_800_000;
 const DAY: i64 = 86_400_000;
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
 
 struct NoEvents;
 
@@ -42,7 +37,7 @@ fn main_window() -> CommandCtx {
 async fn open(dir: &std::path::Path) -> Arc<Core> {
     let deps = CoreDeps {
         engine: Arc::new(ScriptedEngine::new().with_container(dir)),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(NoEvents))
     };
     let core = Arc::new(Core::open(dir, deps).unwrap());
     core.start_first_run();
@@ -306,7 +301,7 @@ async fn a_failed_query_embedding_reports_keyword_only() {
         .with_default(down);
     let deps = CoreDeps {
         engine: Arc::new(engine),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(NoEvents))
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();

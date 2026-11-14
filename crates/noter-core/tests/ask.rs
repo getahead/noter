@@ -1,10 +1,13 @@
 //! FEATURE cpt-noter-feature-core-retrieval-ask, slice 2: Ask threads, cited streamed answers,
 //! Stop and delete, on the real store with the scripted runtime (TL-13) and the scripted engine.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
-use noter_core::{Adapters, Clock, Core, CoreDeps, EventEmitter, Scripted, LAG_LIMIT};
+use noter_core::{Adapters, Core, CoreDeps, EventEmitter, Scripted, LAG_LIMIT};
 use noter_db::{ChangeMeta, Insert};
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
@@ -15,14 +18,6 @@ use serde_json::{json, Value};
 /// 2026-10-31T00:00:00Z.
 const NOW: i64 = 1_793_404_800_000;
 const DAY: i64 = 86_400_000;
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
-    }
-}
 
 struct NoEvents;
 
@@ -110,7 +105,7 @@ async fn world(script: &str) -> World {
     let deps = CoreDeps {
         llm: Adapters::scripted(&llm),
         engine: Arc::new(ScriptedEngine::new().with_container(dir.path())),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(NoEvents))
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();

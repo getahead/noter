@@ -2,9 +2,12 @@
 //! placement, hide for presenting, the tray model, announcements, navigation and external opens,
 //! over a native layer that records what the core asked of it.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
     Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, Placement, Surfaces, TrayAction,
@@ -32,14 +35,6 @@ impl Events {
             .partition(|(e, _)| *e == name);
         *all = rest;
         hit.into_iter().map(|(_, p)| p).collect()
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_792_137_600_000)
     }
 }
 
@@ -151,7 +146,7 @@ fn open(dir: &Path) -> (Core, Arc<Events>, Arc<Rec>) {
     let rec = Arc::new(Rec::default());
     let deps = CoreDeps {
         surfaces: rec.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(1_792_137_600_000)), events.clone())
     };
     (Core::open(dir, deps).expect("core opens"), events, rec)
 }
@@ -510,7 +505,10 @@ async fn the_record_prompt_fits_its_content_within_the_designed_width() {
 #[tokio::test]
 async fn without_a_native_layer_the_fit_is_accepted_and_shows_nothing() {
     let dir = tempfile::tempdir().unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_792_137_600_000)),
+        Arc::new(Events::default()),
+    );
     let core = Core::open(dir.path(), deps).expect("core opens");
     let prompt = window(WindowLabel::RecordPrompt);
     let fit = FitArgs {
@@ -694,7 +692,7 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
                     "read failed",
                 ));
             }
-            let now = FixedClock.now().0;
+            let now = FixedClock::at(1_792_137_600_000).now().0;
             Ok([(2, "Later"), (-1, "Past"), (1, "Next meeting")]
                 .into_iter()
                 .map(|(hours, title)| CalendarEvent {
@@ -725,7 +723,10 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
         let deps = CoreDeps {
             surfaces: rec.clone(),
             native: Arc::new(Calendar { access, failed }),
-            ..CoreDeps::new(Arc::new(FixedClock), Arc::new(Events::default()))
+            ..CoreDeps::new(
+                Arc::new(FixedClock::at(1_792_137_600_000)),
+                Arc::new(Events::default()),
+            )
         };
         let core = Core::open(dir.path(), deps).unwrap();
         core.refresh_tray();

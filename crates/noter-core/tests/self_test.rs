@@ -1,14 +1,17 @@
 //! FEATURE cpt-noter-feature-core-first-run (part 3): self_test_run through the engine
 //! supervisor (S12) with a scripted engine (D3), streamed over the hub.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
-    BoxFuture, BundleFile, BundleSpec, ChunkSink, Clock, Core, CoreDeps, EnvironmentReading,
-    EventEmitter, FetchError, ModelSource, NativeServices,
+    BoxFuture, BundleFile, BundleSpec, ChunkSink, Core, CoreDeps, EnvironmentReading, EventEmitter,
+    FetchError, ModelSource, NativeServices,
 };
 use noter_db::rusqlite::Connection;
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
@@ -23,14 +26,6 @@ struct NoEvents;
 
 impl EventEmitter for NoEvents {
     fn emit(&self, _: &'static str, _: Value) {}
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_790_000_000_000)
-    }
 }
 
 type Listener = Box<dyn Fn(EnvironmentReading) + Send + Sync>;
@@ -136,7 +131,10 @@ fn open(
         native: Arc::new(mac),
         engine: launcher,
         models: models.unwrap_or_else(|| live_model(dir)),
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(NoEvents),
+        )
     };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
@@ -362,7 +360,10 @@ async fn an_engine_that_never_answers_times_out() {
             ping_timeout: Duration::from_millis(100),
             ..noter_engine_client::Config::default()
         },
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(NoEvents),
+        )
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
@@ -391,7 +392,10 @@ async fn a_missing_live_model_is_refused_before_the_channel_opens() {
 
     // No manifest at all names no live model: still missing.
     let dir = tempfile::tempdir().unwrap();
-    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents));
+    let deps = CoreDeps::new(
+        Arc::new(FixedClock::at(1_790_000_000_000)),
+        Arc::new(NoEvents),
+    );
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();
     let err = core
@@ -478,7 +482,7 @@ fn open_probing(dir: &Path, engine: ScriptedEngine) -> Probing {
         native: mac.clone(),
         engine: launcher,
         models: live_model(dir),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(1_790_000_000_000)), events.clone())
     };
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();

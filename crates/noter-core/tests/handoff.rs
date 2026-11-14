@@ -1,13 +1,16 @@
 //! FEATURE cpt-noter-feature-core-handoff: the ten handoff and repository commands over the
 //! scripted runtime and scripted native ops (TL-13, TL-15), on paused time.
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use test_support::FixedClock;
 
 use noter_core::{
-    Adapters, ClipboardText, Clock, Core, CoreDeps, EventEmitter, LaunchRequest, NativeOps,
-    SaveKind, Scripted,
+    Adapters, ClipboardText, Core, CoreDeps, EventEmitter, LaunchRequest, NativeOps, SaveKind,
+    Scripted,
 };
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -44,14 +47,6 @@ impl Events {
                 _ => unreachable!(),
             })
             .collect()
-    }
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(NOW)
     }
 }
 
@@ -164,7 +159,7 @@ fn world(script: &str) -> World {
     let deps = CoreDeps {
         llm: Adapters::scripted(&llm),
         native_ops: ops.clone(),
-        ..CoreDeps::new(Arc::new(FixedClock), events.clone())
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone())
     };
     let core = Arc::new(Core::open(dir.path(), deps).unwrap());
     core.start_first_run();

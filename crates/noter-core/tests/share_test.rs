@@ -2,7 +2,10 @@
 //! native layer the request, whether a call is live, the menu bar title's state and the time,
 //! and answers its result; the rows and the probe states are the native layer's (noter-native).
 
+#[path = "common/test_support.rs"]
+mod test_support;
 use std::sync::{Arc, Mutex};
+use test_support::FixedClock;
 
 use noter_core::{BoxFuture, Clock, Core, CoreDeps, EventEmitter, NativeOps, SaveKind};
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
@@ -14,14 +17,6 @@ struct NoEvents;
 
 impl EventEmitter for NoEvents {
     fn emit(&self, _: &'static str, _: Value) {}
-}
-
-struct FixedClock;
-
-impl Clock for FixedClock {
-    fn now(&self) -> TimestampMs {
-        TimestampMs(1_792_137_600_000)
-    }
 }
 
 /// The asks the core made, and the answer it gets.
@@ -69,7 +64,10 @@ impl NativeOps for Ops {
 fn open(dir: &std::path::Path, ops: Arc<Ops>) -> Core {
     let deps = CoreDeps {
         native_ops: ops,
-        ..CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents))
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_792_137_600_000)),
+            Arc::new(NoEvents),
+        )
     };
     Core::open(dir, deps).expect("core opens")
 }
@@ -97,7 +95,7 @@ async fn the_share_test_asks_the_native_layer_with_the_call_and_menu_bar_state()
     let dir = tempfile::tempdir().unwrap();
     let ops = Arc::new(Ops::default());
     let core = open(dir.path(), ops.clone());
-    let now = FixedClock.now();
+    let now = FixedClock::at(1_792_137_600_000).now();
 
     run(&core, false).await.unwrap();
     // Idle, with the default menu bar title (none).
@@ -171,7 +169,10 @@ async fn without_a_mac_the_share_test_fails_rather_than_report_a_false_pass() {
     let dir = tempfile::tempdir().unwrap();
     let core = Core::open(
         dir.path(),
-        CoreDeps::new(Arc::new(FixedClock), Arc::new(NoEvents)),
+        CoreDeps::new(
+            Arc::new(FixedClock::at(1_792_137_600_000)),
+            Arc::new(NoEvents),
+        ),
     )
     .unwrap();
     assert_eq!(
