@@ -20,6 +20,24 @@ const r1 = (page: Page) => page.locator('[data-region="RP-R1"]');
 const r3 = (page: Page) => page.locator('[data-region="RP-R3"]');
 const button = (page: Page, name: string) => r3(page).getByRole("button", { name, exact: true });
 const notNow = (page: Page) => r3(page).getByRole("button", { name: /^Not Now/ });
+/** Move beyond the rendered panel and wait until the document observes the pointer leaving it. */
+const moveOutsidePanel = async (page: Page) => {
+  const box = await panel(page).boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  const bounds = box!;
+  const size = viewport!;
+  const outside = [
+    { x: 0, y: 0 },
+    { x: size.width - 1, y: 0 },
+    { x: 0, y: size.height - 1 },
+    { x: size.width - 1, y: size.height - 1 },
+  ].find(({ x, y }) => x < bounds.x || x > bounds.x + bounds.width || y < bounds.y || y > bounds.y + bounds.height);
+  expect(outside).toBeDefined();
+  await page.mouse.move(outside!.x, outside!.y);
+  await expect.poll(() => panel(page).evaluate((element) => element.matches(":hover"))).toBe(false);
+};
 /** Arguments of every `name` command the window sent, in order. */
 const sent = async (page: Page, name: string): Promise<Array<Record<string, unknown>>> =>
   (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => (c.args ?? {}) as Record<string, unknown>);
@@ -205,7 +223,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await panel(page).hover();
     await page.clock.fastForward(20_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([]); // paused, no visible countdown
-    await page.mouse.move(0, 0);
+    await moveOutsidePanel(page);
     await page.clock.fastForward(16_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: TEAMS, reason: "timed_out" }]);
     await expect(panel(page)).toHaveCount(0);
@@ -220,7 +238,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await expect(panel(page)).toContainText("Zoom");
     await page.clock.fastForward(20_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([]);
-    await page.mouse.move(0, 0);
+    await moveOutsidePanel(page);
     await page.clock.fastForward(16_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: `det_${W.APPS.zoom.bundle_id}`, reason: "timed_out" }]);
   });
@@ -236,7 +254,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await notNow(page).hover();
     await page.clock.fastForward(20_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([]);
-    await page.mouse.move(0, 0);
+    await moveOutsidePanel(page);
     await page.clock.fastForward(16_000);
     expect(await sent(page, "capture_dismiss_detection")).toEqual([{ detection_id: TEAMS, reason: "timed_out" }]);
   });
@@ -267,7 +285,7 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     await expect(panel(page)).toHaveAttribute("data-state", "countdown-paused");
     await expect(r1(page)).toContainText("Paused while you're here");
     expect(await sent(page, "capture_hold_notice")).toContainEqual({ call_id: W.LIVE_CALL, held: true });
-    await page.mouse.move(0, 0);
+    await moveOutsidePanel(page);
     await expect(panel(page)).toHaveAttribute("data-state", "countdown-running");
     expect(await sent(page, "capture_hold_notice")).toContainEqual({ call_id: W.LIVE_CALL, held: false });
 
