@@ -2,7 +2,7 @@
 title: "Feature: Job scheduler and pipeline jobs"
 description: "Durable pipeline jobs with call and battery guards, progress, bounded writes and cancellation."
 status: PROPOSED
-version: "0.2"
+version: "0.3"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -227,8 +227,9 @@ The system **MUST** use logged batches of at most 200 rows, yield between them a
 - Job definitions are created lazily with their defaults the first time a kind is triggered; there is no seeding migration.
 - The nightly window is read in UTC hours (`"HH-HH"`, wrapping midnight); the user's time zone comes with the maintenance jobs (M5).
 - `models_download` queues one `ModelDownload` run per start (subject `download-N`); a live call holds the download (bundles show paused) and it goes on by itself when the call ends. Pausing it yourself during a call keeps it paused.
-- Power: the scheduler reads a `PowerSource` from `CoreDeps` (mains by default). The macOS battery reading arrives with 2.21 native-services; the harness answers `--power battery|ac`.
+- Power: the scheduler reads a `PowerSource` from `CoreDeps` (mains by default). The macOS host supplies the native IOKit power-source reading; the harness answers `--power battery|ac`.
 
 ## 8. Change log
 
 - 2026-11-14: Clarified that canceled work winding down does not absorb a fresh stop trigger, and a new on-demand Regeneration gets its own run.
+- 2026-11-14: Record the 2.21 macOS IOKit power-source reading wired into scheduler admission.

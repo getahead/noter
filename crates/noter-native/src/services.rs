@@ -17,6 +17,36 @@ use noter_protocol::model::{
 pub use noter_protocol::model::{ClipboardText, LaunchRequest};
 use noter_protocol::{PermissionKind, PermissionState, TimestampMs};
 
+/// Whether a power-source reading identifies battery power; unavailable readings retain the
+/// scheduler's documented mains-power fallback.
+pub(crate) fn is_battery_power(on_battery: Option<bool>) -> bool {
+    on_battery.unwrap_or(false)
+}
+
+/// Whether macOS reports battery power. Other platforms have no native reading.
+pub fn on_battery() -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        crate::mac_services::on_battery()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        is_battery_power(None)
+    }
+}
+
+#[cfg(test)]
+mod power_tests {
+    use super::is_battery_power;
+
+    #[test]
+    fn unknown_power_state_defaults_to_mains_and_battery_is_reported() {
+        assert!(is_battery_power(Some(true)));
+        assert!(!is_battery_power(Some(false)));
+        assert!(!is_battery_power(None));
+    }
+}
+
 // ── launch ─────────────────────────────────────────────────────────────────
 
 pub const TERMINAL_APP: &str = "com.apple.Terminal";
