@@ -95,7 +95,14 @@ test.describe("cpt-noter-dod-ui-live-transcript-replay replay", () => {
       await row(page, ANNA_LINE).hover();
       await row(page, ANNA_LINE).getByRole("button", { name: "Play this line" }).focus();
       await page.keyboard.press("Space");
-      await expect(row(page, ANNA_LINE).getByRole("status")).toBeVisible();
+      const reason = row(page, ANNA_LINE).getByRole("status");
+      const play = row(page, ANNA_LINE).getByRole("button", { name: "Play this line" });
+      await expect(reason).toBeVisible();
+      await page.keyboard.press("Escape");
+      await page.mouse.move(0, 0);
+      await expect(play).toBeFocused();
+      await expect(reason).toBeVisible();
+      await expect(row(page, ANNA_LINE).getByRole("tooltip")).toBeHidden();
       await shot(page, name);
     });
   }

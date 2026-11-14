@@ -13,7 +13,12 @@ type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const quiet = (w: World) => {
   W.idle(w);
   w.app.setup.self_test = { type: "passed", at: 1 };
-  w.calls.find((c) => c.id === W.PAST_CALL)!.tags = ["release", "backend"];
+  const call = w.calls.find((c) => c.id === W.PAST_CALL)!;
+  call.tags = ["release", "backend"];
+  const generated_at = call.started_at + call.duration_ms + 100_000;
+  for (const output of w.outputs.filter((o) => o.call_id === W.PAST_CALL)) {
+    for (const section of output.sections) if (section.writer) section.writer.generated_at = generated_at;
+  }
 };
 const nav = (page: Page, target: unknown) => page.evaluate((t) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: t }), target);
 const share = (page: Page) => page.locator('[data-region="PC-R1"]').getByRole("button", { name: /^Share/ });
@@ -39,6 +44,7 @@ const shot = async (page: Page, name: string) => {
 test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () => {
   test("share menu open on Whole call", async ({ page }) => {
     await open(page);
+    await expect(page.locator(".pc-sec__meta")).toContainText("1 min 40 s after the call");
     await page.locator('[data-region="PC-R1"]').getByRole("button", { name: /^Share/ }).click();
     await expect(page.getByRole("menu")).toContainText("Whole call");
     await shot(page, "call-page-share-menu");
@@ -55,6 +61,7 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
   test("call info with tags and Delete Audio Now…", async ({ page }) => {
     await open(page);
     await expect(page.getByRole("button", { name: "Remove release" })).toBeVisible();
+    await expect(page.locator(".pc-sec__meta")).toContainText("1 min 40 s after the call");
     await shot(page, "call-page-call-info-tags");
   });
 
