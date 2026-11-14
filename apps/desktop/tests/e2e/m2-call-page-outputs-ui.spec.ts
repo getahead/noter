@@ -250,6 +250,34 @@ test.describe("cpt-noter-seq-notifications-open-outputs", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-share-outputs", () => {
+  test("UI — composing Escape keeps the mounted export sheet open, and a later Escape cancels only that sheet", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openReady(page, call);
+    await shortcutsReady(page);
+    await page.keyboard.press("Meta+KeyE");
+    const sheet = page.getByRole("dialog", { name: /Export/ });
+    await expect(sheet).toBeVisible();
+
+    await page.evaluate(() => {
+      (window as Window & { __parentEscapeCount?: number }).__parentEscapeCount = 0;
+      document.body.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          const w = window as Window & { __parentEscapeCount?: number };
+          w.__parentEscapeCount = (w.__parentEscapeCount ?? 0) + 1;
+        }
+      });
+      const input = document.querySelector('[role="dialog"] input');
+      if (!input) throw new Error("the mounted export sheet has no input to dispatch composition keys from");
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true, isComposing: true }));
+    });
+    await expect(sheet).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (window as Window & { __parentEscapeCount?: number }).__parentEscapeCount)).toBe(0);
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => (window as Window & { __parentEscapeCount?: number }).__parentEscapeCount)).toBe(0);
+  });
+
   test("UI — happy path: Share opens on Whole call, Copy for Slack shows Copied for Slack on the button", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openReady(page, call);
