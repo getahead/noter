@@ -1,5 +1,5 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 const hookHarness = vi.hoisted(() => ({ active: false, values: [] as unknown[], setters: [] as ((value: unknown) => void)[] }));
 vi.mock("react", async (load) => {
@@ -15,6 +15,11 @@ vi.mock("react", async (load) => {
       return [hookHarness.values[index], setter];
     },
   };
+});
+afterEach(() => {
+  hookHarness.active = false;
+  hookHarness.values = [];
+  hookHarness.setters = [];
 });
 
 import type { Bridge } from "../../app/bridge/bridge";
