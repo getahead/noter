@@ -53,17 +53,21 @@ public protocol OfflineWork: Sendable {
     var available: Set<OfflineModel> { get }
     /// Decodes the call into `result` and the word timings it references, reporting progress 0...1.
     func archive(
-        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints, progress: (Float) -> Void
+        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
+        yieldIfNeeded: () -> Void, progress: (Float) -> Void
     ) throws
     /// Writes the speaker's 256 float32 values to `out`.
     func speaker(_ request: SpeakerEmbedding, session: URL, out: URL) throws
     /// One 1024-value row per text, in order: written to `out` as float32 rows (nil returned), or
     /// returned inline for one text without `out`.
     func texts(_ texts: [String], out: URL?) throws -> [Float]?
+    /// Releases cached archive memory when a live session starts.
+    func releaseArchive()
 }
 
 extension OfflineWork {
     public var available: Set<OfflineModel> { [.archive, .speaker, .text] }
+    public func releaseArchive() {}
 }
 
 /// Paths the core sends are relative to the App Group container and must stay inside it.
@@ -130,15 +134,27 @@ extension EngineLoop {
         // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
+        archivePassLock.withLock { latestArchivePass[pass.callId] = id }
         // On a `.utility` queue: below capture and the live transcript.
         archiveQueue.async {
+            let isLatest = self.archivePassLock.withLock {
+                guard self.latestArchivePass[pass.callId] == id else { return false }
+                self.latestArchivePass.removeValue(forKey: pass.callId)
+                return true
+            }
+            guard isLatest else { return }
             // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
             do {
                 var reported: Float = -1
                 // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-progress
-                try work.archive(pass, session: session, result: result, constraints: constraints) { progress in
-                    // Capture goes first: the pass waits at its next step while a call is captured.
-                    while self.isCapturing { Thread.sleep(forTimeInterval: 0.2) }
+                try work.archive(
+                    pass, session: session, result: result, constraints: constraints,
+                    yieldIfNeeded: {
+                        while self.isCapturing {
+                            work.releaseArchive()
+                            Thread.sleep(forTimeInterval: 0.2)
+                        }
+                    }) { progress in
                     let p = min(max(progress, 0), 1)
                     if p >= reported + 0.01 || (p == 1 && reported < 1) {
                         reported = p

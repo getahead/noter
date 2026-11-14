@@ -1,6 +1,7 @@
 // Audio as the engine sees it: chunks of float samples per channel, from the live taps or
 // from WAV files (file mode, tests and the golden set).
 
+import AVFoundation
 import Foundation
 
 /// Mono samples of one channel at `sampleRate`.
@@ -17,6 +18,16 @@ public struct AudioChunk: Sendable {
 }
 
 public enum Mix {
+    /// Downmixes planar channel buffers to mono, trimming to the shortest channel.
+    public static func mono(_ channels: [[Float]]) -> [Float] {
+        guard let first = channels.first, !first.isEmpty else { return [] }
+        guard channels.count > 1 else { return first }
+        let frames = channels.map(\.count).min() ?? 0
+        return (0..<frames).map { frame in
+            channels.reduce(Float(0)) { $0 + $1[frame] } / Float(channels.count)
+        }
+    }
+
     /// Interleaved frames of `channels` channels averaged to mono.
     public static func mono(_ interleaved: [Float], channels: Int) -> [Float] {
         guard channels > 1 else { return interleaved }
@@ -155,56 +166,7 @@ public enum Levels {
     }
 }
 
-/// Mono audio read from a WAV file (the first channel of a multichannel file).
-public struct WAVAudio: Sendable {
-    public let sampleRate: Int
-    public let samples: [Float]
-}
-
 public enum WAV {
-    public struct Unreadable: Error, CustomStringConvertible {
-        public let description: String
-    }
-
-    /// Reads PCM 16-bit or float 32-bit RIFF/WAVE.
-    public static func read(_ url: URL) throws -> WAVAudio {
-        let data = try Data(contentsOf: url)
-        func u32(_ at: Int) -> UInt32 { data[at..<at + 4].withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } }
-        func u16(_ at: Int) -> UInt16 { data[at..<at + 2].withUnsafeBytes { $0.loadUnaligned(as: UInt16.self) } }
-        guard data.count >= 12, data.prefix(4) == Data("RIFF".utf8), data[8..<12] == Data("WAVE".utf8) else {
-            throw Unreadable(description: "\(url.lastPathComponent) is not a WAV file")
-        }
-        var format: (tag: UInt16, channels: Int, rate: Int, bits: UInt16)?
-        var offset = 12
-        while offset + 8 <= data.count {
-            let id = String(decoding: data[offset..<offset + 4], as: UTF8.self)
-            let size = Int(u32(offset + 4))
-            let body = offset + 8
-            guard body + size <= data.count else { break }
-            if id == "fmt " {
-                format = (u16(body), Int(u16(body + 2)), Int(u32(body + 4)), u16(body + 14))
-            } else if id == "data", let f = format {
-                let step = Int(f.bits / 8) * f.channels
-                guard step > 0 else { break }
-                let frames = size / step
-                let samples: [Float] = (0..<frames).map { i in
-                    let at = body + i * step
-                    switch (f.tag, f.bits) {
-                    case (1, 16): return Float(Int16(bitPattern: u16(at))) / 32_768
-                    case (3, 32): return Float(bitPattern: u32(at))
-                    default: return .nan
-                    }
-                }
-                guard !samples.contains(where: \.isNaN) else {
-                    throw Unreadable(description: "\(url.lastPathComponent): only PCM 16-bit and float 32-bit")
-                }
-                return WAVAudio(sampleRate: f.rate, samples: samples)
-            }
-            offset = body + size + (size & 1)
-        }
-        throw Unreadable(description: "\(url.lastPathComponent) has no audio data")
-    }
-
     /// A mono WAV file, PCM 16-bit or float 32-bit (tests and the spike's recordings).
     public static func encode(samples: [Float], sampleRate: Int, float: Bool) -> Data {
         var d = Data()
@@ -223,27 +185,38 @@ public enum WAV {
     }
 }
 
-/// Plays two WAV recordings as the two channels, in 100 ms chunks, in file time or as fast
-/// as possible.
+/// Reads two WAV files in aligned 100 ms chunks, in file time or as fast as possible.
 public final class FileAudioSource: AudioSource, @unchecked Sendable {
-    private let mic: WAVAudio
-    private let sys: WAVAudio
+    private let mic: URL
+    private let sys: URL
     private let realtime: Bool
     private let lock = NSLock()
     private var stopped = false
 
-    public init(mic: WAVAudio, sys: WAVAudio, realtime: Bool) {
+    public init(mic: URL, sys: URL, realtime: Bool) {
         self.mic = mic
         self.sys = sys
         self.realtime = realtime
     }
 
+    func validate() throws {
+        _ = try AVAudioFile(forReading: mic)
+        _ = try AVAudioFile(forReading: sys)
+    }
+
     public func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws {
+        // Open here so invalid inputs fail before the session is acknowledged, while sample
+        // data itself remains bounded to a pair of windows.
+        try validate()
         lock.lock()
         stopped = false
         lock.unlock()
         Thread.detachNewThread { [self] in
-            self.play(onChunk)
+            do {
+                try self.play(onChunk)
+            } catch {
+                FileHandle.standardError.write(Data("noter-engine: file audio: \(error)\n".utf8))
+            }
         }
     }
 
@@ -261,28 +234,38 @@ public final class FileAudioSource: AudioSource, @unchecked Sendable {
 
     /// Delivers every 100 ms window of both files; returns how many windows it delivered.
     @discardableResult
-    func play(_ onChunk: (AudioChunk) -> Void) -> Int {
-        let windows = FileAudioSource.windows(mic: mic, sys: sys)
-        for (i, (m, s)) in windows.enumerated() {
-            if isStopped { return i }
-            onChunk(AudioChunk(channel: .mic, samples: m, sampleRate: Double(mic.sampleRate)))
-            onChunk(AudioChunk(channel: .sys, samples: s, sampleRate: Double(sys.sampleRate)))
+    func play(_ onChunk: (AudioChunk) -> Void) throws -> Int {
+        let microphone = try AVAudioFile(forReading: mic)
+        let system = try AVAudioFile(forReading: sys)
+        var count = 0
+        while !isStopped {
+            let m = try Self.readWindow(microphone)
+            let s = try Self.readWindow(system)
+            guard m.frames > 0 || s.frames > 0 else { break }
+            onChunk(AudioChunk(channel: .mic, samples: m.samples, sampleRate: m.rate))
+            onChunk(AudioChunk(channel: .sys, samples: s.samples, sampleRate: s.rate))
+            count += 1
             if realtime { Thread.sleep(forTimeInterval: 0.1) }
         }
-        return windows.count
+        return count
     }
 
-    /// Both files cut into aligned 100 ms windows, as long as the longer file.
-    static func windows(mic: WAVAudio, sys: WAVAudio) -> [([Float], [Float])] {
-        func cut(_ a: WAVAudio, _ n: Int) -> [[Float]] {
-            let size = max(1, a.sampleRate / 10)
-            return (0..<n).map { i in
-                let from = min(i * size, a.samples.count)
-                return Array(a.samples[from..<min(from + size, a.samples.count)])
-            }
+    private static func readWindow(_ file: AVAudioFile) throws -> (samples: [Float], rate: Double, frames: Int) {
+        let rate = file.processingFormat.sampleRate
+        let remaining = file.length - file.framePosition
+        guard remaining > 0 else { return ([], rate, 0) }
+        let frames = AVAudioFrameCount(min(max(1, Int(rate / 10)), Int(remaining)))
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: frames) else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: file.url.path])
         }
-        let count = { (a: WAVAudio) in (a.samples.count + max(1, a.sampleRate / 10) - 1) / max(1, a.sampleRate / 10) }
-        let n = max(count(mic), count(sys))
-        return Array(zip(cut(mic, n), cut(sys, n)))
+        try file.read(into: buffer, frameCount: frames)
+        guard let channels = buffer.floatChannelData else {
+            throw CocoaError(.fileReadUnknown, userInfo: [NSFilePathErrorKey: file.url.path])
+        }
+        let n = Int(buffer.frameLength)
+        let channelCount = Int(buffer.format.channelCount)
+        let planes = (0..<channelCount).map { channel in Array(UnsafeBufferPointer(start: channels[channel], count: n)) }
+        let samples = Mix.mono(planes)
+        return (samples, rate, n)
     }
 }

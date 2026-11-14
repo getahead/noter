@@ -10,6 +10,10 @@
 
 import Foundation
 
+public enum EngineClock {
+    public static func epochMilliseconds() -> Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
+}
+
 /// Must match `ENGINE_PROTOCOL_VERSION` in noter-protocol; the core refuses another major.
 public let engineProtocolVersion = "2.0"
 
@@ -439,7 +443,7 @@ public final class EventWriter: @unchecked Sendable {
 
     /// stdout, with the wall clock.
     public static func stdout() -> EventWriter {
-        EventWriter(clock: { Int64(Date().timeIntervalSince1970 * 1000) }) { FileHandle.standardOutput.write($0) }
+        EventWriter(clock: EngineClock.epochMilliseconds) { FileHandle.standardOutput.write($0) }
     }
 
     public func emit(_ event: EngineEvent) {

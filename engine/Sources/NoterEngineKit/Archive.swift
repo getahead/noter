@@ -215,10 +215,8 @@ enum SessionAudio {
         try file.read(into: buffer, frameCount: AVAudioFrameCount(last - first))
         guard let data = buffer.floatChannelData else { return [] }
         let (n, channels) = (Int(buffer.frameLength), Int(buffer.format.channelCount))
-        let mono =
-            channels == 1
-            ? Array(UnsafeBufferPointer(start: data[0], count: n))
-            : (0..<n).map { i in (0..<channels).reduce(Float(0)) { $0 + data[$1][i] } / Float(channels) }
+        let planes = (0..<channels).map { Array(UnsafeBufferPointer(start: data[$0], count: n)) }
+        let mono = Mix.mono(planes)
         return Mix.resample(mono, from: rate, to: Double(Archive.rate))
     }
 }
@@ -278,8 +276,10 @@ enum Archive {
     /// Without `diarizer` the system channel keeps its live label.
     // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     static func run(
-        _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints, decoder: ArchiveDecoder,
-        diarizer: (clustering: Clustering, speaker: SpeakerModel)? = nil, progress: (Float) -> Void
+        _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints,
+        decoder: () throws -> ArchiveDecoder,
+        diarizer: (clustering: () throws -> Clustering, speaker: SpeakerModel)? = nil,
+        yieldIfNeeded: () -> Void = {}, progress: (Float) -> Void
     ) throws {
         let wordsDir = result.deletingPathExtension().appendingPathExtension("words")
         let wordsPath = (pass.resultPath as NSString).deletingPathExtension + ".words"
@@ -307,21 +307,13 @@ enum Archive {
                 var last: String?
                 for (k, range) in utterances.enumerated() {
                     defer { progress((Float(i) + Float(k + 1) / Float(utterances.count)) / Float(channels.count)) }
+                    yieldIfNeeded()
                     let audio = Array(samples[range])
                     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
                     let (allowed, order) = languages(c, label: label, last: last)
-                    let probabilities = try decoder.languages(audio)
-                    let (lang, langP) = LiveASR.language(probabilities, among: allowed)
+                    let (best, bestLang, bestP) = try decode(
+                        audio, allowed: allowed, order: order, decoder: decoder)
                     // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
-                    var (best, bestLang, bestP) = (try decoder.decode(audio, language: lang), lang, langP)
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
-                    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
-                    if langP < alternativeBelow, let other = order.first(where: { $0 != lang }) {
-                        let again = try decoder.decode(audio, language: other)
-                        if again.avgLogprob > best.avgLogprob { (best, bestLang, bestP) = (again, other, probabilities[other] ?? 0) }
-                    }
-                    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
                     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
                     let decoded = Decoded(
                         text: best.text, lang: bestLang, langP: bestP, avgLogprob: best.avgLogprob, noSpeechP: best.noSpeechP)
@@ -346,7 +338,8 @@ enum Archive {
                 }
                 // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
                 if channel == .sys, let diarizer {
-                    try Diarization.label(&segments, samples: samples, time: time, constraints: c, diarizer)
+                    try Diarization.label(
+                        &segments, samples: samples, time: time, constraints: c, diarizer, yieldIfNeeded: yieldIfNeeded)
                 }
                 // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
             }
@@ -361,6 +354,24 @@ enum Archive {
             try? FileManager.default.removeItem(at: wordsDir)
             throw error
         }
+    }
+
+    private static func decode(
+        _ audio: [Float], allowed: [String], order: [String], decoder makeDecoder: () throws -> ArchiveDecoder
+    ) throws -> (best: Transcript, language: String, probability: Float) {
+        let decoder = try makeDecoder()
+        let probabilities = try decoder.languages(audio)
+        let (language, probability) = LiveASR.language(probabilities, among: allowed)
+        var (best, bestLanguage, bestProbability) = (try decoder.decode(audio, language: language), language, probability)
+        // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
+        if probability < alternativeBelow, let other = order.first(where: { $0 != language }) {
+            let again = try decoder.decode(audio, language: other)
+            if again.avgLogprob > best.avgLogprob {
+                (best, bestLanguage, bestProbability) = (again, other, probabilities[other] ?? 0)
+            }
+        }
+        // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-alternative
+        return (best, bestLanguage, bestProbability)
     }
 
     /// The system channel's voices: its clusters (or its live label), split where the user said

@@ -257,6 +257,18 @@ final class CaptureTests: XCTestCase {
         }
     }
 
+    func testCaptureRingPreservesTheLastSamplesAcrossWraparound() throws {
+        let root = try container()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let ring = try CaptureRing(url: root.appendingPathComponent(CaptureRing.fileName), callId: "wrap")
+        let ramp = (0..<(CaptureRing.capacity + 3)).map(Float.init)
+        ring.write(.mic, Array(ramp[..<CaptureRing.capacity]))
+        ring.write(.mic, Array(ramp[CaptureRing.capacity...]))
+
+        XCTAssertEqual(ring.written(.mic), UInt64(CaptureRing.capacity + 3))
+        XCTAssertEqual(ring.read(.mic, last: 5), Array(ramp.suffix(5)))
+    }
+
     // cpt-noter-flow-core-engine-capture-session: cleanup precedes asynchronous finalization.
     func testFinishingAStoppedCallDoesNotClearTheNextCallsRing() throws {
         let (lines, source, root, loading) = (Lines(), FakeSource(), try container(), DispatchSemaphore(value: 0))

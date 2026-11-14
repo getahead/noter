@@ -40,6 +40,7 @@ final class PitchSegmentation: SegmentationModel, @unchecked Sendable {
 /// turn's length so no two are equal.
 final class PitchSpeaker: SpeakerModel, @unchecked Sendable {
     private(set) var turns = 0
+    private(set) var windows = 0
 
     func embed(_ samples: [Float]) throws -> [Float] {
         turns += 1
@@ -47,6 +48,11 @@ final class PitchSpeaker: SpeakerModel, @unchecked Sendable {
         v[voice(samples[...])] = 1
         v[200] = Float(samples.count % 97) / 1_000
         return v
+    }
+
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        windows += 1
+        return try speakers.map { try embed(window: window, speaking: $0) }
     }
 }
 
@@ -106,7 +112,7 @@ final class DiarizationTests: XCTestCase {
             decoder: { FakeDecoder() }, speaker: { self.speaker },
             clustering: { Clustering(segmentation: self.segmentation, plda: identityPLDA()) })
         let out = container.appendingPathComponent(pass.resultPath)
-        try work.archive(pass, session: session, result: out, constraints: c) { _ in }
+        try work.archive(pass, session: session, result: out, constraints: c, yieldIfNeeded: {}) { _ in }
         return try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: out)).segments
             .map { "\($0.channel.rawValue):\($0.speakerLabel)" }
     }
@@ -122,6 +128,69 @@ final class DiarizationTests: XCTestCase {
             "one label per voice; the microphone stays the user")
         XCTAssertEqual(segmentation.windows, 2, "the system channel in 10 s windows")
         XCTAssertEqual(speaker.turns, 4, "one vector per speaker of a window")
+        XCTAssertEqual(speaker.windows, 2, "one shared filterbank per window")
+    }
+
+    func testClusteringModelsAreReusedBetweenPassesAndReleasedForCapture() throws {
+        try store(seconds: 3, sys: [(0.5, 2.5, 220)])
+        var loads = 0
+        let work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: {
+                loads += 1
+                return Clustering(segmentation: self.segmentation, plda: identityPLDA())
+            })
+        let output = container.appendingPathComponent(pass.resultPath)
+
+        for _ in 0..<2 {
+            try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        }
+        XCTAssertEqual(loads, 1)
+
+        work.releaseArchive()
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        XCTAssertEqual(loads, 2)
+    }
+
+    func testCaptureReleasesClusteringBeforeTheNextDiarizationWindowLoadsIt() throws {
+        try store(seconds: 3, sys: [(0.5, 2.5, 220)])
+        var loads = 0
+        var yields = 0
+        var loadsWhenCaptureStarts: Int?
+        var work: LocalOfflineWork!
+        work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: {
+                loads += 1
+                return Clustering(segmentation: self.segmentation, plda: identityPLDA())
+            })
+        let output = container.appendingPathComponent(pass.resultPath)
+
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {
+            yields += 1
+            if yields == 2 {
+                work.releaseArchive()
+                loadsWhenCaptureStarts = loads
+            }
+        }) { _ in }
+
+        XCTAssertEqual(loadsWhenCaptureStarts, 0, "the live session can release clustering before the window resumes")
+        XCTAssertEqual(loads, 1, "clustering reloads after the capture yield")
+    }
+
+    func testOfflineDiarizationChecksCaptureAtEachSilentWindow() throws {
+        try store(seconds: 20, sys: [])
+        segmentation.silent = true
+        var yields = 0
+        let work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: { Clustering(segmentation: self.segmentation, plda: identityPLDA()) })
+        try work.archive(
+            pass, session: session, result: container.appendingPathComponent(pass.resultPath), constraints: .none,
+            yieldIfNeeded: { yields += 1 }) { _ in }
+
+        XCTAssertEqual(segmentation.windows, 2)
+        XCTAssertEqual(yields, 2, "capture is checked even when a window contains no turns")
     }
 
     func testACannotLinkKeepsTwoTurnsOfOneVoiceApart() throws {
@@ -194,6 +263,53 @@ final class DiarizationTests: XCTestCase {
         let x: [[Double]] = [[1, 0], [0.99, 0.14], [0, 1], [0.1, 0.99]]
         XCTAssertEqual(Diarization.ahc(x, threshold: 0.6), [0, 0, 1, 1])
         XCTAssertEqual(Diarization.ahc(x, threshold: 2), [0, 0, 0, 0])
+    }
+
+    func testAgglomerativeHeapMatchesCentroidReferenceWithTiesAndStalePairs() {
+        let vectors: [[Double]] = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.7, 0.7], [-0.7, -0.7]]
+        for threshold in [0.05, 0.15, 0.4, 1.2] {
+            XCTAssertEqual(Diarization.ahc(vectors, threshold: threshold), referenceAHC(vectors, threshold: threshold))
+        }
+    }
+
+    private func referenceAHC(_ vectors: [[Double]], threshold: Double) -> [Int] {
+        let x = vectors.map { row in
+            let norm = sqrt(row.reduce(0) { $0 + $1 * $1 })
+            return norm > 0 ? row.map { $0 / norm } : row
+        }
+        let n = x.count
+        var d = x.map { a in x.map { b in zip(a, b).reduce(0.0) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) } } }
+        var size = Array(repeating: 1.0, count: n)
+        var parent = Array(0..<n)
+        var alive = Array(repeating: true, count: n)
+        while true {
+            var (bi, bj, best) = (0, 0, Double.infinity)
+            for i in 0..<n where alive[i] {
+                for j in (i + 1)..<n where alive[j] {
+                    if d[i][j] < best { (bi, bj, best) = (i, j, d[i][j]) }
+                }
+            }
+            guard best.squareRoot() <= threshold else { break }
+            let (ni, nj) = (size[bi], size[bj])
+            let m = ni + nj
+            let pull = ni * nj * best / (m * m)
+            for k in 0..<n where alive[k] && k != bi && k != bj {
+                d[bi][k] = max(0, (ni * d[bi][k] + nj * d[bj][k]) / m - pull)
+                d[k][bi] = d[bi][k]
+            }
+            size[bi] = m
+            alive[bj] = false
+            parent[bj] = bi
+        }
+        func root(_ i: Int) -> Int { parent[i] == i ? i : root(parent[i]) }
+        var labels: [Int: Int] = [:]
+        return (0..<n).map { i in
+            let r = root(i)
+            if let label = labels[r] { return label }
+            let label = labels.count
+            labels[r] = label
+            return label
+        }
     }
 
     func testAssignmentKeepsCannotLinks() {

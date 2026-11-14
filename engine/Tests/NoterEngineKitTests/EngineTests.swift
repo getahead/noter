@@ -131,16 +131,25 @@ final class SelfTestTests: XCTestCase {
 
 final class ChunkTests: XCTestCase {
     func testFileChunksCarryTheFileSampleRate() throws {
-        let mic = try WAV.read(try wav("mic", seconds: 0.2, amplitude: 0.3))
+        let mic = try wav("mic", seconds: 0.2, amplitude: 0.3)
         var chunks: [AudioChunk] = []
-        FileAudioSource(mic: mic, sys: mic, realtime: false).play { chunks.append($0) }
+        try FileAudioSource(mic: mic, sys: mic, realtime: false).play { chunks.append($0) }
         XCTAssertEqual(chunks.count, 4)
         XCTAssertTrue(chunks.allSatisfy { $0.sampleRate == 16_000 && $0.samples.count == 1_600 })
+    }
+
+    func testFilePlaybackReportsUnreadableInputInsteadOfTreatingItAsEndOfFile() {
+        let missing = URL(fileURLWithPath: "/nonexistent.wav")
+        XCTAssertThrowsError(try FileAudioSource(mic: missing, sys: missing, realtime: false).play { _ in })
     }
 
     func testInterleavedStereoIsDownmixedToMono() {
         XCTAssertEqual(Mix.mono([1, 3, -1, -3, 0.5, 0.5], channels: 2), [2, -2, 0.5])
         XCTAssertEqual(Mix.mono([1, 2, 3], channels: 1), [1, 2, 3])
+    }
+
+    func testPlanarAudioUsesTheSharedMonoDownmix() {
+        XCTAssertEqual(Mix.mono([[1, -1, 0.5], [3, -3, 0.5]]), [2, -2, 0.5])
     }
 
     func testResamplesTo16kHz() {
@@ -170,18 +179,17 @@ final class WAVTests: XCTestCase {
     func testReadsPCM16AndFloat32() throws {
         for float in [false, true] {
             let url = try wav("tone", seconds: 0.5, amplitude: 0.5, float: float)
-            let audio = try WAV.read(url)
-            XCTAssertEqual(audio.sampleRate, 16_000)
-            XCTAssertEqual(audio.samples.count, 8_000)
-            XCTAssertEqual(audio.samples.map(abs).max() ?? 0, 0.5, accuracy: 0.01)
+            let samples = try SessionAudio.read(url)
+            XCTAssertEqual(samples.count, 8_000)
+            XCTAssertEqual(samples.map(abs).max() ?? 0, 0.5, accuracy: 0.01)
         }
     }
 
     func testRejectsWhatIsNotAWAV() throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).wav")
         try Data("not a wav".utf8).write(to: url)
-        XCTAssertThrowsError(try WAV.read(url))
-        XCTAssertThrowsError(try WAV.read(URL(fileURLWithPath: "/nonexistent.wav")))
+        XCTAssertThrowsError(try FileAudioSource(mic: url, sys: url, realtime: false).validate())
+        XCTAssertThrowsError(try FileAudioSource(mic: URL(fileURLWithPath: "/nonexistent.wav"), sys: url, realtime: false).validate())
     }
 }
 
@@ -209,8 +217,8 @@ final class EngineLoopTests: XCTestCase {
 
     func testTheSelfTestStreamsArrivalThenItsResult() throws {
         let lines = Lines()
-        let mic = try WAV.read(try wav("mic", seconds: 1, amplitude: 0.3))
-        let sys = try WAV.read(try wav("sys", seconds: 1, amplitude: 0.3))
+        let mic = try wav("mic", seconds: 1, amplitude: 0.3)
+        let sys = try wav("sys", seconds: 1, amplitude: 0.3)
         let e = engine(lines, source: FileAudioSource(mic: mic, sys: sys, realtime: false))
         e.start()
         XCTAssertTrue(e.handle(#"{"id":7,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":2000}}"#))
@@ -274,8 +282,8 @@ final class FileModeTests: XCTestCase {
 
     func testASilentSystemFileFailsTheSelfTestWithZeroBuffers() throws {
         let lines = Lines()
-        let mic = try WAV.read(try wav("mic", seconds: 0.5, amplitude: 0.3))
-        let sys = try WAV.read(try wav("sys", seconds: 0.5, amplitude: 0))
+        let mic = try wav("mic", seconds: 0.5, amplitude: 0.3)
+        let sys = try wav("sys", seconds: 0.5, amplitude: 0)
         let e = EngineLoop(
             writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
             source: { _ in FileAudioSource(mic: mic, sys: sys, realtime: false) })

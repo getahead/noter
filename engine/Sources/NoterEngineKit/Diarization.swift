@@ -105,6 +105,54 @@ private struct TensorFile: Decodable {
 }
 
 enum Diarization {
+    private struct ClusterPair {
+        let distance: Double
+        let first: Int
+        let second: Int
+
+        static func precedes(_ lhs: ClusterPair, _ rhs: ClusterPair) -> Bool {
+            if lhs.distance != rhs.distance { return lhs.distance < rhs.distance }
+            if lhs.first != rhs.first { return lhs.first < rhs.first }
+            return lhs.second < rhs.second
+        }
+    }
+
+    private struct ClusterPairHeap {
+        private var values: [ClusterPair] = []
+
+        var first: ClusterPair? { values.first }
+
+        mutating func push(_ value: ClusterPair) {
+            values.append(value)
+            var child = values.count - 1
+            while child > 0 {
+                let parent = (child - 1) / 2
+                guard ClusterPair.precedes(values[child], values[parent]) else { break }
+                values.swapAt(child, parent)
+                child = parent
+            }
+        }
+
+        @discardableResult
+        mutating func pop() -> ClusterPair? {
+            guard !values.isEmpty else { return nil }
+            if values.count == 1 { return values.removeLast() }
+            let first = values[0]
+            values[0] = values.removeLast()
+            var parent = 0
+            while true {
+                let left = parent * 2 + 1
+                guard left < values.count else { break }
+                let right = left + 1
+                let child = right < values.count && ClusterPair.precedes(values[right], values[left]) ? right : left
+                guard ClusterPair.precedes(values[child], values[parent]) else { break }
+                values.swapAt(parent, child)
+                parent = child
+            }
+            return first
+        }
+    }
+
     /// pyannote's window: 10 s at 16 kHz.
     static let window = 160_000
     /// A speaker with less speech alone in a window has no vector; their words take the voice
@@ -126,23 +174,31 @@ enum Diarization {
         let runs: [Range<Int>]
     }
 
+    // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
     /// The system channel's segments labelled by voice, `spk_1`, `spk_2`… in order of first words;
     /// with no speech turn they keep the live label.
     static func label(
         _ segments: inout [Segment], samples: [Float], time: CallTime, constraints c: OfflineConstraints,
-        _ models: (clustering: Clustering, speaker: SpeakerModel)
+        _ models: (clustering: () throws -> Clustering, speaker: SpeakerModel), yieldIfNeeded: () -> Void = {}
     ) throws {
-        let turns = try turns(samples, models.clustering.segmentation)
+        let turns = try turns(samples, { try models.clustering().segmentation }, yieldIfNeeded: yieldIfNeeded)
         guard !turns.isEmpty else { return }
         let rate = Archive.rate
         let runs = turns.map {
             $0.runs.map { (t0: time.call($0.lowerBound * 1000 / rate), t1: time.call($0.upperBound * 1000 / rate, end: true)) }
         }
-        let vectors = try turns.map { t in
-            let from = t.window * window
-            let heard = try models.speaker.embed(window: Array(samples[from..<min(from + window, samples.count)]), speaking: t.alone)
-            return try Vectors.checked(heard, Vectors.speakerDims).map(Double.init)
+        var vectors = Array(repeating: [Double](), count: turns.count)
+        for windowIndex in Set(turns.map(\.window)).sorted() {
+            yieldIfNeeded()
+            let indices = turns.indices.filter { turns[$0].window == windowIndex }
+            let from = windowIndex * window
+            let audio = Array(samples[from..<min(from + window, samples.count)])
+            let embedded = try models.speaker.embed(window: audio, speakers: indices.map { turns[$0].alone })
+            guard embedded.count == indices.count else { throw OfflineFailure(code: .internal) }
+            for (index, vector) in zip(indices, embedded) {
+                vectors[index] = try Vectors.checked(vector, Vectors.speakerDims).map(Double.init)
+            }
         }
         func overlap(_ k: Int, _ t0: Int, _ t1: Int) -> Int { runs[k].reduce(0) { $0 + max(0, min(t1, $1.t1) - max(t0, $1.t0)) } }
         func inside(_ s: Span) -> [Int] { turns.indices.filter { overlap($0, s.t0Ms, s.t1Ms) > 0 } }
@@ -151,8 +207,9 @@ enum Diarization {
             + turns.indices.flatMap { i in
                 turns.indices.filter { turns[$0].window == turns[i].window && turns[$0].local > turns[i].local }.map { (i, $0) }
             }
+        yieldIfNeeded()
         let voices = cluster(
-            vectors, training: turns.map { $0.speech * 1000 >= trainingSpeechMs * rate }, plda: models.clustering.plda,
+            vectors, training: turns.map { $0.speech * 1000 >= trainingSpeechMs * rate }, plda: try models.clustering().plda,
             cannot: cannot)
         var names: [Int: String] = [:]
         for i in segments.indices where segments[i].channel == .sys {
@@ -169,10 +226,14 @@ enum Diarization {
     }
 
     /// The speakers of each window with enough speech alone, as the segmentation hears them.
-    static func turns(_ samples: [Float], _ model: SegmentationModel) throws -> [Turn] {
+    static func turns(
+        _ samples: [Float], _ makeModel: () throws -> SegmentationModel, yieldIfNeeded: () -> Void = {}
+    ) throws -> [Turn] {
         var out: [Turn] = []
         for (w, start) in stride(from: 0, to: samples.count, by: window).enumerated() {
+            yieldIfNeeded()
             let end = min(start + window, samples.count)
+            let model = try makeModel()
             let frames = try model.speakers(Array(samples[start..<end]))
             let at = { (f: Int) in min(end, start + f * window / max(frames.count, 1)) }
             for local in Set(frames.joined()).sorted() {
@@ -212,8 +273,8 @@ enum Diarization {
     /// Centroid-linkage clustering of the normalised vectors (Lance-Williams on squared
     /// distances), joining while the closest two are within `threshold`: the clusters in order of
     /// first member.
-    /// shortcut: O(n³) in turns, under a second for the ~1,000 turns of an hour; a nearest-
-    /// neighbour cache when calls get much longer.
+    /// A lazy min-heap keeps candidate pairs ordered. Merges update one row of the distance
+    /// matrix and add O(n) candidates; stale pairs are discarded when they reach the top.
     static func ahc(_ x: [[Double]], threshold: Double) -> [Int] {
         let x = x.map { scaled($0, to: 1) }
         let n = x.count
@@ -221,12 +282,19 @@ enum Diarization {
             x.map { b in zip(a, b).reduce(0.0) { (sum: Double, p: (Double, Double)) -> Double in sum + (p.0 - p.1) * (p.0 - p.1) } }
         }
         var (size, parent, alive) = (Array(repeating: 1.0, count: n), Array(0..<n), Array(repeating: true, count: n))
+        var candidates = ClusterPairHeap()
+        for i in 0..<n {
+            for j in (i + 1)..<n { candidates.push(ClusterPair(distance: d[i][j], first: i, second: j)) }
+        }
         while true {
-            var (bi, bj, best) = (0, 0, Double.infinity)
-            for i in 0..<n where alive[i] {
-                for j in (i + 1)..<n where alive[j] && d[i][j] < best { (bi, bj, best) = (i, j, d[i][j]) }
+            while let pair = candidates.first,
+                !alive[pair.first] || !alive[pair.second] || d[pair.first][pair.second] != pair.distance
+            {
+                candidates.pop()
             }
-            guard best.squareRoot() <= threshold else { break }
+            guard let pair = candidates.first, pair.distance.squareRoot() <= threshold else { break }
+            candidates.pop()
+            let (bi, bj, best) = (pair.first, pair.second, pair.distance)
             let (ni, nj): (Double, Double) = (size[bi], size[bj])
             let m: Double = ni + nj
             let pull: Double = ni * nj * best / (m * m)
@@ -236,6 +304,9 @@ enum Diarization {
                 d[k][bi] = d[bi][k]
             }
             (size[bi], alive[bj], parent[bj]) = (ni + nj, false, bi)
+            for k in 0..<n where alive[k] && k != bi {
+                candidates.push(ClusterPair(distance: d[bi][k], first: min(bi, k), second: max(bi, k)))
+            }
         }
         func root(_ i: Int) -> Int { parent[i] == i ? i : root(parent[i]) }
         var ids: [Int: Int] = [:]

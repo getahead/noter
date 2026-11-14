@@ -37,8 +37,7 @@ case let .file(mic, sys, realtime):
         writer: writer, engineVersion: version, models: models, sandboxed: sandboxed, container: container,
         transcriber: speechModel, offline: offline
     ) { _ in
-        guard let m = try? WAV.read(mic), let s = try? WAV.read(sys) else { return nil }
-        return FileAudioSource(mic: m, sys: s, realtime: realtime)
+        FileAudioSource(mic: mic, sys: sys, realtime: realtime)
     }
     let replay = FileMode(mic: mic, sys: sys, realtime: realtime)
     exit(

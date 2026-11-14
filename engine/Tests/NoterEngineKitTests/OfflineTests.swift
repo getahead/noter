@@ -12,10 +12,25 @@ import XCTest
 private final class FakeWork: OfflineWork, @unchecked Sendable {
     var fail: EngineErrorCode?
     var leavesPartialFile = false
+    var holdFirst = false
+    let firstStarted = DispatchSemaphore(value: 0)
+    let releaseFirst = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var results: [String] = []
+    var startedResults: [String] { lock.withLock { results } }
 
     func archive(
-        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints, progress: (Float) -> Void
+        _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
+        yieldIfNeeded: () -> Void, progress: (Float) -> Void
     ) throws {
+        let hold = lock.withLock {
+            results.append(result.lastPathComponent)
+            return holdFirst && results.count == 1
+        }
+        if hold {
+            firstStarted.signal()
+            releaseFirst.wait()
+        }
         progress(0.25)
         progress(1.5)  // clamped
         if let fail {
@@ -173,6 +188,28 @@ final class OfflineTests: XCTestCase {
         XCTAssertEqual(failed["code"] as? String, "disk_full")
         XCTAssertFalse(lines.types.contains("offline_done"))
         XCTAssertFalse(exists("audio/call_1/offline.json"))
+    }
+
+    func testQueuedArchivePassesSupersededForTheSameCallAreSkipped() throws {
+        let lines = Lines()
+        let work = FakeWork()
+        work.holdFirst = true
+        let e = engine(lines, work: work)
+
+        _ = e.handle(offlinePass(1, result: "audio/call_1/one.json"))
+        XCTAssertEqual(work.firstStarted.wait(timeout: .now() + 5), .success)
+        _ = e.handle(offlinePass(2, result: "audio/call_1/two.json"))
+        _ = e.handle(offlinePass(3, result: "audio/call_1/three.json"))
+        work.releaseFirst.signal()
+
+        let deadline = Date().addingTimeInterval(5)
+        while lines.types.filter({ $0 == "offline_done" }).count < 2, Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.01)
+        }
+        XCTAssertEqual(work.startedResults, ["one.json", "three.json"])
+        XCTAssertTrue(exists("audio/call_1/one.json"))
+        XCTAssertFalse(exists("audio/call_1/two.json"))
+        XCTAssertTrue(exists("audio/call_1/three.json"))
     }
 
     // MARK: embeddings

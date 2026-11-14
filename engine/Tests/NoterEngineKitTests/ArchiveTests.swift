@@ -90,7 +90,7 @@ final class ArchiveTests: XCTestCase {
         var progress: [Float] = []
         let work = LocalOfflineWork(decoder: { decoder })
         let out = container.appendingPathComponent(pass.resultPath)
-        try work.archive(pass, session: session, result: out, constraints: constraints) { progress.append($0) }
+        try work.archive(pass, session: session, result: out, constraints: constraints, yieldIfNeeded: {}) { progress.append($0) }
         return (try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: out)), progress)
     }
 
@@ -109,6 +109,24 @@ final class ArchiveTests: XCTestCase {
         for segment in segments {
             XCTAssertEqual(segment["lang"] as? [String: String], ["code": "uk"])
         }
+    }
+
+    func testTheArchiveDecoderIsKeptBetweenPassesAndReleasedForCapture() throws {
+        try storeCall(in: session, seconds: 2, mic: [(0.5, 1.5)], sys: [])
+        var loads = 0
+        let work = LocalOfflineWork(decoder: {
+            loads += 1
+            return FakeDecoder()
+        })
+        let output = container.appendingPathComponent("audio/call_1/cached.json")
+
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        XCTAssertEqual(loads, 1)
+
+        work.releaseArchive()
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        XCTAssertEqual(loads, 2)
     }
 
     private func near(_ a: Int, _ b: Int, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
@@ -326,12 +344,18 @@ final class ArchiveTests: XCTestCase {
 
     func testTheArchiveWaitsWhileACallIsCaptured() throws {
         try storeCall(in: session, seconds: 3, mic: [(1, 2)], sys: [])
+        let micFile = try wav("capturing-mic", seconds: 3, amplitude: 0.1)
+        let sysFile = try wav("capturing-sys", seconds: 3, amplitude: 0.1)
+        defer {
+            try? FileManager.default.removeItem(at: micFile)
+            try? FileManager.default.removeItem(at: sysFile)
+        }
         let lines = Lines()
         let decoder = FakeDecoder()
         let e = EngineLoop(
             writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: container,
             offline: LocalOfflineWork(decoder: { decoder }, text: { FakeText() })
-        ) { _ in FileAudioSource(mic: WAVAudio(sampleRate: 16_000, samples: []), sys: WAVAudio(sampleRate: 16_000, samples: []), realtime: true) }
+        ) { _ in FileAudioSource(mic: micFile, sys: sysFile, realtime: true) }
         _ = e.handle(#"{"id":1,"cmd":{"type":"start_session","call_id":"call_2","session_dir":"audio/call_2","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}"#)
         XCTAssertNotNil(lines.waitFor("session_started"))
         _ = e.handle(command(2))

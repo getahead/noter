@@ -1111,6 +1111,7 @@ impl<R: Runtime> TauriSurfaces<R> {
                 TrayEntry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
                 TrayEntry::Item(item) => {
                     let id = format!("{:?}", item.action);
+                    debug_assert!(action_of(&id).is_some(), "tray action {id} has no click handler");
                     let (label, key) = (&item.label, item.key.as_deref());
                     match item.checked {
                         Some(checked) => menu.append(&CheckMenuItem::with_id(
