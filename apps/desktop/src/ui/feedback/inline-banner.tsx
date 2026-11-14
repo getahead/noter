@@ -51,9 +51,14 @@ export interface InlineBannerProps {
 }
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
+// @cpt-state:cpt-noter-state-ui-primitives-inline-banner:p1
 export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: InlineBannerProps) {
   const sev = b.severity;
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-working
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-shown
   const working = b.actions?.some((a) => a.loading);
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-shown
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-working
   const dismissible = b.dismissible ?? (sev === "info" || sev === "success");
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-user-banner
   // consumed here: Esc on × closes the banner, not the sheet or popover around it
@@ -64,7 +69,11 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
     <div
       data-component="cpt-noter-component-ui-inline-banner"
       data-variant={(b.compact ? "compact-" : "") + sev}
+      // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
+      // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
       data-state={working ? "working" : stacked ? "stacked" : "shown"}
+      // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
+      // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
       className={cx("np-banner", `np-banner--${sev}`, b.compact && "is-compact")}
       role={sev === "error" ? "alert" : "status"}
     >
@@ -119,6 +128,11 @@ export interface BannerSlotProps {
 export function BannerSlot({ banners, region, onDismiss }: BannerSlotProps) {
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(new Set());
   const [open, setOpen] = useState(false);
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
+  const toggleOpen = () => setOpen(!open);
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-stacked-shown
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-stacked
   // a banner that left the slot shows again when its event happens again
   const kept = pruneDismissed(dismissed, banners);
   if (kept !== dismissed) setDismissed(kept);
@@ -127,16 +141,22 @@ export function BannerSlot({ banners, region, onDismiss }: BannerSlotProps) {
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-if-dismiss
   const dismiss = (id: string) => {
     // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-dismiss
+    // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-dismissed
     setDismissed(new Set(kept).add(id));
+    // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-dismissed
     void Promise.resolve(onDismiss?.(id)).then((ok) => ok === false && setDismissed((now) => restoreDismissed(now, id)));
     // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-dismiss
   };
   // @cpt-end:cpt-noter-flow-ui-primitives-banner:p1:inst-if-dismiss
   // @cpt-begin:cpt-noter-flow-ui-primitives-banner:p1:inst-return-slot
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-resolved
+  // @cpt-begin:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-resolved
   if (!first) return null;
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-working-resolved
+  // @cpt-end:cpt-noter-state-ui-primitives-inline-banner:p1:inst-shown-resolved
   return (
     <div className="np-bannerslot" data-region={region}>
-      <InlineBanner banner={first} more={more} stacked={open} onMore={() => setOpen(!open)} onDismiss={() => dismiss(first.id)} />
+      <InlineBanner banner={first} more={more} stacked={open} onMore={toggleOpen} onDismiss={() => dismiss(first.id)} />
       {list.map((b) => (
         <InlineBanner key={b.id} banner={b} onDismiss={() => dismiss(b.id)} />
       ))}
