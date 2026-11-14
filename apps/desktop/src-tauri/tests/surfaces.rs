@@ -12,9 +12,8 @@ use noter_core::{
 };
 use noter_desktop::surfaces::{
     action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
-    prompt_display, prompt_frame,
-    posted, quit_alert, running_call, same_shape, settings_url, tray_command, SavedFrames,
-    TauriSurfaces,
+    posted, prompt_display, prompt_frame, quit_alert, running_call, same_shape, settings_url,
+    tray_command, SavedFrames, TauriSurfaces,
 };
 use noter_desktop::Booted;
 use noter_native::Frame;
@@ -95,6 +94,27 @@ fn the_call_display_is_found_by_identity_and_falls_back_to_the_main_display() {
 }
 
 #[test]
+fn unplugging_and_reconnecting_a_call_display_falls_back_then_restores_its_frame() {
+    let built_in = display("dsp_builtin", true);
+    let studio = display("dsp_studio", false);
+    let chosen = DisplayId::new("dsp_studio".to_string());
+
+    let after_unplug = [built_in.clone()];
+    assert_eq!(
+        frame_of(Some(&chosen), &after_unplug, frames),
+        Some((built_in.id.clone(), BUILT_IN)),
+        "an unplugged selected display falls back to the remaining main display"
+    );
+
+    let after_reconnect = [built_in, studio];
+    assert_eq!(
+        frame_of(Some(&chosen), &after_reconnect, frames),
+        Some((chosen, STUDIO)),
+        "reconnecting restores the selected display's own frame"
+    );
+}
+
+#[test]
 fn the_call_window_fills_a_dedicated_visible_frame_or_floats_in_its_top_right_corner() {
     assert_eq!(
         call_frame(CallLayout::Dedicated, false, &STUDIO),
@@ -129,11 +149,13 @@ fn the_record_prompt_uses_the_other_display_and_a_twelve_point_inset() {
         display("dsp_studio", false),
     ];
     assert_eq!(
-        prompt_display(&displays, Some(&DisplayId::new("dsp_builtin")))
-            .map(|d| d.id.clone()),
+        prompt_display(&displays, Some(&DisplayId::new("dsp_builtin"))).map(|d| d.id.clone()),
         Some(DisplayId::new("dsp_studio"))
     );
-    assert_eq!(prompt_frame(&BUILT_IN, (360.0, 132.0)), (1140.0, 12.0, 360.0, 132.0));
+    assert_eq!(
+        prompt_frame(&BUILT_IN, (360.0, 132.0)),
+        (1140.0, 12.0, 360.0, 132.0)
+    );
 }
 
 #[test]
@@ -410,7 +432,7 @@ fn every_menu_item_runs_its_command_with_the_live_call() {
 
 #[test]
 fn every_glyph_has_its_own_template_image_and_hidden_form() {
-    let mut seen = Vec::new();
+    let mut seen = std::collections::HashSet::new();
     for glyph in [
         TrayGlyph::Idle,
         TrayGlyph::Recording,
@@ -422,10 +444,9 @@ fn every_glyph_has_its_own_template_image_and_hidden_form() {
             assert_eq!((image.width(), image.height()), (36, 36));
             // Template: black, the shape in the alpha channel.
             assert!(image.rgba().chunks(4).all(|p| p[..3] == [0, 0, 0]));
-            seen.push(image.rgba().to_vec());
+            seen.insert(image.rgba().to_vec());
         }
     }
-    seen.dedup();
     assert_eq!(seen.len(), 8);
 }
 
@@ -498,12 +519,25 @@ fn the_host_creates_the_core_windows_on_first_use() {
     surfaces.fit_record_prompt(400, 150); // kept for the prompt's first show
     surfaces.show_record_prompt(&prompt_placement());
     surfaces.fit_record_prompt(372, 127);
-    assert!(app
+    let prompt = app
         .get_webview_window(WindowLabel::RecordPrompt.as_str())
-        .is_some());
+        .expect("fit_record_prompt creates the prompt window");
+    assert!(prompt.is_visible().unwrap(), "the fitted prompt is shown");
     surfaces.hide_call_window();
     surfaces.hide_all();
+    assert_eq!(
+        surfaces.hidden_for_presenting(),
+        [
+            WindowLabel::Settings,
+            WindowLabel::CallScreen,
+            WindowLabel::RecordPrompt
+        ]
+    );
     surfaces.restore_all();
+    assert!(surfaces.hidden_for_presenting().is_empty());
+    assert!(app
+        .get_webview_window(WindowLabel::Settings.as_str())
+        .is_some());
 }
 
 // The mock runtime's windows are always "visible" and its show/hide do nothing, so these read the

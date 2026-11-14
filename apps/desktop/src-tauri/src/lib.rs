@@ -46,16 +46,14 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
         .on_page_load(|webview, payload| {
             let (label, event) = (webview.label(), payload.event());
             if event == PageLoadEvent::Started {
-                reset(label, webview.try_state::<Booted>().as_deref());
+                page_load_started(label, webview.try_state::<Booted>().as_deref());
             }
             // A page that never finishes gets a new web process (#521).
             if let Some(watch) = webview.try_state::<webview_watch::Watch>() {
                 let mut loads = webview_watch::lock(&watch);
                 match event {
                     PageLoadEvent::Started => loads.started(label, std::time::Instant::now()),
-                    PageLoadEvent::Finished => {
-                        loads.finished(label, std::time::Instant::now())
-                    }
+                    PageLoadEvent::Finished => loads.finished(label, std::time::Instant::now()),
                 }
             }
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
@@ -73,7 +71,7 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 let _ = window.hide();
             }
             WindowEvent::Destroyed => {
-                reset(window.label(), window.try_state::<Booted>().as_deref());
+                window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
                 if let Some(watch) = window.try_state::<webview_watch::Watch>() {
                     webview_watch::lock(&watch).closed(window.label());
                 }
@@ -230,7 +228,9 @@ fn browser<R: Runtime>(
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
 /// this Mac. Own-account sign-in is M3, so only the API-key and local runtimes run in M2.
 fn runtimes(data: &std::path::Path) -> Adapters {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     let cli = |name: &str| CliConfig {
         program: find_cli(&home, name),
         home: home.clone(),
@@ -247,7 +247,9 @@ fn runtimes(data: &std::path::Path) -> Adapters {
 
 /// The pinned CLIs as accounts and installs, found where `runtimes` finds them.
 fn account_cli() -> Arc<CliAccounts> {
-    let home = std::env::var_os("HOME").map(std::path::PathBuf::from).unwrap_or_default();
+    let home = std::env::var_os("HOME")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_default();
     Arc::new(CliAccounts {
         claude: find_cli(&home, "claude"),
         codex: find_cli(&home, "codex"),
@@ -258,12 +260,17 @@ fn account_cli() -> Arc<CliAccounts> {
 /// shortcut: an app started from Finder has no shell PATH, so the usual install folders are
 /// tried first; a CLI elsewhere is found by name on PATH (CLI install, M3, records its path).
 fn find_cli(home: &std::path::Path, name: &str) -> std::path::PathBuf {
-    let dirs = [
-        home.join(".local/bin"),
-        home.join(".claude/local"),
-        "/opt/homebrew/bin".into(),
-        "/usr/local/bin".into(),
-    ];
+    let system_dirs = ["/opt/homebrew/bin".into(), "/usr/local/bin".into()];
+    find_cli_in(home, name, &system_dirs)
+}
+
+fn find_cli_in(
+    home: &std::path::Path,
+    name: &str,
+    system_dirs: &[std::path::PathBuf],
+) -> std::path::PathBuf {
+    let mut dirs = vec![home.join(".local/bin"), home.join(".claude/local")];
+    dirs.extend_from_slice(system_dirs);
     dirs.iter()
         .map(|d| d.join(name))
         .find(|p| p.is_file())
@@ -376,6 +383,14 @@ fn reset(label: &str, booted: Option<&Booted>) {
     }
 }
 
+fn page_load_started(label: &str, booted: Option<&Booted>) {
+    reset(label, booted);
+}
+
+fn window_destroyed(label: &str, booted: Option<&Booted>) {
+    reset(label, booted);
+}
+
 /// The app's global shortcuts, through the Tauri global-shortcut plugin: each registered chord's
 /// press goes to the core as `Caller::Native { surface: hotkey }`.
 struct TauriShortcuts<R: Runtime>(AppHandle<R>);
@@ -433,5 +448,136 @@ impl EventEmitter for TauriEvents {
         if let Some(app) = self.0.get() {
             let _ = app.emit(event, payload);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use noter_core::{StreamMsg, SystemClock};
+    use noter_protocol::ipc::Sink;
+    use noter_protocol::model::{StreamEndReason, WindowLabel};
+    use noter_protocol::Seq;
+    use std::sync::Mutex;
+
+    struct NoEvents;
+
+    impl EventEmitter for NoEvents {
+        fn emit(&self, _: &'static str, _: Value) {}
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    enum TestMsg {
+        Ended { seq: Seq, reason: StreamEndReason },
+    }
+
+    impl StreamMsg for TestMsg {
+        fn set_seq(&mut self, seq: Seq) {
+            match self {
+                Self::Ended { seq: current, .. } => *current = seq,
+            }
+        }
+
+        fn ended(reason: StreamEndReason) -> Option<Self> {
+            Some(Self::Ended {
+                seq: Seq(0),
+                reason,
+            })
+        }
+    }
+
+    #[test]
+    fn cli_lookup_uses_private_home_and_system_install_order_then_path_fallback() {
+        let temp = tempfile::tempdir().unwrap();
+        let home = temp.path().join("home");
+        let private = home.join(".local/bin");
+        let claude = home.join(".claude/local");
+        let homebrew = temp.path().join("homebrew");
+        let system = temp.path().join("system");
+        for dir in [&private, &claude, &homebrew, &system] {
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(dir.join("codex"), "test placeholder").unwrap();
+        }
+        let system_dirs = [homebrew.clone(), system.clone()];
+        assert_eq!(
+            find_cli_in(&home, "codex", &system_dirs),
+            private.join("codex")
+        );
+        std::fs::remove_file(private.join("codex")).unwrap();
+        assert_eq!(
+            find_cli_in(&home, "codex", &system_dirs),
+            claude.join("codex")
+        );
+        std::fs::remove_file(claude.join("codex")).unwrap();
+        assert_eq!(
+            find_cli_in(&home, "codex", &system_dirs),
+            homebrew.join("codex")
+        );
+        std::fs::remove_file(homebrew.join("codex")).unwrap();
+        assert_eq!(
+            find_cli_in(&home, "codex", &system_dirs),
+            system.join("codex")
+        );
+        std::fs::remove_file(system.join("codex")).unwrap();
+        assert_eq!(
+            find_cli_in(&home, "codex", &[]),
+            std::path::PathBuf::from("codex")
+        );
+    }
+
+    #[test]
+    fn page_load_and_destroy_callbacks_end_subscriptions_as_unsubscribed() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Arc::new(
+            Core::open(
+                dir.path(),
+                CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
+            )
+            .unwrap(),
+        );
+        let hub = core.stream_hub::<TestMsg>(None);
+        let page_messages = Arc::new(Mutex::new(Vec::new()));
+        let sink_messages = page_messages.clone();
+        hub.subscribe(
+            "call_1",
+            Some(WindowLabel::Main),
+            Sink::new(move |message| {
+                sink_messages.lock().unwrap().push(message);
+                true
+            }),
+            || Ok(()),
+        )
+        .unwrap();
+        let destroyed_messages = Arc::new(Mutex::new(Vec::new()));
+        let sink_messages = destroyed_messages.clone();
+        hub.subscribe(
+            "call_1",
+            Some(WindowLabel::CallScreen),
+            Sink::new(move |message| {
+                sink_messages.lock().unwrap().push(message);
+                true
+            }),
+            || Ok(()),
+        )
+        .unwrap();
+        let booted = Booted(Ok(core));
+
+        page_load_started(WindowLabel::Main.as_str(), Some(&booted));
+        window_destroyed(WindowLabel::CallScreen.as_str(), Some(&booted));
+
+        assert!(matches!(
+            page_messages.lock().unwrap().last(),
+            Some(TestMsg::Ended {
+                reason: StreamEndReason::Unsubscribed,
+                ..
+            })
+        ));
+        assert!(matches!(
+            destroyed_messages.lock().unwrap().last(),
+            Some(TestMsg::Ended {
+                reason: StreamEndReason::Unsubscribed,
+                ..
+            })
+        ));
     }
 }

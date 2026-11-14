@@ -3,15 +3,7 @@
 //! own assets or Tauri IPC.
 
 use serde_json::Value;
-
-const LOCAL_SOURCES: [&str; 6] = [
-    "'self'",
-    "'unsafe-inline'",
-    "data:",
-    "asset:",
-    "ipc:",
-    "http://ipc.localhost",
-];
+use std::collections::BTreeMap;
 
 #[test]
 fn the_windows_csp_allows_only_local_sources() {
@@ -19,13 +11,24 @@ fn the_windows_csp_allows_only_local_sources() {
     let csp = conf["app"]["security"]["csp"]
         .as_str()
         .expect("app.security.csp is set");
-    assert!(csp.contains("default-src 'self'"), "{csp}");
-    for directive in csp.split(';').map(str::trim).filter(|d| !d.is_empty()) {
-        for source in directive.split_whitespace().skip(1) {
-            assert!(
-                LOCAL_SOURCES.contains(&source),
-                "remote source {source} in `{directive}`"
-            );
-        }
-    }
+    let parsed: Vec<_> = csp
+        .split(';')
+        .map(str::split_whitespace)
+        .filter_map(|mut parts| {
+            Some((
+                parts.next()?.to_string(),
+                parts.map(str::to_string).collect::<Vec<_>>(),
+            ))
+        })
+        .collect();
+    let directives: BTreeMap<_, _> = parsed.iter().cloned().collect();
+    assert_eq!(parsed.len(), directives.len(), "CSP directive names are unique: {csp}");
+    let expected = BTreeMap::from([
+        ("connect-src".to_string(), vec!["ipc:".to_string(), "http://ipc.localhost".to_string()]),
+        ("default-src".to_string(), vec!["'self'".to_string()]),
+        ("img-src".to_string(), vec!["'self'".to_string(), "asset:".to_string(), "data:".to_string()]),
+        ("script-src".to_string(), vec!["'self'".to_string()]),
+        ("style-src".to_string(), vec!["'self'".to_string(), "'unsafe-inline'".to_string()]),
+    ]);
+    assert_eq!(directives, expected, "CSP directives and sources must stay local: {csp}");
 }

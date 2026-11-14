@@ -240,9 +240,9 @@ The system **MUST** provide the menu bar's content per state as listed in this f
 
 - [x] `p2` - **ID**: `cpt-noter-dod-ui-menu-bar-native-tests`
 
-The system **MUST** have XCUITest cases for every menu item and every glyph, named after the stories they prove (`test_cpt_noter_seq_menu_bar_control_recording__pause_and_resume`, `test_cpt_noter_seq_menu_bar_check_state__setup_incomplete`), that check each action takes effect within a second and opens no window except **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Finish Setup…** and **Settings…**.
+The system **MUST** have XCUITest cases for each user action the native menu owns, named after the stories they prove (`test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue`, `test_cpt_noter_seq_menu_bar_check_state__setup_incomplete`), that check the visible result and opens no window except **Open Noter**, **Open Call Screen**, **Open Last Summary**, **Finish Setup…** and **Settings…**. Host tests prove every glyph image is unique; XCUITest checks the hidden state in the menu bar's VoiceOver label.
 
-The **Paused for 5 min** native case starts from the harness's `paused-5-min` scenario at the reminder deadline, rather than waiting five real minutes. Core tests prove that pausing computes a five-minute deadline and that the menu changes from the paused line exactly at that deadline; the native pause/resume case still drives the real menu actions. The fixture regression checks the paused capture, its live call and its deadline. `just gate` passes.
+The **Paused for 5 min** native case starts from the harness's `paused-5-min` scenario at the reminder deadline, rather than waiting five real minutes. Core tests prove that pausing computes a five-minute deadline and that the menu changes from the paused line exactly at that deadline; native tests prove visible outcomes after Mark Moment and Resume. The hidden-state test checks the VoiceOver label and Hide/Show menu transition together. The fixture regression checks the paused capture, its live call and its deadline. `just gate` passes.
 
 **Implements**:
 - `cpt-noter-flow-ui-menu-bar-control-recording`

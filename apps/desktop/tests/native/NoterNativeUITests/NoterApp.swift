@@ -24,12 +24,9 @@ class NoterTestCase: XCTestCase {
 
     var home: URL?
 
-    override func setUp() {
+    override func setUpWithError() throws {
         continueAfterFailure = false
-        guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"], !path.isEmpty else {
-            XCTFail("NOTER_APP_PATH is not set: run the suite with `just native`")
-            return
-        }
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["NOTER_APP_PATH"].flatMap { $0.isEmpty ? nil : $0 }, "NOTER_APP_PATH is not set: run the suite with `just native`")
         app = XCUIApplication(url: URL(fileURLWithPath: path))
         if let dir = ProcessInfo.processInfo.environment["NOTER_E2E_LOG_DIR"] {
             app.launchEnvironment["NOTER_E2E_LOG_DIR"] = dir
@@ -44,6 +41,7 @@ class NoterTestCase: XCTestCase {
         app.launchEnvironment["HOME"] = home.path
         app.launchEnvironment["TMPDIR"] = home.path + "/"
         app.launchEnvironment["NOTER_TEST_HOTKEY_FILE"] = hotkeyFile(in: home).path
+        app.launchEnvironment["NOTER_TEST_FRAME_STORE"] = home.appendingPathComponent("call-window-frames.json").path
     }
 
     /// Launches the app on the fixture world (a live call recording, the call “Backend sync” in the library) in
@@ -188,6 +186,12 @@ class NoterTestCase: XCTestCase {
 
     /// A window of the app with this title (the main window is “Noter”).
     func window(_ title: String) -> XCUIElement { app.windows[title] }
+
+    /// Some macOS runners expose web headings as AXHeading while XCTest classifies them as StaticText;
+    /// inspecting the window's accessibility snapshot avoids that type mismatch while still checking the rendered label.
+    func accessibilityTreeContains(_ label: String, in window: XCUIElement) -> Bool {
+        window.debugDescription.contains(label)
+    }
 
     /// The call window: a non-activating panel, which the accessibility tree lists as a dialog, not a window.
     var callWindow: XCUIElement { app.dialogs.matching(NSPredicate(format: "label != %@", "Record this call?")).firstMatch }

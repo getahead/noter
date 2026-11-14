@@ -413,7 +413,7 @@ The system **MUST** render the call window as one React tree with the dedicated 
 
 **Touches**:
 - Commands: `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `window_navigate`
-- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); XCUITest for non-activation, ⌃⌥⌘N and loaded WebView process recovery (`test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates`); screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`, `presenting`
+- Tests: E2E `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen` (copilot-off variant); host placement tests simulate display unplug and reconnect; XCUITest covers non-activation, ⌃⌥⌘N, window-share exclusion and loaded WebView process recovery (`test_cpt_noter_seq_floating_panel_hide_and_reopen__loaded_web_process_terminates`); screenshot specs `copilot-off`, `collapsed`, `unplugged`, `paused`, `presenting`
 
 ### Capture notices, closing state and controls
 

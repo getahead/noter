@@ -232,7 +232,7 @@ The system **MUST** share the repository list between Settings and the drawer, p
 
 **Touches**:
 - Commands: `repos_list`, `repo_upsert`, `repo_remove`, `handoff_get`
-- Tests: unit prefill, duplicate-key errors, missing path and cross-window refresh; conformance create/edit/remove with folder cancellation; real-core E2E `cpt-noter-seq-call-page-hand-off-item` (No repository mapped) plus Settings mapping command coverage; native folder-panel test; screenshots empty table, missing folder and Add Mapping sheet
+- Tests: unit prefill, duplicate-key errors, missing path and cross-window refresh; conformance create/edit/remove with folder cancellation; real-core E2E `cpt-noter-seq-call-page-hand-off-item` (No repository mapped) plus Settings mapping command coverage; XCUITest opens the real macOS folder panel and cancels it; screenshots empty table, missing folder and Add Mapping sheet
 
 **Completion gate.** Write failing tests first; unit and changed-line coverage meet 80% per side. Conformance runs fake and real; only successful frozen commands and named real-core stories count toward 60%. Native story ids use underscores. Screenshots meet 98%; due performance coverage meets 60% and scenarios stay within 10% of base instructions; trace never falls. `just gate-fast` stays green; `just gate` passes.
 
