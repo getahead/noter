@@ -750,6 +750,73 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn stopping_while_the_engine_restarts_stops_the_engine_session() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let starts = r.sessions().len();
+    r.engine.kill_current();
+    r.sent_n(starts + 1, |command| {
+        matches!(command, EngineCommand::StartSession(_))
+    })
+    .await;
+
+    let stopped = r
+        .core
+        .capture_stop(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(stopped.phase, CapturePhase::Stopped);
+    assert_eq!(stopped.call_id.as_ref(), Some(&call_id));
+    assert!(r.engine.commands().iter().any(|command| matches!(
+        command,
+        EngineCommand::Stop { call_id: stopped_call } if stopped_call == &call_id
+    )));
+}
+
+#[tokio::test(start_paused = true)]
+async fn discarding_while_the_engine_restarts_removes_the_call() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|notice| matches!(notice, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+
+    let starts = r.sessions().len();
+    r.engine.kill_current();
+    r.sent_n(starts + 1, |command| {
+        matches!(command, EngineCommand::StartSession(_))
+    })
+    .await;
+
+    let stops = r.stops();
+    let discard = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_discard(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.answer_stop(&call_id, stops).await;
+    let idle = discard.await.unwrap().unwrap();
+
+    assert_eq!(idle.phase, CapturePhase::Idle);
+    assert_eq!(idle.call_id, None);
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+    assert_eq!(
+        r.sessions().len(),
+        starts + 1,
+        "discarded call did not restart again"
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn continue_appends_to_the_same_call_within_the_window() {
     let r = rig();
     let call_id = r.recording().await;
@@ -854,7 +921,6 @@ async fn continuing_after_archive_completion_removes_the_stale_archive_pass() {
             },
         ])
         .unwrap();
-
     r.core
         .capture_continue(
             &main_window(),
@@ -877,6 +943,52 @@ async fn continuing_after_archive_completion_removes_the_stale_archive_pass() {
         r.query::<i64>("SELECT count(*) FROM speakers WHERE pass = 'archive'"),
         0
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn continued_engine_gaps_are_already_relative_to_the_original_call() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.advance(100_000);
+    r.stop(&main_window(), &call_id).await;
+    r.advance(60_000);
+    r.core
+        .capture_continue(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    r.session_started(&call_id);
+
+    r.inject(EngineEvent::DeviceChanged {
+        call_id: call_id.clone(),
+        device_name: "Headset".into(),
+        gap_from_ms: OffsetMs(162_000),
+        gap_to_ms: OffsetMs(162_500),
+    });
+    r.inject(EngineEvent::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since_ms: OffsetMs(163_000),
+        confidence: 0.8,
+    });
+    r.degraded_until(|states| {
+        states
+            .iter()
+            .any(|state| matches!(state, DegradedState::SystemAudioSilent { .. }))
+    })
+    .await;
+
+    assert_eq!(
+        r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'device_changed'"),
+        "162000-162500"
+    );
+    assert!(r.degraded().await.iter().any(|state| matches!(state,
+        DegradedState::SystemAudioSilent { call_id: id, since, .. }
+            if id == &call_id && *since == TimestampMs(T0 + 163_000)
+    )));
 }
 
 #[tokio::test(start_paused = true)]

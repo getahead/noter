@@ -251,6 +251,7 @@ async fn three_kills_within_30_s_fail_the_capture_and_try_again_resumes_it() {
         ms(1000).await;
         assert_eq!(c.session(), EngineSession::Capturing);
     }
+    let last_resume = starts(&engine).last().unwrap().resume_from_ms.unwrap().0;
     drain(&mut facts);
     ms(5000).await;
     kill(&engine).await;
@@ -259,7 +260,7 @@ async fn three_kills_within_30_s_fail_the_capture_and_try_again_resumes_it() {
     assert_eq!(engine.launches(), 3, "no fourth engine");
     assert_eq!(
         drain(&mut facts),
-        vec![raised(Degraded::CaptureFailed, 17_003)]
+        vec![raised(Degraded::CaptureFailed, last_resume + 6000)]
     );
 
     c.try_again().await.unwrap();
@@ -269,7 +270,11 @@ async fn three_kills_within_30_s_fail_the_capture_and_try_again_resumes_it() {
         drain(&mut facts),
         vec![
             cleared(Degraded::CaptureFailed),
-            gap(17_003, 18_304, GapReason::EngineRestart)
+            gap(
+                last_resume + 6000,
+                last_resume + 7300,
+                GapReason::EngineRestart,
+            )
         ]
     );
 }
@@ -449,6 +454,67 @@ async fn a_device_change_is_a_state_and_a_gap_and_stopping_clears_every_state() 
 }
 
 #[tokio::test(start_paused = true)]
+async fn supervisor_fact_offsets_include_the_resumed_call_base_and_exclude_pause_time() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    let mut resumed = start();
+    resumed.resume_from_ms = Some(OffsetMs(10_000));
+    c.start_session(resumed).await.unwrap();
+    ms(TAPS_OPEN_MS + 1).await;
+    ms(2000).await;
+    c.pause_session().await.unwrap();
+    ms(5000).await;
+    c.resume_session().await.unwrap();
+    ms(1000).await;
+    engine.inject(levels(-120.0, -30.0));
+    ms(1).await;
+
+    assert_eq!(
+        drain(&mut facts),
+        vec![raised(Degraded::MicrophoneOff, 13_001)]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn supervisor_facts_stay_call_relative_after_an_engine_restart() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    capturing(&c).await;
+    ms(2000).await;
+    engine.kill_current();
+    ms(1).await;
+    for _ in 0..100 {
+        if starts(&engine).len() == 2 {
+            break;
+        }
+        ms(1).await;
+    }
+    let resumed_from = starts(&engine)[1].resume_from_ms.unwrap().0;
+    engine.inject(EngineEvent::SessionStarted {
+        call_id: call(),
+        mic_device: "mic".into(),
+        output_device: "out".into(),
+    });
+    ms(1).await;
+    drain(&mut facts);
+    ms(1000).await;
+    engine.inject(levels(-120.0, -30.0));
+    ms(1).await;
+
+    let observed = drain(&mut facts);
+    let [CaptureFact::Degraded {
+        since_ms, state, ..
+    }] = observed.as_slice()
+    else {
+        panic!("unexpected facts after restart: {observed:?}");
+    };
+    assert_eq!(*state, Degraded::MicrophoneOff);
+    assert!((resumed_from + 1000..=resumed_from + 1100).contains(&since_ms.0));
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_session_whose_engine_cannot_launch_is_refused_and_leaves_no_session() {
     let engine = ScriptedEngine::new().with_default(Behaviour {
         launch_fails: true,
@@ -471,11 +537,94 @@ async fn pause_and_resume_only_follow_the_state_machine() {
     engine.kill_current();
     ms(1).await;
     assert_eq!(c.session(), EngineSession::Restarting);
-    assert!(c.pause_session().await.is_err(), "restarting");
+    assert!(
+        c.pause_session().await.is_ok(),
+        "preserve pause during restart"
+    );
     assert!(!engine.commands().iter().any(|c| matches!(
         c,
         EngineCommand::Pause { .. } | EngineCommand::Resume { .. }
     )));
+    ms(TAPS_OPEN_MS + 1).await;
+    assert_eq!(c.session(), EngineSession::Paused);
+    assert!(
+        engine
+            .commands()
+            .iter()
+            .any(|c| matches!(c, EngineCommand::Pause { .. })),
+        "{:?}",
+        engine.commands()
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_during_restart_prevents_the_engine_session_from_resuming() {
+    let engine = ScriptedEngine::new().with_script(script());
+    let c = client(&engine);
+    capturing(&c).await;
+    engine.kill_current();
+    ms(1).await;
+    assert_eq!(c.session(), EngineSession::Restarting);
+
+    assert!(c.stop_session().await.is_ok());
+    assert_eq!(c.session(), EngineSession::Stopped);
+    ms(TAPS_OPEN_MS + 1).await;
+    for _ in 0..100 {
+        if engine
+            .commands()
+            .iter()
+            .any(|c| matches!(c, EngineCommand::Stop { .. }))
+        {
+            break;
+        }
+        ms(1).await;
+    }
+    assert_eq!(c.session(), EngineSession::Stopped);
+    assert!(
+        engine
+            .commands()
+            .iter()
+            .any(|c| matches!(c, EngineCommand::Stop { .. })),
+        "a session started during the stop race must be stopped: {:?}",
+        engine.commands()
+    );
+    let commands = engine.commands();
+    let stop = commands
+        .iter()
+        .position(|command| matches!(command, EngineCommand::Stop { .. }))
+        .unwrap();
+    assert!(
+        !commands[stop + 1..]
+            .iter()
+            .any(|command| matches!(command, EngineCommand::StartSession(_))),
+        "a restart must not start a session after Stop: {commands:?}"
+    );
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|command| matches!(command, EngineCommand::Stop { .. }))
+            .count(),
+        1,
+        "stopping a restart should send one stop command: {commands:?}"
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn an_error_reply_to_restart_start_session_counts_toward_capture_failure() {
+    let engine = ScriptedEngine::new()
+        .with_script(script())
+        .then(Behaviour::default())
+        .then(Behaviour {
+            reject: true,
+            ..Behaviour::default()
+        });
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    capturing(&c).await;
+    engine.kill_current();
+    ms(1).await;
+    assert_eq!(c.session(), EngineSession::Failed);
+    assert!(drain(&mut facts).contains(&raised(Degraded::CaptureFailed, 0)));
 }
 
 #[tokio::test(start_paused = true)]

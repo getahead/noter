@@ -199,13 +199,15 @@ public final class EngineLoop: @unchecked Sendable {
             session.capture.pause()
             writer.emit(.ack(cmdId: command.id))
         case .resume:
-            session.capture.resume()
+            // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-resumed
             do {
                 try session.audio.start { session.capture.feed($0) }
+                session.capture.resume()
                 writer.emit(.ack(cmdId: command.id))
             } catch {
                 writer.emit(.error(cmdId: command.id, code: .deviceUnavailable, message: "\(error)"))
             }
+            // @cpt-end:cpt-noter-state-core-engine-capture-session:p1:inst-st-resumed
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-if-pause
         // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case .stop:

@@ -2,7 +2,7 @@
 title: "Feature: Engine capture, live ASR and capture-first restart"
 description: "Both channels on one clock into a crash-safe ring, live transcription with language ID and filters, the facts the session manager needs, replay playback, and a capture-first restart with at most a 2 s gap."
 status: PROPOSED
-version: "0.2"
+version: "0.3"
 date: "2026-10-18"
 milestone: M1
 lane: engine
@@ -149,7 +149,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 2. [x] - `p1` - Supervisor respawns the engine and sends `start_session` with the same `call_id` and `resume_from_ms` = the ring's last written offset - `inst-respawn`
 3. [x] - `p1` - Engine opens the taps first, then loads the models, then resumes decoding from the ring - `inst-capture-first`
 4. [x] - `p1` - Supervisor reports a gap `engine_restart` from the last confirmed audio to the resumed offset - `inst-report-gap`
-5. [x] - `p1` - **IF** the restart fails three times within 30 s - `inst-if-restart-fails`
+5. [x] - `p1` - **IF** the restart fails three times within 30 s, or `start_session` returns an explicit error - `inst-if-restart-fails`
    1. [x] - `p1` - **RETURN** `CaptureFailed { call_id, since }` to the session manager - `inst-return-failed`
 6. [x] - `p1` - **RETURN** session running again - `inst-return-recovered`
 
@@ -232,10 +232,10 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Output**: Degraded states for the session manager to publish.
 
 **Steps**:
-1. [x] - `p1` - `no_segments` for 10 s while levels show audio → `TranscriptionStalled`; a `stalled` gap if it lasts - `inst-stalled`
-2. [x] - `p1` - `system_audio_silent` → `SystemAudioSilent { call_id, since, confidence }` - `inst-silent`
+1. [x] - `p1` - `no_segments` for 10 s while levels show audio → `TranscriptionStalled`; a `stalled` gap if it lasts; supervisor-generated offsets include the resumed call base and exclude paused time - `inst-stalled`
+2. [x] - `p1` - `system_audio_silent` → `SystemAudioSilent { call_id, since, confidence }` with its call-relative `since_ms` unchanged - `inst-silent`
 3. [x] - `p1` - Microphone `device_unavailable` or silent microphone while the system channel speaks → `MicrophoneOff { call_id }` - `inst-mic-off`
-4. [x] - `p1` - `device_changed` → `DeviceChanged` and a `device_changed` gap from `gap_from_ms` to `gap_to_ms` - `inst-device`
+4. [x] - `p1` - `device_changed` → `DeviceChanged` and a `device_changed` gap from its call-relative `gap_from_ms` to `gap_to_ms`, without an additional session offset - `inst-device`
 5. [x] - `p1` - Engine restart → an `engine_restart` gap; failure → `CaptureFailed` - `inst-restart-states`
 6. [x] - `p1` - **RETURN** the states; clearing a state is the same rule in reverse - `inst-return-degraded`
 
@@ -253,13 +253,13 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 1. [x] - `p1` - **FROM** idle **TO** starting **WHEN** `start_session` is sent - `inst-st-starting`
 2. [x] - `p1` - **FROM** starting **TO** capturing **WHEN** `session_started` arrives - `inst-st-capturing`
 3. [x] - `p1` - **FROM** capturing **TO** paused **WHEN** `pause` is acknowledged - `inst-st-paused`
-4. [x] - `p1` - **FROM** paused **TO** capturing **WHEN** `resume` is acknowledged - `inst-st-resumed`
-5. [x] - `p1` - **FROM** capturing **TO** restarting **WHEN** the engine process dies - `inst-st-restarting`
+4. [x] - `p1` - **FROM** paused **TO** capturing **WHEN** audio starts and `resume` is acknowledged; if audio start fails, stay paused with the gap open - `inst-st-resumed`
+5. [x] - `p1` - **FROM** capturing **TO** restarting **WHEN** the engine process dies; keep any pause requested during restart - `inst-st-restarting`
 6. [x] - `p1` - **FROM** restarting **TO** capturing **WHEN** the capture-first restart resumed from the ring - `inst-st-recovered`
 7. [x] - `p1` - **FROM** restarting **TO** failed **WHEN** the engine cannot be restarted - `inst-st-failed`
 8. [x] - `p1` - **FROM** failed **TO** restarting **WHEN** the user presses **Try Again** - `inst-st-try-again`
 9. [x] - `p1` - **FROM** capturing **TO** stopping **WHEN** `stop` is sent - `inst-st-stopping`
-10. [x] - `p1` - **FROM** stopping **TO** stopped **WHEN** `session_stopped` arrives - `inst-st-stopped`
+10. [x] - `p1` - **FROM** stopping **TO** stopped **WHEN** `session_stopped` arrives or a pending restart is canceled by Stop - `inst-st-stopped`
 
 ## 5. Definitions of Done
 
@@ -376,4 +376,5 @@ The system **MUST** play spans natively on `play` with positions reported and it
 
 ## Change log
 
+- **0.3 (13 Nov 2026)**: Clarify call-relative fact offsets, restart error handling, stop and pause during restart, and failed resume behavior under the existing engine flow and state contracts. `just gate` passes.
 - **0.2 (13 Nov 2026)**: Clarify clean-stop ring cleanup under the existing capture-session stop instruction and pipeline DoD. `CaptureTests` verifies both storage modes through `EngineLoop`, inspecting both mapped channels and the on-disk PCM; `CaptureTests` also verifies a successor session survives the previous session finishing. Existing crash-recovery tests retain their recovery guarantee. No IPC or UI story changes; conformance and E2E coverage remain the existing capture-session suites (`cpt-noter-seq-call-screen-recover-capture`). Completion requires `just gate` passes.

@@ -131,9 +131,6 @@ pub(crate) struct Session {
     pub(crate) kept_sources: Vec<String>,
     /// The stop under way was the countdown's, not the user's.
     pub(crate) auto_stop: bool,
-    /// Call offset of the engine session's offset 0 (its first `session_started`); the
-    /// supervisor's gaps and degraded states count from there.
-    pub(crate) engine_base: Option<i64>,
 }
 
 /// Where a new call starts: when, under which title, and from which meeting app.
@@ -571,7 +568,6 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-start
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-phase-starting
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-engine
-        session.engine_base = None;
         if self.engine.start_session(start).await.is_err() {
             // Never refused (O1): the call stays; Stop ends it, Try Again restarts the engine.
             session.failed_at = Some(now);
@@ -604,9 +600,6 @@ impl Core {
             EngineEvent::SessionStarted { call_id, .. } => {
                 let mut session = self.capture.lock().await;
                 let state = self.capture_now();
-                if state.call_id.as_ref() == Some(&call_id) && session.engine_base.is_none() {
-                    session.engine_base = Some(session.offset(self.deps.clock.now().0));
-                }
                 // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-phase-recording
                 // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-recording
                 if state.phase == CapturePhase::Starting && state.call_id == Some(call_id) {
@@ -799,7 +792,9 @@ impl Core {
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
         if state.phase != CapturePhase::Failed {
             drop(session);
-            if self.engine.stop_session().await.is_ok() {
+            if self.engine.stop_session().await.is_ok()
+                && self.engine.session() != noter_engine_client::EngineSession::Stopped
+            {
                 self.phase_leaves(CapturePhase::Stopping).await;
             }
             session = self.capture.lock().await;
@@ -965,7 +960,6 @@ impl Core {
             c.recorded_ms = recorded;
         });
         self.listen_for_speech(&mut session);
-        session.engine_base = None;
         if self.engine.start_session(start).await.is_err() {
             session.failed_at = Some(now);
             return Ok(self.set_capture(|c| c.phase = CapturePhase::Failed));
