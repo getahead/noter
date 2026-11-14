@@ -509,7 +509,10 @@ impl<L: EngineLauncher> EngineClient<L> {
                     // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-capturing
                     // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-recovered
                     // A session paused before a crash stays paused (its `pause` is sent again).
-                    x.state = if x.paused {
+                    x.state = if resumed && x.paused {
+                        // Keep controls unavailable until the re-pause command is acknowledged.
+                        EngineSession::Restarting
+                    } else if x.paused {
                         EngineSession::Paused
                     } else {
                         EngineSession::Capturing
@@ -605,24 +608,43 @@ impl<L: EngineLauncher> EngineClient<L> {
         if let Some(call_id) = pause_after_restart {
             let client = self.clone();
             tokio::spawn(async move {
-                let still_paused = client.shared().session.as_ref().is_some_and(|x| {
-                    x.state == EngineSession::Paused && x.paused && x.start.call_id == call_id
-                });
-                if !still_paused {
-                    return;
-                }
-                if client
-                    .command(EngineCommand::Pause {
-                        call_id: call_id.clone(),
-                    })
+                let expected_call_id = call_id.clone();
+                let paused = client
+                    .command_with(
+                        EngineCommand::Pause {
+                            call_id: call_id.clone(),
+                        },
+                        move |shared, _| {
+                            shared
+                                .session
+                                .as_ref()
+                                .is_some_and(|x| {
+                                    x.state == EngineSession::Restarting
+                                        && x.paused
+                                        && x.start.call_id == expected_call_id
+                                })
+                                .then_some(())
+                                .ok_or(CommandError::Unavailable)
+                        },
+                    )
                     .await
-                    .is_err()
-                {
+                    .is_ok();
+                if paused {
+                    if let Some(x) = client.shared().session.as_mut().filter(|x| {
+                        x.state == EngineSession::Restarting
+                            && x.paused
+                            && x.start.call_id == call_id
+                    }) {
+                        x.state = EngineSession::Paused;
+                    }
+                } else {
                     let mut facts = Vec::new();
                     {
                         let mut shared = client.shared();
                         if let Some(x) = shared.session.as_mut().filter(|x| {
-                            x.state == EngineSession::Paused && x.start.call_id == call_id
+                            x.state == EngineSession::Restarting
+                                && x.paused
+                                && x.start.call_id == call_id
                         }) {
                             x.give_up(&mut facts);
                             shared.state = EngineState::Unavailable;
@@ -639,7 +661,7 @@ impl<L: EngineLauncher> EngineClient<L> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use noter_protocol::engine::AsrBackend;
+    use noter_protocol::engine::{AsrBackend, EngineEvent};
 
     fn start() -> StartSession {
         StartSession {
@@ -684,5 +706,42 @@ mod tests {
             .await
             .is_err());
         assert_eq!(engine.commands().len(), before);
+    }
+
+    #[tokio::test]
+    async fn a_paused_restart_stays_unavailable_until_the_repause_is_acknowledged() {
+        let engine = crate::scripted::ScriptedEngine::new();
+        let client = EngineClient::new(engine.clone(), crate::Config::default());
+        client.start_session(start()).await.unwrap();
+        client.shared().session.as_mut().unwrap().state = EngineSession::Restarting;
+        {
+            let mut shared = client.shared();
+            let session = shared.session.as_mut().unwrap();
+            session.paused = true;
+            session.paused_at = Some(Instant::now());
+        }
+
+        client.on_capture_event(&EngineEvent::SessionStarted {
+            call_id: CallId::new("call_1"),
+            mic_device: "mic".into(),
+            output_device: "output".into(),
+        });
+        assert_eq!(client.session(), EngineSession::Restarting);
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if client.session() == EngineSession::Paused
+                    && engine
+                        .commands()
+                        .iter()
+                        .any(|command| matches!(command, EngineCommand::Pause { .. }))
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("restart should acknowledge its pause command");
     }
 }
