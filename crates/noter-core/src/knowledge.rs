@@ -226,8 +226,8 @@ impl Core {
     }
 
     // @cpt-flow:cpt-noter-flow-core-knowledge-remove:p1
-    /// Stops the source's sync and watcher, then removes it with its whole local index; a
-    /// failed removal keeps the source and watches it again.
+    /// Stops the source's sync and watcher, then removes its local index in resumable batches.
+    /// A failure before cleanup starts restores the watcher; an interrupted cleanup stays unwatched.
     pub(crate) fn remove_source(
         &self,
         ctx: &CommandCtx,
@@ -266,7 +266,18 @@ impl Core {
             Ok(result) => result,
             Err(e) => {
                 let back = id.clone();
-                if let Ok(Some(row)) = self.store().read(move |c| noter_knowledge::get(c, &back)) {
+                let restored = self.store().read(move |c| {
+                    let Some(row) = noter_knowledge::get(c, &back)? else {
+                        return Ok(None);
+                    };
+                    let removing = c.query_row(
+                        "SELECT removing FROM sources WHERE id = ?1",
+                        [back.as_str()],
+                        |row| row.get::<_, i64>(0),
+                    )?;
+                    Ok(Some((row, removing)))
+                });
+                if let Ok(Some((row, 0))) = restored {
                     self.watch_source(&row);
                 }
                 return Err(e);
