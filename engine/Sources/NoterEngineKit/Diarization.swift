@@ -105,6 +105,54 @@ private struct TensorFile: Decodable {
 }
 
 enum Diarization {
+    private struct ClusterPair {
+        let distance: Double
+        let first: Int
+        let second: Int
+
+        static func precedes(_ lhs: ClusterPair, _ rhs: ClusterPair) -> Bool {
+            if lhs.distance != rhs.distance { return lhs.distance < rhs.distance }
+            if lhs.first != rhs.first { return lhs.first < rhs.first }
+            return lhs.second < rhs.second
+        }
+    }
+
+    private struct ClusterPairHeap {
+        private var values: [ClusterPair] = []
+
+        var first: ClusterPair? { values.first }
+
+        mutating func push(_ value: ClusterPair) {
+            values.append(value)
+            var child = values.count - 1
+            while child > 0 {
+                let parent = (child - 1) / 2
+                guard ClusterPair.precedes(values[child], values[parent]) else { break }
+                values.swapAt(child, parent)
+                child = parent
+            }
+        }
+
+        @discardableResult
+        mutating func pop() -> ClusterPair? {
+            guard !values.isEmpty else { return nil }
+            if values.count == 1 { return values.removeLast() }
+            let first = values[0]
+            values[0] = values.removeLast()
+            var parent = 0
+            while true {
+                let left = parent * 2 + 1
+                guard left < values.count else { break }
+                let right = left + 1
+                let child = right < values.count && ClusterPair.precedes(values[right], values[left]) ? right : left
+                guard ClusterPair.precedes(values[child], values[parent]) else { break }
+                values.swapAt(parent, child)
+                parent = child
+            }
+            return first
+        }
+    }
+
     /// pyannote's window: 10 s at 16 kHz.
     static let window = 160_000
     /// A speaker with less speech alone in a window has no vector; their words take the voice
@@ -221,9 +269,8 @@ enum Diarization {
     /// Centroid-linkage clustering of the normalised vectors (Lance-Williams on squared
     /// distances), joining while the closest two are within `threshold`: the clusters in order of
     /// first member.
-    /// Each active cluster caches its nearest neighbour. After a merge, only the merged
-    /// cluster and rows whose cached neighbour was removed need a full nearest-neighbour scan;
-    /// all other rows compare the newly computed distance once.
+    /// A lazy min-heap keeps candidate pairs ordered. Merges update one row of the distance
+    /// matrix and add O(n) candidates; stale pairs are discarded when they reach the top.
     static func ahc(_ x: [[Double]], threshold: Double) -> [Int] {
         let x = x.map { scaled($0, to: 1) }
         let n = x.count
@@ -231,24 +278,19 @@ enum Diarization {
             x.map { b in zip(a, b).reduce(0.0) { (sum: Double, p: (Double, Double)) -> Double in sum + (p.0 - p.1) * (p.0 - p.1) } }
         }
         var (size, parent, alive) = (Array(repeating: 1.0, count: n), Array(0..<n), Array(repeating: true, count: n))
-        var nearest = Array(repeating: -1, count: n)
-        var nearestDistance = Array(repeating: Double.infinity, count: n)
-        func refresh(_ i: Int) {
-            var (best, neighbor) = (Double.infinity, -1)
-            for j in 0..<n where alive[j] && i != j {
-                if d[i][j] < best { (best, neighbor) = (d[i][j], j) }
-            }
-            (nearest[i], nearestDistance[i]) = (neighbor, best)
+        var candidates = ClusterPairHeap()
+        for i in 0..<n {
+            for j in (i + 1)..<n { candidates.push(ClusterPair(distance: d[i][j], first: i, second: j)) }
         }
-        for i in 0..<n where alive[i] { refresh(i) }
         while true {
-            var (bi, bj, best) = (0, 0, Double.infinity)
-            for i in 0..<n where alive[i] && nearest[i] >= 0 {
-                if nearestDistance[i] < best {
-                    (bi, bj, best) = (min(i, nearest[i]), max(i, nearest[i]), nearestDistance[i])
-                }
+            while let pair = candidates.first,
+                !alive[pair.first] || !alive[pair.second] || d[pair.first][pair.second] != pair.distance
+            {
+                candidates.pop()
             }
-            guard best.squareRoot() <= threshold else { break }
+            guard let pair = candidates.first, pair.distance.squareRoot() <= threshold else { break }
+            candidates.pop()
+            let (bi, bj, best) = (pair.first, pair.second, pair.distance)
             let (ni, nj): (Double, Double) = (size[bi], size[bj])
             let m: Double = ni + nj
             let pull: Double = ni * nj * best / (m * m)
@@ -258,12 +300,8 @@ enum Diarization {
                 d[k][bi] = d[bi][k]
             }
             (size[bi], alive[bj], parent[bj]) = (ni + nj, false, bi)
-            for i in 0..<n where alive[i] {
-                if i == bi || nearest[i] == bi || nearest[i] == bj {
-                    refresh(i)
-                } else if d[i][bi] < nearestDistance[i] || (d[i][bi] == nearestDistance[i] && bi < nearest[i]) {
-                    (nearest[i], nearestDistance[i]) = (bi, d[i][bi])
-                }
+            for k in 0..<n where alive[k] && k != bi {
+                candidates.push(ClusterPair(distance: d[bi][k], first: min(bi, k), second: max(bi, k)))
             }
         }
         func root(_ i: Int) -> Int { parent[i] == i ? i : root(parent[i]) }

@@ -218,6 +218,53 @@ final class DiarizationTests: XCTestCase {
         XCTAssertEqual(Diarization.ahc(x, threshold: 2), [0, 0, 0, 0])
     }
 
+    func testAgglomerativeHeapMatchesCentroidReferenceWithTiesAndStalePairs() {
+        let vectors: [[Double]] = [[1, 0], [0, 1], [-1, 0], [0, -1], [0.7, 0.7], [-0.7, -0.7]]
+        for threshold in [0.05, 0.15, 0.4, 1.2] {
+            XCTAssertEqual(Diarization.ahc(vectors, threshold: threshold), referenceAHC(vectors, threshold: threshold))
+        }
+    }
+
+    private func referenceAHC(_ vectors: [[Double]], threshold: Double) -> [Int] {
+        let x = vectors.map { row in
+            let norm = sqrt(row.reduce(0) { $0 + $1 * $1 })
+            return norm > 0 ? row.map { $0 / norm } : row
+        }
+        let n = x.count
+        var d = x.map { a in x.map { b in zip(a, b).reduce(0.0) { $0 + ($1.0 - $1.1) * ($1.0 - $1.1) } } }
+        var size = Array(repeating: 1.0, count: n)
+        var parent = Array(0..<n)
+        var alive = Array(repeating: true, count: n)
+        while true {
+            var (bi, bj, best) = (0, 0, Double.infinity)
+            for i in 0..<n where alive[i] {
+                for j in (i + 1)..<n where alive[j] {
+                    if d[i][j] < best { (bi, bj, best) = (i, j, d[i][j]) }
+                }
+            }
+            guard best.squareRoot() <= threshold else { break }
+            let (ni, nj) = (size[bi], size[bj])
+            let m = ni + nj
+            let pull = ni * nj * best / (m * m)
+            for k in 0..<n where alive[k] && k != bi && k != bj {
+                d[bi][k] = max(0, (ni * d[bi][k] + nj * d[bj][k]) / m - pull)
+                d[k][bi] = d[bi][k]
+            }
+            size[bi] = m
+            alive[bj] = false
+            parent[bj] = bi
+        }
+        func root(_ i: Int) -> Int { parent[i] == i ? i : root(parent[i]) }
+        var labels: [Int: Int] = [:]
+        return (0..<n).map { i in
+            let r = root(i)
+            if let label = labels[r] { return label }
+            let label = labels.count
+            labels[r] = label
+            return label
+        }
+    }
+
     func testAssignmentKeepsCannotLinks() {
         let x: [[Double]] = [[1, 0], [1, 0.1], [0, 1]]
         let centroids: [[Double]] = [[1, 0], [0, 1]]
