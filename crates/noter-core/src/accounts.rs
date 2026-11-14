@@ -306,12 +306,16 @@ impl Accounts {
         &self,
         meta: ChangeMeta,
         provider: AccountProvider,
+        identity: &AccountIdentity,
         at: TimestampMs,
     ) -> Result<(), CoreError> {
         let mut state = lock(&self.state);
         let Some(connection) = state.connections.get(&provider) else {
             return Ok(());
         };
+        if &connection.identity != identity || connection.ended_at.is_some() {
+            return Ok(());
+        }
         let mut connections = state.connections.clone();
         connections.insert(
             provider,
@@ -329,12 +333,13 @@ impl Accounts {
         &self,
         meta: ChangeMeta,
         provider: AccountProvider,
+        identity: &AccountIdentity,
     ) -> Result<(), CoreError> {
         let mut state = lock(&self.state);
         let Some(connection) = state.connections.get(&provider) else {
             return Ok(());
         };
-        if connection.ended_at.is_none() {
+        if &connection.identity != identity || connection.ended_at.is_none() {
             return Ok(());
         }
         let mut connections = state.connections.clone();

@@ -2,7 +2,9 @@
 //! binding, the account test and sign-out, on the scripted account CLI, the scripted runtime,
 //! the in-memory Keychain stand-in and tokio's paused time.
 
+use std::future::Future;
 use std::path::Path;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -15,6 +17,8 @@ use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::Value;
+
+type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 const T0: i64 = 1_790_000_000_000;
 const CODE: &str = "ABCD-9137-ONE-TIME";
@@ -58,24 +62,74 @@ struct World {
     core: Arc<Core>,
     events: Arc<Events>,
     cli: ScriptedAccountCli,
+    gated_cli: Arc<GatedStatusCli>,
     scripted: Scripted,
+}
+
+#[derive(Default)]
+struct GatedStatusCli {
+    inner: ScriptedAccountCli,
+    hold_next: std::sync::atomic::AtomicBool,
+    started: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+}
+
+impl AccountCli for GatedStatusCli {
+    fn status(&self, tool: CliTool) -> BoxFuture<'_, noter_llm::CliStatus> {
+        let inner = self.inner.clone();
+        Box::pin(async move {
+            let status = inner.status(tool).await;
+            if self.hold_next.swap(false, Ordering::SeqCst) {
+                self.started.notify_one();
+                self.release.notified().await;
+            }
+            status
+        })
+    }
+
+    fn login(
+        &self,
+        provider: AccountProvider,
+    ) -> BoxFuture<'_, Result<noter_llm::LoginStart, noter_llm::CliError>> {
+        self.inner.login(provider)
+    }
+
+    fn cancel(&self, provider: AccountProvider) {
+        self.inner.cancel(provider);
+    }
+
+    fn logout(&self, provider: AccountProvider) -> BoxFuture<'_, Result<(), noter_llm::CliError>> {
+        self.inner.logout(provider)
+    }
+
+    fn install(
+        &self,
+        tool: CliTool,
+    ) -> BoxFuture<'_, Result<noter_llm::CliStatus, noter_llm::CliError>> {
+        self.inner.install(tool)
+    }
 }
 
 fn open(dir: &Path, script: Option<&str>) -> World {
     let events = Arc::new(Events::default());
     let cli = ScriptedAccountCli::new();
+    let gated_cli = Arc::new(GatedStatusCli {
+        inner: cli.clone(),
+        ..GatedStatusCli::default()
+    });
     let clock = Arc::new(TickClock(AtomicI64::new(T0)));
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
     let deps = CoreDeps::new(clock, events.clone())
         .with_llm(Adapters::scripted(&scripted))
         .with_secrets(Arc::new(MemorySecrets::default()))
-        .with_account_cli(Arc::new(cli.clone()));
+        .with_account_cli(gated_cli.clone());
     let core = Arc::new(Core::open(dir, deps).expect("core opens"));
     core.start_first_run();
     World {
         core,
         events,
         cli,
+        gated_cli,
         scripted,
     }
 }
@@ -721,4 +775,48 @@ async fn an_unknown_probe_preserves_sign_in_and_a_confirmed_identity_recovers_it
             "identity":{"email":"ann@example.com","plan":"Max"}}"#,
     );
     assert!(is_signed_in(&view(&w).await, CLAUDE));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_stale_provider_probe_cannot_end_a_replacement_identity() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    claude(&w, "Max", 0);
+    connect(&w, CLAUDE, true).await;
+
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","auth_known":true}"#,
+    );
+    w.gated_cli.hold_next.store(true, Ordering::SeqCst);
+    let core = w.core.clone();
+    let old_refresh =
+        tokio::spawn(async move { core.accounts_get(&from(WindowLabel::Main), NoArgs {}).await });
+    w.gated_cli.started.notified().await;
+
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296",
+            "identity":{"email":"new@example.com","plan":"Max"},
+            "login_identity":{"email":"new@example.com","plan":"Max"}}"#,
+    );
+    w.core
+        .account_signin_start(&settings(), start(CLAUDE, true))
+        .await
+        .unwrap();
+    wait(1_000).await;
+    assert_eq!(w.events.progress("claude").last().unwrap(), "done");
+
+    w.gated_cli.release.notify_one();
+    let refreshed = old_refresh.await.unwrap().unwrap();
+    assert_eq!(
+        status(&refreshed, CLAUDE),
+        AccountStatus::SignedIn {
+            identity: AccountIdentity {
+                email: "new@example.com".into(),
+                plan: "Max".into(),
+            },
+            since: TimestampMs(T0),
+        }
+    );
 }

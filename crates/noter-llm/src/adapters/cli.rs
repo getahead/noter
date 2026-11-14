@@ -70,12 +70,14 @@ impl Cli {
     }
 
     pub fn availability(&self, runtime: RuntimeChoice, api_key: bool) -> Availability {
-        let version = if let Some(version) = lock(&self.version).clone() {
-            version
-        } else {
-            let detected = self.probe();
-            let mut cached = lock(&self.version);
-            cached.get_or_insert(detected).clone()
+        let cached = lock(&self.version).clone();
+        let version = match cached {
+            Some(version) => version,
+            None => {
+                let detected = self.probe();
+                let mut cached = lock(&self.version);
+                cached.get_or_insert(detected).clone()
+            }
         };
         let unavailable = if version.is_none() {
             Some(RuntimeUnavailableReason::CliMissing)
@@ -469,6 +471,37 @@ mod account_tests {
         assert_eq!(claude_identity("not json"), None);
         assert_eq!(claude_auth_status(r#"{"loggedIn":false}"#), Some(None));
         assert_eq!(claude_auth_status("not json"), None);
+    }
+
+    #[test]
+    fn first_availability_probe_releases_the_cache_lock_before_probing() {
+        use std::os::unix::fs::PermissionsExt;
+        use std::sync::mpsc;
+        use std::thread;
+
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("claude");
+        std::fs::write(&program, "#!/bin/sh\necho '2.1.296 (Claude Code)'\n").unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let cli = Arc::new(Cli::new(
+            CliConfig {
+                program,
+                home: dir.path().join("home"),
+                run_root: dir.path().join("runs"),
+                signed_in: false,
+                models: vec![],
+            },
+            super::super::claude_code::TESTED,
+        ));
+        let (send, receive) = mpsc::channel();
+        thread::spawn(move || {
+            let result = cli.availability(RuntimeChoice::ClaudeApiKey, true);
+            let _ = send.send(result);
+        });
+        let result = receive
+            .recv_timeout(PROBE_TIMEOUT + Duration::from_secs(1))
+            .expect("cold-cache availability must not deadlock while probing");
+        assert_eq!(result.version.as_deref(), Some("2.1.296"));
     }
 
     #[test]

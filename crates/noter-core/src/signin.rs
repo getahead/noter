@@ -125,7 +125,9 @@ impl Core {
                 meta.undoable = false;
                 let at = self.deps.clock.now();
                 // A write that fails leaves the account looking signed in until the next read.
-                let _ = self.accounts.ended(meta, provider, at);
+                let _ = self
+                    .accounts
+                    .ended(meta, provider, &connection.identity, at);
             } else if status.installed
                 && status.auth_known
                 && status.identity.as_ref() == Some(&connection.identity)
@@ -136,7 +138,7 @@ impl Core {
                     "provider_session_recovered",
                 );
                 meta.undoable = false;
-                let _ = self.accounts.revived(meta, provider);
+                let _ = self.accounts.revived(meta, provider, &connection.identity);
             }
             // @cpt-end:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
             // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
