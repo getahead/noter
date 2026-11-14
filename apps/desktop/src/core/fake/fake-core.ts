@@ -21,6 +21,7 @@ import {
   DEFAULT_RETRYABLE,
   isCoreError,
   type CallWindowState,
+  type CardView,
   type ChannelCommand,
   type ChannelMessages,
   type CommandArgs,
@@ -32,12 +33,13 @@ import {
   type EventName,
   type EventPayloads,
   type FakeWorld,
+  type HandoffView,
   type PlaybackState,
   type StreamEndReason,
   type Transport,
   type WindowLabel,
 } from "../bindings";
-import { defaultHandlers } from "./handlers";
+import { createDefaultHandlers } from "./handlers";
 import worldJson from "../../../../../contracts/fixtures/world.json";
 
 export type World = FakeWorld;
@@ -89,8 +91,20 @@ export interface FakeCoreOptions {
 
 type Listener = (payload: unknown) => void;
 
-/** One shared bus so several FakeCore windows in one test see each other's events. */
-const bus = new Map<EventName, Set<Listener>>();
+export interface HandlerState {
+  counter: number;
+  lastCardAction: { card_id: string; state: CardView["state"]; number: number | null; item_id: string | null; at: number } | null;
+  handoffEdits: Map<string, string>;
+  handoffRevs: Map<string, number>;
+  handoffTargets: Map<string, HandoffView["target"]>;
+  handoffGenerating: Map<string, FakeCore>;
+  skills: Map<string, { rev: number; body: string }>;
+  shareWarningSeen: boolean;
+}
+
+function createHandlerState(): HandlerState {
+  return { counter: 0, lastCardAction: null, handoffEdits: new Map(), handoffRevs: new Map([["itm_replay", 1]]), handoffTargets: new Map(), handoffGenerating: new Map(), skills: new Map(), shareWarningSeen: false };
+}
 
 interface OpenChannel {
   cmd: ChannelCommand;
@@ -125,17 +139,20 @@ export class FakeCore implements Transport {
   viewedCall: string | null = null;
   /** Highest `seq` acknowledged per subscription (`stream_ack`). */
   readonly acks = new Map<string, number>();
+  handlerState: HandlerState;
   private handlers: Handlers;
   private failures = new Map<CommandName, CoreError[]>();
   private timers = new Set<ReturnType<typeof setTimeout>>();
   private channels = new Map<string, OpenChannel>();
+  private listeners = new Map<EventName, Set<Listener>>();
 
   constructor(opts: FakeCoreOptions) {
     this.window = opts.window;
     this.world = opts.world ?? structuredClone(worldJson as unknown as World);
+    this.handlerState = [...(coresByWorld.get(this.world) ?? [])][0]?.handlerState ?? createHandlerState();
     registerCore(this, this.world);
     this.latency = opts.latency ?? 0;
-    this.handlers = { ...defaultHandlers, ...opts.handlers };
+    this.handlers = { ...createDefaultHandlers(this), ...opts.handlers };
     const cap = this.world.app.capture;
     this.playback = { version: 1, playing: false, call_id: null, position_ms: 0, to_ms: null, route: cap.output_route, stopped_reason: null };
     this.callWindow = { version: 1, visible: cap.phase === "recording", key: false, layout: "dedicated", collapsed: false, display_id: this.world.settings.call_screen.display_id ?? null, chosen_display_missing: false, show_share_warning: false };
@@ -161,7 +178,8 @@ export class FakeCore implements Transport {
 
   /** Emit an event to every listener (all fake windows). */
   emit<E extends EventName>(event: E, payload: EventPayloads[E]): void {
-    bus.get(event)?.forEach((h) => h(structuredClone(payload)));
+    for (const core of coresByWorld.get(this.world) ?? [this])
+      core.listeners.get(event)?.forEach((h) => h(structuredClone(payload)));
   }
 
   /** The world slice (or core state) a whole-state event carries. */
@@ -222,6 +240,7 @@ export class FakeCore implements Transport {
     else {
       coresByWorld.get(this.world)?.delete(this);
       this.world = structuredClone(change);
+      this.handlerState = [...(coresByWorld.get(this.world) ?? [])][0]?.handlerState ?? createHandlerState();
       registerCore(this, this.world);
     }
     for (const e of events) {
@@ -308,7 +327,10 @@ export class FakeCore implements Transport {
   dispose(): void {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
+    for (const [item, owner] of this.handlerState.handoffGenerating)
+      if (owner === this) this.handlerState.handoffGenerating.delete(item);
     this.channels.clear();
+    this.listeners.clear();
     coresByWorld.get(this.world)?.delete(this);
   }
 
@@ -346,9 +368,12 @@ export class FakeCore implements Transport {
   }
 
   async listen(event: EventName, handler: (payload: unknown) => void): Promise<() => void> {
-    const set = bus.get(event) ?? new Set<Listener>();
+    const set = this.listeners.get(event) ?? new Set<Listener>();
     set.add(handler);
-    bus.set(event, set);
-    return () => set.delete(handler);
+    this.listeners.set(event, set);
+    return () => {
+      set.delete(handler);
+      if (!set.size) this.listeners.delete(event);
+    };
   }
 }

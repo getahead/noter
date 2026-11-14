@@ -16,6 +16,103 @@ afterEach(() => {
 });
 
 describe("fake core stream and record parity", () => {
+  it("does not carry handoff edits into a fresh core with a fresh world", async () => {
+    const first = core("main");
+    await first.invoke("handoff_edit", { item_id: "itm_replay", rev: 1, prompt_md: "private edit" });
+
+    const second = core("main");
+    const handoff = await second.invoke("handoff_get", { item_id: "itm_replay" }) as { rev: number; edited: boolean; prompt_md: string };
+
+    expect(handoff).toMatchObject({ rev: 1, edited: false });
+    expect(handoff.prompt_md).not.toContain("private edit");
+  });
+
+  it("rebinds handler state when a core replaces its world", async () => {
+    const first = core("main");
+    await first.invoke("handoff_edit", { item_id: "itm_replay", rev: 1, prompt_md: "old world edit" });
+    const fresh = core("main");
+
+    first.setWorld(fresh.world);
+    const handoff = await first.invoke("handoff_get", { item_id: "itm_replay" }) as { edited: boolean; prompt_md: string };
+    expect(handoff).toMatchObject({ edited: false });
+    expect(handoff.prompt_md).not.toContain("old world edit");
+  });
+
+  it("partially redoes speaker naming without replacing output text edited after undo", async () => {
+    const fake = core("main");
+    const api = createCore(fake);
+    const call = await api.callGet({ call_id: "call_backend" });
+    expect(call.status).toBe("ok");
+    if (call.status !== "ok") return;
+    const speaker = call.data.speakers.find((item) => item.label.type === "person");
+    expect(speaker).toBeDefined();
+    if (!speaker) return;
+    const output = await api.outputsGet({ call_id: "call_backend" });
+    expect(output.status).toBe("ok");
+    if (output.status !== "ok") return;
+    const summary = output.data.sections.find((item) => item.kind === "summary");
+    expect(summary).toBeDefined();
+    if (!summary?.rev || !summary.summary_id) return;
+    const summaryId = summary.summary_id;
+
+    expect((await api.outputEdit({ call_id: "call_backend", summary_id: summaryId, rev: summary.rev, body_md: `${speaker.label.type === "person" ? speaker.label.person.display_name : ""} owns this.` })).status).toBe("ok");
+    const named = await api.transcriptNameSpeakers({ call_id: "call_backend", assignments: [{ speaker_id: speaker.id, person: { type: "new", display_name: "Renamed Person" } }] });
+    expect(named.status).toBe("ok");
+    if (named.status !== "ok") return;
+    const target = { type: "change" as const, change_id: named.data.change_id };
+    expect((await api.changeUndo({ target })).status).toBe("ok");
+    const undoneOutput = await api.outputsGet({ call_id: "call_backend" });
+    expect(undoneOutput.status).toBe("ok");
+    if (undoneOutput.status !== "ok") return;
+    const undoneSummary = undoneOutput.data.sections.find((item) => item.summary_id === summaryId);
+    expect(undoneSummary).toBeDefined();
+    if (!undoneSummary?.rev) return;
+    expect((await api.outputEdit({ call_id: "call_backend", summary_id: summaryId, rev: undoneSummary.rev, body_md: "My later edit must survive." })).status).toBe("ok");
+
+    expect(await api.changeRedo({ target })).toEqual({ status: "ok", data: { undone: 2, skipped_edited_later: 2 } });
+    const redoneCall = await api.callGet({ call_id: "call_backend" });
+    expect(redoneCall.status).toBe("ok");
+    if (redoneCall.status !== "ok") return;
+    expect(redoneCall.data.speakers.find((item) => item.id === speaker.id)?.label).toMatchObject({ type: "person", person: { display_name: "Renamed Person" } });
+    const finalOutput = await api.outputsGet({ call_id: "call_backend" });
+    expect(finalOutput.status).toBe("ok");
+    if (finalOutput.status !== "ok") return;
+    expect(finalOutput.data.sections.find((item) => item.summary_id === summaryId)?.body_md).toBe("My later edit must survive.");
+  });
+
+  it("shares events only among cores for the same world and drops listeners on dispose", async () => {
+    const first = core("main");
+    const peer = new FakeCore({ window: "main", world: first.world });
+    const unrelated = core("main");
+    cores.push(peer);
+    const heardByPeer = vi.fn();
+    const heardByUnrelated = vi.fn();
+    await peer.listen("entity:changed", heardByPeer);
+    await unrelated.listen("entity:changed", heardByUnrelated);
+
+    const event = { type: "removed", kind: "call", id: "call_fake" } as const;
+    first.emit("entity:changed", event);
+    expect(heardByPeer).toHaveBeenCalledTimes(1);
+    expect(heardByUnrelated).not.toHaveBeenCalled();
+
+    peer.dispose();
+    first.emit("entity:changed", event);
+    expect(heardByPeer).toHaveBeenCalledTimes(1);
+  });
+
+  it("clears an in-flight handoff when its owning core is disposed", async () => {
+    const first = core("main");
+    const world = first.world;
+    const peer = new FakeCore({ window: "main", world });
+    cores.push(peer);
+    const started = await first.invoke("handoff_generate", { item_id: "itm_replay", regenerate: true }) as { state: { type: string } };
+    expect(started.state).toEqual({ type: "generating" });
+
+    first.dispose();
+    const current = await peer.invoke("handoff_get", { item_id: "itm_replay" }) as { state: { type: string } };
+    expect(current.state).toEqual({ type: "ready" });
+  });
+
   it("creates a call row and live transcript on capture start, then stops the row and transcript", async () => {
     const fake = core();
     const other = new FakeCore({ window: "main", world: fake.world });

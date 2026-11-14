@@ -13,7 +13,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { calls, openWindow, type Steer } from "./support/app";
+import { calls, openWindow, steerFor, type Steer } from "./support/app";
 import { alerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
@@ -32,14 +32,14 @@ const word = (p: Page, w: string) => p.getByText(w, { exact: true }).or(p.getByR
 const sent = async (p: Page, name: string): Promise<unknown[]> => (await calls(p)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 const live = { call_id: W.LIVE_CALL };
 
-/** What the core does by itself when the window or the displays change: `window:call` (the fake does not derive it from the world). */
-async function coreWindow(page: Page, patch: Partial<{ visible: boolean; layout: "dedicated" | "floating"; collapsed: boolean; show_share_warning: boolean }>) {
-  if (!FAKE) return; // the real core derives it from the displays and the settings
-  await page.evaluate((p) => {
-    const f = (globalThis as unknown as { __noterFake: { callWindow: object; publish(e: string): void } }).__noterFake;
-    Object.assign(f.callWindow, p);
-    f.publish("window:call");
-  }, patch);
+/** Drive call-window state through the same IPC commands the native host uses. */
+async function coreWindow(page: Page, patch: Partial<{ visible: boolean; layout: "auto" | "floating"; collapsed: boolean; show_share_warning: boolean }>) {
+  const steer = steerFor(page);
+  if (patch.layout) await steer.invoke("window_set_call_layout", { preference: patch.layout }, "call-screen");
+  if (patch.collapsed !== undefined) await steer.invoke("window_set_collapsed", { collapsed: patch.collapsed }, "call-screen");
+  if (patch.visible === false) await steer.invoke("window_hide_call", {}, "call-screen");
+  if (patch.visible === true) await steer.invoke("window_show_call", {}, "call-screen");
+  if (patch.show_share_warning === false) await steer.invoke("window_share_warning_seen", {}, "call-screen");
 }
 /** ⋯ › item in the header of whichever layout is showing. */
 async function more(page: Page, item: string) {
@@ -312,7 +312,7 @@ test.describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
   test("UI — other path: Share warning in the floating panel — shown the first time, Got It closes it, the share glyph stays", async ({ page }) => {
     await startLive(page);
     await toFloating(page);
-    await coreWindow(page, { layout: "floating", show_share_warning: true });
+    await coreWindow(page, { layout: "floating" });
     const warning = page.locator('[data-region="FP-R3"]').filter({ hasText: "Hidden from window shares only. Before sharing your whole screen, press" });
 
     await expect(warning).toContainText("⌃⌥⌘0");
@@ -349,7 +349,7 @@ test.describe("cpt-noter-seq-floating-panel-display-unplugged", () => {
     await steer.change((w) => {
       w.app.environment.displays.push({ id: W.STUDIO_DISPLAY, name: "Studio Display", is_main: false, holds_call_app: false, width_pt: 2560, height_pt: 1440 });
     });
-    await coreWindow(page, { layout: "dedicated" });
+    await coreWindow(page, { layout: "auto" });
     await expect(dedicated(page)).toBeVisible();
     await expect(header(page)).toContainText(W.LIVE_TITLE);
   });

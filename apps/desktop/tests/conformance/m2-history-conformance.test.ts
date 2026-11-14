@@ -1,6 +1,7 @@
 // M2 history conformance (2.20): history_list, change_undo (partial undo too), change_redo and history_export answer
 // the same on the fake and the real core — scopes, page shape, UndoResult and every typed error.
 // @cpt-dod:cpt-noter-dod-core-history-undo-tests:p1
+import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { ChangeId, Core, HistoryListArgs } from "../../src/core/bindings";
@@ -129,6 +130,15 @@ describe("history_export", () => {
       const done = ok(await main.historyExport({ scope, format }));
       expect(done.files).toBe(1);
       expect(done.path.endsWith(format === "json" ? ".json" : ".md")).toBe(true);
+      if (s.target === "stdio") {
+        const text = readFileSync(done.path, "utf8");
+        if (format === "json") {
+          const rows = JSON.parse(text) as Array<{ entity: { id: string }; after: string | null }>;
+          expect(rows).toEqual(expect.arrayContaining([expect.objectContaining({ entity: expect.objectContaining({ id: PAST_CALL }), after: "Export me" })]));
+        } else {
+          expect(text).toContain("Export me");
+        }
+      }
     }
   });
 

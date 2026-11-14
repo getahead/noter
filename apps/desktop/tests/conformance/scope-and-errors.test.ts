@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import { COMMANDS, ERROR_CODES, type CommandName, type WindowLabel } from "../../src/core/bindings";
-import { transportFor } from "../support/core";
+import { unrecordedTransportFor } from "../support/core";
 
 const ALL_WINDOWS: WindowLabel[] = ["main", "call-screen", "record-prompt", "settings", "first-run"];
 const names = Object.keys(COMMANDS) as CommandName[];
@@ -17,7 +17,7 @@ describe("window scope (PM-08)", () => {
   it.each(names)("%s is refused from every window it does not list", async (name) => {
     const allowed = COMMANDS[name].windows as readonly WindowLabel[];
     for (const window of ALL_WINDOWS.filter((w) => !allowed.includes(w))) {
-      const t = transportFor(window);
+      const t = unrecordedTransportFor(window);
       const err = await t.invoke(name, {}, COMMANDS[name].channel ? () => {} : undefined).then(
         () => null,
         (e) => e,
@@ -30,7 +30,7 @@ describe("window scope (PM-08)", () => {
 describe("typed errors", () => {
   it.each(names)("%s answers or rejects with a known CoreError, never crashes", async (name) => {
     const window = COMMANDS[name].windows[0] as WindowLabel;
-    const t = transportFor(window);
+    const t = unrecordedTransportFor(window);
     try {
       await t.invoke(name, {}, COMMANDS[name].channel ? () => {} : undefined);
     } catch (e) {

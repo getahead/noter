@@ -36,24 +36,14 @@ describe("commands the core does not answer yet", () => {
     expect(isLater("no_such_command", "pre-M0")).toBe(false);
   });
 
-  // @cpt-dod:cpt-noter-dod-core-contract-conformance:p1
-  // @cpt-dod:cpt-noter-dod-core-harness-conformance:p1
-  it("runs against the core NOTER_CORE selects: the fake, or the real core through noter-core-harness", () => {
-    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
-    if (target === "fake") {
-      expect(process.env.NOTER_CORE ?? "fake").toBe("fake");
-      return;
-    }
-    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
-    // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
-    expect(process.env.NOTER_CORE_CMD).toMatch(/noter-core-harness/);
-    // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
-  });
-
   it("has example arguments for exactly the commands of the contract", () => {
     expect(Object.keys(EXAMPLE_ARGS).sort()).toEqual([...names].sort());
   });
 
+  // @cpt-dod:cpt-noter-dod-core-contract-conformance:p1
+  // @cpt-dod:cpt-noter-dod-core-harness-conformance:p1
+  // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
+  // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
   // Concurrent (vitest's default of five at a time), each in its own scenario: the isolation is
   // unchanged, only the waiting on the process starts overlaps.
   it.concurrent.each(names)("%s answers, or is not_implemented only before its milestone", async (name) => {
@@ -65,6 +55,7 @@ describe("commands the core does not answer yet", () => {
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-if-differs
     // @cpt-begin:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
     expect(code, target === "fake" ? `the fake refuses the example arguments of ${name}: fix example-args.ts` : `${name} refuses arguments the fake accepts`).not.toBe("invalid_input");
+    expect(code, `${name} returned an internal error for valid example arguments`).not.toBe("internal");
     if (code !== "not_implemented") return;
     expect(isLater(name), `${name} answers not_implemented, but ${milestoneOf(name)} is not after the current ${CURRENT}`).toBe(true);
     // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-fail-run
@@ -76,6 +67,8 @@ describe("commands the core does not answer yet", () => {
     // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-record-pending
     // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-if-later
   });
+  // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-stdio
+  // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-fake
 
   afterAll(() => {
     const unanswered = [...pending.values()].reduce((n, cmds) => n + cmds.length, 0);

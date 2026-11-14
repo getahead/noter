@@ -6,18 +6,14 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import type { Page } from "@playwright/test";
-
 import type { ItemView, LaunchPath } from "../../../src/core/bindings";
 import type { World } from "../../support/scenario";
+import type { Steer } from "./app";
 import * as W from "../../support/world-presets";
 import { sectionOf, written } from "./outputs-world";
 
 export const REAL = process.env.NOTER_CORE === "stdio";
 /** One command through the page's own IPC, as the app sends it. */
-export const invoke = (page: Page, cmd: string, args: unknown) =>
-  page.evaluate(([c, a]) => (globalThis as unknown as { __TAURI_INTERNALS__: { invoke(c: string, p: unknown): Promise<unknown> } }).__TAURI_INTERNALS__.invoke(c, { args: a }).catch((e: unknown) => { throw new Error(JSON.stringify(e)); }), [cmd, args] as const);
-
 export const ITEM = "itm_replay";
 const itemOf = (w: World): ItemView => w.items.find((i) => i.id === ITEM)!;
 export const callOf = (w: World) => itemOf(w).call.id;
@@ -46,14 +42,14 @@ export function sensitive(w: World): void {
 export const unmap = (w: World): void => void (!REAL && (w.repos.mappings.length = 0));
 
 /** A VSTOR mapping to a folder that exists (the fake world already has one). */
-export const map = (page: Page, tool: "claude_code" | "codex" = "claude_code") =>
-  !REAL ? undefined : invoke(page, "repo_upsert", { key: "VSTOR", local_path: mkdtempSync(join(tmpdir(), "noter-vhi-frontend-")), default_tool: tool });
+export const map = (steer: Steer, tool: "claude_code" | "codex" = "claude_code") =>
+  !REAL ? undefined : steer.invoke("repo_upsert", { key: "VSTOR", local_path: mkdtempSync(join(tmpdir(), "noter-vhi-frontend-")), default_tool: tool });
 
 /** What the Mac reports for the next launches: the path Noter would use and the ones that fail (real core only). */
-export async function launch(page: Page, path: LaunchPath, opts: { needsAutomation?: boolean; denied?: boolean; fail?: Array<{ path: LaunchPath; code: string }> } = {}): Promise<void> {
+export async function launch(steer: Steer, path: LaunchPath, opts: { needsAutomation?: boolean; denied?: boolean; fail?: Array<{ path: LaunchPath; code: string }> } = {}): Promise<void> {
   if (!REAL) return;
-  await invoke(page, "harness.launch_world", { plan: { path, needs_automation: opts.needsAutomation ?? false, automation_denied: opts.denied ?? false }, fail: opts.fail ?? [] });
+  await steer.invoke("harness.launch_world", { plan: { path, needs_automation: opts.needsAutomation ?? false, automation_denied: opts.denied ?? false }, fail: opts.fail ?? [] });
 }
 
 /** The launches and clipboard writes the core asked the Mac for, oldest first. */
-export const nativeLog = (page: Page) => invoke(page, "harness.native_log", {}) as Promise<Array<Record<string, unknown>>>;
+export const nativeLog = (steer: Steer) => steer.invoke("harness.native_log", {}) as Promise<Array<Record<string, unknown>>>;

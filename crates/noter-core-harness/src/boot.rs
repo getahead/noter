@@ -794,6 +794,12 @@ impl Harness {
                         ),
                         ("lang", seg["lang"].clone()),
                         ("lang_p", seg["lang_p"].clone()),
+                        // The engine stores average log probability; the fixture exposes its
+                        // confidence projection, so seed the inverse for parity.
+                        (
+                            "avg_logprob",
+                            json!(seg["confidence"].as_f64().unwrap_or(1.0).ln()),
+                        ),
                         ("pass", seg["pass"].clone()),
                     ],
                 ));
@@ -1806,10 +1812,23 @@ fn answer_session(engine: &ScriptedEngine, state: &Value, dir: &Path) {
         Some("stopping") => {
             let folder = dir.join("audio").join(call_id.as_str());
             std::fs::create_dir_all(&folder).expect("scripted capture folder can be created");
-            std::fs::write(folder.join("mic.m4a"), b"scripted microphone recording")
-                .expect("scripted microphone file can be written");
-            std::fs::write(folder.join("sys.m4a"), b"scripted system recording")
-                .expect("scripted system file can be written");
+            let store_audio = engine
+                .commands()
+                .iter()
+                .rev()
+                .find_map(|command| match command {
+                    EngineCommand::StartSession(start) if start.call_id == call_id => {
+                        Some(start.store_audio)
+                    }
+                    _ => None,
+                })
+                .unwrap_or(false);
+            if store_audio {
+                std::fs::write(folder.join("mic.m4a"), b"scripted microphone recording")
+                    .expect("scripted microphone file can be written");
+                std::fs::write(folder.join("sys.m4a"), b"scripted system recording")
+                    .expect("scripted system file can be written");
+            }
             std::fs::write(
                 folder.join("timeline.json"),
                 serde_json::to_vec(&json!({
@@ -1826,8 +1845,8 @@ fn answer_session(engine: &ScriptedEngine, state: &Value, dir: &Path) {
                 EngineEvent::SessionStopped {
                     timeline_path: format!("audio/{call_id}/timeline.json"),
                     call_id: call_id.clone(),
-                    mic_path: Some(format!("audio/{call_id}/mic.m4a")),
-                    sys_path: Some(format!("audio/{call_id}/sys.m4a")),
+                    mic_path: store_audio.then(|| format!("audio/{call_id}/mic.m4a")),
+                    sys_path: store_audio.then(|| format!("audio/{call_id}/sys.m4a")),
                 },
             )
         }

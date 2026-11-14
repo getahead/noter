@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { hold } from "../visual/hold";
-import { calls, openWindow } from "./support/app";
+import { calls, openWindow, steerFor } from "./support/app";
 import { expect, test } from "./support/fixtures";
 import {
   alertText,
@@ -310,19 +310,6 @@ test.describe("cpt-noter-flow-ui-library-calls-delete", () => {
   });
 });
 
-/** A contract command sent from the page, as the screens do (fake core or the app's bridge). */
-const invoke = (page: Page, cmd: string, args: unknown) =>
-  page.evaluate(
-    async ([c, a]) => {
-      const g = globalThis as unknown as {
-        __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> };
-        __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> };
-      };
-      await (g.__noterFake ? g.__noterFake.invoke(c as string, a) : g.__TAURI_INTERNALS__!.invoke(c as string, { args: a }));
-    },
-    [cmd, args] as const,
-  );
-const FAKE = process.env.NOTER_CORE !== "stdio";
 const glyph = (page: Page) => page.locator('.np-srclist__item .np-spin');
 
 test.describe("cpt-noter-flow-ui-library-calls-browse (live status)", () => {
@@ -330,9 +317,8 @@ test.describe("cpt-noter-flow-ui-library-calls-browse (live status)", () => {
     await openCalls(page);
     const row = rowOf(page, "Backend sync").first();
     await expect(glyph(page)).toHaveCount(0);
-    if (!FAKE) return; // the real core has no outputs writer in M1: it never sends outputs:progress yet
-    await invoke(page, "outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"] });
-    // the fake core writes for 300 ms: watch every frame, not every poll
+    await steerFor(page).invoke("outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"], local: false });
+    // Both cores write asynchronously: watch every frame, not every poll.
     await page.waitForFunction(
       () =>
         document.querySelector('[data-lib-row="call_backend"]')?.textContent?.includes("Writing summary…") &&

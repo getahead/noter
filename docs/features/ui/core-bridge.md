@@ -340,6 +340,7 @@ The system **MUST** map every `ErrorCode` of the contract to the calling screen'
 - [x] A window reload against the fake core and against `noter-core-harness` shows the same records before and after, with no message lost or doubled (conformance `snapshot-stream`)
 - [x] A `seq` gap forces a resubscription and the slice ends equal to the core's state
 - [x] A late whole-state payload with a lower `version` never replaces a newer one
+- [x] Fake-only handler state belongs to its `FakeCore`; a fresh fake with a fresh fixture world starts clean, and disposing a fake removes its event listeners
 - [x] Every `ErrorCode` has a mapping test; no command is retried without a user action
 - [x] No module outside `src/core` imports `@tauri-apps/*`; no screen imports the fake core (`just arch` passes)
 - [x] No `localStorage`, `sessionStorage`, IndexedDB or cookie access exists in the UI bundle

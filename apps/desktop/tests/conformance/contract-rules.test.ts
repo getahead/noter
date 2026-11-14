@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { COMMANDS, createCore, DEFAULT_RETRYABLE, ERROR_CODES, type CommandName, type Transport } from "../../src/core/bindings";
 import { FakeCore } from "../../src/core/fake/fake-core";
 import { isFake } from "../support/core";
-import { ahead, ok, refused } from "../support/results";
+import { ahead, ok, pending, refused } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -66,7 +66,7 @@ describe("capture and jobs rules", () => {
   it("job_run_now waits while a call is live, except the post-call analysis (D2)", async () => {
     const main = s.core("main");
     const blocked = await main.jobRunNow({ job_id: "job_evidence" });
-    if (blocked.status === "error" && blocked.error.code === "not_implemented") return; // jobs arrive in M3
+    if (pending(blocked)) return;
     expect(refused(blocked).code).toBe("job_blocked");
     ok(await main.jobRunNow({ job_id: "job_post_call" }));
   });

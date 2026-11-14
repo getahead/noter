@@ -3,7 +3,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import * as W from "../../support/world-presets";
-import { calls, coreReady } from "./app";
+import { calls, coreReady, steerFor } from "./app";
 import { expect } from "./fixtures";
 
 export const banner = (page: Page) => page.locator('[data-region="PC-R2"]');
@@ -22,14 +22,7 @@ export const windowReady = (page: Page) => expect(page.locator('[data-region="wi
 export async function navigate(page: Page, tab: "summary" | "transcript" | "history" = "summary", callId: string = W.PAST_CALL) {
   await windowReady(page); // a `nav:request` published before the window subscribed to events is lost
   await coreReady(page);
-  await page.evaluate(
-    async ([id, t]) => {
-      const args = { target: { type: "call_page", call_id: id, tab: t } };
-      const g = globalThis as unknown as { __noterFake?: { invoke(c: string, a: unknown): Promise<unknown> }; __TAURI_INTERNALS__?: { invoke(c: string, p: unknown): Promise<unknown> } };
-      await (g.__noterFake ? g.__noterFake.invoke("window_navigate", args) : g.__TAURI_INTERNALS__!.invoke("window_navigate", { args }));
-    },
-    [callId, tab] as const,
-  );
+  await steerFor(page).invoke("window_navigate", { target: { type: "call_page", call_id: callId, tab } });
 }
 
 /** The call's page open on Summary (the fixture's past call unless `call` names the one the real core recorded). */

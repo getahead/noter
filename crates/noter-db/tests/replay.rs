@@ -256,6 +256,62 @@ fn an_edit_after_the_change_blocks_undo_and_redo() {
 }
 
 #[test]
+fn a_redo_that_now_violates_a_unique_constraint_is_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&path(&dir));
+    store
+        .write(set("n1", "title", json!("original")), meta("seed"))
+        .unwrap();
+    store
+        .write(set("n2", "title", json!("other")), meta("seed"))
+        .unwrap();
+    raw(&path(&dir))
+        .execute_batch("CREATE UNIQUE INDEX notes_title_unique ON notes(title)")
+        .unwrap();
+
+    let renamed = store
+        .write(set("n1", "title", json!("renamed")), meta("rename"))
+        .unwrap();
+    undo(&store, change(&renamed.change_id)).unwrap();
+    store
+        .write(set("n2", "title", json!("renamed")), meta("occupied"))
+        .unwrap();
+
+    let redone = redo(&store, change(&renamed.change_id)).unwrap();
+    assert_eq!((redone.done, redone.skipped), (0, 1));
+    assert_eq!(title(&store, "n1").as_deref(), Some("original"));
+    assert_eq!(title(&store, "n2").as_deref(), Some("renamed"));
+}
+
+#[test]
+fn an_undo_restore_conflict_still_surfaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = open(&path(&dir));
+    store
+        .write(set("n1", "title", json!("original")), meta("seed"))
+        .unwrap();
+    store
+        .write(set("n2", "title", json!("other")), meta("seed"))
+        .unwrap();
+    raw(&path(&dir))
+        .execute_batch("CREATE UNIQUE INDEX notes_title_unique ON notes(title)")
+        .unwrap();
+    let first = store
+        .write(set("n1", "title", json!("changed")), meta("first"))
+        .unwrap();
+    store
+        .write(set("n2", "title", json!("original")), meta("later"))
+        .unwrap();
+
+    assert_eq!(
+        code(undo(&store, change(&first.change_id))),
+        ErrorCode::Conflict
+    );
+    assert_eq!(title(&store, "n1").as_deref(), Some("changed"));
+    assert_eq!(title(&store, "n2").as_deref(), Some("original"));
+}
+
+#[test]
 fn another_column_of_the_row_is_not_a_later_edit() {
     let dir = tempfile::tempdir().unwrap();
     let store = open(&path(&dir));
