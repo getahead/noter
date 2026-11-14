@@ -37,6 +37,13 @@ describe("InlineBanner (cpt-noter-dod-ui-primitives-feedback)", () => {
     expect(renderToString(<InlineBanner banner={b("dl", "info", { progress: 33.3333 })} />)).toContain(">33 %</span>");
   });
 
+  it("keeps warning and degraded banners non-dismissible by default", () => {
+    for (const severity of ["warning", "degraded"] as const) {
+      expect(renderToString(<InlineBanner banner={b("notice", severity)} />)).not.toContain('aria-label="Dismiss"');
+    }
+    expect(renderToString(<InlineBanner banner={b("quit", "warning", { dismissible: true })} />)).toContain('aria-label="Dismiss"');
+  });
+
   it("a link action renders as a link", () => {
     expect(renderToString(<InlineBanner banner={b("w", "warning", { actions: [{ label: "Learn More", link: true }] })} />)).toContain('class="np-link"');
   });
@@ -56,6 +63,8 @@ describe("inline banner states (cpt-noter-state-ui-primitives-inline-banner)", (
     const stacked = slotView(banners, new Set(), true);
     expect(shown.list).toEqual([]);
     expect(stacked.list.map((banner) => banner.id)).toEqual(["next"]);
+    expect(renderToString(<InlineBanner banner={stacked.first!} more={stacked.more} stacked />)).toContain('data-state="stacked"');
+    expect(renderToString(<InlineBanner banner={stacked.first!} more={stacked.more} />)).toContain('data-state="shown"');
     expect(slotView(banners, new Set(), false).list).toEqual([]); // closing More returns to shown
     expect(slotView(banners, new Set(["first"]), false).first?.id).toBe("next");
     expect(slotView([], new Set(), false).first).toBeNull(); // owner removed the resolved banner
