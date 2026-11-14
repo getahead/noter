@@ -180,7 +180,7 @@ final class MenuBarTests: NoterTestCase {
         let summaryPopup = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Call page view'")).firstMatch
         XCTAssertTrue(waitUntil(5) {
             (summaryTab.exists && summaryTab.isSelected)
-                || (summaryPopup.exists && (summaryPopup.value as? String) == "Summary")
+                || (summaryPopup.exists && ((summaryPopup.value as? String) == "Summary" || summaryPopup.title == "Summary"))
         }, "Open Last Summary selects the Summary view")
     }
 
