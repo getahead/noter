@@ -161,11 +161,11 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     expect(list.get().rows.map((r) => r.id)).toEqual(["z"]);
   });
 
-  it("keeps the loaded page when the next page fails", async () => {
+  it("keeps the loaded page and records a retryable error when the next page fails", async () => {
     const { list } = setup(page([row("a")], "c1"), { status: "error", error: { code: "internal" } });
     await list.load();
     await list.more();
-    expect(list.get()).toMatchObject({ rows: [row("a")], next: "c1", status: "LISTED" });
+    expect(list.get()).toMatchObject({ rows: [row("a")], next: "c1", status: "LISTED", error: { code: "internal" } });
   });
 
   it("a new sort replaces the rows and an older answer cannot overwrite it", async () => {

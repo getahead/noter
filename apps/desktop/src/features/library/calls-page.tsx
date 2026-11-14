@@ -221,6 +221,7 @@ export function CallsPage() {
       onContext={onContext}
       onKeyDown={onKeyDown}
       onRetry={() => void list.load()}
+      onRetryNext={() => void list.more()}
       // @cpt-begin:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-user-trigger
       onSelfTest={() => sheets.open("self-test")}
       // @cpt-end:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-user-trigger

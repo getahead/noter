@@ -53,6 +53,7 @@ const props = (o: Partial<CallsViewProps> = {}): CallsViewProps => ({
   onContext: vi.fn(),
   onKeyDown: vi.fn(),
   onRetry: vi.fn(),
+  onRetryNext: vi.fn(),
   onSelfTest: vi.fn(),
   onDismissFailed: vi.fn(),
   onCloseMenu: vi.fn(),
@@ -121,6 +122,14 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
     expect(html({ failed: "Couldn’t delete the calls" })).toContain(
       "Couldn’t delete the calls",
     );
+  });
+
+  it("shows a paging error at the list end with a retry action", () => {
+    const retry = vi.fn();
+    const h = html({ state: state({ next: "cursor", error: { code: "internal", message: "x", retryable: true, detail: null } }), onRetryNext: retry });
+    expect(h).toContain('role="alert"');
+    expect(h).toContain("Couldn’t read your calls");
+    expect(h).toContain("Try Again");
   });
 
   it("makes the sortable headers keyboard stops and leaves Type and Open as plain headers", () => {

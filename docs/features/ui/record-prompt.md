@@ -88,6 +88,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 - Error — Not enough disk space: **Not enough disk space to record (420 MB free)**, **Record** dimmed, **Delete Old Audio…** opens the sheet in the main window
 - Error — System audio access is off: the warning **System audio access is off · only your side will be recorded** above **Not Now**, **Open System Settings…** and **Record**, which still starts capture
 - Speech model not downloaded: **The speech model is still downloading (62 %)**, **Record** dimmed (prototype state; see 7)
+- A refused `capture_start`, `capture_answer_call_end`, `capture_answer_new_meeting` or `capture_ignore_app` keeps the prompt open and shows a safe error with **Try Again** when retryable
 
 **Steps**:
 1. [x] - `p1` - Core: detects a call, passes the call-screen placement, and shows the panel at its position (top right, inset 12 pt; on the other display when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
@@ -98,14 +99,14 @@ Success criteria: a detected call is recorded with one click or one key while th
 4. [x] - `p1` - API: `window_announce` "Noter: Record this call? Press Control-Option-Command-R to record." (polite) - `inst-api-announce`
 5. [x] - `p1` - User clicks **Record** or **Record as Sensitive**, or presses ⌃⌥⌘R (the core receives the hotkey) - `inst-user-record`
 6. [x] - `p1` - API: `capture_start` (detection, `sensitive` true for **Record as Sensitive**); the button shows loading - `inst-api-start`
-7. [x] - `p1` - **IF** the result is `disk_full` or `model_missing` - `inst-if-refused`
-   1. [x] - `p1` - UI: switch to the Disk full or Speech model variant with its reason - `inst-refused`
+7. [x] - `p1` - **IF** `capture_start` is refused - `inst-if-refused`
+   1. [x] - `p1` - UI: switch to the Disk full or Speech model variant with its reason; for another refusal, keep the prompt open and show its safe error with **Try Again** when retryable - `inst-refused`
 8. [x] - `p1` - **IF** the result is `already_recording` - `inst-if-already`
    1. [x] - `p1` - UI: close the prompt; the core shows the running call - `inst-already`
-9. [x] - `p1` - UI: the panel fades out over 200 ms (in place under Reduce motion); the core opens the call window in the dedicated layout with a second display or the floating layout otherwise; API: `window_announce` "Recording started" - `inst-close-open`
+9. [x] - `p1` - On success, UI: the panel fades out over 200 ms (in place under Reduce motion); the core opens the call window in the dedicated layout with a second display or the floating layout otherwise; API: `window_announce` "Recording started" - `inst-close-open`
 10. [x] - `p1` - **IF** the user opens **Not Now ▾** and chooses **Don't Ask for <app>…** - `inst-if-dont-ask`
     1. [x] - `p1` - UI: replace RP-R3 with the inline confirmation for the app, or the browser line for a browser; **Back** returns - `inst-inline-confirm`
-    2. [x] - `p1` - User clicks **Don't Ask**; API: `capture_ignore_app` (bundle id); the app is listed in Settings › General › **Apps Noter doesn't ask about** - `inst-api-ignore`
+   2. [x] - `p1` - User clicks **Don't Ask**; API: `capture_ignore_app` (bundle id); on refusal keep the inline confirmation and show its safe error with **Try Again** when retryable; on success the app is listed in Settings › General › **Apps Noter doesn't ask about** - `inst-api-ignore`
 11. [x] - `p1` - **IF** the user clicks **Delete Old Audio…** - `inst-if-delete-old`
     1. [x] - `p1` - API: `window_navigate` to the main window with the **Delete Old Audio…** sheet (`cpt-noter-feature-ui-dialogs-host`); after the sheet, the menu bar's **Call Detected · Start Recording** starts the call - `inst-delete-old`
 12. [x] - `p1` - **IF** the user clicks **Open System Settings…** - `inst-if-open-settings`
@@ -146,6 +147,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 **Error Scenarios**:
 - Hover or focus pauses the countdown with **Paused while you're here**
 - No answer: the core stops at the end of the countdown, or applies **Start as New Call** after 60 s; the notice expires (`notice_expired` closes the panel)
+- A refused answer keeps the panel open and shows its safe error with **Try Again** when retryable
 
 **Steps**:
 1. [x] - `p1` - Core: sends `capture:state` with `notice` `call_seems_ended` or `new_meeting` while the call window is hidden and Noter is not hidden for presenting - `inst-core-notice`
@@ -153,7 +155,7 @@ Success criteria: a detected call is recorded with one click or one key while th
 3. [x] - `p1` - **WHILE** the pointer or focus is on the panel - `inst-while-notice-hover`
    1. [x] - `p1` - API: `capture_hold_notice` (held true); the body reads **Paused while you're here**; on release `capture_hold_notice` (false) - `inst-api-hold`
 4. [x] - `p1` - User chooses an action, or presses ⌃⌥⌘R (stop now) or ⌃⌥⌘N (shows the call window with the notice; a second press makes it key) - `inst-user-notice`
-5. [x] - `p1` - **MATCH** the action - `inst-match-notice`
+5. [x] - `p1` - **MATCH** the action; on refusal keep the panel open and show its safe error with **Try Again** when retryable - `inst-match-notice`
    - [x] - `p1` - **CASE** **Keep Recording** or **Stop Now**: `capture_answer_call_end` (keep or stop) - `inst-case-call-end`
    - [x] - `p1` - **CASE** **Start as New Call** or **Keep in This Call**: `capture_answer_new_meeting` - `inst-case-new-meeting`
 6. [x] - `p1` - **RETURN** the panel closed; after **Stop Now** the menu bar offers **Continue Recording** for 5 minutes and the main window loads the Call page without taking focus - `inst-return-notice`

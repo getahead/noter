@@ -174,6 +174,17 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
     expect(keyOf("anthropic").status.type).toBe("configured");
   });
 
+  it("does not retain an API key in the bridge retry handler", async () => {
+    await ready();
+    fake.failNext("api_key_set", "offline");
+    const seen = sentCommands();
+
+    await setKey(bridge, "anthropic", "sk-ant-secret");
+    await bridge.retry("key:set:anthropic");
+
+    expect(seen.filter((cmd) => cmd === "api_key_set")).toHaveLength(1);
+  });
+
   it("Remove… takes the key out; accounts_get and cli_install answer", async () => {
     await ready();
     await removeKey(bridge, "anthropic");

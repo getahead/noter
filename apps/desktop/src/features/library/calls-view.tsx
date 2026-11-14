@@ -41,6 +41,7 @@ export interface CallsViewProps {
   onContext: (id: string, e: MouseEvent) => void;
   onKeyDown: (e: KeyboardEvent) => void;
   onRetry: () => void;
+  onRetryNext: () => void;
   onSelfTest: () => void;
   onDismissFailed: () => void;
   onCloseMenu: () => void;
@@ -228,6 +229,18 @@ function Body(p: CallsViewProps) {
         </tbody>
       </Table>
       <div ref={p.sentinel} aria-hidden="true" />
+      {/* @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-next-error */}
+      {state.error && state.next && (
+        <InlineBanner
+          banner={{
+            id: "calls-next-error",
+            severity: "error",
+            text: t("library.calls.error"),
+            actions: [{ label: t("action.try_again"), onAction: p.onRetryNext }],
+          }}
+        />
+      )}
+      {/* @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-next-error */}
     </>
   );
 }

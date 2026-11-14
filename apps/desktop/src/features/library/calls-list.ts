@@ -88,8 +88,11 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-api-next
   const nextPage = async () => {
     const mine = request;
+    set({ error: null });
     const res = await read(state.sort, state.next!);
-    if (mine === request && res.status === "ok") {
+    if (mine !== request) return;
+    if (res.status === "error") return set({ error: res.error });
+    if (res.status === "ok") {
       const held = new Set(state.rows.map((r) => r.id));
       const rows = res.data.rows.filter((r) => {
         if (held.has(r.id)) return false;

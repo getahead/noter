@@ -35,6 +35,7 @@ export async function runExport(bridge: Bridge, callId: string, include: ExportI
 export const revealExport = (bridge: Bridge, callId: string, path: string) => bridge.act(`calls:export:reveal:${callId}`, "open_external", () => bridge.core.openExternal({ target: { type: "reveal_in_finder", path } }));
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
+export const audioDeleteKey = (callId: string) => `audio:delete:${callId}`;
 /** `tags_list`: the tags in use, offered while typing. */
 export const loadTags = (bridge: Bridge) => bridge.act("tags:list", "tags_list", () => bridge.core.tagsList({}));
 
@@ -60,7 +61,7 @@ export async function deleteAudio(bridge: Bridge, callId: string, ask: typeof as
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-alert
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete
-  const r = await bridge.act(`audio:delete:${callId}`, "audio_delete", () => bridge.core.audioDelete({ call_ids: [callId] }));
+  const r = await bridge.act(audioDeleteKey(callId), "audio_delete", () => bridge.core.audioDelete({ call_ids: [callId] }));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete
   if (r.status !== "ok") return "failed";
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-return
