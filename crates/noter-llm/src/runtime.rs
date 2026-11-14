@@ -44,7 +44,6 @@ pub(crate) use crate::request::{Now, RequestState};
 
 #[cfg(test)]
 type Log = Box<dyn Fn(&Value) + Send + Sync>;
-#[cfg(test)]
 type OnSwitch = Box<dyn Fn(&CallId) + Send + Sync>;
 type OnKeyRejected = Box<dyn Fn(RuntimeChoice, &LlmRunId) + Send + Sync>;
 /// A verification's runtime and the candidate key it runs with.
@@ -61,7 +60,6 @@ struct Inner {
     store: Arc<Store>,
     #[cfg(test)]
     log: Option<Log>,
-    #[cfg(test)]
     on_switch: Option<OnSwitch>,
     /// The API keys of the API-key runtimes (the Keychain in the app).
     secrets: Arc<dyn SecretStore>,
@@ -124,7 +122,6 @@ impl Llm {
             store,
             #[cfg(test)]
             log: None,
-            #[cfg(test)]
             on_switch: None,
             secrets: Arc::new(MemorySecrets::default()),
             on_key_rejected: None,
@@ -192,8 +189,7 @@ impl Llm {
         self.configure(|i| i.log = Some(Box::new(f)))
     }
 
-    /// Test-only observation of a local fallback.
-    #[cfg(test)]
+    /// Called when two consecutive runtime failures switch a call to local.
     pub fn on_switch_to_local(self, f: impl Fn(&CallId) + Send + Sync + 'static) -> Self {
         self.configure(|i| i.on_switch = Some(Box::new(f)))
     }
@@ -409,7 +405,6 @@ impl Inner {
             self.log(
                 json!({"module": "llm", "event": "switched_to_local", "call_id": call.as_str()}),
             );
-            #[cfg(test)]
             if let Some(on_switch) = &self.on_switch {
                 on_switch(call);
             }
