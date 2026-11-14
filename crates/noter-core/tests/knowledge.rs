@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use noter_core::{
     BoxFuture, Clock, Core, CoreDeps, EventEmitter, HttpMcp, Listing, McpAudit, McpError, McpPage,
@@ -362,6 +362,7 @@ async fn changing_one_file_re_embeds_only_that_file_and_same_content_adds_nothin
     .unwrap();
     // Same bytes under a new modification time: hashed again and found unchanged.
     let later = SystemTime::now() + Duration::from_secs(60);
+    let expected_modified = later.duration_since(UNIX_EPOCH).unwrap().as_millis() as i64;
     for name in ["guide.md", "notes.txt"] {
         std::fs::File::options()
             .write(true)
@@ -373,6 +374,14 @@ async fn changing_one_file_re_embeds_only_that_file_and_same_content_adds_nothin
     std::fs::remove_file(rig.folder.join("retry.rs")).unwrap();
     rig.reindex(T0 + 1_000, &row.id).await;
     let after = rig.synced_at(T0 + 1_000).await;
+    let stored_modified: i64 = read(&rig.core, |c| {
+        c.query_row(
+            "SELECT modified_at FROM documents WHERE uri LIKE '%/notes.txt'",
+            [],
+            |r| r.get(0),
+        )
+    });
+    assert_eq!(stored_modified, expected_modified);
     assert_eq!(after.documents, 5);
 
     let now = chunk_ids(&rig.core);
@@ -484,6 +493,31 @@ async fn unreadable_files_are_counted_and_skipped_without_stopping_folder_sync()
     rig.reindex(T0 + 3_000, &row.id).await;
     assert_eq!(rig.synced_at(T0 + 3_000).await.documents, 8);
     assert!(chunk_ids(&rig.core).contains_key("01-empty.docx"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_unreadable_indexed_file_is_skipped_and_keeps_its_previous_document() {
+    let rig = open().await;
+    let row = rig.add().await;
+    let before = chunk_ids(&rig.core);
+    let pdf = rig.folder.join("report.pdf");
+    let original = std::fs::read(&pdf).unwrap();
+    std::fs::write(&pdf, b"not a readable PDF").unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&pdf)
+        .unwrap()
+        .set_modified(SystemTime::now() + Duration::from_secs(60))
+        .unwrap();
+
+    rig.reindex(T0 + 1, &row.id).await;
+    let done = rig.synced_at(T0 + 1).await;
+
+    assert_eq!(done.documents, 6);
+    assert_eq!(chunk_ids(&rig.core)["report.pdf"], before["report.pdf"]);
+    assert_eq!(last_run(&rig.core), (0, 0, 0, None));
+
+    std::fs::write(&pdf, original).unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -662,6 +696,147 @@ async fn removal_deletes_the_index_stops_the_source_and_leaves_the_files() {
     ] {
         assert_eq!(e.code, ErrorCode::NotFound);
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_interrupted_source_cleanup_stays_excluded_and_can_resume() {
+    let rig = open().await;
+    let row = rig.add().await;
+    let meta = noter_db::ChangeMeta {
+        actor: Actor::You,
+        summary: "install cleanup failure fixture".into(),
+        reason: "test".into(),
+        evidence_ids: vec![],
+        batch_id: None,
+        undoable: false,
+        surface: None,
+    };
+    rig.core
+        .store()
+        .write_with(meta.clone(), |tx| {
+            let (document, heading, text, normalized, tokens, embedding): (
+                String,
+                String,
+                String,
+                String,
+                i64,
+                Vec<u8>,
+            ) = tx
+                .query_row(
+                    "SELECT document_id, heading_path, text, text_norm, token_count, embedding
+                     FROM doc_chunks LIMIT 1",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get(0)?,
+                            row.get(1)?,
+                            row.get(2)?,
+                            row.get(3)?,
+                            row.get(4)?,
+                            row.get(5)?,
+                        ))
+                    },
+                )
+                .map_err(|error| CoreError::new(ErrorCode::Internal, error.to_string()))?;
+            for index in 0..600 {
+                tx.execute(
+                    "INSERT INTO doc_chunks (id, document_id, heading_path, text, text_norm,
+                         token_count, embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    noter_db::rusqlite::params![
+                        format!("chk_cleanup_fixture_{index}"),
+                        document,
+                        heading,
+                        text,
+                        normalized,
+                        tokens,
+                        embedding,
+                    ],
+                )
+                .map_err(|error| CoreError::new(ErrorCode::Internal, error.to_string()))?;
+            }
+            tx.execute_batch(
+                "CREATE TABLE fail_chunk_delete_counter (remaining INTEGER NOT NULL);
+                 INSERT INTO fail_chunk_delete_counter VALUES (513);
+                 CREATE TRIGGER fail_chunk_delete BEFORE DELETE ON doc_chunks BEGIN
+                   UPDATE fail_chunk_delete_counter SET remaining = remaining - 1;
+                   SELECT CASE WHEN (SELECT remaining FROM fail_chunk_delete_counter) = 0
+                     THEN RAISE(ABORT, 'test cleanup failure') END;
+                 END;",
+            )
+            .map_err(|error| CoreError::new(ErrorCode::Internal, error.to_string()))?;
+            Ok((
+                (),
+                vec![noter_db::Logged {
+                    entity_type: "test",
+                    entity_id: "cleanup-fixture".into(),
+                    field: Some("trigger".into()),
+                    before: None,
+                    after: Some("installed".into()),
+                    delta: None,
+                }],
+            ))
+        })
+        .unwrap();
+
+    let args = SourceIdArgs {
+        source_id: row.id.clone(),
+    };
+    assert!(rig.core.source_remove(&ctx(), args.clone()).await.is_err());
+    assert_eq!(count(&rig.core, "SELECT removing FROM sources"), 1);
+    assert!(rig.source().await.is_some());
+    assert!(count(&rig.core, "SELECT COUNT(*) FROM doc_chunks") < 606);
+    assert!(count(&rig.core, "SELECT COUNT(*) FROM doc_chunks") > 0);
+    let candidate: ChunkId = read(&rig.core, |c| {
+        c.query_row("SELECT id FROM doc_chunks LIMIT 1", [], |r| {
+            r.get::<_, String>(0).map(ChunkId::new)
+        })
+    });
+    let permitted = rig
+        .core
+        .store()
+        .read(|conn| {
+            noter_knowledge::permitted_chunks(
+                conn,
+                &[candidate],
+                &AskScope {
+                    include_documents: true,
+                    ..AskScope::default()
+                },
+                false,
+            )
+        })
+        .unwrap();
+    assert!(permitted.is_empty());
+
+    rig.core
+        .store()
+        .write_with(meta, |tx| {
+            tx.execute_batch(
+                "DROP TRIGGER fail_chunk_delete; DROP TABLE fail_chunk_delete_counter",
+            )
+            .map_err(|error| CoreError::new(ErrorCode::Internal, error.to_string()))?;
+            Ok((
+                (),
+                vec![noter_db::Logged {
+                    entity_type: "test",
+                    entity_id: "cleanup-fixture".into(),
+                    field: Some("trigger".into()),
+                    before: Some("installed".into()),
+                    after: Some("removed".into()),
+                    delta: None,
+                }],
+            ))
+        })
+        .unwrap();
+    let db_path = rig._dir.path().join("data/noter.db");
+    let db_size_before = std::fs::metadata(&db_path).unwrap().len();
+    rig.core.source_remove(&ctx(), args).await.unwrap();
+    assert!(rig.source().await.is_none());
+    assert_eq!(count(&rig.core, "SELECT COUNT(*) FROM doc_chunks"), 0);
+    assert!(
+        std::fs::metadata(&db_path).unwrap().len() < db_size_before,
+        "incremental vacuum should shrink the database file after the large deletion"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

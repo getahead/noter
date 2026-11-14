@@ -33,21 +33,50 @@ pub fn normalize(text: &str) -> String {
 
 /// shortcut: about four tokens per three words, not the bge-m3 tokenizer; good enough for chunk
 /// sizes, upgrade if retrieval needs exact budgets.
+// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
 pub(crate) fn tokens(text: &str) -> usize {
-    (text.split_whitespace().count() * 4).div_ceil(3)
+    (text.split_whitespace().count() * 4)
+        .div_ceil(3)
+        .max(text.chars().count().div_ceil(4))
 }
 
-/// Splits a paragraph longer than a chunk into pieces of `MAX_TOKENS` at word boundaries.
+/// Splits long paragraphs at character boundaries so an unbroken minified line is bounded too.
+// @cpt-begin:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
 fn pieces(paragraph: &str) -> Vec<String> {
     if tokens(paragraph) <= MAX_TOKENS {
         return vec![paragraph.to_string()];
     }
-    let words: Vec<&str> = paragraph.split_whitespace().collect();
-    words
-        .chunks(MAX_TOKENS * 3 / 4)
-        .map(|w| w.join(" "))
-        .collect()
+    // Leave headroom for the document title and heading path added to every chunk.
+    let max_chars = MAX_TOKENS * 4 - 100;
+    let max_words = MAX_TOKENS * 3 / 4 - 25;
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut count = 0;
+    let mut words = 0;
+    let mut in_word = false;
+    for (index, ch) in paragraph.char_indices() {
+        let next_word = !ch.is_whitespace() && !in_word;
+        if count > 0 && (count == max_chars || words + usize::from(next_word) > max_words) {
+            out.push(paragraph[start..index].to_string());
+            start = index;
+            count = 0;
+            words = 0;
+            in_word = false;
+        }
+        count += 1;
+        if ch.is_whitespace() {
+            in_word = false;
+        } else if !in_word {
+            words += 1;
+            in_word = true;
+        }
+    }
+    if start < paragraph.len() {
+        out.push(paragraph[start..].to_string());
+    }
+    out
 }
+// @cpt-end:cpt-noter-algo-core-knowledge-sync:p1:inst-sync-extract
 
 /// The chunks of an extracted document, in order.
 pub(crate) fn chunks(doc: &Extracted) -> Vec<Chunk> {
@@ -156,5 +185,26 @@ mod tests {
     #[test]
     fn normalisation_folds_width_case_yo_and_sharp_s() {
         assert_eq!(normalize("Ｆｕｌｌ ЁЛКА Straße"), "full елка strasse");
+    }
+
+    #[test]
+    fn a_minified_paragraph_is_split_on_unicode_character_boundaries() {
+        let body = "界".repeat(MAX_TOKENS * 4 + 17);
+        let out = chunks(&doc(vec![(vec![], body)]));
+        assert!(out.len() > 1);
+        assert!(out.iter().all(|chunk| chunk.token_count <= MAX_TOKENS + 1));
+        assert_eq!(
+            out.iter()
+                .map(|chunk| chunk.text.matches('界').count())
+                .sum::<usize>(),
+            MAX_TOKENS * 4 + 17
+        );
+    }
+
+    #[test]
+    fn a_word_dense_line_is_split_before_its_token_estimate_exceeds_the_limit() {
+        let out = chunks(&doc(vec![(vec![], para(1_000))]));
+        assert!(out.len() > 1);
+        assert!(out.iter().all(|chunk| chunk.token_count <= MAX_TOKENS));
     }
 }

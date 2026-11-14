@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use noter_db::rusqlite::types::Type;
-use noter_db::rusqlite::{self, params, Connection, OptionalExtension, Row, Transaction};
+use noter_db::rusqlite::{self, params, Connection, OptionalExtension, Row};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_llm::{Secret, SecretStore};
 use noter_protocol::error::ValidationRule;
@@ -435,10 +435,8 @@ fn guarded(conn: &Connection, args: &SourceUpdateArgs) -> Result<SourceRow, Core
     Ok(current)
 }
 
-/// Replaces the fields `args` carries when `args.rev` is current: one logged change, and a
-/// privacy change moves the source's vectors to the new partition in the same transaction. A
-/// stale revision is `conflict` with nothing written; an edit that changes nothing writes
-/// nothing.
+/// Replaces the fields `args` carries when `args.rev` is current. A privacy change excludes the
+/// source during bounded vector moves; a stale revision is `conflict` with no edit logged.
 pub fn update(
     store: &Store,
     mut meta: ChangeMeta,
@@ -454,14 +452,90 @@ pub fn update(
     }
     let check = args.clone();
     let current = store.read(move |c| Ok(guarded(c, &check)))??;
-    if changes(&current, &args).is_empty() {
+    let wanted = changes(&current, &args);
+    if wanted.is_empty() {
         return Ok(current);
+    }
+    let target_privacy = wanted
+        .iter()
+        .find(|(column, _, _)| *column == "privacy_class")
+        .and_then(|(_, _, value)| value.as_str())
+        .map(str::to_owned);
+    let id = args.source_id.clone();
+    let (removing, removing_to) = store.read(move |c| {
+        c.query_row(
+            "SELECT removing, removing_to FROM sources WHERE id = ?1",
+            [id.as_str()],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, Option<String>>(1)?)),
+        )
+    })?;
+    if removing == 1 || (removing == 2 && target_privacy.as_deref() != removing_to.as_deref()) {
+        return Err(CoreError::new(
+            ErrorCode::Conflict,
+            "source removal or reclassification is in progress",
+        ));
     }
     // @cpt-end:cpt-noter-flow-core-knowledge-manage:p1:inst-manage-update
     meta.undoable = false;
+    if let Some(privacy) = &target_privacy {
+        let id = args.source_id.clone();
+        let check = args.clone();
+        let to = privacy.clone();
+        store.write_with(meta.clone(), move |tx| {
+            guarded(tx, &check)?;
+            let changed = tx
+                .execute(
+                    "UPDATE sources SET removing = 2, removing_to = ?1
+                     WHERE id = ?2 AND (removing = 0 OR (removing = 2 AND removing_to = ?1))",
+                    params![to, id.as_str()],
+                )
+                .map_err(internal)?;
+            if changed == 0 {
+                return Err(CoreError::new(
+                    ErrorCode::Conflict,
+                    "source removal or reclassification is in progress",
+                ));
+            }
+            Ok((
+                (),
+                vec![Logged {
+                    entity_type: "source",
+                    entity_id: id.as_str().into(),
+                    field: Some("privacy_repartition".into()),
+                    before: None,
+                    after: Some(to),
+                    delta: None,
+                }],
+            ))
+        })?;
+        repartition_batches(
+            store,
+            &args.source_id,
+            &text(&current.privacy),
+            privacy,
+            meta.clone(),
+        )?;
+    }
+    let expected_repartition = target_privacy.clone();
     let written = store.write_with(meta, move |tx| {
         // @cpt-begin:cpt-noter-flow-core-knowledge-manage:p1:inst-manage-commit
         let current = guarded(tx, &args)?;
+        let (removing, removing_to): (i64, Option<String>) = tx
+            .query_row(
+                "SELECT removing, removing_to FROM sources WHERE id = ?1",
+                [args.source_id.as_str()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .map_err(internal)?;
+        if (removing == 0 && expected_repartition.is_some())
+            || (removing == 2 && expected_repartition.as_deref() != removing_to.as_deref())
+            || (removing == 1)
+        {
+            return Err(CoreError::new(
+                ErrorCode::Conflict,
+                "source removal or reclassification is in progress",
+            ));
+        }
         let wanted = changes(&current, &args);
         for (column, _, new) in &wanted {
             let value = new.as_str().map(String::from);
@@ -477,9 +551,15 @@ pub fn update(
             params![current.rev.0 + 1, args.source_id.as_str()],
         )
         .map_err(internal)?;
-        if let Some((_, _, privacy)) = wanted.iter().find(|(c, _, _)| *c == "privacy_class") {
-            repartition(tx, &args.source_id, privacy.as_str().unwrap_or("normal"))
-                .map_err(internal)?;
+        if wanted
+            .iter()
+            .any(|(column, _, _)| *column == "privacy_class")
+        {
+            tx.execute(
+                "UPDATE sources SET removing = 0, removing_to = NULL WHERE id = ?1",
+                [args.source_id.as_str()],
+            )
+            .map_err(internal)?;
         }
         let row = get(tx, &args.source_id)
             .map_err(internal)?
@@ -523,47 +603,209 @@ fn logged(id: &SourceId, wanted: &[(&'static str, Value, Value)]) -> Logged {
     }
 }
 
-/// Moves the source's vectors to the partition of its new privacy class.
-fn repartition(tx: &Transaction<'_>, id: &SourceId, privacy: &str) -> rusqlite::Result<()> {
-    tx.execute(
-        "DELETE FROM doc_vec WHERE chunk_id IN (SELECT c.id FROM doc_chunks c
-             JOIN documents d ON d.id = c.document_id WHERE d.source_id = ?1)",
-        [id.as_str()],
-    )?;
-    tx.execute(
-        "INSERT INTO doc_vec (chunk_id, privacy_class, embedding)
-         SELECT c.id, ?2, c.embedding FROM doc_chunks c JOIN documents d ON d.id = c.document_id
-         WHERE d.source_id = ?1 AND c.embedding IS NOT NULL",
-        params![id.as_str(), privacy],
-    )?;
+/// Moves vectors in bounded writer transactions while the source is excluded from retrieval.
+fn repartition_batches(
+    store: &Store,
+    id: &SourceId,
+    from: &str,
+    to: &str,
+    meta: ChangeMeta,
+) -> Result<(), CoreError> {
+    if from == to {
+        return Ok(());
+    }
+    loop {
+        let id = id.clone();
+        let from = from.to_owned();
+        let to = to.to_owned();
+        let _moved = match store.write_with(meta.clone(), move |tx| {
+            let target: Option<String> = tx
+                .query_row(
+                    "SELECT removing_to FROM sources WHERE id = ?1 AND removing = 2",
+                    [id.as_str()],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(internal)?;
+            if target.as_deref() != Some(to.as_str()) {
+                return Err(CoreError::new(
+                    ErrorCode::Conflict,
+                    "source repartition was interrupted",
+                ));
+            }
+            let ids =
+                {
+                    let mut statement = tx.prepare(
+                    "SELECT v.chunk_id FROM doc_vec v JOIN doc_chunks c ON c.id = v.chunk_id
+                     JOIN documents d ON d.id = c.document_id
+                     WHERE v.privacy_class = ?1 AND d.source_id = ?2 LIMIT 512",
+                ).map_err(internal)?;
+                    let rows = statement
+                        .query_map(params![from, id.as_str()], |row| row.get::<_, String>(0))
+                        .map_err(internal)?;
+                    rows.collect::<rusqlite::Result<Vec<_>>>()
+                        .map_err(internal)?
+                };
+            if ids.is_empty() {
+                return Err(CoreError::new(
+                    ErrorCode::NotFound,
+                    "no vectors remain to repartition",
+                ));
+            }
+            for chunk in &ids {
+                tx.execute("DELETE FROM doc_vec WHERE chunk_id = ?1", [chunk])
+                    .map_err(internal)?;
+                tx.execute(
+                    "INSERT INTO doc_vec (chunk_id, privacy_class, embedding)
+                     SELECT c.id, ?2, c.embedding FROM doc_chunks c
+                     JOIN documents d ON d.id = c.document_id
+                     WHERE c.id = ?1 AND d.source_id = ?3 AND c.embedding IS NOT NULL",
+                    params![chunk, to, id.as_str()],
+                )
+                .map_err(internal)?;
+            }
+            Ok((
+                ids.len(),
+                vec![Logged {
+                    entity_type: "source",
+                    entity_id: id.as_str().into(),
+                    field: Some("privacy_repartition_progress".into()),
+                    before: None,
+                    after: Some(ids.len().to_string()),
+                    delta: None,
+                }],
+            ))
+        }) {
+            Ok(batch) => batch.value,
+            Err(error) if error.code == ErrorCode::NotFound => break,
+            Err(error) => return Err(error),
+        };
+    }
     Ok(())
 }
 
 // @cpt-dod:cpt-noter-dod-core-knowledge-removal:p1
 // @cpt-algo:cpt-noter-algo-core-knowledge-remove-index:p1
-/// Deletes the source with its documents, chunks, keyword and vector entries and sync runs in
-/// one transaction; a failure rolls everything back and answers `internal`. Files in the folder
-/// and remote pages are never touched. Returns the documents removed plus the source.
+/// Hides the source from retrieval, deletes its chunks and documents in bounded writer
+/// transactions, then removes its row. Files in the folder and remote pages are never touched.
 pub fn remove(
     store: &Store,
     mut meta: ChangeMeta,
     id: &SourceId,
 ) -> Result<DeleteResult, CoreError> {
     meta.undoable = false;
-    let id = id.clone();
+    let source = id.clone();
+    let id = source.clone();
+    let documents = store
+        .write_with(meta.clone(), move |tx| {
+            // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-begin
+            let documents: u32 = tx
+                .query_row(
+                    "SELECT COUNT(*) FROM documents WHERE source_id = ?1",
+                    [id.as_str()],
+                    |r| r.get(0),
+                )
+                .map_err(internal)?;
+            let gone = tx
+                .execute(
+                    "UPDATE sources SET removing = 1, removing_to = NULL WHERE id = ?1",
+                    [id.as_str()],
+                )
+                .map_err(internal)?;
+            if gone == 0 {
+                return Err(not_found());
+            }
+            // @cpt-end:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-begin
+            Ok((
+                documents,
+                vec![Logged {
+                    entity_type: "source",
+                    entity_id: id.as_str().into(),
+                    field: Some("cleanup_progress".into()),
+                    before: None,
+                    after: Some("started".into()),
+                    delta: None,
+                }],
+            ))
+        })?
+        .value;
+
+    loop {
+        let id = source.clone();
+        let _deleted = match store.write_with(meta.clone(), move |tx| {
+            let count = tx
+                .execute(
+                    "DELETE FROM doc_chunks WHERE id IN (
+                     SELECT c.id FROM doc_chunks c JOIN documents d ON d.id = c.document_id
+                     WHERE d.source_id = ?1 LIMIT 512
+                 )",
+                    [id.as_str()],
+                )
+                .map_err(internal)?;
+            if count == 0 {
+                return Err(CoreError::new(
+                    ErrorCode::NotFound,
+                    "no chunks remain to remove",
+                ));
+            }
+            Ok((
+                count,
+                vec![Logged {
+                    entity_type: "source",
+                    entity_id: id.as_str().into(),
+                    field: Some("cleanup_progress".into()),
+                    before: None,
+                    after: Some(format!("chunks:{count}")),
+                    delta: None,
+                }],
+            ))
+        }) {
+            Ok(batch) => batch.value,
+            Err(error) if error.code == ErrorCode::NotFound => break,
+            Err(error) => return Err(error),
+        };
+    }
+
+    loop {
+        let id = source.clone();
+        let _deleted = match store.write_with(meta.clone(), move |tx| {
+            let count = tx
+                .execute(
+                    "DELETE FROM documents WHERE id IN (
+                     SELECT id FROM documents WHERE source_id = ?1 LIMIT 64
+                 )",
+                    [id.as_str()],
+                )
+                .map_err(internal)?;
+            if count == 0 {
+                return Err(CoreError::new(
+                    ErrorCode::NotFound,
+                    "no documents remain to remove",
+                ));
+            }
+            Ok((
+                count,
+                vec![Logged {
+                    entity_type: "source",
+                    entity_id: id.as_str().into(),
+                    field: Some("cleanup_progress".into()),
+                    before: None,
+                    after: Some(format!("documents:{count}")),
+                    delta: None,
+                }],
+            ))
+        }) {
+            Ok(batch) => batch.value,
+            Err(error) if error.code == ErrorCode::NotFound => break,
+            Err(error) => return Err(error),
+        };
+    }
+
+    // If maintenance cannot reclaim pages, keep the hidden source row so removal can resume.
+    store.incremental_vacuum()?;
+    let id = source.clone();
     let removed = store.write_with(meta, move |tx| {
-        // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-begin
-        let documents: u32 = tx
-            .query_row(
-                "SELECT COUNT(*) FROM documents WHERE source_id = ?1",
-                [id.as_str()],
-                |r| r.get(0),
-            )
-            .map_err(internal)?;
-        // @cpt-end:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-begin
         // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-delete
-        // The foreign keys cascade to documents, chunks and sync runs; the chunk triggers drop
-        // the keyword and vector entries in the same transaction.
         let gone = tx
             .execute("DELETE FROM sources WHERE id = ?1", [id.as_str()])
             .map_err(internal)?;
@@ -579,11 +821,11 @@ pub fn remove(
             delta: None,
         };
         // @cpt-end:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-delete
-        Ok((documents, vec![tombstone]))
+        Ok(((), vec![tombstone]))
     });
     // @cpt-begin:cpt-noter-algo-core-knowledge-remove-index:p1:inst-drop-commit
     let documents = match removed {
-        Ok(custom) => custom.value,
+        Ok(_) => documents,
         Err(e) if e.code == ErrorCode::NotFound => return Err(e),
         Err(e) => return Err(CoreError::new(ErrorCode::Internal, e.message)),
     };

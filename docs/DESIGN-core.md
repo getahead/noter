@@ -2,7 +2,7 @@
 title: "Technical Design — Noter Core (backend)"
 description: "The Rust core, the Swift engine sidecar, noter-mcp and the contracts between them and the UI, designed so that the UI and the core can be built in parallel from day one."
 status: PROPOSED
-version: "0.4"
+version: "0.5"
 date: "2026-10-17"
 prd: docs/PRD.md
 ui_design: docs/DESIGN.md
@@ -44,6 +44,7 @@ note: "The PRD is not yet a registered kit artifact and has no requirement IDs, 
   - [4.5 Terms](#45-terms)
   - [4.6 Checklist dispositions](#46-checklist-dispositions)
 - [5. Traceability](#5-traceability)
+- [Change Log](#change-log)
 
 <!-- /toc -->
 
@@ -774,7 +775,7 @@ Documents become first-class evidence only if they are indexed into the same sto
 
 ##### Responsibility scope
 
-Crate `noter-knowledge`. Folder sources through a security-scoped bookmark and FSEvents; text extraction for Markdown, text, PDF, Word, HTML and code; heading chunking; indexed MCP sources with the server's OAuth flow (token in the Keychain), resource listing or seed-query crawl, content-hash change detection; removal in one transaction. Sync runs are jobs with `sync_runs` rows and source status.
+Crate `noter-knowledge`. Folder sources through a security-scoped bookmark and FSEvents; text extraction for Markdown, text, PDF, Word, HTML and code; heading chunking; indexed MCP sources with the server's OAuth flow (token in the Keychain), resource listing or seed-query crawl, content-hash change detection; resumable source cleanup and privacy repartition in bounded writer transactions, with in-progress sources excluded from retrieval. Sync runs are jobs with `sync_runs` rows and source status.
 
 ##### Responsibility boundaries
 
@@ -2555,10 +2556,11 @@ Knowledge sources; documents and chunks as in the PRD. Change from the PRD: adds
 | privacy_class, scope | TEXT | Applied before retrieval |
 | token_ref | TEXT NULL | Keychain item name, never the token |
 | status, last_sync_at | TEXT/INTEGER | Status |
+| removing, removing_to | INTEGER/TEXT NULL | Internal retrieval exclusion; 1 means source cleanup, 2 means privacy repartition to `removing_to`, 0 means available |
 
 **PK**: id
 
-**Constraints**: Removing a source deletes documents, doc_chunks and doc_vec rows in one transaction
+**Constraints**: A source is excluded from retrieval while cleanup or privacy repartition moves its vectors and chunks in bounded writer transactions; an interrupted operation remains excluded and can resume
 
 **Additional info**: `documents`, `doc_chunks`, `doc_vec`, `sync_runs` as in PRD › Data model
 
@@ -2976,3 +2978,7 @@ Items of the DESIGN checklist that do not apply, with the reason; everything els
 | Events: Call state, Degraded state, Outputs, Jobs and proposals, Environment | `capture:*`, `degraded:changed`, `banners:changed`, `outputs:progress`, `jobs:progress`, `proposals:counts`, `env:changed`, `settings:changed`, `accounts:changed`, `signin:progress`, `hotkeys:changed`, `privacy:changed`, `window:call`, `app:presenting`, `playback:state`, `entity:changed`, `nav:request`, `setup:changed`, `copilot:status` | 20 | frozen except `copilot:status` |
 
 **PRD Part B sections → components**: Architecture overview → 1.3, 3.8; Audio capture → `cpt-noter-component-engine`, `cpt-noter-component-core-session`; Transcription pipeline → engine, `cpt-noter-component-core-transcript`; Diarization and speaker identity → engine, transcript, `cpt-noter-component-core-people`; LLM orchestration → `cpt-noter-component-core-llm-router`, `cpt-noter-component-core-mcp`, `cpt-noter-component-core-privacy`; Live copilot loop → `cpt-noter-component-core-copilot`, `cpt-noter-component-core-native`; Data model → 3.7, `cpt-noter-component-core-storage`; Search → `cpt-noter-component-core-retrieval`; Maintenance and history → `cpt-noter-component-core-jobs`, `cpt-noter-component-core-changelog`; Security → `cpt-noter-component-core-privacy`, `cpt-noter-component-core-credentials`; Repository layout → 3.4.
+
+## Change Log
+
+- 2026-11-13: Documented the internal retrieval exclusion used during bounded source cleanup and privacy repartition.

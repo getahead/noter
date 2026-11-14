@@ -666,6 +666,13 @@ impl Core {
             ids,
             self.change_meta(ctx, "Deleted a call".into(), "calls_delete"),
         )?;
+        if self.store().incremental_vacuum().is_err() {
+            self.log(object(json!({
+                "level": "warn",
+                "module": "library",
+                "code": "incremental_vacuum_failed"
+            })));
+        }
         // @cpt-end:cpt-noter-algo-core-library-calls-delete:p1:inst-del-tx
         for (id, _) in &deleted {
             // @cpt-begin:cpt-noter-algo-core-library-calls-delete:p1:inst-del-files
