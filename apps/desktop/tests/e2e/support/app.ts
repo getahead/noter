@@ -11,7 +11,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import fixture from "../../../../../contracts/fixtures/world.json" with { type: "json" };
-import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type WindowLabel } from "../../../src/core/bindings";
+import { COMMANDS, type ChannelCommand, type CommandName, type ErrorCode, type ErrorDetail, type HotkeyAction, type WindowLabel } from "../../../src/core/bindings";
 import type { ChannelBody } from "../../../src/core/fake/fake-core";
 import type { World } from "../../support/scenario";
 import { StdioCore } from "../../support/stdio-transport";
@@ -25,6 +25,8 @@ export interface CorePlan {
   latency?: number;
   /** Page Date and the real core use the fixture's clock; browser timers still run. */
   fixedClock?: boolean;
+  /** The real core's scripted host refuses this initially bound chord. */
+  hotkeyConflict?: { action: HotkeyAction; shortcut: string; owner: string };
   /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
   world?: (world: World) => void;
   /** The window's first bundle download ends in `checksum_failed` once (harness.corrupt_next_download), set before the page loads. */
@@ -63,6 +65,12 @@ const HOOK = `
     if (plan && !this.__noterPlanned) {
       this.__noterPlanned = (async () => {
         if (globalThis.__noterSeed) this.world = await globalThis.__noterSeed(this.world);
+        if (plan.hotkeyConflict) {
+          const binding = this.world.hotkeys.bindings.find((item) => item.action === plan.hotkeyConflict.action);
+          if (!binding) throw new Error("no fixture hotkey binding for " + plan.hotkeyConflict.action);
+          binding.shortcut = plan.hotkeyConflict.shortcut;
+          binding.status = { type: "conflict", owner: plan.hotkeyConflict.owner };
+        }
         (plan.fail ?? []).forEach((f) => this.failNext(f.cmd, f.code));
         if (plan.contractVersion) this.world.app.contract_version = plan.contractVersion;
         if (plan.latency) this.latency = plan.latency;
@@ -143,7 +151,11 @@ const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
 async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<Steer> {
   const command = process.env.NOTER_CORE_CMD;
   if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
-  const core = new StdioCore({ command: plan.fixedClock ? `${command} --clock fixed` : command });
+  const args = [
+    ...(plan.fixedClock ? ["--clock", "fixed"] : []),
+    ...(plan.hotkeyConflict ? ["--hotkey-conflict", `${plan.hotkeyConflict.shortcut}=${plan.hotkeyConflict.owner}`] : []),
+  ];
+  const core = new StdioCore({ command, args });
   page.once("close", () => void core.close());
   const win = (WINDOWS.includes(label) ? label : "main") as WindowLabel; // as main.tsx reads it
   // Harness control requests (tests/support/scenario.ts › HARNESS_CONTROLS), not contract commands.

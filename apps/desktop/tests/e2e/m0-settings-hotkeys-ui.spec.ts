@@ -80,7 +80,7 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
   });
 
   test("UI — clears a pane-reported conflict as soon as the shortcut is cleared", async ({ page }) => {
-    await openWindow(page, "settings", { world: (w) => { const binding = w.hotkeys.bindings.find((item) => item.action === "mark_moment"); if (binding) binding.status = { type: "conflict", owner: "Zoom" }; } });
+    await openWindow(page, "settings", { hotkeyConflict: { action: "mark_moment", shortcut: "Ctrl+Alt+Super+M", owner: "Zoom" } });
     await openHotkeys(page);
     await expect(pane(page)).toContainText("Used by Zoom");
     await pane(page).locator('[data-component="cpt-noter-component-ui-hotkey-recorder"]').filter({ hasText: "Mark moment" }).getByRole("button", { name: "Clear shortcut" }).click();

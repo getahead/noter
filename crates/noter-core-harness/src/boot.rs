@@ -17,8 +17,8 @@ use noter_core::{
     Adapters, BoxFuture as CoreFuture, BundleFile, BundleSpec, CalendarAttendee, CalendarEvent,
     CaptureEvent, ChunkSink, ClipboardText, Clock, Core, CoreDeps, EnvironmentReading,
     EventEmitter, FetchError, LaunchRequest, MemorySecrets, ModelSource, NativeOps, NativeServices,
-    Placement, SaveKind, Scripted, ScriptedAccountCli, ScriptedMcp, ScriptedServer, Surfaces,
-    SystemClock, ToolScript, TrayModel, Updater,
+    Placement, SaveKind, Scripted, ScriptedAccountCli, ScriptedMcp, ScriptedServer,
+    ShortcutRegistrar, ShortcutTaken, Surfaces, SystemClock, ToolScript, TrayModel, Updater,
 };
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_protocol::engine::{
@@ -60,6 +60,8 @@ pub struct Options {
     pub launch_world: Option<LaunchWorld>,
     /// Folder-panel answers (`NOTER_TEST_FOLDER_PANELS`): null cancels; exhaustion cancels.
     pub folder_panels: Option<VecDeque<Option<PathBuf>>>,
+    /// `--hotkey-conflict <shortcut>=<owner>`: the scripted host refuses one initial chord.
+    pub hotkey_conflict: Option<(String, String)>,
 }
 
 impl Options {
@@ -75,6 +77,13 @@ impl Options {
                 ("--fixture", Some("world")) => options.fixture = true,
                 ("--fixture", name) => return Err(format!("unknown fixture {name:?}; known: world")),
                 ("--clock", Some("fixed")) => options.fixed_clock = true,
+                ("--hotkey-conflict", Some(value)) => {
+                    let (shortcut, owner) = value
+                        .split_once('=')
+                        .filter(|(shortcut, owner)| !shortcut.is_empty() && !owner.is_empty())
+                        .ok_or_else(|| "--hotkey-conflict needs <shortcut>=<owner>".to_string())?;
+                    options.hotkey_conflict = Some((shortcut.to_string(), owner.to_string()));
+                }
                 ("--llm-script", Some(file)) => {
                     let text = std::fs::read_to_string(file)
                         .map_err(|e| format!("llm script {file}: {e}"))?;
@@ -92,7 +101,7 @@ impl Options {
                         Script::parse(&text).map_err(|e| format!("engine script {file}: {e}"))?;
                     options.engine_script = Some(script);
                 }
-                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--engine-script <file>] [--llm-script <file>]")),
+                _ => return Err(format!("unknown arguments {args:?}; usage: noter-core-harness [--fixture world] [--clock fixed] [--power battery|ac] [--hotkey-conflict <shortcut>=<owner>] [--engine-script <file>] [--llm-script <file>]")),
             }
         }
         Ok(options)
@@ -364,6 +373,7 @@ impl Harness {
             clock.clone(),
             Arc::new(EventLines(events, seeding.clone(), engine.clone())),
         )
+        .with_shortcuts(Arc::new(ScriptedShortcuts(options.hotkey_conflict.clone())))
         .with_native(native.clone())
         .with_models(models.clone())
         .with_engine(Arc::new(engine.clone()))
@@ -1342,6 +1352,22 @@ impl Harness {
         *lock(&self.world) = parsed;
         Ok(json!({}))
     }
+}
+
+/// The harness host accepts shortcuts unless the test starts it with one held chord.
+struct ScriptedShortcuts(Option<(String, String)>);
+
+impl ShortcutRegistrar for ScriptedShortcuts {
+    fn register(&self, chord: &str) -> Result<(), ShortcutTaken> {
+        match &self.0 {
+            Some((taken, owner)) if taken == chord => Err(ShortcutTaken {
+                owner: Some(owner.clone()),
+            }),
+            _ => Ok(()),
+        }
+    }
+
+    fn unregister(&self, _chord: &str) {}
 }
 
 #[derive(serde::Deserialize)]
