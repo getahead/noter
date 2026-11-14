@@ -87,13 +87,13 @@ private final class Loaded<T>: @unchecked Sendable {
 }
 
 // @cpt-dod:cpt-noter-dod-core-engine-offline-embeddings:p1
-/// The offline commands on the installed models. Large v3 stays loaded between passes and is
-/// released when capture starts; the embedding models stay loaded.
+/// The offline commands on the installed models. Archive models stay loaded between passes and
+/// are released when capture starts; the embedding models stay loaded.
 public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
     private let decoder: Loaded<ArchiveDecoder>?
     private let speakerModel: Loaded<SpeakerModel>?
     private let textModel: Loaded<TextModel>?
-    private let clustering: (() throws -> Clustering)?
+    private let clustering: Loaded<Clustering>?
 
     public init(
         decoder: (() throws -> ArchiveDecoder)? = nil, speaker: (() throws -> SpeakerModel)? = nil,
@@ -102,14 +102,17 @@ public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
         self.decoder = decoder.map(Loaded.init)
         speakerModel = speaker.map(Loaded.init)
         textModel = text.map(Loaded.init)
-        self.clustering = clustering
+        self.clustering = clustering.map(Loaded.init)
     }
 
     public var available: Set<OfflineModel> {
         Set([decoder.map { _ in .archive }, speakerModel.map { _ in .speaker }, textModel.map { _ in .text }].compactMap { $0 })
     }
 
-    public func releaseArchive() { decoder?.clear() }
+    public func releaseArchive() {
+        decoder?.clear()
+        clustering?.clear()
+    }
 
 
     // @cpt-dod:cpt-noter-dod-core-engine-offline-archive:p1
@@ -118,8 +121,12 @@ public final class LocalOfflineWork: OfflineWork, @unchecked Sendable {
         yieldIfNeeded: () -> Void, progress: (Float) -> Void
     ) throws {
         guard let decoder else { throw OfflineFailure(code: .modelMissing) }
-        // Clustering loads for each pass like Large v3; it needs WeSpeaker beside its own models.
-        let diarizer = try clustering.flatMap { make in try speakerModel.map { (try Loaded.load(make), try $0.get()) } }
+        let diarizer: (clustering: () throws -> Clustering, speaker: SpeakerModel)?
+        if let clustering, let speakerModel {
+            diarizer = (clustering: { try clustering.get() }, speaker: try speakerModel.get())
+        } else {
+            diarizer = nil
+        }
         try Archive.run(
             pass, session: session, result: result, constraints: constraints, decoder: { try decoder.get() },
             diarizer: diarizer, yieldIfNeeded: yieldIfNeeded, progress: progress)

@@ -277,7 +277,8 @@ enum Archive {
     // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     static func run(
         _ pass: OfflinePass, session: URL, result: URL, constraints c: OfflineConstraints,
-        decoder: () throws -> ArchiveDecoder, diarizer: (clustering: Clustering, speaker: SpeakerModel)? = nil,
+        decoder: () throws -> ArchiveDecoder,
+        diarizer: (clustering: () throws -> Clustering, speaker: SpeakerModel)? = nil,
         yieldIfNeeded: () -> Void = {}, progress: (Float) -> Void
     ) throws {
         let wordsDir = result.deletingPathExtension().appendingPathExtension("words")

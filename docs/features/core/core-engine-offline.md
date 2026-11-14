@@ -2,7 +2,7 @@
 title: "Feature: Engine offline pass and embeddings"
 description: "Large v3 and constrained VBx archive processing, speaker embeddings and local text embeddings over engine stdio."
 status: PROPOSED
-version: "0.2"
+version: "0.3"
 date: "2026-10-18"
 milestone: M2
 lane: engine
@@ -12,7 +12,7 @@ design: docs/DESIGN-core.md
 
 # Feature: Engine offline pass and embeddings
 
-> **Change log (v0.2):** Speaker embedding scratch files are removed after failed as well as successful requests.
+> **Change log (v0.3):** Archive decoder, segmentation model and PLDA tensors are reused between passes and released when capture starts.
 
 <!-- toc -->
 
@@ -46,7 +46,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features. Offline work yields to live capture at window boundaries, drops queued archive requests superseded for the same call, and releases its cached archive model when a live session starts. Within one diarization window, all local speakers are embedded from the same filterbank result.
+The Swift engine and Rust supervisor gain the offline Large v3 pass with VBx clustering, 256-dimensional speaker embeddings and 1024-dimensional bge-m3 text embeddings. Large results travel by file inside the App Group container. The engine returns facts and files; installing archive results, identifying people and querying vectors belong to their consuming features. Offline work yields to live capture at window boundaries, drops queued archive requests superseded for the same call, and releases its cached archive decoder, segmentation model and PLDA tensors when a live session starts. Within one diarization window, all local speakers are embedded from the same filterbank result.
 
 > **M2 decisions (Backend Teamlead, 1 Nov 2026).** The constraints file is `OfflineConstraints` (`contracts/engine.schema.json#offline_constraints`): `{languages, glossary, speaker_priors, must_link: [{a: {t0_ms, t1_ms}, b: {...}}], cannot_link, speaker_names: {live_label: name}}`, every key required, spans in call milliseconds on the system channel; 2.13 writes it (TL-16). Large v3 runs on WhisperKit, which has no beam search, so the decode is greedy with a temperature fallback over the top five tokens, not beam 5; a voice with under 3 s of speech gets the label `''` (TL-16). Clustering implements the owner's D-32 answer, option 2 (1 Nov, #279): pinned pyannote community-1 segmentation and WeSpeaker CoreML models with VBx and the user's constraints in the engine, no FluidAudio binary; every pinned file is CC-BY-4.0 and needs attribution (`.plans/backend/m2-diarization-licences.md`); the golden set is the owner's item (TL-17). Crosstalk: the engine only reports overlap; `segments.crosstalk_with` storage and both transcript readers land with the archive install in 2.17 and are cross-referenced from the crosstalk acceptance criterion below (TL-21, D-40).
 
@@ -90,6 +90,7 @@ The live transcript can improve after the call without losing the user's speaker
 **Success Scenarios**:
 - A stopped call with stored audio is processed with user constraints; progress arrives and the finished result file is returned once complete.
 - If capture starts during an archive pass, the pass yields at its next diarization-window boundary and resumes after capture ends; queued passes superseded for that call do not start.
+- The archive decoder, segmentation model and PLDA tensors are reused across passes and released when capture starts.
 
 **Error Scenarios**:
 - Missing audio or model, malformed constraints, failed decode or disk failure returns the protocol's correlated error or `offline_failed`; the live transcript remains usable.
@@ -244,4 +245,5 @@ Open: the file-mode golden-call tests in English, Russian and German need `evals
 
 ## 7. Changelog
 
+- **0.3 (14 Nov 2026)**: Reuse segmentation and PLDA models across archive passes and release them for live capture.
 - **0.2 (14 Nov 2026)**: Define capture yielding at diarization-window boundaries, stale queued archive suppression, archive-model release at session start, and one shared filterbank result per diarization window.

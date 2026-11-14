@@ -26,6 +26,7 @@ final class Box<T>: @unchecked Sendable {
 /// The fake source of CaptureTests, plus what the live source reports on its own.
 final class DeviceSource: AudioSource, @unchecked Sendable {
     private let lock = NSLock()
+    let started = DispatchSemaphore(value: 0)
     private var onChunk: (@Sendable (AudioChunk) -> Void)?
     private var onDevice: (@Sendable (DeviceChange) -> Void)?
     private(set) var excluded: [String] = []
@@ -33,7 +34,10 @@ final class DeviceSource: AudioSource, @unchecked Sendable {
     /// A leaky system: the tap hears what the engine itself plays.
     var leaky = false
 
-    func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws { lock.withLock { self.onChunk = onChunk } }
+    func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws {
+        lock.withLock { self.onChunk = onChunk }
+        started.signal()
+    }
     func stop() { lock.withLock { onChunk = nil } }
 
     func exclude(bundleId: String) throws {

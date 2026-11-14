@@ -131,6 +131,53 @@ final class DiarizationTests: XCTestCase {
         XCTAssertEqual(speaker.windows, 2, "one shared filterbank per window")
     }
 
+    func testClusteringModelsAreReusedBetweenPassesAndReleasedForCapture() throws {
+        try store(seconds: 3, sys: [(0.5, 2.5, 220)])
+        var loads = 0
+        let work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: {
+                loads += 1
+                return Clustering(segmentation: self.segmentation, plda: identityPLDA())
+            })
+        let output = container.appendingPathComponent(pass.resultPath)
+
+        for _ in 0..<2 {
+            try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        }
+        XCTAssertEqual(loads, 1)
+
+        work.releaseArchive()
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {}) { _ in }
+        XCTAssertEqual(loads, 2)
+    }
+
+    func testCaptureReleasesClusteringBeforeTheNextDiarizationWindowLoadsIt() throws {
+        try store(seconds: 3, sys: [(0.5, 2.5, 220)])
+        var loads = 0
+        var yields = 0
+        var loadsWhenCaptureStarts: Int?
+        var work: LocalOfflineWork!
+        work = LocalOfflineWork(
+            decoder: { FakeDecoder() }, speaker: { self.speaker },
+            clustering: {
+                loads += 1
+                return Clustering(segmentation: self.segmentation, plda: identityPLDA())
+            })
+        let output = container.appendingPathComponent(pass.resultPath)
+
+        try work.archive(pass, session: session, result: output, constraints: .none, yieldIfNeeded: {
+            yields += 1
+            if yields == 2 {
+                work.releaseArchive()
+                loadsWhenCaptureStarts = loads
+            }
+        }) { _ in }
+
+        XCTAssertEqual(loadsWhenCaptureStarts, 0, "the live session can release clustering before the window resumes")
+        XCTAssertEqual(loads, 1, "clustering reloads after the capture yield")
+    }
+
     func testOfflineDiarizationChecksCaptureAtEachSilentWindow() throws {
         try store(seconds: 20, sys: [])
         segmentation.silent = true

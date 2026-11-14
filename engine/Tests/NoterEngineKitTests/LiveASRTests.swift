@@ -394,6 +394,7 @@ final class EngineASRTests: XCTestCase {
         func selfTest() throws -> [[String: Any]] {
             lines = Lines()
             _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":3000}}"#)
+            XCTAssertEqual(source.started.wait(timeout: .now() + 5), .success, "the self-test source is ready")
             source.push(ms: 300)
             XCTAssertNotNil(lines.waitFor("levels"), "the capture loop is running")
             for _ in 0..<20 { source.push(mic: speech(), sys: speech()) }

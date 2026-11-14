@@ -180,9 +180,9 @@ enum Diarization {
     /// with no speech turn they keep the live label.
     static func label(
         _ segments: inout [Segment], samples: [Float], time: CallTime, constraints c: OfflineConstraints,
-        _ models: (clustering: Clustering, speaker: SpeakerModel), yieldIfNeeded: () -> Void = {}
+        _ models: (clustering: () throws -> Clustering, speaker: SpeakerModel), yieldIfNeeded: () -> Void = {}
     ) throws {
-        let turns = try turns(samples, models.clustering.segmentation, yieldIfNeeded: yieldIfNeeded)
+        let turns = try turns(samples, { try models.clustering().segmentation }, yieldIfNeeded: yieldIfNeeded)
         guard !turns.isEmpty else { return }
         let rate = Archive.rate
         let runs = turns.map {
@@ -207,8 +207,9 @@ enum Diarization {
             + turns.indices.flatMap { i in
                 turns.indices.filter { turns[$0].window == turns[i].window && turns[$0].local > turns[i].local }.map { (i, $0) }
             }
+        yieldIfNeeded()
         let voices = cluster(
-            vectors, training: turns.map { $0.speech * 1000 >= trainingSpeechMs * rate }, plda: models.clustering.plda,
+            vectors, training: turns.map { $0.speech * 1000 >= trainingSpeechMs * rate }, plda: try models.clustering().plda,
             cannot: cannot)
         var names: [Int: String] = [:]
         for i in segments.indices where segments[i].channel == .sys {
@@ -225,11 +226,14 @@ enum Diarization {
     }
 
     /// The speakers of each window with enough speech alone, as the segmentation hears them.
-    static func turns(_ samples: [Float], _ model: SegmentationModel, yieldIfNeeded: () -> Void = {}) throws -> [Turn] {
+    static func turns(
+        _ samples: [Float], _ makeModel: () throws -> SegmentationModel, yieldIfNeeded: () -> Void = {}
+    ) throws -> [Turn] {
         var out: [Turn] = []
         for (w, start) in stride(from: 0, to: samples.count, by: window).enumerated() {
             yieldIfNeeded()
             let end = min(start + window, samples.count)
+            let model = try makeModel()
             let frames = try model.speakers(Array(samples[start..<end]))
             let at = { (f: Int) in min(end, start + f * window / max(frames.count, 1)) }
             for local in Set(frames.joined()).sorted() {
