@@ -34,6 +34,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   const [saved, setSaved] = useState(false);
   const [showing, setShowing] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
+  const [diffSelected, setDiffSelected] = useState(false);
   const [versionError, setVersionError] = useState<string | null>(null);
   const versions = useVersions(section.summary_id);
   const state = section.state.type;
@@ -81,8 +82,10 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-version
   const show = async (id: string | null) => {
     setVersionError(null);
-    if (id && section.summary_id && !(await readVersion(bridge, section.summary_id, id))) return setVersionError(id);
+    if (id && section.summary_id && !(await readVersion(bridge, section.summary_id, id))) { setVersionError(id); return false; }
     setShowing(id);
+    setDiffSelected(false);
+    return true;
   };
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-version
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-diff
@@ -90,12 +93,19 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-compare
   // @cpt-begin:cpt-noter-state-ui-call-page-outputs-section:p1:inst-hide
   const compare = async () => {
-    if (comparing || !section.summary_id) return setComparing(false);
+    if (comparing) {
+      setComparing(false);
+      if (diffSelected) setShowing(null);
+      setDiffSelected(false);
+      return;
+    }
+    if (!section.summary_id) return;
     // the version before the newest, or the one on show, against the text now
     const list: VersionMeta[] = versions?.versions ?? (await loadVersions(bridge, section.summary_id).then((r) => (r.status === "ok" ? r.data.versions : [])));
     const older = showing ?? [...list].sort((a, b) => b.created_at - a.created_at)[1]?.id ?? null;
     if (!older) return;
-    await show(older);
+    if (!(await show(older))) return;
+    setDiffSelected(!showing);
     setComparing(true);
   };
   // @cpt-end:cpt-noter-state-ui-call-page-outputs-section:p1:inst-hide

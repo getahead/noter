@@ -55,7 +55,7 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-sheet
   return (
-    <Sheet title={t("outputs.regen.title")} width={520} busy={busy} onCancel={close}>
+    <Sheet title={t("outputs.regen.title")} width={520} busy={busy} onCancel={close} onDefault={() => void submit()}>
       <div className="np-sheet__head"><div className="np-sheet__title">{t("outputs.regen.title")}</div></div>
       <div className="np-sheet__body pc-regen">
         {error && <InlineBanner banner={{ id: "regen-error", severity: "error", text: error }} />}

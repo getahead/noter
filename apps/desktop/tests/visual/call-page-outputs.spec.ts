@@ -15,6 +15,13 @@ const quiet = (w: World) => {
   w.calls.find((c) => c.id === W.PAST_CALL)!.tags = ["release", "backend"];
 };
 const nav = (page: Page, target: unknown) => page.evaluate((t) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.invoke("window_navigate", { target: t }), target);
+const share = (page: Page) => page.locator('[data-region="PC-R1"]').getByRole("button", { name: /^Share/ });
+const outputBody = (page: Page) => page.locator('[data-region="PC-R3"]');
+
+async function shortcutsReady(page: Page) {
+  await expect(share(page)).toBeVisible();
+  await expect(outputBody(page).locator(".pc-sec").first()).toBeVisible();
+}
 
 async function open(page: Page) {
   await openWindow(page, "main", { world: quiet });
@@ -38,6 +45,7 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
 
   test("export sheet with Audio while it is kept", async ({ page }) => {
     await open(page);
+    await shortcutsReady(page);
     await page.keyboard.press("Meta+KeyE");
     await expect(page.getByRole("dialog", { name: /Export/ })).toContainText("Scope: Whole call");
     await shot(page, "call-page-export-sheet");
