@@ -4,7 +4,6 @@
 import { useEffect, useId, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
-import { applyRecord } from "../../app/store/window-store";
 import { elementId } from "../../app/element-id";
 import { isTyping } from "../../app/a11y/keys";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -23,7 +22,7 @@ import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import type { ActionItemRowProps } from "../call-page/slots";
-import { acceptSaved, answerHandoff, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
+import { acceptSaved, answerHandoff, rememberItem, review, reviewAll, reopen, saveDraft, setDone, undoRow } from "./actions";
 import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, SECTION_OF, type Draft } from "./review";
 import { ShareMenu } from "../call-page/ShareMenu";
@@ -170,7 +169,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
-  useEffect(() => bridge.store.setState((s) => applyRecord(s, "item", it)), [bridge, it]);
+  useEffect(() => rememberItem(bridge, it), [bridge, it]);
   // @cpt-state:cpt-noter-state-ui-core-bridge-command:p1
   const completing = useWindow(bridge, (s) => s.commands["item:done:".concat(it.id)]?.state === "WAITING");
   const prefs = useWindow(bridge, (s) => s.app?.prefs);

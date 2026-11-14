@@ -137,11 +137,12 @@ function tauriIpcStandIn(): void {
     unregisterCallback: (id: number) => callbacks.delete(id),
     async invoke(cmd: string, payload: { args?: unknown; channel?: { id: number }; event?: string; handler?: number; eventId?: number }) {
       if (cmd === "plugin:event|listen") {
-        calls.push({ kind: "listen", name: payload.event! });
+        if (payload.event !== "shell:menu-action") calls.push({ kind: "listen", name: payload.event! });
         await w.__noterListen(doc, payload.event!, payload.handler!);
         return payload.handler;
       }
       if (cmd === "plugin:event|unlisten") return w.__noterUnlisten(doc, payload.eventId!);
+      if (cmd === "plugin:event|emit") return;
       const call: Call = { kind: "invoke", name: cmd, args: structuredClone(payload.args), completed: false };
       calls.push(call);
       const answer = await w.__noterInvoke(doc, cmd, payload.args, payload.channel?.id ?? null);

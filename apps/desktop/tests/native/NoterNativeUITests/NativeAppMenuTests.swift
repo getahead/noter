@@ -117,7 +117,7 @@ final class NativeAppMenuTests: NoterTestCase {
         let settings = app.windows["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "the native Settings menu opens the Settings window")
         attachScreenshot("settings-native-titlebar")
-        editMenu.click()
+        edit.click()
         XCTAssertFalse(app.menuItems["Copy for Slack"].isEnabled, "Settings does not retain call-page share actions")
         app.typeKey(.escape, modifierFlags: [])
 

@@ -10,6 +10,7 @@ import { resetUndo } from "../history/undo";
 import { slots as outputSlots } from "../call-page/slots";
 import { ActionItemRow, EditFields, focusNext, reviewMenu, ReviewButtons, rowKey } from "./ActionItemRow";
 import { localOf, patchLocal, resetLocal } from "./local";
+import { rememberItem } from "./actions";
 import { RejectedList } from "./RejectedList";
 import { slots } from "./slots";
 import "./register";
@@ -40,6 +41,20 @@ const press = (tree: ReturnType<typeof rendered>, label: string) => (find(tree, 
 const key = (code: string, o: Record<string, unknown> = {}) => ({ code, key: o.key ?? code, ctrlKey: false, altKey: false, shiftKey: false, metaKey: false, target: null, preventDefault() {}, stopPropagation() {}, ...o }) as never;
 
 describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
+  it("keeps a loaded row seed idempotent at the same revision", async () => {
+    await ready();
+    const loaded = item("itm_replay");
+    let updates = 0;
+    const stop = bridge.store.subscribe(() => updates++);
+    rememberItem(bridge, loaded);
+    expect(bridge.store.getState().entities.item[loaded.id]).toBe(loaded);
+    const afterInsert = updates;
+    rememberItem(bridge, { ...loaded, text: "stale projection" });
+    expect(bridge.store.getState().entities.item[loaded.id]).toBe(loaded);
+    expect(updates).toBe(afterInsert);
+    stop();
+  });
+
   it("the outputs section's seam is filled with it", async () => {
     await ready();
     expect(outputSlots.actionItemRow).toBe(ActionItemRow);

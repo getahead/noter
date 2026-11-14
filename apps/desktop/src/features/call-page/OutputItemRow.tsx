@@ -2,9 +2,9 @@
 // one click away. Action items use the same row until the Items review rows replace it.
 import { useEffect } from "react";
 import { useWindow } from "../../app/use-window";
-import { applyRecord } from "../../app/store/window-store";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { ItemView } from "../../core/bindings";
+import { rememberItem } from "../items/actions";
 import { openSpan } from "../items/evidence";
 import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
@@ -15,8 +15,8 @@ import { slots } from "./slots";
 export function OutputItemRow({ bridge, item: listed }: { bridge: Bridge; item: ItemView }) {
   // a review or edit since the section was read: the store holds the newer record
   const held = useWindow(bridge, (s) => s.entities.item[listed.id]);
-  const item = held && held.rev > listed.rev ? held : listed;
-  useEffect(() => bridge.store.setState((s) => applyRecord(s, "item", item)), [bridge, item]);
+  const item = held && held.rev >= listed.rev ? held : listed;
+  useEffect(() => rememberItem(bridge, item), [bridge, item]);
   const Tail = slots.itemTail;
   const span = item.spans[0];
   return (
