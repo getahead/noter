@@ -94,7 +94,7 @@ final class ArchiveTests: XCTestCase {
         return (try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: out)), progress)
     }
 
-    // cpt-noter-algo-core-engine-offline-decode-v2
+    // cpt-noter-algo-core-engine-offline-decode
     func testUnrestrictedLanguageArchiveUsesTheCoreWireShape() throws {
         try storeCall(in: session, seconds: 3, mic: [(0, 2)], sys: [])
         let decoder = FakeDecoder()

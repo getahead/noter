@@ -175,7 +175,7 @@ enum Diarization {
     }
 
     // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
-    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
+    // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
     /// The system channel's segments labelled by voice, `spk_1`, `spk_2`… in order of first words;
     /// with no speech turn they keep the live label.
     static func label(
@@ -264,7 +264,7 @@ enum Diarization {
         }
         return assign(vectors, centroids: centroids, cannot: cannot)
     }
-    // @cpt-end:cpt-noter-algo-core-engine-offline-decode-v2:p1:inst-decode-cluster
+    // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
 
     /// Centroid-linkage clustering of the normalised vectors (Lance-Williams on squared
     /// distances), joining while the closest two are within `threshold`: the clusters in order of

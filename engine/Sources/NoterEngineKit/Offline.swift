@@ -111,9 +111,9 @@ extension EngineLoop {
         (error as? OfflineFailure)?.code ?? .internal
     }
 
-    // @cpt-flow:cpt-noter-flow-core-engine-offline-archive-v2:p1
+    // @cpt-flow:cpt-noter-flow-core-engine-offline-archive:p1
     func offlinePass(_ id: UInt64, _ pass: OfflinePass) {
-        // @cpt-begin:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-paths
+        // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-paths
         guard let container,
             let session = ContainerPath.resolve(pass.sessionDir, in: container), Self.isDirectory(session),
             SessionAudio.stored(in: session, within: container), let result = ContainerPath.resolve(pass.resultPath, in: container)
@@ -127,11 +127,11 @@ extension EngineLoop {
             }
             constraints = read
         }
-        // @cpt-end:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-paths
+        // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-paths
         guard let work = offline, work.available.contains(.archive) else {
             return refuse(id, "offline_pass: no archive model", .modelMissing)
         }
-        // @cpt-begin:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-start
+        // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
         writer.emit(.ack(cmdId: id))
         let writer = self.writer
         archivePassLock.withLock { latestArchivePass[pass.callId] = id }
@@ -143,10 +143,10 @@ extension EngineLoop {
                 return true
             }
             guard isLatest else { return }
-            // @cpt-end:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-start
+            // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-start
             do {
                 var reported: Float = -1
-                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-progress
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-progress
                 try work.archive(
                     pass, session: session, result: result, constraints: constraints,
                     yieldIfNeeded: {
@@ -161,18 +161,18 @@ extension EngineLoop {
                         writer.emit(.offlineProgress(callId: pass.callId, progress: p))
                     }
                 }
-                // @cpt-end:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-progress
-                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-complete
+                // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-progress
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-complete
                 // The pass wrote the words, then the result, each to a temporary name renamed in place.
                 guard FileManager.default.fileExists(atPath: result.path) else { throw OfflineFailure(code: .internal) }
                 writer.emit(.offlineDone(callId: pass.callId, resultPath: pass.resultPath))
-                // @cpt-end:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-complete
+                // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-complete
             } catch {
-                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-fail
+                // @cpt-begin:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-fail
                 // Never a partial file where the core could take it for a result.
                 try? FileManager.default.removeItem(at: result)
                 writer.emit(.offlineFailed(callId: pass.callId, code: Self.code(error)))
-                // @cpt-end:cpt-noter-flow-core-engine-offline-archive-v2:p1:inst-archive-fail
+                // @cpt-end:cpt-noter-flow-core-engine-offline-archive:p1:inst-archive-fail
             }
         }
     }

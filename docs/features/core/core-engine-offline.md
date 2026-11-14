@@ -83,7 +83,7 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Run an archive pass
 
-- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive-v2`
+- [x] `p1` - **ID**: `cpt-noter-flow-core-engine-offline-archive`
 
 **Actor**: Engine supervisor, for the archive job
 
@@ -97,7 +97,7 @@ The live transcript can improve after the call without losing the user's speaker
 **Steps**:
 1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
 2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
-3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode-v2` at low priority with the requested archive backend - `inst-archive-start`
+3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
 4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; if capture starts, yield at the next diarization-window boundary and resume after capture ends - `inst-archive-progress`
 5. [x] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
 6. [x] - `p1` - **IF** asynchronous processing fails, emit `offline_failed { call_id, code }`; never report an incomplete file as done - `inst-archive-fail`
@@ -129,10 +129,7 @@ The live transcript can improve after the call without losing the user's speaker
 
 ### Decode and cluster with corrections
 
-Previous revision, retained as a trace alias for `cpt-noter-algo-core-engine-offline-decode-v2`.
-
 - [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode`
-- [x] `p1` - **ID**: `cpt-noter-algo-core-engine-offline-decode-v2`
 
 **Input**: Stopped-call mic and system audio, timeline, glossary and persisted must-link and cannot-link constraints.
 
@@ -193,8 +190,8 @@ Abandoning a request invalidates its completion at the supervisor; it adds no en
 The system **MUST** implement the offline pass through the existing stdio protocol, decode both channels with full Large v3 and constrained VBx, preserve timing and gaps, and publish progress and complete result files without replacing the core's live rows itself.
 
 **Implements**:
-- `cpt-noter-flow-core-engine-offline-archive-v2`
-- `cpt-noter-algo-core-engine-offline-decode-v2`
+- `cpt-noter-flow-core-engine-offline-archive`
+- `cpt-noter-algo-core-engine-offline-decode`
 - `cpt-noter-state-core-engine-offline-request`
 
 **Constraints**: `cpt-noter-constraint-core-engine-offline`
@@ -226,7 +223,7 @@ The system **MUST** correlate speaker and text embeddings, validate their dimens
 The system **MUST** pass Swift unit and file-mode golden-call tests, Rust supervisor tests for correlation, unsafe paths, malformed vectors, engine exit and late completions, and engine-schema conformance tests. Real-core post-call E2E covers consumption; this feature owns no IPC command or story denominator. `just gate` passes.
 
 **Implements**:
-- `cpt-noter-flow-core-engine-offline-archive-v2`
+- `cpt-noter-flow-core-engine-offline-archive`
 - `cpt-noter-flow-core-engine-offline-embeddings`
 
 **Touches**:
