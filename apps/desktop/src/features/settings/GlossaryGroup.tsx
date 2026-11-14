@@ -33,7 +33,7 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
     if (index === null) return;
     focusAfterRemove.current = null;
     const next = Math.min(index, terms.length - 1);
-    focusFirstAvailable(document, [...(next >= 0 ? [`glossary-row-${terms[next]!.id}`] : []), "glossary-add"]);
+    focusFirstAvailable(document, [...(next >= 0 ? ["g" + next] : []), "glossary-add"]);
   }, [terms]);
 
   const { add, remove } = createGlossaryActions(bridge, { form, selected, editing, setTerms, setForm, setSelected, setEditing });
@@ -98,7 +98,7 @@ export function TermRows({ terms, selected, onSelect, onEdit }: { terms: Glossar
   return (
     <>
       {terms.map((g, i) => (
-        <tr key={g.id} id={`glossary-row-${g.id}`} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => onSelect(g.id)} onFocus={() => onSelect(g.id)} onDoubleClick={onEdit} onKeyDown={(event) => { if (event.key === "Enter") onEdit?.(); }}>
+        <tr key={g.id} id={"g" + i} tabIndex={g.id === selected || (!selected && i === 0) ? 0 : -1} aria-selected={g.id === selected} onClick={() => onSelect(g.id)} onFocus={() => onSelect(g.id)} onDoubleClick={onEdit} onKeyDown={(event) => { if (event.key === "Enter") onEdit?.(); }}>
           <td lang="und">{g.term}</td>
           <td lang="und">{cell(g.variants_latin)}</td>
           <td lang="ru">{cell(g.variants_cyrillic)}</td>
