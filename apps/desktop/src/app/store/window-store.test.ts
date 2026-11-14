@@ -165,6 +165,24 @@ describe("window store", () => {
     ).toBe(s);
   });
 
+  it("removing a call clears its progress, sections, speakers and related handoffs", () => {
+    const call = { id: "call_1", rev: 1, title: "A" } as never;
+    let s = applyEvent(initialState("main"), { event: "entity:changed", payload: { type: "call", call } });
+    s = { ...s,
+      outputs: { "call_1/summary": { call_id: "call_1", section: "summary", state: { type: "writing" } } as never, "call_10/summary": { call_id: "call_10", section: "summary", state: { type: "writing" } } as never },
+      sections: { "call_1/summary": {} as never, "call_10/summary": {} as never },
+      entities: { ...s.entities,
+        speaker: { speaker_1: { id: "speaker_1", call_id: "call_1" } as never, speaker_10: { id: "speaker_10", call_id: "call_10" } as never },
+        handoff: { item_1: { item: { id: "item_1", call: { id: "call_1" } } } as never, item_10: { item: { id: "item_10", call: { id: "call_10" } } } as never },
+      },
+    };
+    s = applyEvent(s, { event: "entity:changed", payload: { type: "removed", kind: "call", id: "call_1" } });
+    expect(s.outputs).toEqual({ "call_10/summary": expect.anything() });
+    expect(s.sections).toEqual({ "call_10/summary": expect.anything() });
+    expect(Object.keys(s.entities.speaker)).toEqual(["speaker_10"]);
+    expect(Object.keys(s.entities.handoff)).toEqual(["item_10"]);
+  });
+
   it("writes a command's returned record by identity, keeping the higher rev", () => {
     const item = { id: "it1", rev: 2, text: "A" };
     let s = applyRecord(initialState("main"), "item", {

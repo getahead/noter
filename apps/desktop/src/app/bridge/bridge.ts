@@ -190,15 +190,29 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-failed-loading
     // @cpt-end:cpt-noter-state-ui-core-bridge-window-store:p1:inst-empty-loading
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-subscribe-events
-    listening ??= Promise.all(
-      (Object.keys(EVENTS) as EventName[]).map((event) =>
-        core.on(event, (payload) => {
-          if (!closed)
-            write((s) => applyEvent(s, { event, payload } as AnyEvent));
-        }),
-      ),
-    );
-    await listening;
+    listening ??= (async () => {
+      const attached = await Promise.allSettled(
+        (Object.keys(EVENTS) as EventName[]).map((event) =>
+          core.on(event, (payload) => {
+            if (!closed)
+              write((s) => applyEvent(s, { event, payload } as AnyEvent));
+          }),
+        ),
+      );
+      const failures = attached.filter((result) => result.status === "rejected");
+      const unlisteners = attached.flatMap((result) => result.status === "fulfilled" ? [result.value] : []);
+      if (failures.length) {
+        await Promise.all(unlisteners.map((unlisten) => unlisten()));
+        throw failures[0]!.reason;
+      }
+      return unlisteners;
+    })();
+    try {
+      await listening;
+    } catch {
+      listening = null;
+      return failWindow({ code: "window_not_allowed", state: "section", tryAgain: true });
+    }
     // @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-subscribe-events
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-api-snapshot
     const res = await slowAfter(core.appSnapshot({}), (slow) => set({ slow }));
@@ -232,6 +246,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     flushTimer = null;
     const batch = [...buffers];
     buffers.clear();
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
     set((s) => {
       const streams = { ...s.streams } as Record<
@@ -253,6 +268,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       return { streams: streams as WindowState["streams"] };
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-return-flush
     });
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
     // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-commit
   }
 
@@ -264,13 +280,16 @@ export function createBridge(label: WindowLabel, transport: Transport) {
 
   function buffer(cmd: ChannelCommand, m: StreamMsg): void {
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-buffer
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-buffer
     buffers.set(cmd, [...(buffers.get(cmd) ?? []), m]);
-    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-buffer
-    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-buffer
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-flush
     flushTimer ??= setTimeout(flush, FLUSH_MS);
-    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-flush
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-flush
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-buffer
   }
 
+  // @cpt-algo:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1
   function resync<K extends ChannelCommand>(
     cmd: K,
     args: CommandArgs[K],
@@ -289,7 +308,7 @@ export function createBridge(label: WindowLabel, transport: Transport) {
   }
 
   /** Snapshot, then stream: fill the Channel's slice from the result, then keep it current. */
-  // @cpt-algo:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1
+  // @cpt-algo:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1
   async function subscribe<K extends ChannelCommand>(
     cmd: K,
     args: CommandArgs[K],
@@ -309,24 +328,37 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       // Messages the generated client releases before the result is ours wait for `last_seq`.
       if (lastSeq === null) return void early.push(m);
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-for-each-msg
-      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-gap
-      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-ended
-      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-map-ended
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-for-each-msg
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-gap
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-ended
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-map-ended
       const lagged = m.event?.type === "ended" && m.event.reason === "lagged";
-      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-map-ended
-      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-ended
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-map-ended
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-ended
       if (m.seq !== lastSeq + 1 || lagged) {
+        if (cmd === "ask_start" || cmd === "self_test_run") {
+          // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-no-retry-actions
+          const id = subs.get(cmd)?.id;
+          subs.delete(cmd);
+          setStream(cmd, { ended: "lagged" });
+          if (!lagged && id) void core.streamUnsubscribe({ subscription_id: id });
+          // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-no-retry-actions
+          return;
+        }
         // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-resubscribe
+        // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-resubscribe
         return resync(cmd, args, named);
         // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-resubscribe
+        // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-resubscribe
       }
-      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-gap
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-gap
       lastSeq = m.seq;
       if (m.event?.type === "ended") subs.delete(cmd); // the core ended it: nothing to unsubscribe
       buffer(cmd, m);
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-for-each-msg
       // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-for-each-msg
     };
-    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-call-subscribing
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-call-subscribing
     const subscribing = (subscribers[cmd] as Subscribe<K>)(
       args,
       receive as (m: ChannelMessages[K]) => void,
@@ -335,22 +367,23 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       subscribing,
       (slow) => current() && setStream(cmd, { slow }), // a superseded call must not write into the newer one's slice
     );
-    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-call-subscribing
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-call-subscribing
     if (!current()) {
       // Superseded or closed while waiting: end the Channel this call opened.
       const id = res.status === "ok" ? res.data.subscription_id : null;
       if (id) await core.streamUnsubscribe({ subscription_id: id });
       return;
     }
-    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-sub-error
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-sub-error
     if (res.status === "error") {
       subs.delete(cmd);
-      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-return-sub-error
+      // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-sub-error
       return setStream(cmd, { error: mapError(res.error, cmd, named) });
-      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-return-sub-error
+      // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-sub-error
     }
-    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-if-sub-error
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-if-sub-error
     // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-store-snapshot
     subs.set(cmd, { token: mine, id: res.data.subscription_id });
     lastSeq = (res.data as { last_seq?: number }).last_seq ?? 0;
     setStream(cmd, {
@@ -358,10 +391,11 @@ export function createBridge(label: WindowLabel, transport: Transport) {
       ended: null,
       error: null,
     });
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-store-snapshot
     // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-store-snapshot
-    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-return-live
+    // @cpt-begin:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-live
     early.splice(0).forEach(receive);
-    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream:p1:inst-return-live
+    // @cpt-end:cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2:p1:inst-return-live
   }
 
   /** End one Channel (the screen showing it went away) and drop its slice. */

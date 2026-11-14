@@ -2,7 +2,7 @@
 title: "Feature — Core bridge and window stores"
 description: "How every Noter WebView window talks to the Rust core through the generated contract and renders from its own in-memory store: snapshot then stream, wanted state, typed errors to named states, no retries."
 status: IN_PROGRESS
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-core-bridge
 milestone: M0
@@ -24,6 +24,7 @@ milestone: M0
   - [Close a window](#close-a-window)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Snapshot, then stream](#snapshot-then-stream)
+  - [Snapshot, then stream (command-aware)](#snapshot-then-stream-command-aware)
   - [Apply whole state](#apply-whole-state)
   - [Flush stream buffers](#flush-stream-buffers)
   - [Map a typed error to a named state](#map-a-typed-error-to-a-named-state)
@@ -94,6 +95,7 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 - A window that comes back after a crash shows the same call, transcript, cards, pins and marks (PM-46)
 
 **Error Scenarios**:
+- An event listener rejects: the bridge drops any listeners already attached and shows a retryable section error before requesting the snapshot.
 - The snapshot fails: the window shows its section-level error with **Try Again**
 - The contract major version differs: the bridge refuses to start and logs the mismatch
 
@@ -101,12 +103,12 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 1. [x] - `p1` - User opens, reloads or reopens a window; the window reads its label (`main`, `call-screen`, `record-prompt`, `settings`, `first-run`) - `inst-read-label`
 2. [x] - `p1` - UI: build the bridge for that label over the Tauri transport, or over `FakeCore` when `VITE_FAKE_CORE` is set or in tests and stories - `inst-build-bridge`
 3. [x] - `p1` - UI: create an empty store for the window; view state starts from defaults (no browser storage) - `inst-create-store`
-4. [x] - `p1` - UI: subscribe to the 20 events of the contract before asking for the snapshot, so no change between the two is lost - `inst-subscribe-events`
+4. [x] - `p1` - UI: subscribe to the 20 events before asking for the snapshot; if a listener rejects, remove successful registrations and show a retryable section error - `inst-subscribe-events`
 5. [x] - `p1` - API: `app_snapshot` (no arguments; returns `AppSnapshot` with setup, capture, detection, copilot, privacy, presenting, degraded, accounts, features, prefs, proposals, banners, environment) - `inst-api-snapshot`
 6. [x] - `p1` - **IF** the snapshot's `contract_version` major differs from the bindings' `CONTRACT_VERSION` - `inst-if-version`
    1. [x] - `p1` - API: `log_ui` with the mismatch, no content; the window shows the section-level error and stops - `inst-version-stop`
 7. [x] - `p1` - Algorithm: apply each slice with `cpt-noter-algo-ui-core-bridge-apply-whole-state` - `inst-apply-snapshot`
-8. [x] - `p1` - UI: the screen the window shows calls its own read commands and Channels through `cpt-noter-algo-ui-core-bridge-snapshot-then-stream` - `inst-screen-reads`
+8. [x] - `p1` - UI: the screen the window shows calls its own read commands and Channels through `cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2` - `inst-screen-reads`
 9. [x] - `p1` - **IF** a read takes longer than 300 ms - `inst-if-slow`
    1. [x] - `p1` - UI: the region shows skeleton rows until the data arrives (DESIGN state "Window reloaded") - `inst-skeleton`
 10. [x] - `p1` - **RETURN** a window rendering only what the core sent - `inst-return-window`
@@ -162,6 +164,19 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
 
+This stable read-stream algorithm remains the contract for `transcript_subscribe`, `levels_subscribe` and `cards_subscribe`: it fills the snapshot, applies ordered messages, and resubscribes after a sequence gap or a `lagged` end.
+
+**Steps**:
+1. [x] - `p1` - Call the read subscription and retain its snapshot and `last_seq` - `inst-store-snapshot`
+2. [x] - `p1` - **FOR EACH** delivered message, append it in sequence order - `inst-for-each-msg`
+   1. [x] - `p1` - **IF** a sequence is missing or the stream ends as `lagged`, close it and resubscribe from a fresh snapshot - `inst-resubscribe`
+   2. [x] - `p1` - **ELSE** add the message to the flush buffer - `inst-buffer`
+3. [x] - `p1` - Flush buffered messages every 100 ms and return the live slice - `inst-flush`
+
+### Snapshot, then stream (command-aware)
+
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2`
+
 **Input**: a subscribing command (`transcript_subscribe`, `levels_subscribe`, `cards_subscribe`, `ask_start`, `self_test_run`) with its arguments, and the store slice it fills
 
 **Output**: the slice filled from the snapshot and kept current by the Channel, or a named error state
@@ -172,11 +187,12 @@ Success criteria: every window renders from `app_snapshot` within one frame afte
    1. [x] - `p1` - **RETURN** the mapped error state (`cpt-noter-algo-ui-core-bridge-map-error`) - `inst-return-sub-error`
 3. [x] - `p1` - Store the snapshot part of the result in the slice and remember `subscription_id` and `last_seq` - `inst-store-snapshot`
 4. [x] - `p1` - **FOR EACH** delivered message, in `seq` order (the client already drops `seq <= last_seq` and duplicates and sends `stream_ack` every 100 messages or 1 s) - `inst-for-each-msg`
-   1. [x] - `p1` - **IF** `seq` is not `last_seq + 1` - `inst-if-gap`
-      1. [x] - `p1` - Close the subscription and run this algorithm again from step 1 (resubscribe); the screen keeps showing what it has - `inst-resubscribe`
+   1. [x] - `p1` - **IF** `seq` is not `last_seq + 1` or the stream ends as `lagged` - `inst-if-gap`
+      1. [x] - `p1` - **IF** the command is a read subscription (`transcript_subscribe`, `levels_subscribe`, `cards_subscribe`), close it and run this algorithm again from step 1; the screen keeps showing what it has - `inst-resubscribe`
+      2. [x] - `p1` - **ELSE** (`ask_start`, `self_test_run`): end the slice as `lagged` and do not repeat the action - `inst-no-retry-actions`
    2. [x] - `p1` - Append the message to the slice's buffer - `inst-buffer`
    3. [x] - `p1` - **IF** the message is `ended` with a reason - `inst-if-ended`
-      1. [x] - `p1` - Map the reason to the screen's named state (for example `lagged` to resubscribe, `call_deleted` to the page's empty state) - `inst-map-ended`
+      1. [x] - `p1` - Map the reason to the screen's named state (for example `call_deleted` to the page's empty state; `lagged` follows the command-specific recovery above) - `inst-map-ended`
 5. [x] - `p1` - Every 100 ms, flush the buffer into the slice in one store update (`cpt-noter-algo-ui-core-bridge-flush-buffer`) - `inst-flush`
 6. [x] - `p1` - **RETURN** the live slice - `inst-return-live`
 
@@ -291,6 +307,7 @@ The system **MUST** keep one in-memory store per window with entity slices keyed
 
 **Implements**:
 - `cpt-noter-algo-ui-core-bridge-snapshot-then-stream`
+- `cpt-noter-algo-ui-core-bridge-snapshot-then-stream-v2`
 - `cpt-noter-algo-ui-core-bridge-apply-whole-state`
 - `cpt-noter-algo-ui-core-bridge-flush-buffer`
 
@@ -326,7 +343,13 @@ The system **MUST** map every `ErrorCode` of the contract to the calling screen'
 - [x] Every `ErrorCode` has a mapping test; no command is retried without a user action
 - [x] No module outside `src/core` imports `@tauri-apps/*`; no screen imports the fake core (`just arch` passes)
 - [x] No `localStorage`, `sessionStorage`, IndexedDB or cookie access exists in the UI bundle
+- Event-listen rejection leaves the window in a retryable section error; retry attaches listeners again before reading the snapshot.
+- A stream sequence gap resubscribes only read subscriptions (`transcript_subscribe`, `levels_subscribe`, `cards_subscribe`); action streams (`ask_start`, `self_test_run`) end as lagged without replaying the action.
+- Starting capture creates its call row and empty live transcript; stopping marks the row stopped and ends transcript subscribers; discarding removes the call's transcript, details and items and emits a removal event.
+- Fake-core item creation and card pinning use blank item fields; hotkey conflicts are reported, level streams continue until unsubscribed, replay timers cannot stop a later play, transcript scripts run once per call, and stopping Ask preserves only the streamed partial answer.
 - [x] Unit line coverage of the new code is at least 80 % (`just cov-unit`)
+
+**Changelog.** v1.1 (13 Nov 2026): record bridge retry, stream resync, capture lifecycle, and fake-core regression requirements for issues #710, #715, #733 and #734.
 
 ## 7. Additional Context
 

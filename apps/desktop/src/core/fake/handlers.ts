@@ -6,6 +6,7 @@
 
 import type {
   AgentView,
+  AskAnswer,
   CallRef,
   CallRow,
   CaptureState,
@@ -70,6 +71,18 @@ function findItem(world: World, id: string): ItemView {
 function checkRev(current: Rev, sent: Rev): void {
   if (current !== sent) throw coreError("conflict", "rev is stale", { type: "conflict", current_rev: current });
 }
+
+function blankItem(call: CallRow, overrides: Partial<ItemView>): ItemView {
+  return {
+    id: newId("itm"), rev: 1, call: callRef(call), kind: "action_item", text: "",
+    lang: call.languages[0] ?? "en", owner: null, due: null, status: "open", review: "accepted",
+    created_by: "user", topic: null, is_engineering: false, linked_issue: null, spans: [], handoff: null,
+    closed_by: null, done_at: null, owed: "to_you", carried_from: null, edited: false, ...overrides,
+  };
+}
+
+type AskRun = { subscription: string; thread: string; question: string; scope: World["ask_threads"][number]["scope"]; text: string; citations: AskAnswer["citations"]; timers: ReturnType<typeof setTimeout>[] };
+const askRuns = new WeakMap<FakeCore, Map<string, AskRun>>();
 
 type ChangeInput = Pick<ChangeRow, "entity" | "summary"> & Partial<Pick<ChangeRow, "actor" | "field" | "before" | "after" | "reason" | "undoable" | "batch_id">>;
 
@@ -242,6 +255,16 @@ function setCapture(fake: FakeCore, next: Partial<CaptureState>): CaptureState {
   return fake.world.app.capture;
 }
 
+function createCaptureCall(world: World, id: string, title: string, started_at: number, sensitive: boolean): CallRow {
+  const template = world.calls[0];
+  const row: CallRow = template
+    ? { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], privacy: sensitive ? "sensitive" : "normal", status: "recording", outputs: "not_started", archive: "not_started", audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 }
+    : { id, rev: 1, title, call_type: "one_on_one", started_at, duration_ms: 0, platform: null, participants: [], unnamed_speakers: 0, languages: [], tags: [], privacy: sensitive ? "sensitive" : "normal", status: "recording", outputs: "not_started", archive: "not_started", audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 };
+  world.calls.unshift(row);
+  world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });
+  return row;
+}
+
 function findCard(world: World, id: string): CardView {
   const card = world.cards.find((c) => c.id === id);
   if (!card) throw coreError("card_gone", `card ${id}`);
@@ -350,6 +373,7 @@ const defaultSkill = (a: AgentView) => `---\nname: ${a.name}\n---\n\nYou are the
 /** The call a scripted transcript event belongs to, if it names one. */
 /** How many events of the live script each transcript snapshot has had streamed into it. */
 const scriptPlayed = new WeakMap<object, number>();
+const scriptRunning = new WeakSet<object>();
 
 function scriptCall(e: World["live_script"][number]): string | undefined {
   if ("segment" in e) return e.segment.call_id;
@@ -362,6 +386,7 @@ function scriptCall(e: World["live_script"][number]): string | undefined {
 
 // ── handlers ─────────────────────────────────────────────────────────────
 
+// @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
 export const defaultHandlers: Handlers = {
   // ── App ──────────────────────────────────────────────────────────────
   app_snapshot: (_a, { world, window }) => ({ ...world.app, copilot: world.app.copilot ? world.copilot : null, window }),
@@ -406,11 +431,13 @@ export const defaultHandlers: Handlers = {
       world.app.detection.detection = null;
       publish("capture:detected");
     }
+    const started_at = now();
+    createCaptureCall(world, id, "New call", started_at, a.sensitive);
     return setCapture(fake, {
       phase: "recording",
       call_id: id,
       title: "New call",
-      started_at: now(),
+      started_at,
       recorded_ms: 0,
       sensitive: a.sensitive,
       pause: null,
@@ -419,8 +446,15 @@ export const defaultHandlers: Handlers = {
       audio_writing: free >= 500,
     });
   },
-  capture_stop: (a, { world, fake }) => {
+  capture_stop: (a, { world, fake, emit }) => {
     requireLive(world.app.capture, a.call_id);
+    const row = world.calls.find((c) => c.id === a.call_id);
+    if (row) {
+      row.status = "processing";
+      row.duration_ms = world.app.capture.recorded_ms;
+      emit("entity:changed", { type: "call", call: row });
+    }
+    fake.closeChannels("transcript_subscribe", a.call_id, "call_stopped");
     return setCapture(fake, { phase: "stopped", pause: null, notice: null, continue_until: now() + 5 * MIN });
   },
   capture_set_paused: (a, { world, fake }) => {
@@ -480,13 +514,8 @@ export const defaultHandlers: Handlers = {
     const title = cap.notice.event?.title ?? "New call";
     const id = newId("call");
     const started_at = cap.notice.detected_at;
-    // Like the real core: the new call has its row and an empty live transcript at once (D-37).
-    const template = world.calls.find((c) => c.id === cap.call_id) ?? world.calls[0];
-    if (template) {
-      const row = { ...template, id, rev: 1, title, started_at, duration_ms: 0, participants: [], unnamed_speakers: 0, languages: [], tags: [], audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 };
-      world.calls = [row, ...world.calls];
-    }
-    world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });
+    // Like the real core, a new call has its row and empty live transcript at once (D-37).
+    createCaptureCall(world, id, title, started_at, cap.sensitive);
     return setCapture(fake, { call_id: id, title, started_at, recorded_ms: 0, notice: null });
   },
   capture_keep_recording: (a, { world, fake }) => {
@@ -494,9 +523,15 @@ export const defaultHandlers: Handlers = {
     if (cap.call_id !== a.call_id || !cap.notice || cap.notice.type !== "nothing_heard") throw coreError("notice_expired");
     return setCapture(fake, { notice: null });
   },
-  capture_discard: (a, { world, fake }) => {
+  capture_discard: (a, { world, fake, emit }) => {
     requireLive(world.app.capture, a.call_id);
+    fake.closeChannels("transcript_subscribe", a.call_id, "discarded");
     world.calls = world.calls.filter((c) => c.id !== a.call_id);
+    world.transcripts = world.transcripts.filter((t) => t.call_id !== a.call_id);
+    world.call_details = world.call_details.filter((d) => d.call.id !== a.call_id);
+    world.items = world.items.filter((item) => item.call.id !== a.call_id);
+    world.outputs = world.outputs.filter((o) => o.call_id !== a.call_id);
+    emit("entity:changed", { type: "removed", kind: "call", id: a.call_id });
     return setCapture(fake, { phase: "idle", call_id: null, title: null, started_at: null, recorded_ms: 0, pause: null, notice: null, continue_until: null });
   },
   capture_set_sensitive: (a, { world, fake, emit }) => {
@@ -555,7 +590,7 @@ export const defaultHandlers: Handlers = {
     // Deleting a call's audio keeps its transcript and ends replay.
     if (!isLive) return { ...snap, subscription_id: null, live: false, audio_available: snap.audio_available && !world.calls.find((c) => c.id === a.call_id)?.audio_deleted };
     const sub = newId("sub");
-    fake.openChannel(sub, "transcript_subscribe", send as (m: unknown) => void, snap.last_seq);
+    fake.openChannel(sub, "transcript_subscribe", send as (m: unknown) => void, snap.last_seq, a.call_id);
     // Like the real core, messages can reach the page before this snapshot resolves: one the
     // snapshot already contains (seq = last_seq) and the first new one. The client drops the
     // first and holds the second until the snapshot is in (R23).
@@ -565,15 +600,22 @@ export const defaultHandlers: Handlers = {
     send({ seq: snap.last_seq, event: { type: "segments_updated", segments: snap.segments.slice(-1) } });
     // what the stream sends joins the snapshot, so the next subscribe returns everything up to `last_seq`
     const play = (event: (typeof rest)[number]) => {
-      const seq = fake.push(sub, { event });
-      if (seq === null) return;
+      const delivered = fake.pushAll("transcript_subscribe", { event }, a.call_id);
+      if (!delivered) return;
       if (event.type === "confirmed") snap.segments.push(event.segment);
-      snap.last_seq = seq;
+      snap.last_seq += 1;
       scriptPlayed.set(snap, (scriptPlayed.get(snap) ?? 0) + 1);
     };
     const snapshot = { ...snap, segments: [...snap.segments], subscription_id: sub }; // taken before the first new message, which the client holds (R23)
-    if (first) play(first);
-    rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => play(event)));
+    if (first && !scriptRunning.has(snap)) {
+      scriptRunning.add(snap);
+      play(first);
+      if (!rest.length) scriptRunning.delete(snap);
+      rest.forEach((event, i) => fake.later((i + 1) * world.script_interval_ms, () => {
+        play(event);
+        if (i === rest.length - 1) scriptRunning.delete(snap);
+      }));
+    }
     return snapshot;
   },
   levels_subscribe: (_a, { fake, send }) => {
@@ -582,7 +624,7 @@ export const defaultHandlers: Handlers = {
     let t = 0;
     const tick = () => {
       t += 100;
-      if (fake.push(sub, { at_ms: t, mic_db: -30 - Math.random() * 20, sys_db: -25 - Math.random() * 20 }) !== null && t < 30_000) fake.later(100, tick);
+      if (fake.push(sub, { at_ms: t, mic_db: -30 - Math.random() * 20, sys_db: -25 - Math.random() * 20 }) !== null) fake.later(100, tick);
     };
     fake.later(100, tick);
     return { subscription_id: sub, last_seq: 0 };
@@ -674,8 +716,9 @@ export const defaultHandlers: Handlers = {
     }
     Object.assign(fake.playback, { playing: true, call_id: a.call_id, position_ms: a.from_ms, to_ms: a.to_ms ?? null, route: env.output_route, stopped_reason: null });
     publish("playback:state");
+    const playVersion = fake.playback.version;
     fake.later(3000, () => {
-      if (fake.playback.playing && fake.playback.call_id === a.call_id) {
+      if (fake.playback.playing && fake.playback.version === playVersion) {
         Object.assign(fake.playback, { playing: false, stopped_reason: "ended" });
         publish("playback:state");
       }
@@ -730,7 +773,7 @@ export const defaultHandlers: Handlers = {
     const card = findCard(world, a.card_id);
     if (card.state === "expired" || card.state === "dismissed") throw coreError("card_gone");
     const c = call(world, card.call_id);
-    const item: ItemView = { ...world.items[0], id: newId("itm"), rev: 1, call: callRef(c), kind: "action_item", text: card.title, created_by: "pin", review: "accepted", status: "open", edited: false };
+    const item = blankItem(c, { lang: card.lang, kind: "action_item", text: card.title, created_by: "pin" });
     cardAction(world, card, item);
     card.state = "pinned";
     world.items.push(item);
@@ -903,27 +946,16 @@ export const defaultHandlers: Handlers = {
     if (!a.text.trim()) throw coreError("invalid_input", "text required", { type: "validation", field: "text", rule: "required" });
     const c = call(world, a.call_id);
     const owner = a.owner?.type === "existing" ? person(world, a.owner.person_id) : null;
-    const item: ItemView = {
-      ...world.items[0],
-      id: newId("itm"),
+    const item = blankItem(c, {
       rev: 0,
-      call: callRef(c),
       kind: a.kind,
       text: a.text,
       owner: owner ? { id: owner.id, display_name: owner.display_name, short_name: owner.short_name, initials: owner.initials, is_you: owner.is_you } : null,
       due: a.due ?? null,
-      status: "open",
-      review: "accepted",
       created_by: "user",
       spans: a.span ? [a.span] : [],
-      handoff: null,
-      closed_by: null,
-      done_at: null,
       owed: owner?.is_you ? "by_you" : "to_you",
-      edited: false,
-      linked_issue: null,
-      is_engineering: false,
-    };
+    });
     world.items.push(item);
     return itemChanged(world, item, emit, "Added an item", null, null);
   },
@@ -1223,26 +1255,54 @@ export const defaultHandlers: Handlers = {
     fake.openChannel(sub, "ask_start", send as (m: unknown) => void);
     const cite = world.ask_threads[0]?.turns[0]?.citations[0];
     const words = "On 2 Oct you agreed with Dmitri S. that drawer events go through the notification service [1].".split(" ");
-    fake.later(200, () => fake.push(sub, { event: { type: "started", runtime: "claude_api_key", mode: world.app.privacy.effective } }));
-    words.forEach((w, i) => fake.later(400 + i * 60, () => fake.push(sub, { event: { type: "delta", text: (i ? " " : "") + w } })));
-    if (cite) fake.later(400 + words.length * 60, () => fake.push(sub, { event: { type: "citation", citation: cite } }));
-    fake.later(400 + words.length * 60 + 100, () => {
-      const answer = { turn_id: turn, question: a.question, answer_md: words.join(" "), citations: cite ? [cite] : [], found: true, runtime: "claude_api_key" as const, answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: now() };
+    const run: AskRun = { subscription: sub, thread, question: a.question, scope: a.scope, text: "", citations: [], timers: [] };
+    const runs = askRuns.get(fake) ?? new Map<string, AskRun>();
+    runs.set(turn, run);
+    askRuns.set(fake, runs);
+    const later = (ms: number, action: () => void) => {
+      run.timers.push(fake.later(ms, action));
+    };
+    const save = (answer: AskAnswer) => {
       const existing = world.ask_threads.find((t) => t.id === thread);
       if (existing) existing.turns.push(answer);
       else world.ask_threads.unshift({ id: thread, title: a.question, scope: a.scope, turns: [answer] });
+    };
+    later(200, () => fake.push(sub, { event: { type: "started", runtime: "claude_api_key", mode: world.app.privacy.effective } }));
+    words.forEach((w, i) => later(400 + i * 60, () => {
+      const text = (i ? " " : "") + w;
+      run.text += text;
+      fake.push(sub, { event: { type: "delta", text } });
+    }));
+    if (cite) later(400 + words.length * 60, () => {
+      run.citations.push(cite);
+      fake.push(sub, { event: { type: "citation", citation: cite } });
+    });
+    later(400 + words.length * 60 + 100, () => {
+      const answer: AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: now() };
+      save(answer);
       fake.push(sub, { event: { type: "done", answer } });
       fake.push(sub, { event: { type: "ended", reason: "call_stopped" } });
       fake.closeChannel(sub);
+      runs.delete(turn);
     });
     return { thread_id: thread, turn_id: turn, subscription_id: sub };
   },
   ask_stop: (a, { fake }) => {
-    const sub = fake.latestSubscription("ask_start");
-    if (sub) {
-      fake.push(sub, { event: { type: "failed", error: coreError("answer_stopped", `turn ${a.turn_id} stopped`) } });
-      fake.push(sub, { event: { type: "ended", reason: "unsubscribed" } });
-      fake.closeChannel(sub);
+    const runs = askRuns.get(fake);
+    const run = runs?.get(a.turn_id);
+    if (run) {
+      run.timers.forEach((timer) => fake.cancelLater(timer));
+      if (run.text) {
+        const answer: AskAnswer = { turn_id: a.turn_id, question: run.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: now() };
+        const world = fake.world;
+        const existing = world.ask_threads.find((t) => t.id === run.thread);
+        if (existing) existing.turns.push(answer);
+        else world.ask_threads.unshift({ id: run.thread, title: run.question, scope: run.scope, turns: [answer] });
+      }
+      fake.push(run.subscription, { event: { type: "failed", error: coreError("answer_stopped", `turn ${a.turn_id} stopped`) } });
+      fake.push(run.subscription, { event: { type: "ended", reason: "unsubscribed" } });
+      fake.closeChannel(run.subscription);
+      runs?.delete(a.turn_id);
     }
     return ack;
   },
@@ -1564,6 +1624,8 @@ export const defaultHandlers: Handlers = {
     if (a.shortcut === "Super+Q" || a.shortcut === "Super+Tab") throw coreError("hotkey_reserved");
     const b = world.hotkeys.bindings.find((x) => x.action === a.action);
     if (!b) throw coreError("not_found", `hotkey ${a.action}`);
+    const owner = a.shortcut && world.hotkeys.bindings.find((x) => x.action !== a.action && x.shortcut === a.shortcut);
+    if (owner) throw coreError("hotkey_conflict", "shortcut in use", { type: "hotkey_owner", owner: owner.action });
     b.shortcut = a.shortcut ?? null;
     b.status = b.shortcut ? (b.action === "undo_card_action" ? { type: "registered_during_capture" } : { type: "registered" }) : { type: "not_set" };
     publish("hotkeys:changed");

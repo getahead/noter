@@ -13,7 +13,7 @@ import { UndoStrip } from "../history/UndoStrip";
 import { BannerSlot } from "../../ui/feedback/inline-banner";
 import { OldAudio } from "../../ui/dialogs/old-audio";
 import { SplitDivider } from "../../ui/primitives/split-divider";
-import { appBanners, commandFailures, isBannerKind, type BannerActions } from "./app-banners";
+import { appBanners, commandFailures, commandFailuresKey, isBannerKind, type BannerActions } from "./app-banners";
 import { frameState } from "./frame";
 import { InspectorSlot } from "./inspector";
 import { closeInspector, inspectorOverride, useInspectorOverride } from "./inspector-override";
@@ -78,8 +78,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const snapshotApplied = useWindow(bridge, (s) => s.app !== null);
   const slow = useWindow(bridge, (s) => s.slow);
   const updateInstall = useWindow(bridge, (s) => s.commands["update_install"]);
-  const commands = useWindow(bridge, (s) => s.commands);
-  const outputs = useWindow(bridge, (s) => s.outputs);
+  const failures = useWindow(bridge, (s) => commandFailuresKey(s.commands));
+  const writingOutputs = useWindow(bridge, (s) => writing(s.outputs));
 
   const shellRef = useRef(shell);
   shellRef.current = shell;
@@ -185,7 +185,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     retry: (key) => void bridge.retry(key),
   };
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banners
-  const bannerList = appBanners({ banners, setup }, bannerActions, commandFailures(commands));
+  const failureList = JSON.parse(failures) as ReturnType<typeof commandFailures>;
+  const bannerList = appBanners({ banners, setup }, bannerActions, failureList);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banners
 
   const inspector = override ?? (shell.history.inspectorOpen ? page.inspector : undefined);
@@ -204,7 +205,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             selected={route.section}
             waiting={proposals?.waiting ?? 0}
             problems={proposals?.needs_attention ?? 0}
-            writing={writing(outputs)}
+            writing={writingOutputs}
             live={live}
             mode={mode}
             footer={footer}

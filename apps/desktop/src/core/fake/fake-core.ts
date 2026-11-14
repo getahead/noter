@@ -96,6 +96,15 @@ interface OpenChannel {
   cmd: ChannelCommand;
   send: (message: unknown) => void;
   seq: number;
+  scope?: string;
+}
+
+const coresByWorld = new WeakMap<World, Set<FakeCore>>();
+
+function registerCore(core: FakeCore, world: World): void {
+  let cores = coresByWorld.get(world);
+  if (!cores) coresByWorld.set(world, (cores = new Set()));
+  cores.add(core);
 }
 
 type Versioned = { version: number };
@@ -124,6 +133,7 @@ export class FakeCore implements Transport {
   constructor(opts: FakeCoreOptions) {
     this.window = opts.window;
     this.world = opts.world ?? structuredClone(worldJson as unknown as World);
+    registerCore(this, this.world);
     this.latency = opts.latency ?? 0;
     this.handlers = { ...defaultHandlers, ...opts.handlers };
     const cap = this.world.app.capture;
@@ -209,7 +219,11 @@ export class FakeCore implements Transport {
     const before = new Map(events.map((e) => [e, strip(this.slice(e))]));
     const versions = new Map(events.map((e) => [e, this.slice(e).version]));
     if (typeof change === "function") change(this.world);
-    else this.world = structuredClone(change);
+    else {
+      coresByWorld.get(this.world)?.delete(this);
+      this.world = structuredClone(change);
+      registerCore(this, this.world);
+    }
     for (const e of events) {
       const s = this.slice(e);
       if (s.version < versions.get(e)!) s.version = versions.get(e)!;
@@ -219,8 +233,8 @@ export class FakeCore implements Transport {
   }
 
   /** Register a Channel opened by a subscribing command; messages start after `fromSeq`. */
-  openChannel(subscription: string, cmd: ChannelCommand, send: (message: unknown) => void, fromSeq = 0): void {
-    this.channels.set(subscription, { cmd, send, seq: fromSeq });
+  openChannel(subscription: string, cmd: ChannelCommand, send: (message: unknown) => void, fromSeq = 0, scope?: string): void {
+    this.channels.set(subscription, { cmd, send, seq: fromSeq, scope });
   }
 
   /**
@@ -232,6 +246,12 @@ export class FakeCore implements Transport {
       this.push(subscription, { event: { type: "ended", reason } } as ChannelBody);
     }
     return this.channels.delete(subscription);
+  }
+
+  closeChannels(cmd: ChannelCommand, scope: string, reason: StreamEndReason): void {
+    for (const core of coresByWorld.get(this.world) ?? [this])
+      for (const [id, channel] of core.channels)
+        if (channel.cmd === cmd && channel.scope === scope) core.closeChannel(id, reason);
   }
 
   /** The newest open subscription of a command, if any. */
@@ -262,18 +282,34 @@ export class FakeCore implements Transport {
   }
 
   /** Schedule work that `dispose()` cancels. */
-  later(ms: number, fn: () => void): void {
+  later(ms: number, fn: () => void): ReturnType<typeof setTimeout> {
     const t = setTimeout(() => {
       this.timers.delete(t);
       fn();
     }, ms);
     this.timers.add(t);
+    return t;
+  }
+
+  cancelLater(timer: ReturnType<typeof setTimeout>): void {
+    clearTimeout(timer);
+    this.timers.delete(timer);
+  }
+
+  /** Push one event to every matching subscription, as the real stream hub does. */
+  pushAll(target: ChannelCommand, body: ChannelBody, scope?: string): number {
+    let delivered = 0;
+    for (const core of coresByWorld.get(this.world) ?? [this])
+      for (const [id, channel] of core.channels)
+        if (channel.cmd === target && (scope === undefined || channel.scope === scope) && core.push(id, body) !== null) delivered++;
+    return delivered;
   }
 
   dispose(): void {
     this.timers.forEach(clearTimeout);
     this.timers.clear();
     this.channels.clear();
+    coresByWorld.get(this.world)?.delete(this);
   }
 
   async invoke(cmd: CommandName, args: unknown, onMessage?: (message: unknown) => void): Promise<unknown> {

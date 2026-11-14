@@ -316,9 +316,29 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
           const slice = (
             s.entities as unknown as Record<string, Record<string, unknown>>
           )[c.kind];
-          if (!slice || !(c.id in slice)) return s;
-          const { [c.id]: _gone, ...rest } = slice;
-          return { ...s, entities: { ...s.entities, [c.kind]: rest } };
+          let entities = s.entities;
+          if (slice && c.id in slice) {
+            const { [c.id]: _gone, ...rest } = slice;
+            entities = { ...entities, [c.kind]: rest };
+          }
+          if (c.kind === "call") {
+            const prefix = `${c.id}/`;
+            return {
+              ...s,
+              entities: {
+                ...entities,
+                speaker: Object.fromEntries(Object.entries(entities.speaker).filter(([, speaker]) => speaker.call_id !== c.id)),
+                handoff: Object.fromEntries(Object.entries(entities.handoff).filter(([, handoff]) => handoff.item?.call?.id !== c.id)),
+              },
+              outputs: Object.fromEntries(Object.entries(s.outputs).filter(([key]) => !key.startsWith(prefix))),
+              sections: Object.fromEntries(Object.entries(s.sections).filter(([key]) => !key.startsWith(prefix))),
+            };
+          }
+          if (c.kind === "item") {
+            const { [c.id]: _handoff, ...handoff } = entities.handoff;
+            return { ...s, entities: { ...entities, handoff } };
+          }
+          return entities === s.entities ? s : { ...s, entities };
         }
         default: // a kind a same-major contract bump added: ignore it rather than fall into outputs:progress
           return s;
