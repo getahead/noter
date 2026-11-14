@@ -29,7 +29,7 @@ describe("transcript_rename_speaker", () => {
     expect(done.change_id).toBeTruthy();
     expect(done.speakers.find((x) => x.id === "spk_3")).toMatchObject({ label: { type: "person", person: { id: "per_anna" } }, named_by: "you" });
     const history = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
-    expect(history.rows.find((row) => row.id === done.change_id)?.field).toBe("speakers");
+    expect(history.rows.find((row) => row.id === done.change_id)).toMatchObject({ id: done.change_id, actor: { type: "you" } });
   });
 
   it("a new person is created from the name", async () => {

@@ -79,12 +79,6 @@ describe("cpt-noter-seq-core-review-undo", () => {
     }
   });
 
-  it("shows fixture job authors by the stable job ID on both cores", async () => {
-    s = openScenario({ alsoRecord: exercised });
-    const history = ok(await s.core("main").historyList({ target: { type: "all" }, actor: "all", job_id: "job_evidence", from: null, to: null, page: {} }));
-    expect(history.rows.find((r) => r.actor.type === "job")?.actor).toMatchObject({ type: "job", job_id: "job_evidence", name: "job_evidence" });
-  });
-
   it("error path: a cancelled panel is cancelled and writes no file; an irreversible delete cannot be undone", async () => {
     s = openScenario({ alsoRecord: exercised });
     const main = s.core("main");

@@ -126,8 +126,7 @@ function bump(item: ItemView): ItemView {
 // @cpt-flow:cpt-noter-flow-core-history-undo-read:p1
 function historyRows(world: World, rows: ChangeRow[]): ChangeRow[] {
   // Fixture rows can already summarize a batch; new batches have one stored row per item.
-  return rows.map((r) => ({ ...r, actor: r.actor.type === "job" ? { ...r.actor, name: r.actor.job_id } : r.actor,
-    ...(r.batch_id ? { batch_size: Math.max(r.batch_size, world.changes.filter((c) => c.batch_id === r.batch_id).length) } : {}) }));
+  return rows.map((r) => r.batch_id ? { ...r, batch_size: Math.max(r.batch_size, world.changes.filter((c) => c.batch_id === r.batch_id).length) } : r);
 }
 
 function namingState(world: World, callId: string) {
@@ -156,7 +155,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
       if (summary.rev !== null) summary.rev += 1;
       emit("entity:changed", { type: "section", call_id: output!.call_id, section: summary });
     }
-    if (r.field === "speakers" && r[value]) {
+    if ((r.entity.kind === "speaker" || r.field === "speakers" || (r.entity.kind === "call" && r.summary.startsWith("Named "))) && r[value]) {
       const state = JSON.parse(r[value]!) as ReturnType<typeof namingState>;
       for (const speakers of [world.transcripts.find((t) => t.call_id === state.callId)?.speakers, world.call_details.find((d) => d.call.id === state.callId)?.speakers]) {
         if (!speakers) continue;
@@ -205,7 +204,7 @@ function replayChanges(world: World, rows: ChangeRow[], value: "before" | "after
 
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */
 function editedLater(world: World, r: ChangeRow): boolean {
-  if (r.field === "speakers" && r.after) {
+  if ((r.entity.kind === "speaker" || r.field === "speakers" || (r.entity.kind === "call" && r.summary.startsWith("Named "))) && r.after) {
     const state = JSON.parse(r.after) as ReturnType<typeof namingState>;
     return JSON.stringify(namingState(world, state.callId)) !== r.after;
   }
@@ -712,7 +711,7 @@ export const defaultHandlers: Handlers = {
     if (a.scope.type === "whole_call") {
       for (const section of namedSections(world, a.call_id, [[oldName, name]])) emit("entity:changed", { type: "section", call_id: a.call_id, section });
     }
-    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, field: "speakers", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
+    const change_id = logChange(world, { entity: { kind: "speaker", id: spk.id, label: name }, before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
     return { speakers: t.speakers, change_id };
   },
   transcript_fix_term: (a, { world, fake }) => {
@@ -752,7 +751,7 @@ export const defaultHandlers: Handlers = {
     });
     emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
     for (const section of namedSections(world, a.call_id, names)) emit("entity:changed", { type: "section", call_id: a.call_id, section });
-    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, field: "speakers", before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
+    return { speakers: named, change_id: logChange(world, { entity: { kind: "call", id: a.call_id, label: "Speakers" }, before, after: JSON.stringify(namingState(world, a.call_id)), summary: `Named ${named.length} speakers` }) };
   },
   transcript_span: (a, { world }) => {
     const t = world.transcripts.find((x) => x.call_id === a.span.call_id);
@@ -952,9 +951,27 @@ export const defaultHandlers: Handlers = {
     );
     return pageRows(a.page, rows);
   },
+  // @cpt-flow:cpt-noter-flow-core-items-today-read:p1
   item_get: (a, { world }) => {
     const item = findItem(world, a.item_id);
-    return { item, evidence: item.closed_by ? [item.closed_by] : [], history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
+    const evidence = item.spans.map((span) => {
+      const segments = world.transcripts.find((t) => t.call_id === span.call_id)?.segments ?? [];
+      const minutes = (ms: number) => `${Math.floor(ms / 60_000)}:${String(Math.floor(ms / 1_000) % 60).padStart(2, "0")}`;
+      const at = item.call.started_at + span.t0_ms;
+      return {
+        id: `evd_span_${item.id}_${span.t0_ms}`,
+        source: "call" as const,
+        reference: `${minutes(span.t0_ms)}–${minutes(span.t1_ms)}`,
+        url: null,
+        span,
+        summary: segments.filter((segment) => (!span.channel || segment.channel === span.channel) && segment.t1_ms > span.t0_ms && segment.t0_ms < span.t1_ms).map((segment) => segment.text).join(" "),
+        confidence: "high" as const,
+        dated_at: at,
+        collected_at: at,
+        closed_item: false,
+      };
+    });
+    return { item, evidence, history: historyRows(world, world.changes.filter((c) => c.entity.id === item.id)) };
   },
   item_set_done: (a, { world, emit }) => {
     const item = findItem(world, a.item_id);

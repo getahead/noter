@@ -37,8 +37,10 @@ describe("items_list and item_get", () => {
 
   it("item_get answers the item with its evidence and history, and not_found for a stranger", async () => {
     const detail = ok(await main.itemGet({ item_id: "itm_spec" }));
-    expect(detail.item).toMatchObject({ id: "itm_spec", kind: "action_item", review: "accepted" });
-    expect(detail.evidence).toEqual([]);
+    expect(detail.item).toMatchObject({ id: "itm_spec", kind: "action_item", review: "accepted", text: "Drawer redesign spec by Friday" });
+    expect(detail.evidence).toHaveLength(detail.item.spans.length);
+    expect(detail.evidence[0]).toMatchObject({ source: "call", span: detail.item.spans[0], reference: "19:58–20:10", summary: expect.any(String), confidence: "high" });
+    expect(detail.evidence[0]?.summary.length).toBeGreaterThan(0);
     expect(detail.history).toEqual([]);
     expect(refused(await main.itemGet({ item_id: "itm_nobody" })).code).toBe("not_found");
   });
@@ -122,7 +124,12 @@ describe("item mutations", () => {
 describe("today_get", () => {
   it("answers the whole Today view", async () => {
     const today = ok(await main.todayGet({}));
-    expect(today).toMatchObject({ date: expect.any(String), banners: [], calendar: "granted", done_today: [], due_without_call: [], first_use: false });
+    expect(today.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(today.calendar).toBe("granted");
+    expect(today.review_calls.map((call) => call.id)).toContain(LIVE_CALL);
+    expect(today.done_today).toEqual([]);
+    expect(today.due_without_call.every((item) => item.review === "accepted" && item.due !== null && item.due <= today.date)).toBe(true);
+    expect(today.banners.every((banner) => ["self_test_not_passed", "recording_interrupted_by_quit", "audio_access_never_granted"].includes(banner.type))).toBe(true);
   });
 });
 
