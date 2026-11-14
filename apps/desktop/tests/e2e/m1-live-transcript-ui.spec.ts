@@ -330,12 +330,13 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
       world: liveWith(many(60), false),
     });
     await expect(rowWith(page, "Test line number 59")).toBeInViewport(); // the log has drawn and follows the end
-    // Reproduce a wheel animation's first one-pixel frame, before scrolling the rest of the way up (#576).
+    // Use a real wheel event for its first one-pixel frame, before scrolling the rest of the way up (#576).
     const scroller = log(page).locator(".cw-tv__scroll");
     await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThanOrEqual(1);
     // Wait until the initial programmatic jump's native scroll event has passed through the view's handler.
     await expect.poll(() => scroller.evaluate((el) => (window as unknown as { __noterTranscriptScrollEvents: WeakSet<Element> }).__noterTranscriptScrollEvents.has(el))).toBe(true);
-    await scroller.evaluate((el) => el.scrollTo({ top: el.scrollTop - 1, behavior: "instant" }));
+    await scroller.hover();
+    await page.mouse.wheel(0, -1);
     await expect(log(page)).toHaveAttribute("data-state", "detached");
     await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
