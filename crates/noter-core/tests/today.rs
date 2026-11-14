@@ -554,7 +554,7 @@ async fn attendee_alias_is_resolved_on_the_today_card_and_carry_query() {
             "e_alias",
             "1:1 Anna",
             NOW + HOUR,
-            &["Annie"],
+            &["Annie   K"],
         )])),
     );
     people_world(&core);
@@ -564,8 +564,8 @@ async fn attendee_alias_is_resolved_on_the_today_card_and_carry_query() {
             &[
                 ("id", json!("alias_anna")),
                 ("person_id", json!("per_anna")),
-                ("alias", json!("Annie")),
-                ("alias_norm", json!("annie")),
+                ("alias", json!("Annie K")),
+                ("alias_norm", json!("annie k")),
             ],
         )])
         .unwrap();

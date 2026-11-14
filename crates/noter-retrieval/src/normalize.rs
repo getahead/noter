@@ -13,6 +13,9 @@ pub fn normalize(text: &str) -> String {
         .to_lowercase()
         .replace('ё', "е")
         .replace('ß', "ss")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Approximate token count used by chunking before a model tokenizer is available.
@@ -128,6 +131,8 @@ mod tests {
         assert_eq!(normalize("ﬁle ＡＰＩ"), "file api");
         // A decomposed ё (е + combining diaeresis) composes first, then folds.
         assert_eq!(normalize("е\u{0308}ж"), "еж");
+        // Preserve people matching's former collapsed-whitespace behavior.
+        assert_eq!(normalize(" Anna\u{00a0}  Koval "), "anna koval");
     }
 
     #[test]
