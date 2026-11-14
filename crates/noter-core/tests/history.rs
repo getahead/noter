@@ -267,7 +267,45 @@ async fn history_pages_newest_first_and_filters_by_actor_job_and_period() {
     models.actor = ActorFilter::Models;
     assert!(history(&core, models).await.rows.is_empty());
 
-    // Rows are stamped with the wall clock of the run: a period in 1970 is empty.
+    // Rows are stamped with the wall clock of the run: period bounds include an exact match.
+    let mut you = list_args(HistoryTarget::All);
+    you.actor = ActorFilter::You;
+    let all_you = history(&core, you.clone()).await.rows;
+    let latest = all_you[0].clone();
+    let expected_at_boundary = all_you
+        .iter()
+        .filter(|row| row.at == latest.at)
+        .map(|row| row.id.clone())
+        .collect::<Vec<_>>();
+    let mut boundary = list_args(HistoryTarget::All);
+    boundary.actor = ActorFilter::You;
+    boundary.from = Some(latest.at);
+    boundary.to = Some(latest.at);
+    assert_eq!(
+        history(&core, boundary)
+            .await
+            .rows
+            .iter()
+            .map(|row| row.id.clone())
+            .collect::<Vec<_>>(),
+        expected_at_boundary
+    );
+    let mut after = list_args(HistoryTarget::All);
+    after.actor = ActorFilter::You;
+    after.from = Some(TimestampMs(latest.at.0 + 1));
+    assert!(!history(&core, after)
+        .await
+        .rows
+        .iter()
+        .any(|row| row.id == latest.id));
+    let mut before = list_args(HistoryTarget::All);
+    before.actor = ActorFilter::You;
+    before.to = Some(TimestampMs(latest.at.0 - 1));
+    assert!(!history(&core, before)
+        .await
+        .rows
+        .iter()
+        .any(|row| row.id == latest.id));
     let mut old = list_args(HistoryTarget::All);
     old.to = Some(TimestampMs(1));
     assert!(history(&core, old).await.rows.is_empty());

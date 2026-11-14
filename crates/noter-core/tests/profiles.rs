@@ -525,16 +525,34 @@ async fn carry_offers_open_items_for_the_calls_people_and_returns_them_at_stop()
         .insert_batch(vec![
             call("call_old", NOW - 3 * DAY),
             call("call_live", NOW),
+            call("call_elsewhere", NOW - 2 * DAY),
             person("per_anna", "Anna Koval"),
+            person("per_boris", "Boris Petrov"),
             part("call_old", "per_anna"),
             part("call_live", "per_anna"),
+            part("call_elsewhere", "per_boris"),
             item("itm_open", "call_old", "action_item", Some("per_anna")),
             item("itm_closed", "call_old", "action_item", Some("per_anna")),
             item("itm_answered", "call_old", "open_question", None),
+            item(
+                "itm_elsewhere",
+                "call_elsewhere",
+                "action_item",
+                Some("per_boris"),
+            ),
         ])
         .unwrap();
     let live = CallId::new("call_live");
     assert_eq!(testing::carry_start(&core, &live).unwrap(), 3);
+    assert_eq!(
+        text(
+            dir.path(),
+            "SELECT status FROM items WHERE id = 'itm_elsewhere'"
+        )
+        .as_deref(),
+        Some("open"),
+        "an unrelated call's item is not carried"
+    );
     assert_eq!(
         text(dir.path(), "SELECT status FROM items WHERE id = 'itm_open'").as_deref(),
         Some("carried")
@@ -598,7 +616,8 @@ async fn unknown_people_carry_nothing_and_metrics_off_leaves_talk_time_alone() {
     assert_eq!(testing::carry_start(&core, &live).unwrap(), 0);
     exec(dir.path(), "INSERT INTO call_participants (id, call_id, person_id) VALUES ('cpx', 'call_live', 'per_anna')").unwrap();
     // Behaviour metrics are off by default: no talk time is kept.
-    exec(dir.path(), "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text, text_norm, pass) VALUES ('sg', 'call_live', 'sp_live', 'sys', 0, 5000, 'hi', 'hi', 'live')").ok();
+    exec(dir.path(), "INSERT INTO speakers (id, call_id, label, n, channel, person_id, pass) VALUES ('sp_live', 'call_live', 'spk_0', 1, 'sys', 'per_anna', 'live')").unwrap();
+    exec(dir.path(), "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text, text_norm, pass) VALUES ('sg', 'call_live', 'sp_live', 'sys', 0, 5000, 'hi', 'hi', 'live')").unwrap();
     testing::carry_end(&core, &live).unwrap();
     assert_eq!(
         count(
@@ -623,8 +642,8 @@ async fn unknown_people_carry_nothing_and_metrics_off_leaves_talk_time_alone() {
     assert_eq!(
         count(
             dir.path(),
-            "SELECT count(*) FROM call_participants WHERE talk_time_ms IS NOT NULL"
+            "SELECT talk_time_ms FROM call_participants WHERE call_id = 'call_live'"
         ),
-        1
+        5000
     );
 }

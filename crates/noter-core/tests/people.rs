@@ -968,12 +968,12 @@ async fn a_rename_reaches_the_speakers_of_a_call_without_rewriting_text() {
     )
     .unwrap();
     let patch = PersonPatch {
-        display_name: Some("Dmitri Orlov-Smith".into()),
+        display_name: Some("Dmitri Smith".into()),
         ..PersonPatch::default()
     };
     let renamed = update(&core, "per_dima", 1, patch).await.unwrap();
     assert_eq!(
-        renamed.person.short_name, "Dmitri O.",
+        renamed.person.short_name, "Dmitri S.",
         "a derived short name follows"
     );
     let detail = core
@@ -993,8 +993,9 @@ async fn a_rename_reaches_the_speakers_of_a_call_without_rewriting_text() {
             _ => None,
         })
         .collect();
-    assert!(
-        names.contains(&"Dmitri Orlov-Smith".to_string()),
-        "{names:?}"
+    assert!(names.contains(&"Dmitri Smith".to_string()), "{names:?}");
+    assert_eq!(
+        text(dir.path(), "SELECT text FROM segments WHERE id = 'seg_1'").as_deref(),
+        Some("hello there")
     );
 }

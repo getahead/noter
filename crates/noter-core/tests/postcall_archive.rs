@@ -432,7 +432,7 @@ async fn suggested_items_carry_their_evidence_and_reviewed_ones_are_never_sugges
         items[1][1..3],
         [json!("decision"), json!("Scripted decision")]
     );
-    // Evidence: spans of call time on the cited segments' channel.
+    // Evidence spans preserve the exact time range and channel of the cited live segment.
     let spans = rows(
         &r.core,
         &format!(
@@ -440,8 +440,7 @@ async fn suggested_items_carry_their_evidence_and_reviewed_ones_are_never_sugges
             items[1][0].as_str().unwrap()
         ),
     );
-    assert!(!spans.is_empty());
-    assert!(spans.iter().all(|s| s[0] == "sys"));
+    assert_eq!(spans, vec![vec![json!("sys"), json!(0), json!(5_000)]]);
     // A rerun replaces the still-suggested items: the same two, new ids.
     let regen = trigger(&r.core, JobKind::Regeneration, CALL);
     assert_eq!(
@@ -833,9 +832,60 @@ async fn a_failed_archive_keeps_the_live_transcript_and_sends_the_users_names() 
 }
 
 #[tokio::test(start_paused = true)]
+async fn the_builtin_archive_installs_live_segments_through_the_core() {
+    let r = open("", true).await;
+    seed_call(&r.core, CALL, 2);
+    let audio = r.dir.path().join(format!("audio/{CALL}"));
+    std::fs::create_dir_all(&audio).unwrap();
+    std::fs::write(audio.join("mic.wav"), b"audio").unwrap();
+    let transcript = (0..2)
+        .map(|n| {
+            serde_json::to_string(&json!({
+                "id": format!("{CALL}_seg_{n}"),
+                "call_id": CALL,
+                "channel": "sys",
+                "speaker": {
+                    "speaker_id": format!("{CALL}_spk"),
+                    "label": { "type": "unnamed", "n": 1 }
+                },
+                "crosstalk_with": [],
+                "t0_ms": n * 10_000,
+                "t1_ms": n * 10_000 + 5_000,
+                "text": format!("We agree on step {n}."),
+                "lang": "en",
+                "lang_p": 0.9,
+                "confidence": 0.8,
+                "state": "confirmed",
+                "pass": "live",
+                "corrections": []
+            }))
+            .unwrap()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(audio.join("transcript.jsonl"), transcript).unwrap();
+
+    let run = trigger(&r.core, JobKind::ArchivePass, CALL);
+    assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Succeeded);
+    assert_eq!(
+        rows(
+            &r.core,
+            &format!("SELECT text FROM segments WHERE call_id = '{CALL}' AND pass = 'archive' ORDER BY t0_ms")
+        ),
+        vec![
+            vec![json!("We agree on step 0.")],
+            vec![json!("We agree on step 1.")]
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_archive_of_a_silent_call_is_done_and_queues_the_regeneration() {
     let r = open("", true).await;
     seed_call(&r.core, CALL, 0);
+    let audio = r.dir.path().join(format!("audio/{CALL}"));
+    std::fs::create_dir_all(&audio).unwrap();
+    std::fs::write(audio.join("mic.wav"), b"silent audio").unwrap();
     let run = trigger(&r.core, JobKind::ArchivePass, CALL);
     assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Succeeded);
     assert_eq!(

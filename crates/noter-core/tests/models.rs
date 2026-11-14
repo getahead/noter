@@ -404,10 +404,13 @@ async fn not_enough_disk_is_disk_full_with_the_space_needed() {
     let s = open(dir.path(), two_bundles(), 10);
     let err = download(&s.core, DownloadAction::Start).await.unwrap_err();
     assert_eq!(err.code, ErrorCode::DiskFull);
-    assert!(matches!(
+    assert_eq!(
         err.detail,
-        Some(ErrorDetail::DiskSpace { free_mb: 10, .. })
-    ));
+        Some(ErrorDetail::DiskSpace {
+            free_mb: 10,
+            needed_mb: 501
+        })
+    );
     assert!(s.source.fetches.lock().unwrap().is_empty());
 }
 

@@ -1173,6 +1173,7 @@ dependencies = [
  "noter-engine-client",
  "noter-native",
  "noter-protocol",
+ "noter-retrieval",
  "serde",
  "serde_json",
  "sha2 0.11.1",

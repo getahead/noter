@@ -389,6 +389,42 @@ async fn the_core_routes_acks_unsubscribes_reloads_and_shutdown_to_its_hubs() {
     assert_eq!(c.ended(), Some(StreamEndReason::Shutdown));
 }
 
+// cpt-noter-algo-core-ipc-host-ack: an ack routed through Core advances the subscriber window.
+#[tokio::test]
+async fn a_core_ack_keeps_a_stream_alive_until_the_next_lag_limit() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = core(dir.path());
+    let hub = core.stream_hub::<TestMsg>(None);
+    let window = Window::default();
+    let id = hub
+        .subscribe("call_1", MAIN, window.sink(), || Ok(()))
+        .unwrap()
+        .subscription_id;
+    let main = from(WindowLabel::Main);
+    let first = hub.publish("call_1", value(1));
+    core.stream_ack(
+        &main,
+        StreamAckArgs {
+            subscription_id: id,
+            seq: first,
+        },
+    )
+    .await
+    .unwrap();
+
+    for n in 2..=LAG_LIMIT {
+        hub.publish("call_1", value(n as u32));
+    }
+    assert_eq!(
+        window.ended(),
+        None,
+        "the core-routed ack advances the limit"
+    );
+    hub.publish("call_1", value((LAG_LIMIT + 1) as u32));
+    assert_eq!(window.ended(), Some(StreamEndReason::Lagged));
+    core.shutdown().await;
+}
+
 #[tokio::test]
 async fn a_subscribing_command_belongs_to_the_calling_window() {
     let dir = tempfile::tempdir().unwrap();

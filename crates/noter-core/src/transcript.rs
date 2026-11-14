@@ -90,6 +90,7 @@ impl Transcript {
 #[derive(Default)]
 struct State {
     calls: HashMap<CallId, Live>,
+    discarded: HashSet<CallId>,
     /// When the first levels of a stream arrived: `LevelsMsg.at_ms` counts from it.
     levels_origin: HashMap<String, i64>,
     /// Test hook state (D-27): not compiled into a release build.
@@ -192,6 +193,9 @@ impl Core {
             return;
         }
         let call_id = seg.call_id.clone();
+        if state.discarded.contains(&call_id) {
+            return;
+        }
         let live = match self.live(&mut state, &call_id) {
             Ok(live) => live,
             Err(e) => return self.log_error("segment", &e),
@@ -430,7 +434,12 @@ impl Core {
                 self.log_error("file", &e);
             }
         }
-        lock(&self.transcript.state).calls.remove(call_id);
+        let mut state = lock(&self.transcript.state);
+        state.calls.remove(call_id);
+        if reason == StreamEndReason::Discarded {
+            state.discarded.insert(call_id.clone());
+        }
+        drop(state);
         self.transcript_hub().end_stream(call_id.as_str(), reason);
     }
     // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-end-stream

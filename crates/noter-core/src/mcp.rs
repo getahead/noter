@@ -1686,11 +1686,161 @@ fn person_of(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::McpSource;
 
     struct Quiet;
 
     impl crate::EventEmitter for Quiet {
         fn emit(&self, _: &'static str, _: Value) {}
+    }
+
+    #[tokio::test]
+    async fn long_data_paths_use_a_private_socket_folder_and_socket() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().unwrap();
+        let data = temp.path().join("d".repeat(100));
+        std::fs::create_dir_all(&data).unwrap();
+        let core = Arc::new(
+            Core::open(
+                &data,
+                crate::CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet)),
+            )
+            .unwrap(),
+        );
+        let socket = core.serve_socket().await.unwrap();
+
+        assert!(
+            !socket.starts_with(&data),
+            "the long data path must use the hashed temp socket"
+        );
+        assert_eq!(
+            std::fs::metadata(socket.parent().unwrap())
+                .unwrap()
+                .permissions()
+                .mode()
+                & 0o777,
+            0o700
+        );
+        assert_eq!(
+            std::fs::metadata(&socket).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        core.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn colliding_live_tool_names_reach_their_source_after_removal() {
+        let dir = tempfile::tempdir().unwrap();
+        let mcp = Arc::new(crate::ScriptedMcp::default());
+        mcp.set(
+            "https://first.example",
+            crate::ScriptedServer {
+                pages: vec![crate::ScriptedPage {
+                    uri: "doc://first".into(),
+                    title: "marker first".into(),
+                    hash: None,
+                    text: "first server".into(),
+                    mime: None,
+                }],
+                ..crate::ScriptedServer::default()
+            },
+        );
+        mcp.set(
+            "https://second.example",
+            crate::ScriptedServer {
+                pages: vec![crate::ScriptedPage {
+                    uri: "doc://second".into(),
+                    title: "marker second".into(),
+                    hash: None,
+                    text: "second server".into(),
+                    mime: None,
+                }],
+                ..crate::ScriptedServer::default()
+            },
+        );
+        let core = Core::open(
+            &dir.path().join("data"),
+            crate::CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet))
+                .with_mcp_source(mcp.clone()),
+        )
+        .unwrap();
+        let conn = noter_db::rusqlite::Connection::open(dir.path().join("data/noter.db")).unwrap();
+        conn.execute(
+            "INSERT INTO sources (id, rev, kind, mode, name, location, privacy_class, scope, status) VALUES
+             ('src_first', 1, 'mcp', 'live', 'MCP Alpha', 'https://first.example', 'normal', '{\"type\":\"all_calls\"}', '{\"type\":\"idle\"}'),
+             ('src_second', 1, 'mcp', 'live', 'MCP-Alpha', 'https://second.example', 'normal', '{\"type\":\"all_calls\"}', '{\"type\":\"idle\"}')",
+            [],
+        ).unwrap();
+
+        let tools = core.live_tools(None).unwrap();
+        assert_eq!(
+            tools.iter().map(|t| t.name.as_str()).collect::<Vec<_>>(),
+            [
+                "live_mcp_alpha_search",
+                "live_mcp_alpha_read",
+                "live_mcp_alpha__search",
+                "live_mcp_alpha__read",
+            ]
+        );
+        assert_eq!(tools[0].source.server, "https://first.example");
+        assert_eq!(tools[2].source.server, "https://second.example");
+
+        let audit = |_: &str, _: &[u8]| true;
+        let renewed = |_: String| {};
+        let remote = crate::McpRemote {
+            audit: &audit,
+            renewed: &renewed,
+        };
+        let first_token = mcp.oauth("https://first.example", &audit).await.unwrap();
+        let second_token = mcp.oauth("https://second.example", &audit).await.unwrap();
+        let first_answer = core
+            .live_call(
+                &tools[0].source.server,
+                Live::Search,
+                &json!({ "query": "marker" }),
+                &first_token,
+                &remote,
+            )
+            .await
+            .unwrap();
+        let second_answer = core
+            .live_call(
+                &tools[2].source.server,
+                Live::Search,
+                &json!({ "query": "marker" }),
+                &second_token,
+                &remote,
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_answer["results"][0]["uri"], "doc://first");
+        assert_eq!(second_answer["results"][0]["uri"], "doc://second");
+
+        conn.execute("DELETE FROM sources WHERE id = 'src_first'", [])
+            .unwrap();
+        let remaining = core.live_tools(None).unwrap();
+        assert_eq!(
+            remaining
+                .iter()
+                .map(|t| t.name.as_str())
+                .collect::<Vec<_>>(),
+            ["live_mcp_alpha_search", "live_mcp_alpha_read",]
+        );
+        assert!(remaining
+            .iter()
+            .all(|t| t.source.server == "https://second.example"));
+        let remaining_answer = core
+            .live_call(
+                &remaining[0].source.server,
+                Live::Search,
+                &json!({ "query": "marker" }),
+                &second_token,
+                &remote,
+            )
+            .await
+            .unwrap();
+        assert_eq!(remaining_answer["results"][0]["uri"], "doc://second");
     }
 
     /// A cloud run's results are refused until the release gate exists, so the sensitive-call

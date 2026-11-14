@@ -2,8 +2,8 @@
 title: "Feature: noter-core-harness and real-core conformance"
 description: "A test binary that runs the real CoreApi without Tauri over JSON Lines, with a fixture database, a scripted engine and a scripted runtime, so the conformance suite and the UI E2E flows count against the real core from M0."
 status: PROPOSED
-version: "0.2"
-date: "2026-10-18"
+version: "0.3"
+date: "2026-11-14"
 milestone: M0
 lane: core
 decomposition: docs/DECOMPOSITION-core.md
@@ -13,6 +13,7 @@ design: docs/DESIGN-core.md
 # Feature: noter-core-harness and real-core conformance
 
 > **Change log (v0.2):** The fixture seeds engine-named audio files and the scripted stop writes physical recordings.
+> **Change log (v0.3):** The built-in offline archive returns live transcript segments when call audio exists and fails when it does not.
 
 <!-- toc -->
 
@@ -143,6 +144,8 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 
 **Output**: The same events the supervisor would read from a live engine, answered commands acknowledged.
 
+**Built-in archive behavior** (implemented in this change for issue #681): when no explicit `offline_pass` script overrides the built-in answer, a call whose audio directory contains audio must return that call's live segments as its scripted archive result. The real core installs that result through its normal archive path. If the directory contains no audio, the built-in answer must fail the archive pass. A two-segment live transcript is a regression scenario, not a fixed segment count for every call. This scripts the engine seam; it does not perform speech recognition.
+
 **Steps**:
 1. [x] - `p1` - Answer `ready` with the current `ENGINE_PROTOCOL_VERSION` - `inst-ready`
 2. [x] - `p1` - **FOR EACH** command the supervisor sends - `inst-for-commands`
@@ -220,3 +223,12 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 - [x] Closing stdin ends every open stream with `shutdown` and exits with code 0; stdout holds only protocol lines.
 - [x] The conformance suite passes with `NOTER_CORE=stdio` for every M0 command.
 - [x] `just gate` passes.
+
+**Additional archive regression criteria** (issue #681; not included in the checked M0 criteria above):
+
+- With no explicit `offline_pass` script, a stopped call with audio and two live segments gets an archive result containing those two segments; the real core installs them and reports archive success.
+- With no explicit `offline_pass` script and no audio in the call's audio directory, the archive pass fails rather than reporting a successful upgrade.
+
+**Verification in this change**: unit tests in `crates/noter-engine-client/tests/offline.rs` cover the built-in success and no-audio answers; real-core tests in `crates/noter-core/tests/postcall_archive.rs` cover installation and failure; conformance coverage in `apps/desktop/tests/conformance/m2-stories-postcall.test.ts` uses no explicit offline script. The call-page review outputs DESIGN story runs against the real core. These additional criteria remain unchecked until `just gate` passes.
+
+**Change log**: 0.3 (2026-11-14) specifies built-in archive behavior and regression criteria; implementation and focused regressions are in this change, with the definition-of-done gate still outstanding. Version 0.2 records fixture audio seeding and physical recordings on scripted stop.

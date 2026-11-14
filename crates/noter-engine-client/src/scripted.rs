@@ -13,8 +13,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use noter_protocol::engine::{
     ArchiveResult, EngineCommand, EngineCommandLine, EngineErrorCode, EngineEvent, EngineEventLine,
-    ENGINE_PROTOCOL_VERSION,
+    EngineSegment, EngineSegmentState, ENGINE_PROTOCOL_VERSION,
 };
+use noter_protocol::model::{SegmentState, SegmentView, TranscriptPass};
 use noter_protocol::{AudioChannel, PermissionState, TimestampMs};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, DuplexStream};
@@ -391,19 +392,94 @@ fn f32_bytes(values: &[f32]) -> Vec<u8> {
     values.iter().flat_map(|v| v.to_le_bytes()).collect()
 }
 
+// @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
+fn live_segments(
+    root: &Path,
+    call_dir: &str,
+    call_id: &noter_protocol::CallId,
+) -> Result<Vec<EngineSegment>, EngineErrorCode> {
+    const AUDIO_EXTENSIONS: [&str; 6] = ["m4a", "aac", "caf", "wav", "pcm", "ring"];
+    let dir = root.join(call_dir);
+    let has_audio = std::fs::read_dir(&dir)
+        .map_err(|_| EngineErrorCode::ZeroBuffers)?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .any(|path| {
+            path.is_file()
+                && path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext| {
+                        AUDIO_EXTENSIONS
+                            .iter()
+                            .any(|audio| ext.eq_ignore_ascii_case(audio))
+                    })
+        });
+    if !has_audio {
+        return Err(EngineErrorCode::ZeroBuffers);
+    }
+
+    let transcript = match std::fs::read_to_string(dir.join("transcript.jsonl")) {
+        Ok(transcript) => transcript,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(_) => return Err(EngineErrorCode::Internal),
+    };
+    transcript
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let segment: SegmentView =
+                serde_json::from_str(line).map_err(|_| EngineErrorCode::Internal)?;
+            if segment.call_id != *call_id
+                || segment.pass != TranscriptPass::Live
+                || segment.state != SegmentState::Confirmed
+            {
+                return Ok(None);
+            }
+            Ok(Some(EngineSegment {
+                id: segment.id.to_string(),
+                call_id: segment.call_id,
+                channel: segment.channel,
+                t0_ms: segment.t0_ms,
+                t1_ms: segment.t1_ms,
+                state: EngineSegmentState::Confirmed,
+                lang: segment.lang,
+                lang_p: segment.lang_p,
+                speaker_label: segment.speaker.speaker_id.to_string(),
+                text: segment.text,
+                words_path: None,
+                avg_logprob: segment.confidence.max(f32::MIN_POSITIVE).ln(),
+                no_speech_p: 0.0,
+                corrections: Vec::new(),
+                crosstalk_labels: Vec::new(),
+            }))
+        })
+        .filter_map(|result| match result {
+            Ok(Some(segment)) => Some(Ok(segment)),
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect()
+}
+
 /// The built-in answer to an offline command: its file first, then its events.
 fn answer_offline(root: &Path, cmd: EngineCommand) -> Vec<EngineEvent> {
     match cmd {
         EngineCommand::OfflinePass {
             call_id,
+            session_dir,
             result_path,
             backend,
             ..
         } => {
+            let segments = match live_segments(root, &session_dir, &call_id) {
+                Ok(segments) => segments,
+                Err(code) => return vec![EngineEvent::OfflineFailed { call_id, code }],
+            };
             let result = ArchiveResult {
                 call_id: call_id.clone(),
                 backend,
-                segments: Vec::new(),
+                segments,
             };
             let bytes = serde_json::to_vec(&result).unwrap_or_default();
             let progress = |progress| EngineEvent::OfflineProgress {
@@ -534,7 +610,6 @@ fn schedule(
     due.sort_by_key(|(at, _)| *at);
 }
 
-// @cpt-algo:cpt-noter-algo-core-harness-scripted-engine:p1
 async fn run(
     engine: ScriptedEngine,
     b: Behaviour,

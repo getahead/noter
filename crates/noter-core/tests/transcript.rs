@@ -195,10 +195,12 @@ async fn a_hypothesis_is_streamed_and_never_stored() {
     let (snapshot, got) = subscribe(&r).await;
     assert!(snapshot.live && snapshot.segments.is_empty() && snapshot.subscription_id.is_some());
     engine_up(&r).await;
-    r.engine
-        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hel"));
-    r.engine
-        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hello"));
+    assert!(r
+        .engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hel")));
+    assert!(r
+        .engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hello")));
     settle(500).await;
     let heard = events(&got);
     assert_eq!(heard.len(), 2);
@@ -211,6 +213,12 @@ async fn a_hypothesis_is_streamed_and_never_stored() {
     assert_eq!(late.hypotheses.len(), 1);
     assert_eq!(late.hypotheses[0].text, "hello");
     assert_eq!(late.speakers.len(), 1);
+    assert_eq!(late.last_seq, Seq(2));
+    let (_, after_snapshot) = subscribe(&r).await;
+    r.engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hello!"));
+    settle(1).await;
+    assert_eq!(after_snapshot.lock().unwrap()[0].seq, Seq(3));
 }
 
 #[tokio::test(start_paused = true)]
@@ -221,8 +229,9 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
     new_call(&r.core, "recording");
     let (_, got) = subscribe(&r).await;
     engine_up(&r).await;
-    r.engine
-        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "hello"));
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "hello")));
     settle(500).await;
     let first = events(&got)
         .into_iter()
@@ -232,8 +241,9 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
         })
         .unwrap();
     assert!(matches!(first.speaker.label, SpeakerLabel::Unnamed { .. }));
-    r.engine
-        .inject(hypothesis(AudioChannel::Sys, "spk_1", 2000, "other"));
+    assert!(r
+        .engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_1", 2000, "other")));
     settle(100).await;
     let done = r
         .core
@@ -260,13 +270,16 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
         matches!(&named.label, SpeakerLabel::Person { person } if person.display_name == "Dana")
     );
     got.lock().unwrap().clear();
-    r.engine
-        .inject(hypothesis(AudioChannel::Sys, "spk_0", 1000, "next"));
+    assert!(r
+        .engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 1000, "next")));
     settle(100).await;
-    r.engine
-        .inject(confirmed(AudioChannel::Sys, "spk_0", 1000, "next line"));
-    r.engine
-        .inject(confirmed(AudioChannel::Sys, "spk_1", 2000, "other voice"));
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 1000, "next line")));
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_1", 2000, "other voice")));
     settle(500).await;
     let heard = events(&got);
     let later: Vec<_> = heard
@@ -669,8 +682,9 @@ async fn a_discarded_call_drops_its_open_batch_and_writes_no_file() {
     new_call(&r.core, "recording");
     let (_, got) = subscribe(&r).await;
     engine_up(&r).await;
-    r.engine
-        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "secret"));
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "secret")));
     settle(10).await;
     testing::capture_event(
         &r.core,
@@ -679,6 +693,9 @@ async fn a_discarded_call_drops_its_open_batch_and_writes_no_file() {
             reason: StreamEndReason::Discarded,
         },
     );
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 2000, "after discard")));
     settle(400).await;
     assert_eq!(
         events(&got),
@@ -719,8 +736,9 @@ async fn a_crash_between_commit_and_publish_loses_and_doubles_nothing() {
     let (snapshot, _) = subscribe(&r).await;
     assert_eq!(snapshot.segments.len(), 1);
     engine_up(&r).await;
-    r.engine
-        .inject(confirmed(AudioChannel::Sys, "spk_0", 2000, "after"));
+    assert!(r
+        .engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 2000, "after")));
     settle(400).await;
     assert_eq!(stored(&r.core, "SELECT label FROM speakers"), vec!["spk_0"]);
     let (snapshot, _) = subscribe(&r).await;

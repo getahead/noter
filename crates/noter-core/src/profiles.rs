@@ -802,10 +802,93 @@ impl Core {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
 
     // Sealed by chacha20poly1305 0.10.1 (key 00..1f, nonce 64..6f): centroids stored before the
     // 0.11 update must still open.
     const SEALED_BY_0_10: &str = include_str!("../tests/data/centroid-chacha20poly1305-0.10.hex");
+
+    struct Quiet;
+
+    impl crate::EventEmitter for Quiet {
+        fn emit(&self, _: &'static str, _: Value) {}
+    }
+
+    #[test]
+    fn a_deleted_voice_profile_rejects_a_stale_match_score() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Core::open(
+            dir.path(),
+            crate::CoreDeps::new(Arc::new(crate::SystemClock), Arc::new(Quiet)),
+        )
+        .unwrap();
+        let db = Connection::open(dir.path().join("noter.db")).unwrap();
+        db.execute_batch(
+            "INSERT INTO calls (id, rev, started_at, title, call_type, status, mode_used)
+               VALUES ('call_match', 1, 1, 'Call', 'planning', 'ready', 'local_only');
+             INSERT INTO people (id, rev, display_name, short_name, voice_profile_optin)
+               VALUES ('per_match', 1, 'Match Person', 'Match P.', 1);
+             INSERT INTO speakers (id, call_id, label, n, channel, pass)
+               VALUES ('spk_match', 'call_match', 'spk_0', 1, 'sys', 'live');
+             INSERT INTO voice_profiles (id, person_id, embedding, last_used_at)
+               VALUES ('vp_match', 'per_match', X'00', 1);",
+        )
+        .unwrap();
+        let stale = Score {
+            person: "per_match".into(),
+            profile: "vp_match".into(),
+            cosine: 0.9,
+        };
+        db.execute("DELETE FROM voice_profiles WHERE id = 'vp_match'", [])
+            .unwrap();
+
+        assert!(!core
+            .commit_match(&CallId::new("call_match"), "spk_match", &stale, 2)
+            .unwrap());
+        let speaker_person: Option<String> = db
+            .query_row(
+                "SELECT person_id FROM speakers WHERE id = 'spk_match'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(speaker_person, None);
+    }
+
+    #[test]
+    fn verdict_checks_the_threshold_and_runner_up_margin_at_their_boundaries() {
+        let score = |person: &str, cosine| Score {
+            person: person.into(),
+            profile: format!("vp_{person}"),
+            cosine,
+        };
+
+        assert!(verdict(vec![score("below", 0.74)]).is_none());
+        assert_eq!(verdict(vec![score("above", 0.76)]).unwrap().person, "above");
+        assert!(verdict(vec![score("best", 0.80), score("close", 0.76)]).is_none());
+        assert_eq!(
+            verdict(vec![score("best", 0.80), score("clear", 0.74)])
+                .unwrap()
+                .person,
+            "best"
+        );
+    }
+
+    #[test]
+    fn clustering_groups_close_samples_per_device_and_keeps_distant_voices_separate() {
+        let centroids = cluster(&[
+            ("mac".into(), vec![1.0, 0.0]),
+            ("mac".into(), vec![0.99, 0.1]),
+            ("mac".into(), vec![0.0, 1.0]),
+            ("phone".into(), vec![1.0, 0.0]),
+        ]);
+
+        let counts: Vec<_> = centroids
+            .iter()
+            .map(|centroid| (centroid.device.as_str(), centroid.samples))
+            .collect();
+        assert_eq!(counts, [("mac", 2), ("mac", 1), ("phone", 1)]);
+    }
 
     fn golden_key() -> SecretKey {
         SecretKey(unhex(&noter_db::hex(&(0u8..32).collect::<Vec<_>>())).unwrap())

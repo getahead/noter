@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use noter_core::{Clock, Core, CoreDeps, EventEmitter};
 use noter_db::Insert;
 use noter_protocol::error::ValidationRule;
-use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
+use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -57,6 +57,18 @@ fn ctx() -> CommandCtx {
     }
 }
 
+fn collecting<T: Send + 'static>() -> (Sink<T>, Arc<Mutex<Vec<T>>>) {
+    let got = Arc::new(Mutex::new(Vec::new()));
+    let sink = got.clone();
+    (
+        Sink::new(move |message| {
+            sink.lock().unwrap().push(message);
+            true
+        }),
+        got,
+    )
+}
+
 fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
     Insert {
         table,
@@ -74,7 +86,7 @@ fn call(id: &str) -> Insert {
             ("ended_at", json!(NOW - 3_000_000)),
             ("title", json!(format!("Call {id}"))),
             ("call_type", json!("planning")),
-            ("status", json!("ready")),
+            ("status", json!("recording")),
             ("mode_used", json!("cloud_redacted")),
         ],
     )
@@ -196,6 +208,16 @@ async fn naming_a_speaker_for_the_call_renames_every_line_and_undo_restores_them
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());
     seed(&core);
+    let (sink, updates) = collecting();
+    core.transcript_subscribe(
+        &ctx(),
+        TranscriptSubscribeArgs {
+            call_id: CallId::new("call_a"),
+        },
+        sink,
+    )
+    .await
+    .unwrap();
 
     let done = core
         .transcript_rename_speaker(&ctx(), rename_args("spk_1", "Dana", RenameScope::WholeCall))
@@ -229,7 +251,27 @@ async fn naming_a_speaker_for_the_call_renames_every_line_and_undo_restores_them
         "SPEAKER_00",
         "another call is untouched"
     );
-    assert!(!events.named("entity:changed").is_empty());
+    {
+        let updates = updates.lock().unwrap();
+        assert!(updates.iter().any(|message| matches!(
+            &message.event,
+            TranscriptEvent::SegmentsUpdated { segments }
+                if segments.iter().any(|segment| segment.call_id.as_str() == "call_a" && segment.id.as_str() == "seg_1")
+        )));
+        assert!(updates.iter().any(|message| matches!(
+            &message.event,
+            TranscriptEvent::SpeakersUpdated { speakers, .. }
+                if speakers.iter().any(|speaker| speaker.id.as_str() == "spk_1")
+        )));
+    }
+    let changes = events.named("entity:changed");
+    assert!(changes.iter().any(|change| {
+        change["type"] == "speakers"
+            && change["call_id"] == "call_a"
+            && change["speakers"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row["id"] == "spk_1"))
+    }));
     let file = std::fs::read_to_string(dir.path().join("audio/call_a/transcript.jsonl")).unwrap();
     assert!(file.contains("Dana"));
 
@@ -490,17 +532,27 @@ async fn a_term_fix_keeps_the_original_updates_the_search_text_and_teaches_the_g
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());
     seed(&core);
+    let (sink, updates) = collecting();
+    core.transcript_subscribe(
+        &ctx(),
+        TranscriptSubscribeArgs {
+            call_id: CallId::new("call_a"),
+        },
+        sink,
+    )
+    .await
+    .unwrap();
 
     let done = core
-        .transcript_fix_term(&ctx(), fix("seg_1", 0, 9, "Kubernetes", true))
+        .transcript_fix_term(&ctx(), fix("seg_1", 0, 9, "ﬁle Ｗｅｂ Ёлка Straße", true))
         .await
         .unwrap();
 
-    assert_eq!(done.segment.text, "Kubernetes is down");
+    assert_eq!(done.segment.text, "ﬁle Ｗｅｂ Ёлка Straße is down");
     assert_eq!(
         done.segment.corrections,
         [TermCorrection {
-            range: TextRange { start: 0, end: 10 },
+            range: TextRange { start: 0, end: 19 },
             original: "kubernets".into()
         }]
     );
@@ -510,8 +562,26 @@ async fn a_term_fix_keeps_the_original_updates_the_search_text_and_teaches_the_g
     assert!(list
         .terms
         .iter()
-        .any(|t| t.id == term && t.term == "Kubernetes"));
-    assert_eq!(text_of(&core, "seg_1").1, "kubernetes is down");
+        .any(|t| t.id == term && t.term == "ﬁle Ｗｅｂ Ёлка Straße"));
+    assert_eq!(text_of(&core, "seg_1").1, "file web елка strasse is down");
+    let found = core
+        .search(
+            &ctx(),
+            SearchArgs {
+                query: "file web елка strasse".into(),
+                filter: CallFilter::default(),
+                limit: Some(10),
+            },
+        )
+        .await
+        .unwrap();
+    assert!(
+        found.calls.iter().any(|hit| matches!(
+            &hit.target,
+            HitTarget::Segment { span } if span.call_id.as_str() == "call_a"
+        )),
+        "normalized keyword query finds corrected segment"
+    );
     assert_eq!(
         text_of(&core, "seg_x").0,
         "elsewhere",
@@ -520,9 +590,29 @@ async fn a_term_fix_keeps_the_original_updates_the_search_text_and_teaches_the_g
     assert!(
         std::fs::read_to_string(dir.path().join("audio/call_a/transcript.jsonl"))
             .unwrap()
-            .contains("Kubernetes is down")
+            .contains("ﬁle Ｗｅｂ Ёлка Straße is down")
     );
-    assert!(!events.named("entity:changed").is_empty());
+    {
+        let updates = updates.lock().unwrap();
+        assert!(updates.iter().any(|message| matches!(
+            &message.event,
+            TranscriptEvent::SegmentsUpdated { segments }
+                if segments.iter().any(|segment| segment.id.as_str() == "seg_1" && segment.text == "ﬁle Ｗｅｂ Ёлка Straße is down")
+        )));
+        assert!(updates.iter().any(|message| matches!(
+            &message.event,
+            TranscriptEvent::SpeakersUpdated { speakers, .. }
+                if speakers.iter().any(|speaker| speaker.id.as_str() == "spk_1")
+        )));
+    }
+    let changes = events.named("entity:changed");
+    assert!(changes.iter().any(|change| {
+        change["type"] == "speakers"
+            && change["call_id"] == "call_a"
+            && change["speakers"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row["id"] == "spk_1"))
+    }));
 
     undo(&core, &done.change_id).await;
     assert_eq!(text_of(&core, "seg_1").0, "kubernets is down");
@@ -561,6 +651,30 @@ async fn a_term_fix_without_teaching_leaves_the_glossary_alone_and_counts_utf16_
         .unwrap();
     assert_eq!(again.segment.text, "Привет Kubernetes 😀 OK");
     assert_eq!(again.segment.corrections.len(), 2);
+}
+
+#[tokio::test]
+async fn an_overlapping_term_fix_replaces_the_previous_correction() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    core.transcript_fix_term(&ctx(), fix("seg_1", 0, 9, "Kubernetes", false))
+        .await
+        .unwrap();
+
+    let overlapping = core
+        .transcript_fix_term(&ctx(), fix("seg_1", 0, 10, "Kube", false))
+        .await
+        .unwrap();
+
+    assert_eq!(overlapping.segment.text, "Kube is down");
+    assert_eq!(
+        overlapping.segment.corrections,
+        [TermCorrection {
+            range: TextRange { start: 0, end: 4 },
+            original: "Kubernetes".into(),
+        }]
+    );
 }
 
 #[tokio::test]

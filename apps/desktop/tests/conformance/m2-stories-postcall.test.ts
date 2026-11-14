@@ -5,7 +5,7 @@
 // the archive pass through the scripted engine (`--engine-script` playing `offline_done` with a
 // recorded result) followed by a regeneration that keeps the edit. Those steps exist only in the
 // real core, so the fake skips this file; m2-outputs.test.ts runs the five commands on both.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -67,12 +67,12 @@ const LINES = ["Let's ship the drawer redesign in 8.0.", "Anna takes the virtual
  * By default the archive pass answers, `archiveAfterMs` after the core asks, with a result
  * recorded for the call's three lines.
  */
-function open(opts: { llm?: object[]; engine?: object[]; archiveAfterMs?: number } = {}): void {
+function open(opts: { llm?: object[]; engine?: object[] | null; archiveAfterMs?: number } = {}): void {
   dir = mkdtempSync(join(tmpdir(), "noter-postcall-"));
   const archive = join(dir, "archive.json");
   writeFileSync(archive, JSON.stringify({ call_id: "call_recorded", backend: "whisper_large_v3", segments: LINES.map((t, i) => heard(i, t)) }));
-  const engine = opts.engine ?? [{ on: "offline_pass", after_ms: opts.archiveAfterMs ?? 0, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }];
-  const flags = [`--engine-script ${write("engine.jsonl", engine)}`];
+  const engine = opts.engine === null ? null : opts.engine ?? [{ on: "offline_pass", after_ms: opts.archiveAfterMs ?? 0, event: { type: "offline_done", call_id: "call_recorded", result_path: archive } }];
+  const flags = engine === null ? [] : [`--engine-script ${write("engine.jsonl", engine)}`];
   if (opts.llm) flags.push(`--llm-script ${write("llm.jsonl", opts.llm)}`);
   const base = process.env.NOTER_CORE_CMD;
   process.env.NOTER_CORE_CMD = `${base} ${flags.join(" ")}`;
@@ -110,6 +110,13 @@ async function record(lines = LINES): Promise<CallId> {
 
 async function stop(call: CallId): Promise<void> {
   expect(ok(await s.core("main").captureStop({ call_id: call })).phase).toBe("stopped");
+}
+
+async function giveCallAudio(call: CallId): Promise<void> {
+  const { path } = (await harness().invoke("main", "harness.data_dir", {})) as { path: string };
+  const audio = join(path, "audio", call);
+  mkdirSync(audio, { recursive: true });
+  writeFileSync(join(audio, "mic.wav"), "fixture audio");
 }
 
 const outputs = async (call: CallId): Promise<CallOutputs> => ok(await s.core("main").outputsGet({ call_id: call }));
@@ -168,6 +175,37 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
     const versions = ok(await s.core("main").outputVersions({ summary_id: summary.summary_id! })).versions;
     expect(versions.map((v) => v.kind)).toEqual(["generated", "user_edit", "generated", "user_edit"]);
     expect(versions[2].writer).toMatchObject({ from_pass: "archive" });
+  });
+
+  it("cpt-noter-seq-call-page-review-outputs: the built-in archive pass uses live transcript segments when audio exists", async () => {
+    open({ engine: null });
+    const call = await record(LINES.slice(0, 2));
+    await giveCallAudio(call);
+    await stop(call);
+
+    await until(async () => (await outputs(call)).archive === "done", "the built-in archive pass done");
+    expect(await rows("SELECT text FROM segments WHERE call_id = ? AND pass = 'archive' ORDER BY t0_ms", call)).toEqual(
+      LINES.slice(0, 2).map((text) => ({ text })),
+    );
+  });
+
+  it("cpt-noter-seq-call-page-check-evidence: an archive result keeps transcript evidence readable", async () => {
+    open({ engine: null });
+    const call = await record(LINES.slice(0, 2));
+    await giveCallAudio(call);
+    await stop(call);
+
+    await until(async () => (await outputs(call)).archive === "done", "the built-in archive pass done");
+    const archive = await rows<{ t0_ms: number; t1_ms: number }>(
+      "SELECT t0_ms, t1_ms FROM segments WHERE call_id = ? AND pass = 'archive' ORDER BY t0_ms",
+      call,
+    );
+    const span = ok(
+      await s.core("main").transcriptSpan({
+        span: { call_id: call, t0_ms: archive[0].t0_ms, t1_ms: archive[0].t1_ms },
+      }),
+    );
+    expect(span.segments.map((segment) => segment.text)).toContain(LINES[0]);
   });
 
   it("cpt-noter-seq-call-page-review-outputs: the sections fill in order, the user edits the summary, the version menu ends with Your Edit and Undo restores the written text", async () => {

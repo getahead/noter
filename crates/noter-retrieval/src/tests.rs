@@ -69,6 +69,14 @@ fn library_with_migrations(migrations: &[noter_db::Migration]) -> Library {
     let ru = "Мы решили перейти на вебсокеты в ящике уведомлений.";
     lib.segment("seg_a1", "call_a", "spk_anna", 1_000, en, "en");
     lib.segment(
+        "seg_ligature",
+        "call_a",
+        "spk_anna",
+        4_000,
+        "Oﬃce hours moved.",
+        "en",
+    );
+    lib.segment(
         "seg_a2",
         "call_a",
         "spk_anna",
@@ -184,7 +192,7 @@ impl Library {
 
     fn segment(&self, id: &str, call: &str, speaker: &str, t0: i64, text: &str, lang: &str) {
         // As capture stores it: `transcript::shadow` folds case, ё and ß.
-        let norm = text.to_lowercase().replace('ё', "е").replace('ß', "ss");
+        let norm = normalize(text);
         self.db
             .execute(
                 "INSERT INTO segments (id, call_id, speaker_id, channel, t0_ms, t1_ms, text,
@@ -219,7 +227,7 @@ impl Library {
 
     fn chunk(&self, id: &str, call: &str, t0: i64, t1: i64, body: &str, seed: Option<u32>) {
         let text = format!("Call: header\n{body}");
-        let norm = text.to_lowercase().replace('ё', "е").replace('ß', "ss");
+        let norm = normalize(&text);
         self.db
             .execute(
                 "INSERT INTO chunks (id, call_id, t0_ms, t1_ms, text, text_norm, token_count,
@@ -265,7 +273,7 @@ fn ids(hits: &[Hit]) -> Vec<String> {
 #[test]
 fn the_triggers_keep_keyword_shadows_and_vectors_current() {
     let lib = library();
-    assert_eq!(lib.count("SELECT count(*) FROM segments_fts"), 6);
+    assert_eq!(lib.count("SELECT count(*) FROM segments_fts"), 7);
     assert_eq!(lib.count("SELECT count(*) FROM items_fts"), 4);
     // A chunk with an embedding lands in `chunk_vec` as it is written; one without does not.
     assert_eq!(lib.count("SELECT count(*) FROM chunk_vec"), 3);
@@ -387,6 +395,7 @@ fn keywords_match_normalized_stems_in_english_russian_and_german() {
     // BM25: the shorter segment with the term first.
     assert_eq!(ids(&en.calls), ["seg_c1", "seg_a1"]);
     assert_eq!(ids(&en.items), ["itm_ws"]);
+    assert_eq!(ids(&lib.find(query("office")).calls), ["seg_ligature"]);
     assert!(en
         .calls
         .iter()
@@ -2304,4 +2313,65 @@ fn keyword_upgrade_rebuilds_existing_rows_and_keeps_edits_current() {
     assert_eq!(ids(&lib.find(query("replacement")).calls), ["seg_upgrade"]);
     assert_eq!(ids(&lib.find(query("replacement")).items), ["itm_upgrade"]);
     assert_eq!(lib.count("SELECT count(*) FROM chunk_vec"), 3);
+}
+
+// cpt-noter-algo-core-storage-migrate: a store opened partway through the retrieval migrations upgrades in place.
+#[test]
+fn retrieval_upgrade_preserves_aliases_and_indexes_existing_chunks() {
+    let lib = library_with_migrations(&crate::MIGRATIONS[..2]);
+    lib.topic("top_upgrade", "Upgrade", None, OCT_1, OCT_1 + DAY);
+    lib.db.execute(
+        "INSERT INTO topic_aliases (topic_id, alias) VALUES ('top_upgrade', 'Old name'), ('top_upgrade', 'Former name')",
+        [],
+    ).unwrap();
+    lib.chunk(
+        "chk_upgrade",
+        "call_a",
+        20_000,
+        23_000,
+        "sentinelxyz sentinel",
+        Some(7),
+    );
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+    let store = Store::open(
+        &path,
+        &[
+            noter_db::MIGRATIONS,
+            noter_core::MIGRATIONS,
+            crate::MIGRATIONS,
+        ],
+    )
+    .unwrap();
+    let db = Connection::open(&path).unwrap();
+    let aliases: Vec<(String, String)> = {
+        let mut stmt = db
+            .prepare(
+                "SELECT id, alias FROM topic_aliases WHERE topic_id = 'top_upgrade' ORDER BY alias",
+            )
+            .unwrap();
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect()
+    };
+    assert_eq!(
+        aliases
+            .iter()
+            .map(|(_, alias)| alias.as_str())
+            .collect::<Vec<_>>(),
+        ["Former name", "Old name"]
+    );
+    assert_ne!(aliases[0].0, aliases[1].0);
+    let upgraded = Library {
+        dir,
+        store: Arc::new(store),
+        db,
+    };
+    assert_eq!(
+        ids(&upgraded.find(query("sentinelxyz")).calls),
+        ["chk_upgrade"]
+    );
 }
