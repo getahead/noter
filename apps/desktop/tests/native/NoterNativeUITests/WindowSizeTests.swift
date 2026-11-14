@@ -54,11 +54,12 @@ final class WindowSizeTests: NoterTestCase {
         func verifySearchInput() {
             XCTAssertTrue(search.isHittable, "the Settings search target can receive a pointer click")
             search.click()
-            search.typeText("not-a-settings-pane")
-            XCTAssertEqual(search.value as? String, "not-a-settings-pane", "clicking the field gives it keyboard focus and typing updates the search")
+            let query = "not-a-settings-pane"
+            search.typeText(query)
+            XCTAssertTrue(waitUntil(5) { (search.value as? String) == query }, "clicking the field gives it keyboard focus and typing updates the full search query")
             search.typeKey("a", modifierFlags: .command)
             search.typeKey(.delete, modifierFlags: [])
-            XCTAssertEqual(search.value as? String, "", "the search remains editable after clearing its text")
+            XCTAssertTrue(waitUntil(5) { (search.value as? String) == "" }, "the search remains editable after clearing its text")
             XCTAssertTrue(pane.waitForExistence(timeout: 5), "clearing the query restores the Settings pane content")
         }
 

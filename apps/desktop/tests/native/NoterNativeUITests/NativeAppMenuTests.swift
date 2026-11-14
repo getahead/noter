@@ -123,6 +123,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertFalse(rowUndo.exists, "the fresh action row has no Undo action")
         let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested action item is visible")
+        bringRowIntoView(main: main, row: suggestion)
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
         edit.click()
@@ -140,6 +141,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertFalse(rowUndo.exists, "the fresh decision row has no Undo action")
         let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested decision is visible")
+        bringRowIntoView(main: main, row: suggestion)
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
         edit.click()
@@ -157,6 +159,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertFalse(rowUndo.exists, "the fresh question row has no Undo action")
         let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested question is visible")
+        bringRowIntoView(main: main, row: suggestion)
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
         edit.click()
@@ -222,7 +225,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertFalse(app.menuItems["Accept Item"].isEnabled, "Accept Item requires a focused suggested row")
         XCTAssertFalse(app.menuItems["Reject Item"].isEnabled, "Reject Item requires a focused suggested row")
         let acceptAll = app.menuItems["Accept All Suggestions"]
-        XCTAssertTrue(acceptAll.waitForExistence(timeout: 5) && acceptAll.isEnabled, "Accept All enables while all three item kinds have suggestions")
+        XCTAssertTrue(waitUntil(5) { acceptAll.exists && acceptAll.isEnabled }, "Accept All enables while all three item kinds have suggestions")
         attachScreenshot("app-menu-edit-all-kinds-suggested")
         acceptAll.click()
         XCTAssertTrue(waitUntil(10) { main.staticTexts["Accepted 3 suggested items"].exists }, "Accept All reviews action items, decisions and questions in one batch")
@@ -249,9 +252,9 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     private func assertReviewedRowUndo(main: XCUIElement, row: XCUIElement, title: String, rowUndo: XCUIElement) {
-        // The row outcome offers Undo briefly. Check and activate that exact item's action
-        // immediately after the menu dispatch, before any focus/menu work can expire it.
-        XCTAssertTrue(waitUntil(2) { rowUndo.exists }, "the menu action adds Undo to the selected row")
+        // The row outcome offers Undo briefly. The row is already visible before dispatch, so
+        // check and activate that exact item's action without scrolling after the review.
+        XCTAssertTrue(waitUntil(2) { rowUndo.exists && rowUndo.isHittable }, "the menu action adds an accessible, visible Undo link to the selected row")
         XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
         let hierarchy = main.debugDescription
         let accessibility = XCTAttachment(string: hierarchy)
@@ -260,8 +263,6 @@ final class NativeAppMenuTests: NoterTestCase {
         add(accessibility)
         XCTAssertTrue(hierarchy.contains(title) && hierarchy.contains("Undo: \(title)"), "the native accessibility tree names this row's outcome and its specific Undo action")
 
-        bringRowIntoView(main: main, row: row)
-        XCTAssertTrue(rowUndo.isHittable, "the selected row exposes its own accessible, hittable Undo link")
         rowUndo.click()
         XCTAssertTrue(waitUntil(10) { !rowUndo.exists }, "activating the row Undo clears only that row outcome action")
         row.click()
