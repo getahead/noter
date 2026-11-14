@@ -31,7 +31,7 @@ final class MenuBarTests: NoterTestCase {
         let menu = openMenu()
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
         item("Mark Moment", in: menu).click()
-        XCTAssertTrue(waitUntil(5) { !isOpen(menu) }, "Mark Moment closes the menu")
+        XCTAssertTrue(waitUntil(5) { !menu.exists || menu.frame.height == 0 }, "Mark Moment closes the menu")
         let reopened = openMenu()
         item("Pause", in: reopened).click()
         let paused = openMenu()
