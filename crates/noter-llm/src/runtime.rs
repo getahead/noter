@@ -789,6 +789,22 @@ impl Inner {
         })
     }
 
+    // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
+    async fn route_async(
+        self: &Arc<Self>,
+        req: &RunRequest,
+        spent_usd: f64,
+        prefer_local: bool,
+        verifying: Option<RuntimeChoice>,
+    ) -> Result<Choice, Failure> {
+        let inner = Arc::clone(self);
+        let req = req.clone();
+        tokio::task::spawn_blocking(move || inner.route(&req, spent_usd, prefer_local, verifying))
+            .await
+            .map_err(|_| Failure::Timeout)?
+    }
+    // @cpt-end:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
+
     /// Counts consecutive runtime failures per call; the second switches the call to local.
     fn note_outcome(&self, call: Option<&CallId>, runtime_failed: bool) {
         let Some(call) = call else { return };
@@ -813,7 +829,7 @@ impl Inner {
 
     // @cpt-flow:cpt-noter-flow-core-llm-gate-run:p1
     async fn run(
-        &self,
+        self: &Arc<Self>,
         req: RunRequest,
         session: Option<(RuntimeChoice, String)>,
         candidate: Candidate,
@@ -831,7 +847,8 @@ impl Inner {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
         let verifying = verifying.or_else(|| candidate.as_ref().map(|(runtime, _)| *runtime));
         let routed = self
-            .route(&req, 0.0, false, verifying)
+            .route_async(&req, 0.0, false, verifying)
+            .await
             .and_then(|choice| match &session {
                 // A session never carries a turn to another runtime (privacy changed, say).
                 Some((runtime, _)) if *runtime != choice.runtime => Err(Failure::Unavailable(
@@ -914,7 +931,7 @@ impl Inner {
     /// The first attempt, the repair retry and the fallback; each one routed and gated again.
     // @cpt-algo:cpt-noter-algo-core-llm-gate-validate:p1
     async fn attempts(
-        &self,
+        self: &Arc<Self>,
         req: &RunRequest,
         session: Option<&str>,
         candidate: &Candidate,
@@ -933,7 +950,9 @@ impl Inner {
                 return Err(Failure::Cancelled);
             }
             if attempt > 0 {
-                let rerouted = (self.route(req, tally.spent_usd, tally.fallback, verifying))
+                let rerouted = self
+                    .route_async(req, tally.spent_usd, tally.fallback, verifying)
+                    .await
                     .and_then(|choice| match session {
                         Some(_) if choice.runtime != tally.choice.runtime => {
                             Err(Failure::Unavailable(route::unavailable(
@@ -1213,7 +1232,7 @@ impl Inner {
     }
 
     // @cpt-flow:cpt-noter-flow-core-llm-gate-session:p1
-    async fn turn(&self, id: &SessionId, req: RunRequest) -> RunOutcome {
+    async fn turn(self: &Arc<Self>, id: &SessionId, req: RunRequest) -> RunOutcome {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-session:p1:inst-session-reset
         let (runtime, cli_session) = {
             let mut sessions = lock(&self.sessions);
