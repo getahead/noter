@@ -258,7 +258,7 @@ describe("streams", () => {
     await b.subscribe("levels_subscribe", { call_id: null });
     await vi.advanceTimersByTimeAsync(400);
     const levels = state().streams.levels_subscribe?.data?.levels;
-    expect(levels?.seq).toBeGreaterThanOrEqual(3);
+    expect(levels?.seq).toBe(3);
   });
 
   it("levels use the returned baseline when samples arrive before the subscription response", async () => {
