@@ -57,8 +57,7 @@ final class WindowSizeTests: NoterTestCase {
             let query = "not-a-settings-pane"
             search.typeText(query)
             XCTAssertTrue(waitUntil(5) { (search.value as? String) == query }, "clicking the field gives it keyboard focus and typing updates the full search query")
-            search.typeKey("a", modifierFlags: .command)
-            search.typeKey(.delete, modifierFlags: [])
+            search.typeKey(.escape, modifierFlags: [])
             XCTAssertTrue(waitUntil(5) { (search.value as? String) == "" }, "the search remains editable after clearing its text")
             XCTAssertTrue(pane.waitForExistence(timeout: 5), "clearing the query restores the Settings pane content")
         }

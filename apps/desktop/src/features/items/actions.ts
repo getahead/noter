@@ -219,6 +219,9 @@ export async function undoRow(bridge: Bridge, id: string, target: UndoTarget) {
   // @cpt-begin:cpt-noter-flow-ui-items-status:p1:inst-return
   patchLocal(id, { outcome: undefined, doneTarget: undefined, error: undefined });
   await refresh(bridge, id); // the core's item again, with its prior review and handoff state
+  const row = Array.from(globalThis.document?.querySelectorAll<HTMLElement>("[data-item-id]") ?? [])
+    .find((element) => element.dataset.itemId === id);
+  row?.focus(); // restore keyboard/native-menu context to the item the user just restored
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-return
   holdUndo({ target, mode: "redo", message: t("undo.undone", { count: res.data.undone }), refresh: () => refreshCompletion(bridge, id, target) });
 }

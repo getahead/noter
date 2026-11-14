@@ -252,9 +252,10 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     private func assertReviewedRowUndo(main: XCUIElement, row: XCUIElement, title: String, rowUndo: XCUIElement) {
-        // The row outcome offers Undo briefly. The row is already visible before dispatch, so
-        // check and activate that exact item's action without scrolling after the review.
-        XCTAssertTrue(waitUntil(2) { rowUndo.exists && rowUndo.isHittable }, "the menu action adds an accessible, visible Undo link to the selected row")
+        // The menu handler focuses the next suggestion after review, which can scroll this row
+        // out of WebKit's accessibility viewport. Bring this exact row back before querying Undo.
+        bringRowIntoView(main: main, row: row)
+        XCTAssertTrue(rowUndo.exists && rowUndo.isHittable, "the menu action adds an accessible, visible Undo link to the selected row")
         XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
         let hierarchy = main.debugDescription
         let accessibility = XCTAttachment(string: hierarchy)
@@ -265,7 +266,6 @@ final class NativeAppMenuTests: NoterTestCase {
 
         rowUndo.click()
         XCTAssertTrue(waitUntil(10) { !rowUndo.exists }, "activating the row Undo clears only that row outcome action")
-        row.click()
         let edit = app.menuBars.menuBarItems["Edit"]
         edit.click()
         XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && app.menuItems["Accept Item"].isEnabled && app.menuItems["Reject Item"].isEnabled }, "row Undo restores this selected item to Suggested")

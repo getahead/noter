@@ -315,6 +315,20 @@ describe("undoRow", () => {
     expect(localOf("itm_replay").outcome).toBeUndefined();
   });
 
+  it("returns focus to the restored row for its contextual native menu actions", async () => {
+    await ready();
+    await review(bridge, item("itm_replay"), "reject");
+    const target = localOf("itm_replay").outcome!.target!;
+    const focus = vi.fn();
+    const row = { dataset: { itemId: "itm_replay" }, focus } as unknown as HTMLElement;
+    vi.stubGlobal("document", { querySelectorAll: () => [row] });
+
+    await undoRow(bridge, "itm_replay", target);
+
+    expect(item("itm_replay").review).toBe("suggested");
+    expect(focus).toHaveBeenCalledOnce();
+  });
+
   it("a refused undo names the error", async () => {
     await ready();
     bridge.core.changeUndo = (async () => ({ status: "error", error: { code: "edited_later", retryable: false } })) as never;
