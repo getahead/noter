@@ -223,7 +223,9 @@ pub fn environment(storage: &Path) -> Reading {
         displays: displays(),
         output_device,
         output_route,
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
         notifications: notifications(),
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
         online: online(),
         disk_free_mb: disk_free_mb(storage),
     }
@@ -253,7 +255,7 @@ fn display_id(id: CGDirectDisplayID) -> DisplayId {
     DisplayId::new(format!("{}_{uuid}", DisplayId::PREFIX))
 }
 
-fn displays() -> Vec<DisplayInfo> {
+pub fn displays() -> Vec<DisplayInfo> {
     let main = CGMainDisplayID();
     active_displays()
         .iter()

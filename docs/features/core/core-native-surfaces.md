@@ -215,7 +215,7 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 - [x] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-placement`
 
-**Input**: Displays by identity, the chosen call display, the layout preference, the saved frames per display.
+**Input**: The connected displays by identity (read without collecting unrelated environment state), the chosen call display, the layout preference, the saved frames per display.
 
 **Output**: Display, layout and frame for the call window; `chosen_display_missing`.
 

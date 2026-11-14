@@ -17,6 +17,7 @@ mod test_hooks;
 pub mod updater;
 pub mod webview_watch;
 
+use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 
 use noter_core::{
@@ -129,13 +130,14 @@ pub fn run() {
             }));
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
             let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
+            // D14: the shared App Group container, or the data folder in unsigned development.
             let group = noter_core::default_data_dir()
                 .map(|dir| noter_native::app_group_container().unwrap_or(dir))
                 .unwrap_or_default();
-            let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group);
+            let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
             app.manage(webview_watch::start(app.handle()));
-            app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces));
+            app.manage(boot(events.clone(), shortcuts, updater.clone(), surfaces, group));
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
             #[cfg(all(debug_assertions, feature = "test-hooks", target_os = "macos"))]
@@ -166,6 +168,7 @@ fn boot<R: Runtime>(
     shortcuts: Arc<dyn ShortcutRegistrar>,
     updater: Arc<dyn noter_core::Updater>,
     surfaces: Arc<surfaces::TauriSurfaces<R>>,
+    group: PathBuf,
 ) -> Booted {
     // The native UI tests opt in to a debug build on the harness's scripted Mac.
     #[cfg(all(debug_assertions, feature = "test-hooks"))]
@@ -175,9 +178,6 @@ fn boot<R: Runtime>(
     let Some(dir) = noter_core::default_data_dir() else {
         return Booted(Err("no home folder".into()));
     };
-    // D14: the App Group container the sandboxed engine shares (its models/); unsigned
-    // development runs have none and use the data folder.
-    let group = noter_native::app_group_container().unwrap_or_else(|| dir.clone());
     // The engine sits next to the app binary (Contents/MacOS) or at NOTER_ENGINE_PATH in
     // development.
     let bundled = std::env::current_exe()

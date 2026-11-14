@@ -120,11 +120,7 @@ impl NativeOps for MacOps {
         path: LaunchPath,
         req: &'a LaunchRequest,
     ) -> BoxFuture<'a, Result<(), ErrorCode>> {
-        let req = noter_native::LaunchRequest {
-            target: req.target,
-            cwd: req.cwd.clone(),
-            prompt_file: req.prompt_file.clone(),
-        };
+        let req = req.clone();
         Box::pin(async move {
             off_runtime(move || noter_native::launch(path, &req))
                 .await?
@@ -133,13 +129,8 @@ impl NativeOps for MacOps {
     }
 
     fn clipboard_write<'a>(&'a self, text: &'a ClipboardText) -> BoxFuture<'a, Result<(), String>> {
-        let text = noter_native::ClipboardText {
-            plain: text.plain.clone(),
-            markdown: text.markdown.clone(),
-            html: text.html.clone(),
-        };
         // NSPasteboard takes writes from any thread.
-        let written = (self.pasteboard)(&text);
+        let written = (self.pasteboard)(text);
         Box::pin(async move { written })
     }
 
@@ -184,19 +175,6 @@ impl Mac {
     }
 }
 
-fn reading(r: noter_native::Reading) -> EnvironmentReading {
-    EnvironmentReading {
-        displays: r.displays,
-        output_device: r.output_device,
-        output_route: r.output_route,
-        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
-        notifications: r.notifications,
-        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
-        online: r.online,
-        disk_free_mb: r.disk_free_mb,
-    }
-}
-
 // @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
 impl NativeServices for Mac {
     fn permission(&self, kind: PermissionKind) -> PermissionState {
@@ -213,12 +191,12 @@ impl NativeServices for Mac {
     }
 
     fn environment(&self) -> EnvironmentReading {
-        reading(noter_native::environment(&self.storage))
+        noter_native::environment(&self.storage)
     }
 
     fn on_change(&self, on_change: Box<dyn Fn(EnvironmentReading) + Send + Sync>) {
         let watch = noter_native::watch(self.storage.clone(), Duration::from_secs(2), move |r| {
-            on_change(reading(r))
+            on_change(r)
         });
         *self.watch.lock().unwrap_or_else(|e| e.into_inner()) = Some(watch);
     }

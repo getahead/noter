@@ -7,7 +7,8 @@
 //! * [`permission`] reads a permission without prompting; [`request_permission`] shows the
 //!   macOS prompt (only `permission_request` calls it). System Audio Recording cannot be
 //!   queried: the core infers it from the self-test and asks through the engine.
-//! * [`environment`] reads displays, the output device and route, notification
+//! * [`displays`] reads connected displays without collecting the rest of the environment;
+//!   [`environment`] reads displays, the output device and route, notification
 //!   authorization, reachability and free disk; [`watch`] reports changes.
 //! * [`set_login_item`] / [`login_item`] use SMAppService.
 //! * [`app_group_container`] finds the App Group container shared with the engine (D14).
@@ -39,9 +40,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+pub use noter_protocol::model::EnvironmentReading as Reading;
 use noter_protocol::model::{
-    CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputDeviceInfo, OutputRoute,
-    Politeness,
+    CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputRoute, Politeness,
 };
 use noter_protocol::{CallId, DisplayId, PermissionKind, PermissionState};
 
@@ -54,31 +55,6 @@ pub enum LoginItem {
     RequiresApproval,
     /// The app bundle is not where SMAppService looks (development builds).
     NotFound,
-}
-
-/// What `noter-native` reads for `EnvironmentState`; the core adds permissions and the update.
-#[derive(Debug, Clone, PartialEq)]
-pub struct Reading {
-    pub displays: Vec<DisplayInfo>,
-    pub output_device: Option<OutputDeviceInfo>,
-    pub output_route: OutputRoute,
-    pub notifications: NotificationAuth,
-    pub online: bool,
-    pub disk_free_mb: u32,
-}
-
-impl Default for Reading {
-    /// Nothing known: no displays, an unknown route, notifications not determined, offline.
-    fn default() -> Self {
-        Self {
-            displays: Vec::new(),
-            output_device: None,
-            output_route: OutputRoute::Unknown,
-            notifications: NotificationAuth::NotDetermined,
-            online: false,
-            disk_free_mb: 0,
-        }
-    }
 }
 
 /// `AVAuthorizationStatus` (microphone).
@@ -207,8 +183,18 @@ pub fn environment(storage: &Path) -> Reading {
     #[cfg(not(target_os = "macos"))]
     Reading {
         disk_free_mb: disk_free_mb(storage),
+        online: false,
         ..Reading::default()
     }
+}
+
+/// The connected displays, without reading unrelated environment state.
+// @cpt-algo:cpt-noter-algo-core-native-surfaces-placement:p1
+pub fn displays() -> Vec<DisplayInfo> {
+    #[cfg(target_os = "macos")]
+    return mac::displays();
+    #[cfg(not(target_os = "macos"))]
+    Vec::new()
 }
 
 /// Stops its watcher when dropped.
