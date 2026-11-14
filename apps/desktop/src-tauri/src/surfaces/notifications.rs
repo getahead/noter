@@ -102,3 +102,16 @@ pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-return-receive
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-click
+
+/// Post the prepared notification; delivery is fire-and-forget and clicks route via
+/// `notification_clicked`.
+pub(super) fn post(notification: &Notification) {
+    // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+    if let Err(e) = noter_native::post_notification(&posted(notification)) {
+        eprintln!("noter: a notification was not posted: {e}");
+    }
+    // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
+    // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
+    // Delivery is fire-and-forget; clicks return through `notification_clicked`.
+    // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
+}

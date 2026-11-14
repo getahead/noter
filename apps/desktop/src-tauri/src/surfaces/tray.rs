@@ -199,6 +199,20 @@ pub fn settings_url(permission: PermissionKind) -> &'static str {
 }
 
 impl<R: Runtime> TauriSurfaces<R> {
+    /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
+    /// for the clock and the countdowns while the core lives.
+    pub fn attach(&self, core: &Arc<Core>) {
+        let _ = self.core.set(Arc::downgrade(core));
+        let core = Arc::downgrade(core);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
+        std::thread::spawn(move || loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+            let Some(core) = core.upgrade() else { return };
+            core.refresh_tray();
+        });
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
+    }
+
     /// Shows the latest model `set_tray` was given; on the main thread only.
     pub(super) fn show_tray(&self) {
         let Some(model) = lock(&self.wanted).take() else {

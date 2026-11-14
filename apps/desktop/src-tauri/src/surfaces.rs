@@ -273,20 +273,6 @@ impl<R: Runtime> TauriSurfaces<R> {
         surfaces
     }
 
-    /// The core the menu bar's clicks go to, once it opened; it rebuilds the menu every second
-    /// for the clock and the countdowns while the core lives.
-    pub fn attach(&self, core: &Arc<Core>) {
-        let _ = self.core.set(Arc::downgrade(core));
-        let core = Arc::downgrade(core);
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
-        std::thread::spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let Some(core) = core.upgrade() else { return };
-            core.refresh_tray();
-        });
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-build
-    }
-
     /// The windows Show Noter will bring back, in that order.
     pub fn hidden_for_presenting(&self) -> Vec<WindowLabel> {
         lock(&self.hidden).clone()
@@ -417,14 +403,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     }
 
     fn post_notification(&self, notification: &Notification) {
-        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
-        if let Err(e) = noter_native::post_notification(&posted(notification)) {
-            eprintln!("noter: a notification was not posted: {e}");
-        }
-        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
-        // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
-        // Delivery is fire-and-forget: a click comes back through `notification_clicked`.
-        // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-return-notify
+        notifications::post(notification);
     }
 }
 
