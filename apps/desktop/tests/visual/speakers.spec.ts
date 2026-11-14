@@ -14,6 +14,7 @@ const quiet = (w: World) => {
   W.idle(w);
   w.app.setup.self_test = { type: "passed", at: 1 };
   S.unnamed(w, 2);
+  S.inviteSuggestion(w);
 };
 const panel = (page: Page) => page.locator('[data-region="PC-R9"]');
 const rowOf = (page: Page, label: string) => panel(page).getByRole("group", { name: label });
@@ -31,6 +32,7 @@ const shot = async (page: Page, name: string) => {
 test.describe("cpt-noter-dod-ui-speakers-naming speaker naming panel", () => {
   test("Name speakers: a row per unnamed speaker", async ({ page }) => {
     await open(page);
+    await expect(rowOf(page, "Speaker 4").getByRole("group", { name: "From the invite" })).toContainText("Lena K.");
     await shot(page, "naming-panel-rows");
   });
 

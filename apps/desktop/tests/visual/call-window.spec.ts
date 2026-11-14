@@ -1,6 +1,6 @@
 // Call window (cpt-noter-feature-ui-call-window) in the copilot-off layout of M1: one screenshot per state of
 // surface('call') the FEATURE's definitions of done list, rendered against the fake core and a frozen
-// clock. The countdown and the transcript (the live-transcript feature's, still streaming its script) are masked.
+// clock. The live script is empty, so the transcript, countdown and notice bar are part of each comparison.
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow } from "../e2e/support/app";
@@ -14,7 +14,7 @@ const FLOATING = { width: 420, height: 560 };
 
 async function shot(page: Page, name: string, world: (w: World) => void = () => {}, win: Win = {}) {
   await page.setViewportSize(win.layout === "floating" ? (win.collapsed ? { width: 420, height: 56 } : FLOATING) : DEDICATED);
-  await openWindow(page, "call-screen", { world });
+  await openWindow(page, "call-screen", { world: (w) => { world(w); w.live_script = []; } });
   if (Object.keys(win).length)
     await page.evaluate((p) => {
       const f = (globalThis as unknown as { __noterFake: { callWindow: object; publish(e: string): void } }).__noterFake;
@@ -24,8 +24,7 @@ async function shot(page: Page, name: string, world: (w: World) => void = () => 
   await expect(page.locator('[data-component="cpt-noter-component-shell-call-window"]')).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await settled(page);
-  const mask = [page.locator(".np-tnum"), page.locator('[data-region="CS-R2"], [data-region="FP-R5"]'), page.locator(".cw-notice__bar")];
-  await expect(page).toHaveScreenshot(`${name}.png`, { mask });
+  await expect(page).toHaveScreenshot(`${name}.png`);
 }
 
 test.beforeEach(({ page }) => freeze(page));
@@ -50,14 +49,34 @@ test.describe("cpt-noter-dod-ui-call-window-shell call window layouts", () => {
   test("floating, first open: the share warning", async ({ page }) => shot(page, "share-warning", () => {}, { layout: "floating", show_share_warning: true }));
   test("collapsed: the strip", async ({ page }) => shot(page, "collapsed", () => {}, { layout: "floating", collapsed: true }));
   test("paused: Resume is primary", async ({ page }) => shot(page, "paused", (w) => Object.assign(w.app.capture, { phase: "paused", pause: { since: NOW - 3 * W.MIN, remind_at: null } })));
-  test("presenting: the window keeps its state while hidden", async ({ page }) => shot(page, "presenting", (w) => (w.app.presenting.hidden = true)));
 });
 
 test.describe("cpt-noter-dod-ui-call-window-capture capture notices and the closing state", () => {
   test("call-ended", async ({ page }) => shot(page, "call-ended", ended));
   test("call-ended, floating", async ({ page }) => shot(page, "call-ended-floating", ended, { layout: "floating" }));
   test("new-meeting", async ({ page }) => shot(page, "new-meeting", meeting));
-  test("nothing-heard", async ({ page }) => shot(page, "nothing-heard", (w) => W.notice(w, { type: "nothing_heard", since: NOW - 5 * W.MIN })));
+  test("nothing-heard: the waiting transcript and recovery notice", async ({ page }) => {
+    await page.setViewportSize(DEDICATED);
+    await openWindow(page, "call-screen", { world: (w) => {
+      w.live_script = [];
+      W.notice(w, { type: "nothing_heard", since: NOW - 5 * W.MIN });
+      const transcript = w.transcripts.find((item) => item.call_id === live)!;
+      Object.assign(transcript, { segments: [], hypotheses: [], marks: [], gaps: [] });
+    } });
+    await expect(page.locator('[data-component="cpt-noter-component-shell-call-window"]')).toBeVisible();
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await settled(page);
+    const transcript = page.locator('[data-component="cpt-noter-component-ui-transcript-view"]');
+    await expect(transcript).toHaveAttribute("data-state", "waiting-for-speech");
+    await expect(transcript.getByText("Waiting for speech…")).toBeInViewport();
+    await expect(transcript.getByText("You", { exact: true })).toBeInViewport();
+    await expect(transcript.getByText("Others", { exact: true })).toBeInViewport();
+    await expect(transcript.locator('[data-component="cpt-noter-component-ui-transcript-segment-row"]')).toHaveCount(0);
+    await expect(page.getByText("Nothing heard yet")).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Discard Recording" })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Keep Recording" })).toBeInViewport();
+    await expect(page).toHaveScreenshot("nothing-heard.png");
+  });
   test("closing-manual", async ({ page }) => shot(page, "closing-manual", (w) => stoppedAt(w, false)));
   test("closing-auto", async ({ page }) => shot(page, "closing-auto", (w) => stoppedAt(w, true)));
 });

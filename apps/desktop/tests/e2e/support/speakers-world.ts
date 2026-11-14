@@ -41,6 +41,20 @@ export function unnamed(w: World, n: number, lines = 3): void {
   }
 }
 
+/** An invited attendee who is not yet assigned to a voice in the live call. */
+export function inviteSuggestion(w: World): void {
+  const invitee = {
+    id: "per_lena",
+    display_name: "Lena Keller",
+    short_name: "Lena K.",
+    initials: "LK",
+    is_you: false,
+  };
+  const detail = w.call_details.find((d) => d.call.id === CALL)!;
+  detail.call.participants.push(invitee);
+  w.calls.find((c) => c.id === CALL)!.participants.push(invitee);
+}
+
 /** The call's audio was deleted after its retention period: no sample to play. */
 export function audioGone(w: World): void {
   for (const s of transcript(w).speakers) s.sample = null;
