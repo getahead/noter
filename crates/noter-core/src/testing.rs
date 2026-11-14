@@ -75,6 +75,11 @@ pub fn capture_event(core: &Core, event: crate::capture::CaptureEvent) {
     core.capture_event(event);
 }
 
+/// Whether a batch has left transcript memory for its writer commit, before publication.
+pub fn transcript_has_unpublished(core: &Core, call_id: &noter_protocol::CallId) -> bool {
+    core.transcript.has_unpublished(call_id)
+}
+
 /// One pass of the scheduler's loop now, as its minute tick would (scheduled triggers).
 pub fn jobs_tick(core: &Core) {
     core.jobs.tick();

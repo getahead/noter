@@ -539,6 +539,10 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-return
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-install
+        // Speaker names and term fixes may change while offline recognition runs. Re-read them
+        // after the last checkpoint so installation carries the user's latest edits forward.
+        let id = call.as_str().to_owned();
+        let (speakers, live) = self.store().read(move |c| live_of(c, &id))?;
         // Capture data (TL-1): one transaction, no change rows; the live rows stay.
         self.store()
             .insert_batch(install_rows(call, &result, &speakers, &live))?;

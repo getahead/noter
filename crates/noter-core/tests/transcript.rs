@@ -5,11 +5,12 @@
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
+use std::thread;
 use std::time::Duration;
 
 use noter_core::{testing, CaptureEvent, Clock, Core, CoreDeps, EventEmitter};
-use noter_db::{Insert, Mutation};
+use noter_db::{ChangeMeta, Insert, Logged, Mutation};
 use noter_engine_client::scripted::ScriptedEngine;
 use noter_engine_client::EngineLauncher;
 use noter_protocol::engine::{EngineEvent, EngineSegment, EngineSegmentState};
@@ -511,6 +512,104 @@ async fn a_stopped_call_gives_the_whole_transcript_and_no_stream() {
         .await
         .unwrap_err();
     assert_eq!(unknown.code, ErrorCode::NotFound);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn call_finalization_waits_for_an_in_flight_batch_commit_and_publish() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "recording");
+    let (snapshot, got) = subscribe(&r).await;
+    assert!(snapshot.live);
+    engine_up(&r).await;
+
+    let (writer_started_tx, writer_started_rx) = mpsc::channel();
+    let (writer_release_tx, writer_release_rx) = mpsc::channel();
+    let store_core = r.core.clone();
+    let writer = thread::spawn(move || {
+        store_core.store().write_with(
+            ChangeMeta {
+                actor: Actor::You,
+                summary: "hold transcript writer".into(),
+                reason: "test".into(),
+                evidence_ids: vec![],
+                batch_id: None,
+                undoable: false,
+                surface: None,
+            },
+            move |_| {
+                writer_started_tx.send(()).unwrap();
+                writer_release_rx.recv().unwrap();
+                Ok((
+                    (),
+                    vec![Logged {
+                        entity_type: "call",
+                        entity_id: "call_live".into(),
+                        field: Some("test".into()),
+                        before: Some("before".into()),
+                        after: Some("after".into()),
+                        delta: None,
+                    }],
+                ))
+            },
+        )
+    });
+    writer_started_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("the writer gate is active");
+
+    r.engine
+        .inject(confirmed(AudioChannel::Sys, "spk_0", 0, "the final line"));
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while !testing::transcript_has_unpublished(&r.core, &call_id()) {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the timer has taken the batch and is waiting for the writer");
+
+    let core = r.core.clone();
+    let (finalizer_started_tx, finalizer_started_rx) = mpsc::channel();
+    let (finalizer_done_tx, finalizer_done_rx) = mpsc::channel();
+    let finalizer = thread::spawn(move || {
+        finalizer_started_tx.send(()).unwrap();
+        testing::capture_event(
+            &core,
+            CaptureEvent::Stopped {
+                call_id: call_id(),
+                reason: StreamEndReason::CallStopped,
+            },
+        );
+        finalizer_done_tx.send(()).unwrap();
+    });
+    finalizer_started_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("finalization started");
+    assert!(
+        finalizer_done_rx
+            .recv_timeout(Duration::from_millis(50))
+            .is_err(),
+        "finalization must wait while the timer owns the in-flight batch"
+    );
+
+    writer_release_tx.send(()).unwrap();
+    writer.join().unwrap().unwrap();
+    finalizer_done_rx
+        .recv_timeout(Duration::from_secs(2))
+        .expect("finalization resumes after the batch publishes");
+    finalizer.join().unwrap();
+
+    assert!(events(&got).iter().any(
+        |event| matches!(event, TranscriptEvent::Confirmed { segment } if segment.text == "the final line")
+    ));
+    let file = dir.path().join("audio/call_live/transcript.jsonl");
+    let lines: Vec<_> = std::fs::read_to_string(file)
+        .unwrap()
+        .lines()
+        .map(str::to_owned)
+        .collect();
+    assert_eq!(lines.len(), 1);
+    assert!(lines[0].contains("the final line"));
 }
 
 #[tokio::test(start_paused = true)]

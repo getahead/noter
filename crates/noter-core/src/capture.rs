@@ -7,7 +7,7 @@
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 
-use noter_db::{Insert, Mutation};
+use noter_db::{Insert, Logged, Mutation};
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::engine::{AsrBackend, EngineCommand, EngineEvent, GlossaryEntry, StartSession};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx};
@@ -280,11 +280,6 @@ impl Core {
         if on {
             let core = self.clone();
             self.spawn(async move { core.send_detection(true).await });
-        }
-        if let Err(e) = self.find_interrupted() {
-            self.log(crate::object(json!({
-                "level": "error", "module": "capture", "code": e.code
-            })));
         }
         let weak = Arc::downgrade(self);
         self.on_glossary_changed(move |list| {
@@ -870,8 +865,15 @@ impl Core {
         self.clear_engine_states();
         self.release_held();
         self.close_continue_at(call_id.clone(), until, CONTINUE_MS);
-        // The call's pipeline: the post-call analysis first, then the archive pass. The handlers
-        // are seams until post-call lands; a repeated stop of the same pending work is one run.
+        self.trigger_post_call_jobs(call_id);
+        // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
+        // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-phase-stopped
+        Ok(())
+    }
+
+    /// Queue the per-call work after either a normal or interrupted stop.
+    pub(crate) fn trigger_post_call_jobs(&self, call_id: &CallId) {
+        // The post-call analysis runs first, then the archive pass. Repeated stops deduplicate.
         for kind in [JobKind::PostCall, JobKind::ArchivePass] {
             let req = Request::for_call(kind, Trigger::AfterCall, call_id);
             if let Err(e) = self.in_runtime(|| self.jobs.trigger(req)) {
@@ -880,9 +882,6 @@ impl Core {
                 })));
             }
         }
-        // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopped
-        // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-phase-stopped
-        Ok(())
     }
 
     pub(crate) async fn continue_call(
@@ -910,8 +909,49 @@ impl Core {
         self.insert_gap(&call_id, t0, t1, GapReason::Continued)?;
         session.away_ms += now - stopped_at;
         // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
-        let values = vec![("status", json!("recording")), ("ended_at", Value::Null)];
-        self.write_call(ctx, &call_id, "Continued recording", false, values)?;
+        let mut meta = self.change_meta(ctx, "Continued recording".into(), "capture_continue");
+        meta.undoable = false;
+        let id = call_id.as_str().to_owned();
+        self.store().write_with(meta, move |tx| {
+            let (status, ended_at, archive_status): (String, Option<i64>, String) = tx
+                .query_row(
+                    "SELECT status, ended_at, archive_status FROM calls WHERE id = ?1",
+                    [&id],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                )
+                .map_err(internal)?;
+            tx.execute(
+                "DELETE FROM segments WHERE call_id = ?1 AND pass = 'archive'",
+                [&id],
+            )
+            .map_err(internal)?;
+            tx.execute(
+                "DELETE FROM speakers WHERE call_id = ?1 AND pass = 'archive'",
+                [&id],
+            )
+            .map_err(internal)?;
+            tx.execute(
+                "UPDATE calls SET status = 'recording', ended_at = NULL,
+                 archive_status = 'pending', rev = rev + 1 WHERE id = ?1",
+                [&id],
+            )
+            .map_err(internal)?;
+            Ok((
+                (),
+                vec![Logged {
+                    entity_type: "call",
+                    entity_id: id,
+                    field: None,
+                    before: None,
+                    after: None,
+                    delta: Some(json!({
+                        "status": [status, "recording"],
+                        "ended_at": [ended_at, Value::Null],
+                        "archive_status": [archive_status, "pending"]
+                    })),
+                }],
+            ))
+        })?;
         // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
         let start = self.session_for(&call_id, Some(t1))?;
         let recorded = session.recorded(now, None);

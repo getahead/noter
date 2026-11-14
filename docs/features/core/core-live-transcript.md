@@ -186,8 +186,8 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 1. [x] - `p1` - **IF** the segment is a hypothesis - `inst-if-hypothesis`
    1. [x] - `p1` - Publish `hypothesis` (it replaces the channel's grey line); never persist it - `inst-publish-hypothesis`
 2. [x] - `p1` - **ELSE** assign a segment id, map the live speaker label with `cpt-noter-algo-core-live-transcript-speakers`, compute the normalised shadow text, add it to the open batch - `inst-add-confirmed`
-3. [x] - `p1` - When the batch is 250 ms old or the call stops, DB: INSERT the batch into `segments` (pass `live`) in one writer transaction - `inst-commit-batch`
-4. [x] - `p1` - After the commit, publish `confirmed` for each segment in order (it removes the hypothesis) - `inst-publish-confirmed`
+3. [x] - `p1` - When the batch is 250 ms old or the call stops, serialize the batch commit and publication with call finalization; DB: INSERT the batch into `segments` (pass `live`) in one writer transaction - `inst-commit-batch`
+4. [x] - `p1` - After the commit, publish `confirmed` for each segment in order (it removes the hypothesis); call finalization waits for this publication before ending the stream - `inst-publish-confirmed`
 5. [x] - `p1` - Publish `gap` and `mark` messages as the session manager writes them - `inst-publish-gap-mark`
 6. [x] - `p1` - **RETURN** - `inst-return-batch`
 
@@ -228,8 +228,8 @@ The transcript is primary data: written exactly once, never lost on a reload, an
 **Output**: `audio/<call_id>/transcript.jsonl`, 0600, for re-import after a corruption.
 
 **Steps**:
-1. [x] - `p1` - Flush the open batch - `inst-file-flush`
-2. [x] - `p1` - Write every segment of the call's current pass, one JSON line each, to a temporary file and rename it into place - `inst-file-write`
+1. [x] - `p1` - Serialize with in-flight batch commits and other finalizers, then flush the open batch - `inst-file-flush`
+2. [x] - `p1` - While finalization remains serialized, write every segment of the call's current pass, one JSON line each, to a temporary file and rename it into place - `inst-file-write`
 3. [x] - `p1` - **RETURN** - `inst-file-return`
 
 ## 4. States (CDSL)

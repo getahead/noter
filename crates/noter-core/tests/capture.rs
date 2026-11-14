@@ -16,7 +16,7 @@ use noter_protocol::engine::{EngineCommand, EngineEvent, StartSession};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::Value;
+use serde_json::{json, Value};
 
 const T0: i64 = 1_790_000_000_000;
 
@@ -795,6 +795,87 @@ async fn continue_appends_to_the_same_call_within_the_window() {
                 .await
         ),
         ErrorCode::ContinueWindowClosed
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn continuing_after_archive_completion_removes_the_stale_archive_pass() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.stop(&main_window(), &call_id).await;
+    r.core
+        .store()
+        .write(
+            noter_db::Mutation {
+                entity_type: "call",
+                table: "calls",
+                id: call_id.to_string(),
+                base_rev: None,
+                bump_rev: true,
+                values: vec![("archive_status", json!("done"))],
+            },
+            noter_db::ChangeMeta {
+                actor: Actor::You,
+                summary: "test archive completion".into(),
+                reason: "test".into(),
+                evidence_ids: vec![],
+                batch_id: None,
+                undoable: false,
+                surface: None,
+            },
+        )
+        .unwrap();
+    r.core
+        .store()
+        .insert_batch(vec![
+            noter_db::Insert {
+                table: "speakers",
+                values: vec![
+                    ("id", json!("archive_speaker")),
+                    ("call_id", json!(call_id.as_str())),
+                    ("label", json!("archive:voice")),
+                    ("channel", json!("sys")),
+                    ("pass", json!("archive")),
+                ],
+            },
+            noter_db::Insert {
+                table: "segments",
+                values: vec![
+                    ("id", json!("archive_segment")),
+                    ("call_id", json!(call_id.as_str())),
+                    ("speaker_id", json!("archive_speaker")),
+                    ("channel", json!("sys")),
+                    ("t0_ms", json!(0)),
+                    ("t1_ms", json!(1_000)),
+                    ("text", json!("old archived speech")),
+                    ("text_norm", json!("old archived speech")),
+                    ("pass", json!("archive")),
+                ],
+            },
+        ])
+        .unwrap();
+
+    r.core
+        .capture_continue(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        r.query::<String>("SELECT archive_status FROM calls"),
+        "pending"
+    );
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM segments WHERE pass = 'archive'"),
+        0
+    );
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM speakers WHERE pass = 'archive'"),
+        0
     );
 }
 
@@ -2112,6 +2193,14 @@ async fn a_dismissed_banner_ends_the_interrupted_call_at_its_last_audio() {
         r.call_row(&call_id),
         ("processing".into(), Some(T0 + 60_000))
     );
+    assert!(r
+        ._dir
+        .path()
+        .join(format!("audio/{call_id}/transcript.jsonl"))
+        .exists());
+    let jobs = r.core.scheduler().runs().unwrap();
+    assert!(jobs.iter().any(|job| job.kind == JobKind::PostCall));
+    assert!(jobs.iter().any(|job| job.kind == JobKind::ArchivePass));
     let r = r.crash_and_reopen().await;
     assert!(r.banners().await.is_empty(), "never offered again");
 }
@@ -2122,7 +2211,12 @@ async fn another_capture_ends_the_interrupted_call() {
     let next = r.recording().await;
     assert_ne!(next, call_id);
     assert!(r.banners().await.is_empty());
-    assert_eq!(r.call_row(&call_id).0, "processing");
+    let (status, ended_at) = r.call_row(&call_id);
+    assert!(matches!(status.as_str(), "processing" | "ready"));
+    assert_eq!(ended_at, Some(T0 + 60_000));
+    let jobs = r.core.scheduler().runs().unwrap();
+    assert!(jobs.iter().any(|job| job.kind == JobKind::PostCall));
+    assert!(jobs.iter().any(|job| job.kind == JobKind::ArchivePass));
 }
 
 #[tokio::test(start_paused = true)]

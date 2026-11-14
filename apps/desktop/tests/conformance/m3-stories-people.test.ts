@@ -304,9 +304,10 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
       ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
     }, false);
     await archived(call);
-    // The archive pass starts without names: both voices of the call carry the profile's vector.
+    // The profile is created while the pass runs; its user-named source stays named by the user,
+    // and the remaining archive voice is matched by the profile.
     expect(await archiveSpeakers(call)).toEqual([
-      { person_id: owner, named_by: "voice_profile" },
+      { person_id: owner, named_by: "you" },
       { person_id: owner, named_by: "voice_profile" },
     ]);
   });

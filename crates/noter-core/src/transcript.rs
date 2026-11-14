@@ -61,6 +61,8 @@ pub(crate) struct Transcript {
     hub: OnceLock<Arc<StreamHub<TranscriptMsg>>>,
     levels: OnceLock<Arc<StreamHub<LevelsMsg>>>,
     state: Mutex<State>,
+    /// Serializes flush commit/publication with file generation and stream shutdown.
+    finalize: Mutex<()>,
 }
 
 impl Transcript {
@@ -70,6 +72,7 @@ impl Transcript {
             hub: OnceLock::new(),
             levels: OnceLock::new(),
             state: Mutex::new(State::default()),
+            finalize: Mutex::new(()),
         }
     }
 
@@ -77,6 +80,14 @@ impl Transcript {
     #[cfg(feature = "harness")]
     pub(crate) fn fail_after_commit_once(&self) {
         lock(&self.state).fail_after_commit = true;
+    }
+
+    #[cfg(feature = "harness")]
+    pub(crate) fn has_unpublished(&self, call_id: &CallId) -> bool {
+        lock(&self.state)
+            .calls
+            .get(call_id)
+            .is_some_and(|live| !live.unpublished.is_empty())
     }
 }
 
@@ -316,6 +327,12 @@ impl Core {
     /// the batch for the next flush.
     // @cpt-begin:cpt-noter-algo-core-live-transcript-batch:p1:inst-commit-batch
     fn flush(&self, call_id: &CallId) {
+        let _finalize = lock(&self.transcript.finalize);
+        self.flush_locked(call_id);
+    }
+
+    /// Caller holds `Transcript::finalize` for the commit through its stream publication.
+    fn flush_locked(&self, call_id: &CallId) {
         let (rows, segments) = {
             let mut state = lock(&self.transcript.state);
             let Some(live) = state.calls.get_mut(call_id) else {
@@ -407,9 +424,10 @@ impl Core {
     }
 
     pub(crate) fn call_ended(&self, call_id: &CallId, reason: StreamEndReason) {
+        let _finalize = lock(&self.transcript.finalize);
         if reason != StreamEndReason::Discarded {
             // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
-            self.flush(call_id);
+            self.flush_locked(call_id);
             // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             // The post-call job moves the call on from processing once its outputs are written.
             if let Err(e) = self.write_transcript_file(call_id) {
