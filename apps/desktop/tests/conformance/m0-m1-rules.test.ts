@@ -8,11 +8,14 @@
 // rest `not_implemented`. A step on a later command goes through `ahead()` (or `pending()` for an
 // expected refusal) and the test stops there; everything before it is still asserted, and
 // against the fake (which answers every command) every step runs.
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { DEFAULT_RETRYABLE, ERROR_CODES, type CaptureState, type CommandName, type CoreError, type LevelsMsg, type TranscriptMsg, type WindowLabel } from "../../src/core/bindings";
-import { exercised } from "../support/core";
-import { ahead, ok, refused, until } from "../support/results";
+import { exercised, isFake } from "../support/core";
+import { ahead, ok, pending, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import * as W from "../support/world-presets";
 
@@ -25,11 +28,6 @@ afterEach(async () => {
 });
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
-/** True when a later milestone's command answered `not_implemented`: the test stops at that step. */
-function pending<T>(res: { status: string; error?: CoreError } & T): boolean {
-  return res.status === "error" && res.error?.code === "not_implemented";
-}
 
 /** `s.change`, or false while the core does not own the slice the change touches yet (`not_implemented`). */
 async function changeAhead(mutate: Parameters<Scenario["change"]>[0]): Promise<boolean> {
@@ -192,6 +190,57 @@ describe("capture notices: hold, keep and resume", () => {
       expect(released?.type === "call_ended" && released.stops_at !== null && released.stops_at > Date.now()).toBe(true);
     }
     expect(ok(await s.core("call-screen").captureAnswerCallEnd({ call_id: W.LIVE_CALL, choice: "keep_recording" }))).toMatchObject({ phase: "recording", notice: null });
+  });
+
+  it("cpt-noter-seq-first-run-download-models: a start downloads the required bundles to ready", async () => {
+    await s.change((w) => W.firstRun(w, { modelsReady: false }));
+    const firstRun = s.core("first-run");
+    const started = ok(await firstRun.modelsDownload({ action: "start" }));
+    expect(started.models.bundles.some((bundle) => bundle.state === "downloading")).toBe(true);
+    const ready = await until(async () => {
+      const status = ok(await firstRun.setupStatus({}));
+      return status.models.bundles.every((bundle) => bundle.state === "ready") && status;
+    }, "required model bundles to finish downloading", 15_000);
+    expect(ready.models.done_mb).toBe(ready.models.total_mb);
+    expect(ready.models.bundles.filter((bundle) => bundle.required_for_capture).every((bundle) => bundle.state === "ready")).toBe(true);
+  });
+
+  it("cpt-noter-seq-notifications-allow-notifications: requesting permission reports the granted result", async () => {
+    await s.change((w) => W.firstRun(w));
+    const firstRun = s.core("first-run");
+    const requested = ok(await firstRun.permissionRequest({ kind: "notifications" }));
+    expect(requested).toEqual({ kind: "notifications", state: "granted" });
+    expect(ok(await firstRun.setupStatus({})).permissions.find((row) => row.kind === "notifications")?.state).toBe("granted");
+    expect(ok(await firstRun.appSnapshot({})).environment.permissions.find((row) => row.kind === "notifications")?.state).toBe("granted");
+  });
+
+  it("cpt-noter-seq-first-run-complete-setup: Never store audio applies to the next capture", async () => {
+    await s.change(W.idle);
+    ok(await s.core("first-run").setupSetAudioStorage({ never_store_audio: true, retention: "never_store" }));
+    expect(ok(await s.core("settings").settingsGet({})).audio.retention).toBe("never_store");
+    const started = ok(await s.core("main").captureStart({ source: "today", sensitive: false }));
+    expect(started.audio_not_stored).toBe(true);
+    const audioDir = isFake ? null : join((await (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<{ path: string }> } }).process.invoke("main", "harness.data_dir", {})).path, "audio", started.call_id!);
+    ok(await s.core("main").captureStop({ call_id: started.call_id! }));
+    if (audioDir) {
+      const audioFiles = existsSync(audioDir) ? readdirSync(audioDir, { recursive: true }).filter((name) => /\.(?:m4a|wav|aac)$/i.test(String(name))) : [];
+      expect(audioFiles.map((name) => ({ name, size: statSync(join(audioDir, String(name))).size }))).toEqual([]);
+    }
+  });
+
+  it("cpt-noter-flow-core-capture-session-stop: Discard removes the call row and its audio folder", async () => {
+    await s.change(W.idle);
+    const started = ok(await s.core("main").captureStart({ source: "today", sensitive: false }));
+    const audioDir = isFake ? null : join((await (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<{ path: string }> } }).process.invoke("main", "harness.data_dir", {})).path, "audio", started.call_id!);
+    if (audioDir) {
+      mkdirSync(audioDir, { recursive: true });
+      writeFileSync(join(audioDir, "mic.m4a"), "test audio fixture");
+    }
+    await s.change((w) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN }));
+    expect(ok(await s.core("call-screen").captureDiscard({ call_id: started.call_id! })).phase).toBe("idle");
+    expect(ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).rows.some((row) => row.id === started.call_id)).toBe(false);
+    expect((await s.core("main").callGet({ call_id: started.call_id! })).status).toBe("error");
+    if (audioDir) expect(existsSync(audioDir)).toBe(false);
   });
 
   it("capture_keep_recording closes the nothing-heard notice and keeps the call", async () => {

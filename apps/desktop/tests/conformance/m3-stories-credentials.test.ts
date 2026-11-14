@@ -3,7 +3,7 @@
 // `accounts:changed` and `signin:progress` events, the settings roles, the `changes`, `settings`
 // and `audit_log` rows and the exported file. The scripted Keychain, account CLIs, runtime and
 // clock exist only in the real core (`harness.*`), so the fake skips this file.
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -62,13 +62,32 @@ async function rows<T>(sql: string, ...params: string[]): Promise<T[]> {
     db.close();
   }
 }
-/** Everything the core persisted about accounts, changes and audit, as one string. */
-const persisted = async () =>
-  JSON.stringify([
-    await rows("SELECT before, after, reason, entity_type FROM changes"),
-    await rows("SELECT key, value FROM settings"),
-    await rows("SELECT what, destination FROM audit_log"),
-  ]);
+/** Stable snapshot of every file below the harness data directory, including logs and exports. */
+function dataFiles(root: string): Array<{ path: string; size: number; mtimeMs: number; ino: number }> {
+  const files: Array<{ path: string; size: number; mtimeMs: number; ino: number }> = [];
+  for (const name of readdirSync(root)) {
+    const path = join(root, name);
+    const stat = statSync(path);
+    if (stat.isDirectory()) files.push(...dataFiles(path));
+    else files.push({ path, size: stat.size, mtimeMs: stat.mtimeMs, ino: stat.ino });
+  }
+  return files.sort((a, b) => a.path.localeCompare(b.path));
+}
+const persisted = async () => {
+  const { path } = (await control("data_dir")) as { path: string };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const before = dataFiles(path);
+      const contents = before.map(({ path: file }) => readFileSync(file));
+      const after = dataFiles(path);
+      if (JSON.stringify(before) === JSON.stringify(after)) return contents;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
+  }
+  throw new Error("harness data files kept changing during the secret scan");
+};
+const containsSecret = async (secret: string) => (await persisted()).some((file) => file.includes(Buffer.from(secret)));
 
 const accounts = async (window: "settings" | "first-run" = "settings"): Promise<AccountsView> => ok(await s.core(window).accountsGet({}));
 const keyStatus = (view: AccountsView, provider: KeyProvider) => view.keys.find((k) => k.provider === provider)!.status;
@@ -123,15 +142,15 @@ describe.skipIf(isFake)("cpt-noter-seq-first-run-connect-assistant on the real c
     expect(keyStatus(view, "anthropic")).toMatchObject({ type: "configured" });
     expect(keyStatus(await accounts("first-run"), "anthropic")).toMatchObject({ type: "configured" });
     expect(changed.latest()?.keys.find((k) => k.provider === "anthropic")?.status.type).toBe("configured");
+    expect(await containsSecret(KEY)).toBe(false);
     await finishAndRecord("done");
-    expect(await persisted()).not.toContain(KEY);
   });
 
   it("error — the key is rejected: the field shows the refusal and nothing is stored", async () => {
     open(['{"on": "ask-answer", "fail": "key_rejected"}'], firstRun);
     expect(refused(await s.core("first-run").apiKeySet({ provider: "anthropic", key: BAD })).code).toBe("key_rejected");
     expect(keyStatus(await accounts("first-run"), "anthropic")).toEqual({ type: "rejected", reason: "key_rejected" });
-    expect(await persisted()).not.toContain(BAD);
+    expect(await containsSecret(BAD)).toBe(false);
   });
 
   it("other — sign in with your own account: a checked account counts as connected at Finish", async () => {
@@ -143,8 +162,8 @@ describe.skipIf(isFake)("cpt-noter-seq-first-run-connect-assistant on the real c
     await ended(run.steps);
     expect(run.steps().map((p) => p.step)).toEqual(["waiting_for_browser", "signed_in", "checking_plan", "sending_test_request", "done"]);
     expect(accountStatus(await accounts("first-run"), "claude")).toMatchObject({ type: "signed_in", identity: ANN });
+    expect(await containsSecret(CODE)).toBe(false);
     await finishAndRecord("done");
-    expect(await persisted()).not.toContain(CODE);
   });
 
   it("empty — no key and no local runtime: Finish without an assistant still completes, Today opens and capture works", async () => {
@@ -179,8 +198,11 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-replace-api-key on the real core
     expect(keyStatus(ok(await s.core("settings").apiKeyRemove({ provider: "anthropic" })), "anthropic")).toEqual({ type: "not_set" });
     // No secret anywhere: results, events, change rows, settings rows, audit rows.
     await control("llm_run", { skill: "post-call", items: [{ id: "seg_1", text: PAYLOAD }] });
-    const seen = JSON.stringify([first, fixed, changed.all]) + (await persisted());
-    for (const secret of [KEY, BAD, FIXED]) expect(seen).not.toContain(secret);
+    const seen = JSON.stringify([first, fixed, changed.all]);
+    for (const secret of [KEY, BAD, FIXED]) {
+      expect(seen).not.toContain(secret);
+      expect(await containsSecret(secret)).toBe(false);
+    }
     expect(changed.all.length).toBeGreaterThan(1);
   });
 });
@@ -207,7 +229,7 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     expect(accountStatus(await accounts(), "claude")).toMatchObject({ type: "signed_in", identity: ANN });
     expect(claude.steps().at(-1)!.step).toBe("done");
     expect(await control("account_cli_log")).toEqual({ calls: ["login:Claude", "login:Chatgpt"] });
-    expect(await persisted()).not.toContain(CODE);
+    expect(await containsSecret(CODE)).toBe(false);
   });
 
   it("the five-minute window is one clock: a browser result after it is rejected and binds nothing", async () => {

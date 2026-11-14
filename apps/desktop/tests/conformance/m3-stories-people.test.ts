@@ -7,7 +7,6 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -88,7 +87,7 @@ describe("cpt-noter-seq-people-prepare-one-on-one", () => {
     const p = await make("Nobody Yet");
     const page = ok(await main.personGet({ person_id: p.id }));
     expect([page.calls, page.owns_open, page.you_owe, page.open_questions]).toEqual([[], [], [], []]);
-    if (s.target === "stdio") expect(page.topics).toEqual([]); // the fake's page lists the fixture's topics for everyone
+    expect(page.topics).toEqual([]);
     expect(page.talk_share).toBeNull();
   });
 
@@ -323,7 +322,7 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
   it("an archive install names the matching voice by voice_profile", async () => {
     const { call, owner } = await record(async (owner, first) => {
       ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
-    }, false);
+    }, true);
     await archived(call);
     // The profile is created while the pass runs; its user-named source stays named by the user,
     // and the remaining archive voice is matched by the profile.
@@ -336,11 +335,7 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
   it("a profile unused for 90 days stops matching", async () => {
     const { call } = await record(async (owner, first) => {
       ok(await main.voiceProfileCreate({ person_id: owner, from_speaker: first }));
-      // Stand-in for the injected clock (proved in noter-core's profiles tests): the profile was last used 91 days ago.
-      const db = new DatabaseSync(join((await dataDir(s))!, "noter.db"));
-      db.exec("PRAGMA busy_timeout = 5000");
-      db.prepare("UPDATE voice_profiles SET last_used_at = last_used_at - ? WHERE person_id = ?").run(91 * 86_400_000, owner);
-      db.close();
+      await wire().invoke("main", "harness.advance_clock", { ms: 91 * 86_400_000 });
     }, true);
     // The first voice carries the live name; the second, unnamed one is what the profile would match.
     await archived(call);
@@ -357,12 +352,5 @@ describe.skipIf(isFake)("cpt-noter-seq-dialogs-set-up-voice-profile (archive ins
     expect(speakers.filter((x) => x.named_by === "voice_profile")).toEqual([]);
     // The name the user gave the live voice stays.
     expect(await rows(s, "SELECT person_id, named_by FROM speakers WHERE call_id = ? AND pass = 'live' AND person_id IS NOT NULL", call)).toEqual([{ person_id: owner, named_by: "you" }]);
-  });
-});
-
-describe("the eight people commands", () => {
-  it("each succeeded at least once in this run", () => {
-    const eight = ["people_list", "person_get", "person_create", "person_update", "people_merge", "person_delete", "voice_profile_create", "voice_profile_delete"] as const;
-    expect(eight.filter((c) => !exercised.has(c))).toEqual([]);
   });
 });

@@ -680,13 +680,6 @@
             "short_name": "Anna K."
           },
           {
-            "display_name": "Pavel Romanov",
-            "id": "per_pavel",
-            "initials": "PR",
-            "is_you": false,
-            "short_name": "Pavel"
-          },
-          {
             "display_name": "Dmitri Sokolov",
             "id": "per_dmitri",
             "initials": "DS",
@@ -694,9 +687,16 @@
             "short_name": "Dmitri S."
           },
           {
+            "display_name": "Pavel Romanov",
+            "id": "per_pavel",
+            "initials": "PR",
+            "is_you": false,
+            "short_name": "Pavel"
+          },
+          {
             "display_name": "You",
             "id": "per_you",
-            "initials": "You",
+            "initials": "Y",
             "is_you": true,
             "short_name": "You"
           }
@@ -837,13 +837,7 @@
             "t1_ms": 1241000
           },
           "segment_count": 1,
-          "suggestion": {
-            "display_name": "Lena Krüger",
-            "id": "per_lena",
-            "initials": "LK",
-            "is_you": false,
-            "short_name": "Lena K."
-          },
+          "suggestion": null,
           "talk_ms": null
         }
       ]
@@ -864,7 +858,7 @@
           "ru",
           "en"
         ],
-        "open_items": 1,
+        "open_items": 0,
         "outputs": "ready",
         "participants": [
           {
@@ -884,7 +878,7 @@
           {
             "display_name": "You",
             "id": "per_you",
-            "initials": "You",
+            "initials": "Y",
             "is_you": true,
             "short_name": "You"
           }
@@ -949,7 +943,12 @@
             "type": "person"
           },
           "named_by": "calendar",
-          "sample": null,
+          "sample": {
+            "call_id": "call_backend",
+            "channel": null,
+            "t0_ms": 12000,
+            "t1_ms": 20000
+          },
           "segment_count": 1,
           "suggestion": null,
           "talk_ms": null
@@ -1035,13 +1034,6 @@
           "short_name": "Anna K."
         },
         {
-          "display_name": "Pavel Romanov",
-          "id": "per_pavel",
-          "initials": "PR",
-          "is_you": false,
-          "short_name": "Pavel"
-        },
-        {
           "display_name": "Dmitri Sokolov",
           "id": "per_dmitri",
           "initials": "DS",
@@ -1049,9 +1041,16 @@
           "short_name": "Dmitri S."
         },
         {
+          "display_name": "Pavel Romanov",
+          "id": "per_pavel",
+          "initials": "PR",
+          "is_you": false,
+          "short_name": "Pavel"
+        },
+        {
           "display_name": "You",
           "id": "per_you",
-          "initials": "You",
+          "initials": "Y",
           "is_you": true,
           "short_name": "You"
         }
@@ -1081,7 +1080,7 @@
         "ru",
         "en"
       ],
-      "open_items": 1,
+      "open_items": 0,
       "outputs": "ready",
       "participants": [
         {
@@ -1101,7 +1100,7 @@
         {
           "display_name": "You",
           "id": "per_you",
-          "initials": "You",
+          "initials": "Y",
           "is_you": true,
           "short_name": "You"
         }
@@ -1588,7 +1587,7 @@
       "owner": {
         "display_name": "You",
         "id": "per_you",
-        "initials": "You",
+        "initials": "Y",
         "is_you": true,
         "short_name": "You"
       },
@@ -1769,7 +1768,7 @@
       "owner": {
         "display_name": "You",
         "id": "per_you",
-        "initials": "You",
+        "initials": "Y",
         "is_you": true,
         "short_name": "You"
       },
@@ -2126,7 +2125,7 @@
               "owner": {
                 "display_name": "You",
                 "id": "per_you",
-                "initials": "You",
+                "initials": "Y",
                 "is_you": true,
                 "short_name": "You"
               },
@@ -2198,7 +2197,7 @@
       "display_name": "You",
       "email": null,
       "id": "per_you",
-      "initials": "You",
+      "initials": "Y",
       "is_you": true,
       "last_call_at": 1792137600000,
       "open_items": 1,
@@ -2559,7 +2558,7 @@
         "owner": {
           "display_name": "You",
           "id": "per_you",
-          "initials": "You",
+          "initials": "Y",
           "is_you": true,
           "short_name": "You"
         },
@@ -2608,13 +2607,6 @@
           "short_name": "Anna K."
         },
         {
-          "display_name": "Pavel Romanov",
-          "id": "per_pavel",
-          "initials": "PR",
-          "is_you": false,
-          "short_name": "Pavel"
-        },
-        {
           "display_name": "Dmitri Sokolov",
           "id": "per_dmitri",
           "initials": "DS",
@@ -2622,9 +2614,16 @@
           "short_name": "Dmitri S."
         },
         {
+          "display_name": "Pavel Romanov",
+          "id": "per_pavel",
+          "initials": "PR",
+          "is_you": false,
+          "short_name": "Pavel"
+        },
+        {
           "display_name": "You",
           "id": "per_you",
-          "initials": "You",
+          "initials": "Y",
           "is_you": true,
           "short_name": "You"
         }
@@ -3222,13 +3221,7 @@
             "t1_ms": 1241000
           },
           "segment_count": 1,
-          "suggestion": {
-            "display_name": "Lena Krüger",
-            "id": "per_lena",
-            "initials": "LK",
-            "is_you": false,
-            "short_name": "Lena K."
-          },
+          "suggestion": null,
           "talk_ms": null
         }
       ],
@@ -3338,7 +3331,12 @@
             "type": "person"
           },
           "named_by": "calendar",
-          "sample": null,
+          "sample": {
+            "call_id": "call_backend",
+            "channel": null,
+            "t0_ms": 12000,
+            "t1_ms": 20000
+          },
           "segment_count": 1,
           "suggestion": null,
           "talk_ms": null

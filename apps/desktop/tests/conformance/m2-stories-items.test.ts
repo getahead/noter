@@ -227,7 +227,7 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
     const main = s.core("main");
     const res = await main.shareCopy({ call_id: LIVE_CALL, scope: reviewed, format: "markdown" });
     expect(res.status).toBe("error");
-    if (res.status === "error") expect(["outputs_not_ready", "unreviewed_in_scope"]).toContain(res.error.code);
+    if (res.status === "error") expect(res.error.code).toBe("outputs_not_ready");
     if (s.target === "stdio") {
       expect(res.status === "error" && res.error.code).toBe("outputs_not_ready");
       const log = (await wire().invoke("main", "harness.native_log", {})) as { clipboard: unknown[] };
@@ -249,7 +249,10 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
       expect(files).toHaveLength(done.files);
       expect(files.some((f) => f.endsWith(".md"))).toBe(true);
       expect(files.some((f) => f.endsWith("-mic.m4a"))).toBe(true);
-      expect(readFileSync(`${done.path}/${files.find((f) => f.endsWith(".md"))}`, "utf8").length).toBeGreaterThan(0);
+      const summary = readFileSync(`${done.path}/${files.find((f) => f.endsWith(".md"))}`, "utf8");
+      expect(summary).toContain("Backend and QA aligned on the websocket notifications.");
+      const transcript = JSON.parse(readFileSync(`${done.path}/${files.find((f) => f.endsWith(".json"))}`, "utf8")) as Array<{ text: string }>;
+      expect(transcript).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Can we keep serving reads while it rebuilds?" })]));
     }
   });
 });

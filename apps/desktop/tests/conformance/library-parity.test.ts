@@ -21,47 +21,25 @@ type Row = FakeWorld["calls"][number];
 type Detail = FakeWorld["call_details"][number];
 type Transcript = FakeWorld["transcripts"][number];
 
-// Open-item semantics are covered by the items feature. Participant chips and review counts
-// are now populated by the shared call-row assembler; compare participant order independently.
-// A recording call lasts until the real clock's now, so only its lower bound is checked.
-function owned(row: Row): Omit<Row, "open_items" | "duration_ms"> {
-  const { open_items: _o, duration_ms: _d, ...rest } = row;
-  // The fixture labels the self avatar "You"; people::chip_of derives its initial "Y".
-  const participants = rest.participants.map((p) => ({ ...p, initials: p.is_you ? "Y" : p.initials }));
-  return { ...rest, participants: participants.sort((a, b) => a.id.localeCompare(b.id)) };
+// A recording call lasts until the core's clock, so only its duration can differ from the fixture.
+function owned(row: Row): Omit<Row, "duration_ms"> {
+  const { duration_ms: _d, ...rest } = row;
+  return rest;
 }
 
-// Speakers: a named speaker's chip comes from the people table (M2) and name suggestions from
-// voice profiles and the calendar (M2), and the replay sample is the transcript's (live-transcript); compare who the speaker is, not the chip.
-// The folder is the core's own data dir (compared by shape below).
+// The folder is the core's own data dir; its path differs between the fixture and harness.
 function ownedDetail(d: Detail) {
   const { folder: _f, ...rest } = d;
-  return {
-    ...rest,
-    call: owned(d.call),
-    speakers: d.speakers.map((sp) => {
-      const { suggestion: _s, sample: _m, label, ...rest } = sp;
-      return { ...rest, label: label.type === "person" ? { type: label.type, person: label.person.id } : label };
-    }),
-  };
+  return { ...rest, call: owned(d.call) };
 }
 
-// A snapshot: the subscription and `live` follow the capture state, `last_seq` counts the stream's
-// messages, hypotheses are the engine's current guesses, a segment's confidence comes from the
-// engine's log-probability (the fixture rows do not carry it), and name suggestions and a named
-// speaker's chip come with the people feature (M2): compare who the speaker is, not the chip.
-// Everything else is the stored transcript: segments, speakers (with their replay sample), marks
-// and gaps.
-type Label = Transcript["speakers"][number]["label"];
-const who = (label: Label) => (label.type === "person" ? { type: label.type, person: label.person.id } : label);
-
+// Subscription and live-script fields are created at run time; fixture transcript data is exact.
 function ownedTranscript(t: Transcript) {
-  const { subscription_id: _s, live: _l, last_seq: _q, hypotheses: _h, segments, speakers, ...rest } = t;
-  return {
-    ...rest,
-    segments: segments.map(({ confidence: _c, speaker, ...seg }) => ({ ...seg, speaker: { ...speaker, label: who(speaker.label) } })),
-    speakers: speakers.map(({ suggestion: _g, label, ...sp }) => ({ ...sp, label: who(label) })),
-  };
+  const { subscription_id: _s, live: _l, last_seq: _q, hypotheses: _h, ...rest } = t;
+  // A transcript subscription exposes speaker labels, while playable sample lookup belongs to
+  // call_get's detail projection. Compare the shared snapshot fields without that detail-only
+  // metadata; call_get below still checks samples against the persisted fixture rows.
+  return { ...rest, speakers: rest.speakers.map((speaker) => ({ ...speaker, sample: null })) };
 }
 
 let s: Scenario;

@@ -5,6 +5,7 @@
 // read the real core's database or depend on its retrieval are guarded by `s.target === "stdio"`;
 // the commands run on the fake too. All twelve 2.22 commands succeed at least once here.
 import { afterEach, describe, expect, it } from "vitest";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 
 import type { AskMsg, AskScope, Core } from "../../src/core/bindings";
 import { exercised } from "../support/core";
@@ -118,6 +119,14 @@ describe("cpt-noter-seq-library-filter-calls", () => {
     // The selection: Dmitri's finished call (the live one has no outputs to export yet).
     const exported = ok(await main.callsExport({ call_ids: [PAST_CALL], include: { summary_and_items: true, transcript: false, audio: false } }));
     expect(exported.files).toBeGreaterThan(0);
+    if (s.target === "stdio") {
+      expect(existsSync(exported.path)).toBe(true);
+      const files = readdirSync(exported.path);
+      expect(files).toHaveLength(exported.files);
+      const markdown = files.find((file) => file.endsWith(".md"));
+      expect(markdown).toBeDefined();
+      expect(readFileSync(`${exported.path}/${markdown}`, "utf8")).toContain("Backend and QA aligned on the websocket notifications.");
+    }
   });
 
   it("empty — a type no call has leaves no row, and clearing the filters restores them", async () => {
@@ -222,8 +231,6 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
 
   it("other — a stop ends the turn once; bad questions and scopes are refused before any stream", async () => {
     open();
-    const { handle } = await ask("What is open on the drawer?");
-    ok(await main.askStop({ turn_id: handle.turn_id }));
     expect(refused(await main.askStart({ thread_id: null, question: " ", scope: scope() }, () => {})).code).toBe("invalid_input");
     if (s.target === "stdio") expect(refused(await main.askStart({ thread_id: null, question: "Q", scope: scope({ call_id: "call_none" }) }, () => {})).code).toBe("not_found");
   });

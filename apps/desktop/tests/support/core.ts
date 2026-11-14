@@ -19,28 +19,33 @@ export const exercised = new Set<CommandName>();
 let shared: StdioCore | null = null;
 const fakes: FakeCore[] = [];
 
-export function recording(inner: Transport): Transport {
+export function recording(inner: Transport, covered: Set<CommandName> = exercised): Transport {
   return {
     async invoke(cmd, args, onMessage) {
       const result = await inner.invoke(cmd, args, onMessage);
-      exercised.add(cmd);
+      covered.add(cmd);
       return result;
     },
     listen: (event, handler) => inner.listen(event, handler),
   };
 }
 
-/** A raw transport for `window` against the selected core. */
-export function transportFor(window: WindowLabel): Transport {
+/** A raw transport for probes whose assertions do not count toward E2E coverage. */
+export function unrecordedTransportFor(window: WindowLabel): Transport {
   if (target === "stdio") {
     const command = process.env.NOTER_CORE_CMD;
     if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
     shared ??= new StdioCore({ command });
-    return recording(shared.transport(window));
+    return shared.transport(window);
   }
   const fake = new FakeCore({ window });
   fakes.push(fake);
-  return recording(fake);
+  return fake;
+}
+
+/** A raw transport for `window` against the selected core. */
+export function transportFor(window: WindowLabel): Transport {
+  return recording(unrecordedTransportFor(window));
 }
 
 /** The typed client for `window`, exactly as the UI uses it. */

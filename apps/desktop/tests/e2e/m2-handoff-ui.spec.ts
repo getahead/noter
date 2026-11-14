@@ -21,7 +21,7 @@ const row = (page: Page) => page.getByRole("row", { name: /Replay buffer/ }).or(
 const PROMPT_LINE = "Opens Claude Code in your usual terminal with the prompt filled in; nothing is sent until you press Return.";
 
 /** The call page of the item with the drawer open; `mapped` creates the VSTOR mapping first. */
-async function open(page: Page, opts: { own?: boolean; mapped?: boolean; sensitive?: boolean; failGenerate?: boolean; launch?: () => Promise<void> } = {}) {
+async function open(page: Page, opts: { own?: boolean; mapped?: boolean; sensitive?: boolean; failGenerate?: boolean; launch?: (steer: Awaited<ReturnType<typeof openWindow>>) => Promise<void> } = {}) {
   let callId = "";
   const steer = await openWindow(page, "main", {
     world: (w) => {
@@ -33,9 +33,9 @@ async function open(page: Page, opts: { own?: boolean; mapped?: boolean; sensiti
     },
   });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
-  if (opts.mapped ?? true) await H.map(page);
+  if (opts.mapped ?? true) await H.map(steer);
   await navigate(page, "summary", callId);
-  await opts.launch?.();
+  await opts.launch?.(steer);
   if (opts.failGenerate) await steer.failNext("handoff_generate", "runtime_unavailable");
   await row(page).getByRole("button", { name: "Handoff" }).click();
   return steer;
@@ -67,25 +67,34 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(row(page)).toContainText("Handed off");
   });
 
-  test("UI — error path: No Claude Code link handler — the launch line names iTerm and the one-time Automation question, Open says Opened in iTerm · item marked Handed off", async ({ page }) => {
-    await open(page, { launch: () => H.launch(page, "iterm", { needsAutomation: true }) });
-    if (!REAL) return; // the launch path is what the Mac reports (harness.launch_world): the fake core has no Mac
-    await expect(region(page, "HD-R5")).toContainText(/No Claude Code link handler found\. Noter will open iTerm and run claude in .+; macOS asks once to allow Automation\./);
+  test("UI — error path: No Claude Code link handler — fallback on the real host; an injected open failure keeps Copy Prompt on the fake", async ({ page }) => {
+    const steer = await open(page, { launch: REAL ? (steer) => H.launch(steer, "iterm", { needsAutomation: true }) : undefined });
+    if (REAL) {
+      await expect(region(page, "HD-R5")).toContainText(/No Claude Code link handler found\. Noter will open iTerm and run claude in .+; macOS asks once to allow Automation\./);
+    } else {
+      await steer.failNext("handoff_open", "no_link_handler");
+    }
     await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
-    await expect(region(page, "HD-R6")).toContainText("Opened in iTerm · item marked Handed off");
-    expect(JSON.stringify(await H.nativeLog(page))).toContain("iterm");
+    if (REAL) {
+      await expect(region(page, "HD-R6")).toContainText("Opened in iTerm · item marked Handed off");
+      expect(JSON.stringify(await H.nativeLog(steer))).toContain("iterm");
+    } else {
+      await expect(region(page, "HD-R7")).toContainText("Couldn't open Claude Code · use Copy Prompt");
+      await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
+      await expect(region(page, "HD-R7")).toContainText("Copied");
+    }
   });
 
-  test("UI — error path: Automation denied — Couldn't open Claude Code · use Copy Prompt, Copy Prompt says Copied and puts the prompt on the clipboard", async ({ page }) => {
-    await open(page, { launch: () => H.launch(page, "iterm", { needsAutomation: true, denied: true, fail: [{ path: "iterm", code: "automation_denied" }] }) });
-    if (!REAL) return; // Automation is the Mac's answer (harness.launch_world): the fake core never refuses
+  test("UI — error path: Automation denied — Open leaves the item here and Copy Prompt provides the fallback", async ({ page }) => {
+    const steer = await open(page, { launch: REAL ? (steer) => H.launch(steer, "iterm", { needsAutomation: true, denied: true, fail: [{ path: "iterm", code: "automation_denied" }] }) : undefined });
+    if (!REAL) await steer.failNext("handoff_open", "automation_denied");
     await region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" }).click();
     await expect(region(page, "HD-R7")).toContainText("Couldn't open Claude Code · use Copy Prompt");
     await expect(drawer(page)).not.toContainText("Handed off to");
     await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
     expect(await sent(page, "handoff_copy")).toEqual([expect.objectContaining({ item_id: H.ITEM })]);
     await expect(region(page, "HD-R7")).toContainText("Copied");
-    expect(JSON.stringify(await H.nativeLog(page))).toContain("clipboard");
+    if (REAL) expect(JSON.stringify(await H.nativeLog(steer))).toContain("clipboard");
   });
 
   test("UI — error path: No repository mapped — No repository mapped for VSTOR · Add Mapping…, Open disabled and Copy Prompt enabled", async ({ page }) => {
@@ -145,9 +154,12 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(row(page)).toContainText("Dmitri S.");
   });
 
-  test("UI — error path: Prompt not written — Couldn't write the prompt with Try Again, Try Again says Writing the handoff prompt… and the prompt follows", async ({ page }) => {
-    await open(page, { failGenerate: true });
-    if (!REAL) return; // the fake core answers handoff_get with a written prompt: only the real core starts at not_generated
+  test("UI — error path: Prompt not written — Regenerate or initial generation fails, Try Again writes the prompt", async ({ page }) => {
+    const steer = await open(page, { failGenerate: REAL });
+    if (!REAL) {
+      await steer.failNext("handoff_generate", "runtime_unavailable");
+      await region(page, "HD-R1").getByRole("button", { name: "Regenerate" }).click();
+    }
     await expect(region(page, "HD-R4")).toContainText("Couldn't write the prompt");
     await region(page, "HD-R4").getByRole("button", { name: "Try Again" }).click();
     await expect(region(page, "HD-R4").getByRole("textbox")).toBeVisible();

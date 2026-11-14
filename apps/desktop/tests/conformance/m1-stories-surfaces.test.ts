@@ -25,6 +25,15 @@ const asked = async () => (await s.surfaces()) ?? [];
 const phase = async () => ok(await s.core("main").appSnapshot({})).capture.phase;
 
 describe("cpt-noter-seq-call-screen-hide-for-presenting", () => {
+  it("Other — Share warning: Got It turns the warning off and publishes the new call-window state", async () => {
+    const screen = s.core("call-screen");
+    const changed = await s.events("window:call");
+    const after = ok(await screen.windowShareWarningSeen({}));
+    expect(after.show_share_warning).toBe(false);
+    expect(ok(await screen.windowCallState({})).show_share_warning).toBe(false);
+    await until(() => changed.latest()?.show_share_warning === false, "window:call with the warning dismissed");
+  });
+
   it("happy path: hiding for presenting hides every surface, recording goes on, showing restores exactly the open windows", async () => {
     const screen = s.core("call-screen");
     const presenting = await s.events("app:presenting");
@@ -166,15 +175,16 @@ describe("the window commands", () => {
   it("window_report_view, window_navigate, window_announce, window_fit and open_external each succeed at least once", async () => {
     const main = s.core("main");
     const nav = await s.events("nav:request");
-    ok(await main.windowReportView({ call_id: null }));
-    ok(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } }));
+    expect(ok(await main.windowReportView({ call_id: null }))).toEqual({});
+    expect(ok(await main.windowNavigate({ target: { type: "call_page", call_id: W.PAST_CALL, tab: "summary" } }))).toEqual({});
     await until(() => nav.latest()?.type === "call_page", "nav:request");
-    ok(await main.windowReportView({ call_id: W.PAST_CALL }));
-    ok(await s.core("call-screen").windowAnnounce({ text: "Recording paused", politeness: "polite" }));
-    ok(await s.core("record-prompt").windowFit({ width: 372, height: 127 }));
+    expect(ok(await main.windowReportView({ call_id: W.PAST_CALL }))).toEqual({});
+    expect(ok(await s.core("call-screen").windowAnnounce({ text: "Recording paused", politeness: "polite" }))).toEqual({});
+    if (real()) await until(() => asked().then((log) => log.includes("announce Recording paused")), "native accessibility announcement");
+    expect(ok(await s.core("record-prompt").windowFit({ width: 372, height: 127 }))).toEqual({});
     expect(refused(await s.core("record-prompt").windowFit({ width: 0, height: 127 })).code).toBe("invalid_input");
     if (real()) expect(await asked()).toEqual(expect.arrayContaining(["fit_record_prompt 372x127"]));
-    ok(await main.openExternal({ target: { type: "system_settings", permission: "system_audio" } }));
+    expect(ok(await main.openExternal({ target: { type: "system_settings", permission: "system_audio" } }))).toEqual({});
     if (real()) expect(await asked()).toEqual(expect.arrayContaining(["open_external system_settings"]));
     expect(ok(await s.core("call-screen").windowSetCallLayout({ preference: "auto" })).layout).toMatch(/^(dedicated|floating)$/);
     ok(await s.core("call-screen").windowShowCall({}));

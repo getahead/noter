@@ -39,6 +39,8 @@ export interface CorePlan {
 
 /** What the outside world does to the core behind an open window, as the scenario controls do. */
 export interface Steer {
+  /** Send a setup/control command without counting it as a page invocation. */
+  invoke(cmd: string, args: unknown, window?: WindowLabel): Promise<unknown>;
   change(mutate: (world: World) => void): Promise<void>;
   failNext(cmd: CommandName, code: ErrorCode, detail?: ErrorDetail | null): Promise<void>;
   push(cmd: ChannelCommand, body: ChannelBody): Promise<void>;
@@ -66,6 +68,7 @@ const HOOK = `
   const calls = (globalThis.__noterCalls ??= []);
   FakeCore.prototype.invoke = function (cmd, args, onMessage) {
     globalThis.__noterFake = this;
+    const steered = globalThis.__noterSteering === true;
     const plan = globalThis.__noterPlan;
     if (plan && !this.__noterPlanned) {
       this.__noterPlanned = (async () => {
@@ -85,13 +88,13 @@ const HOOK = `
         }
       })();
     }
-    const call = { kind: "invoke", name: cmd, args: structuredClone(args), completed: false };
-    calls.push(call);
+    const call = steered ? null : { kind: "invoke", name: cmd, args: structuredClone(args), completed: false };
+    if (call) calls.push(call);
     return Promise.resolve(this.__noterPlanned).then(async () => {
       if (plan?.latency && plan.latencyFor === cmd) await new Promise((resolve) => setTimeout(resolve, plan.latency));
       return invoke.call(this, cmd, args, onMessage);
     }).then((result) => {
-      call.completed = true;
+      if (call) call.completed = true;
       return result;
     });
   };
@@ -154,6 +157,13 @@ function tauriIpcStandIn(): void {
 export const pageExercised = new Set<CommandName>();
 
 const WINDOWS = COMMANDS.app_snapshot.windows as readonly string[];
+const pageSteers = new WeakMap<Page, Steer>();
+
+export function steerFor(page: Page): Steer {
+  const steer = pageSteers.get(page);
+  if (!steer) throw new Error("the page has no core steering client");
+  return steer;
+}
 
 /** Node side of the stdio target: one core process per page, closed with the page. */
 async function connectRealCore(page: Page, label: string, plan: CorePlan): Promise<Steer> {
@@ -167,8 +177,9 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
   page.once("close", () => void core.close());
   const win = (WINDOWS.includes(label) ? label : "main") as WindowLabel; // as main.tsx reads it
   // Harness control requests (tests/support/scenario.ts › HARNESS_CONTROLS), not contract commands.
-  const control = (name: string, args: unknown) => core.invoke("main", name as CommandName, args);
+  const control = (name: string, args: unknown, window: WindowLabel = "main") => core.invoke(window, name as CommandName, args);
   const steer: Steer = {
+    invoke: (cmd, args, window) => control(cmd, args, window),
     async change(mutate) {
       const world = (await control("harness.world_get", {})) as World;
       mutate(world);
@@ -221,6 +232,12 @@ interface PageFake {
 /** The fake target's controls: the FakeCore the page built, reached through the hook. */
 function fakeSteer(page: Page): Steer {
   return {
+    invoke: (cmd, args) => page.evaluate(async ([c, a]) => {
+      const g = globalThis as unknown as { __noterFake: { invoke(cmd: string, args: unknown): Promise<unknown> }; __noterSteering?: boolean };
+      g.__noterSteering = true;
+      try { return await g.__noterFake.invoke(c, a); }
+      finally { g.__noterSteering = false; }
+    }, [cmd, args] as const),
     async change(mutate) {
       const world = await page.evaluate(() => (globalThis as unknown as PageFake).__noterFake.world);
       mutate(world);
@@ -256,6 +273,7 @@ export async function openWindow(page: Page, label: WindowLabel | string, plan: 
     });
     steer = fakeSteer(page);
   }
+  pageSteers.set(page, steer);
   await page.goto(`/?window=${label}`);
   return steer;
 }

@@ -16,7 +16,7 @@ describe("optimistic concurrency", () => {
     expect(stale.status).toBe("error");
     if (stale.status !== "error") return;
     expect(stale.error.code).toBe("conflict");
-    expect(stale.error.detail?.type).toBe("conflict");
+    expect(stale.error.detail).toMatchObject({ type: "conflict", current_rev: 2 });
   });
 });
 // @cpt-end:cpt-noter-flow-core-contract-conformance:p1:inst-run-group

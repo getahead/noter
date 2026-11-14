@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, afterEach } from "vitest";
 
 import { disposeAll, exercised, target } from "./core";
-import { storyIds } from "./stories";
+import { storiesForCoverage } from "./coverage-recording";
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const outDir = join(repoRoot, "coverage", "e2e");
@@ -16,10 +16,7 @@ const suite = process.env.NOTER_E2E_SUITE ?? "conformance";
 const stories = new Set<string>();
 
 afterEach(({ task }) => {
-  if (task.result?.errors?.length) return;
-  const names: string[] = [];
-  for (let t: { name: string; suite?: unknown } | undefined = task; t; t = t.suite as typeof t) names.push(t.name);
-  storyIds(names.join(" ")).forEach((id) => stories.add(id));
+  storiesForCoverage(task).forEach((id) => stories.add(id));
 });
 
 afterAll(async () => {

@@ -80,7 +80,7 @@ const PEOPLE: &[P] = &[
         id: "per_you",
         name: "You",
         short: "You",
-        initials: "You",
+        initials: "Y",
         role: "Team lead, frontend",
         you: true,
         voice: false,
@@ -873,7 +873,7 @@ pub fn world() -> FakeWorld {
             segment_count: 1,
             talk_ms: None,
             sample: Some(span(LIVE, 1235, 1241)),
-            suggestion: Some(chip("per_lena")),
+            suggestion: None,
             named_by: None,
         },
     ];
@@ -913,7 +913,7 @@ pub fn world() -> FakeWorld {
             channel,
             segment_count,
             talk_ms: None,
-            sample: None,
+            sample: (id == "spk_b_dmitri").then(|| span(BACKEND, 12, 20)),
             suggestion: None,
             named_by: Some(NamedBy::Calendar),
         };
@@ -1179,8 +1179,8 @@ pub fn world() -> FakeWorld {
             platform: Some(s("Microsoft Teams")),
             participants: vec![
                 chip("per_anna"),
-                chip("per_pavel"),
                 chip("per_dmitri"),
+                chip("per_pavel"),
                 chip("per_you"),
             ],
             unnamed_speakers: 1,
@@ -1217,7 +1217,7 @@ pub fn world() -> FakeWorld {
             audio_deleted: false,
             audio_deleted_at: None,
             audio_retention_days: 30,
-            open_items: 1,
+            open_items: 0,
             review_waiting: 0,
         },
     ];
