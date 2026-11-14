@@ -6,7 +6,7 @@ import { base } from "./attrs";
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function Toolbar({ region, label, children }: { region?: string; label?: string; children?: ReactNode }) {
   return (
-    <header className="np-toolbar" {...base("toolbar", { region })} role="toolbar" aria-label={label}>
+    <header className="np-toolbar" data-tauri-drag-region {...base("toolbar", { region })} role="toolbar" aria-label={label}>
       {children}
     </header>
   );

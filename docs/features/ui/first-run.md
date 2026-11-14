@@ -2,7 +2,7 @@
 title: "Feature — First-run wizard"
 description: "Six-step first-run window that downloads the models in the background, asks for Microphone and System Audio Recording, proves both streams with the self-test, and sets the call display and audio retention, so call detection is on before the first call."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-first-run
 milestone: M0
@@ -10,9 +10,14 @@ milestone: M0
 
 # Feature: First-run wizard
 
+## Changelog
+
+- 2026-11-14: The first-run window hides its native title in the overlaid title bar.
+
 
 <!-- toc -->
 
+- [Changelog](#changelog)
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
   - [1.2 Purpose](#12-purpose)

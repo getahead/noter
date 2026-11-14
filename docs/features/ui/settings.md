@@ -2,7 +2,7 @@
 title: "Feature — Settings window"
 description: "The separate Noter Settings window: 11 panes with a search field, settings applied at once, the hotkey and card-key recorder with conflict checks, and the panes Noter needs from M0."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-settings
 milestone: M0
@@ -10,9 +10,14 @@ milestone: M0
 
 # Feature: Settings window
 
+## Changelog
+
+- 2026-11-14: The Settings window uses its own native title, hides that title in the overlaid title bar, and participates in the shared app menu.
+
 
 <!-- toc -->
 
+- [Changelog](#changelog)
 - [1. Feature Context](#1-feature-context)
   - [1.1 Overview](#11-overview)
   - [1.2 Purpose](#12-purpose)

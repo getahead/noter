@@ -93,7 +93,7 @@ pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
         let _ = main.show();
         let _ = main.set_focus();
     }
-    let _ = app.emit(event_names::NAV_REQUEST, target);
+    crate::emit_navigation(app, json!(target));
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click
     // @cpt-end:cpt-noter-state-ui-notifications-item:p1:inst-sent-opened
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-user-click

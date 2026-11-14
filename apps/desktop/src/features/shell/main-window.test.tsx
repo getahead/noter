@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../../app/App";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
+import { listenNativeMenuAction } from "../../core/native-menu";
 import type { World } from "../../../tests/support/scenario";
 import { find, rendered } from "../../ui/testing";
 import { MainWindow } from "./main-window";
@@ -30,7 +31,10 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
-vi.mock("../../core/tauri-transport", () => ({ nativeAsk: vi.fn().mockResolvedValue(true) }));
+vi.mock("../../core/tauri-transport", () => ({
+  nativeAsk: vi.fn().mockResolvedValue(true),
+  listenNativeMenuAction: vi.fn().mockResolvedValue(() => {}),
+}));
 
 let bridge: Bridge | null = null;
 afterEach(async () => {
@@ -159,6 +163,27 @@ describe("MainWindow (cpt-noter-component-shell-main-window)", () => {
 });
 
 describe("MainWindow controls", () => {
+  it("routes native Settings menu selections through the shell action", async () => {
+    const fake = new FakeCore({ window: "main" });
+    bridge = createBridge("main", fake);
+    await bridge.open();
+    const acts: string[] = [];
+    vi.spyOn(bridge, "act").mockImplementation((async (key: string, _cmd: string, run: () => Promise<unknown>) => (acts.push(key), void run(), { status: "ok", data: {} })) as never);
+    rendered(MainWindow, { bridge });
+
+    const effect = effects.find((run) => run.toString().includes("listenNativeMenuAction"));
+    expect(effect).toBeDefined();
+    vi.mocked(listenNativeMenuAction).mockClear();
+    const cleanup = effect!() as unknown as (() => void) | undefined;
+    await Promise.resolve();
+    const handler = vi.mocked(listenNativeMenuAction).mock.calls[0]?.[0];
+    expect(handler).toBeDefined();
+    handler!("menu.settings");
+    cleanup?.();
+
+    expect(acts).toContain("window_navigate");
+  });
+
   it("runs each control's command through the bridge: show the call, banner actions, dismiss, Settings", async () => {
     vi.useFakeTimers();
     const fake = new FakeCore({ window: "main" });
