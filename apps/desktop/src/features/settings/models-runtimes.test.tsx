@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
-import { sentCommands as recordCommands } from "../../../tests/support/fake-core";
+import { sentCommands } from "../../../tests/support/fake-core";
 import { installCli, loadAccounts, removeKey, setKey } from "./accounts";
 import { loadSettings } from "./actions";
 import { KeyRow } from "./CredentialRow";
@@ -32,10 +32,6 @@ const accounts = () => bridge.store.getState().whole.accounts!;
 const keyOf = (provider: "anthropic" | "codex") => accounts().keys.find((k) => k.provider === provider)!;
 type Tree = ReturnType<typeof rendered>;
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => unknown;
-const sentCommands = () => {
-  return recordCommands(fake);
-};
-
 describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
   it("opens from the pane list in place of the later-version note", async () => {
     await ready();
@@ -90,7 +86,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
 
   it("saves a Runtime per task choice as the runtimes section", async () => {
     const props = await ready();
-    const seen = sentCommands();
+    const seen = sentCommands(fake);
     on(rendered(ModelsRuntimesPane, props), "Post-call analysis")("local");
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("settings_update"));
     expect(bridge.store.getState().whole.settings!.runtimes.post_call).toBe("local");
@@ -101,7 +97,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
       w.app.accounts.local.cli.installed = false;
       w.app.accounts.local.running = false;
     });
-    const seen = sentCommands();
+    const seen = sentCommands(fake);
     on(rendered(ModelsRuntimesPane, props), "Install Ollama…")();
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("cli_install"));
   });
@@ -125,7 +121,7 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
 
   it("Verify stores the key once and the row reads Configured; a blank or repeated submit sends nothing", async () => {
     await ready((w) => (w.app.accounts.keys[1]!.status = { type: "not_set" }));
-    const seen = sentCommands();
+    const seen = sentCommands(fake);
     const d = draftOf(rendered(KeySheet, { bridge, provider: "codex" as const, mode: "add" as const, onClose: () => {} }));
     expect(await d.verify()).toBe(false); // blank
     d.edit("sk-codex-123456");
@@ -172,7 +168,7 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
   it("does not retain an API key in the bridge retry handler", async () => {
     await ready();
     fake.failNext("api_key_set", "offline");
-    const seen = sentCommands();
+    const seen = sentCommands(fake);
 
     await setKey(bridge, "anthropic", "sk-ant-secret");
     await bridge.retry("key:set:anthropic");

@@ -36,14 +36,10 @@ const stored = () => bridge.store.getState().whole.settings!;
 type Tree = ReturnType<typeof rendered>;
 /** The handler of the control that has this label (or aria-label) and a handler under `prop`. */
 const on = (tree: Tree, label: string, prop = "onAction") => find(tree, (p) => (p.label === label || p.ariaLabel === label) && typeof p[prop] === "function").props[prop] as (v?: unknown) => void;
-const calls = () => {
-  return sentCommands(fake);
-};
-
 describe("General", () => {
   it("every control saves its own setting or runs its command", async () => {
     await ready((w) => ((w.app.environment.notifications = "denied"), (w.app.setup.self_test = { type: "not_run" })));
-    const seen = calls();
+    const seen = sentCommands(fake);
     const tree = rendered(GeneralPane, { bridge, settings: stored() });
     on(tree, "Summary language")("ru");
     on(tree, "Horizon")("today");
@@ -80,7 +76,7 @@ describe("General", () => {
 describe("Audio", () => {
   it("the archive backend saves, the permission rows ask or open System Settings, the self-test button is there", async () => {
     await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "microphone" && (p.state = "not_asked")));
-    const seen = calls();
+    const seen = sentCommands(fake);
     const tree = rendered(AudioPane, { bridge, settings: stored() });
     on(tree, "Archive pass")("whisper_large_v3");
     const mic = find(tree, (p) => p.id === "mic" && typeof p.onAllow === "function").props;
@@ -115,7 +111,7 @@ describe("Audio", () => {
 describe("Call screen", () => {
   it("picking a display runs setup_set_call_display", async () => {
     await ready();
-    const seen = calls();
+    const seen = sentCommands(fake);
     (find(rendered(CallScreenPane, { bridge, settings: stored() }), (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("setup_set_call_display"));
   });
@@ -135,7 +131,7 @@ describe("Call screen", () => {
 describe("Privacy", () => {
   it("Calendar asks through permission_request, opens System Settings, and Manage on Person Pages sends nothing", async () => {
     await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "calendar" && (p.state = "not_asked")));
-    const seen = calls();
+    const seen = sentCommands(fake);
     const tree = rendered(PrivacyPane, { bridge, settings: stored() });
     const cal = find(tree, (p) => p.id === "cal").props;
     (cal.onAllow as () => void)();
@@ -166,7 +162,7 @@ describe("Hotkeys, Performance, Updates, Models", () => {
 
   it("Restart Now installs a waiting update; Check Now reads the core again", async () => {
     await ready((w) => (w.app.environment.update = { version: "1.2", notes_md: "", ready: true }));
-    const seen = calls();
+    const seen = sentCommands(fake);
     const tree = rendered(UpdatesPane, { bridge, settings: stored() });
     const banner = find(tree, (p) => p.banner !== undefined).props.banner as { actions: { onAction: () => void }[] };
     banner.actions[0]!.onAction();
@@ -176,7 +172,7 @@ describe("Hotkeys, Performance, Updates, Models", () => {
 
   it("a pending model offers Download and runs models_download", async () => {
     await ready((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
-    const seen = calls();
+    const seen = sentCommands(fake);
     on(rendered(ModelsGroup, { bridge }), "Download")();
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("models_download"));
     expect(renderToString(<ModelsGroup bridge={bridge} />)).toContain("Download");
