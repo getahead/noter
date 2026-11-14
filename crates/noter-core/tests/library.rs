@@ -790,11 +790,75 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
                     ("token_count", json!(3)),
                 ],
             ),
+            row(
+                "item_spans",
+                &[
+                    ("item_id", json!("itm_delete")),
+                    ("call_id", json!("call_a")),
+                    ("t0_ms", json!(0)),
+                    ("t1_ms", json!(1000)),
+                ],
+            ),
+            row(
+                "speaker_constraints",
+                &[
+                    ("id", json!("spc_delete")),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("must_link")),
+                    ("a_t0_ms", json!(0)),
+                    ("a_t1_ms", json!(100)),
+                    ("b_t0_ms", json!(200)),
+                    ("b_t1_ms", json!(300)),
+                ],
+            ),
+            row(
+                "call_participants",
+                &[
+                    ("id", json!("cp_delete")),
+                    ("call_id", json!("call_a")),
+                    ("person_id", json!("per_you")),
+                ],
+            ),
+            row(
+                "summaries",
+                &[
+                    ("id", json!("sum_delete")),
+                    ("rev", json!(1)),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("summary")),
+                    ("current_version_id", json!("sv_delete")),
+                ],
+            ),
+            row(
+                "summary_versions",
+                &[
+                    ("id", json!("sv_delete")),
+                    ("summary_id", json!("sum_delete")),
+                    ("n", json!(1)),
+                    ("kind", json!("generated")),
+                    ("body_md", json!("Secret summary needle")),
+                    ("lang", json!("en")),
+                    ("from_pass", json!("live")),
+                    ("created_at", json!(NOW)),
+                ],
+            ),
         ])
         .unwrap();
     std::fs::create_dir_all(dir.path().join("audio/call_a")).unwrap();
     std::fs::write(dir.path().join("audio/call_a/mic.m4a"), b"x").unwrap();
     std::fs::create_dir_all(dir.path().join("audio/call_b")).unwrap();
+    let indexed = Connection::open(dir.path().join("noter.db")).unwrap();
+    for (table, needle) in [("items_fts", "staging"), ("chunks_fts", "secretneedle")] {
+        let hits: u32 = indexed
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE {table} MATCH ?1"),
+                [needle],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hits, 1, "{table} fixture must be indexed before deletion");
+    }
+    drop(indexed);
     let args = CallsDeleteArgs {
         call_ids: vec![
             CallId::new("call_a"),
@@ -817,6 +881,10 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
         "gaps",
         "call_tags",
         "items",
+        "item_spans",
+        "speaker_constraints",
+        "call_participants",
+        "summaries",
         "chunks",
     ] {
         let n: u32 = c
@@ -827,6 +895,24 @@ async fn delete_removes_the_call_and_its_files_and_logs_one_change_without_conte
             )
             .unwrap();
         assert_eq!(n, 0, "{table}");
+    }
+    let versions: u32 = c
+        .query_row(
+            "SELECT count(*) FROM summary_versions WHERE summary_id = 'sum_delete'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(versions, 0, "summary_versions");
+    for (table, needle) in [("items_fts", "staging"), ("chunks_fts", "secretneedle")] {
+        let hits: u32 = c
+            .query_row(
+                &format!("SELECT count(*) FROM {table} WHERE {table} MATCH ?1"),
+                [needle],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(hits, 0, "{table} retains deleted call text");
     }
     let scrubbed: (Option<String>, Option<String>, Option<Vec<u8>>) = c
         .query_row(
