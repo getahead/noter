@@ -17,7 +17,6 @@ import { windowReady } from "./support/call-page";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
-const STDIO = process.env.NOTER_CORE === "stdio";
 const TITLE = "Backend sync"; // call_backend: Zoom, 52 min, Dmitri S., Oleg M., You, audio kept
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
 const banner = (page: Page) => page.locator('[data-region="PC-R2"], [data-region="MW-R5"]').filter({ hasText: /summary is ready/ });
@@ -81,8 +80,7 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
   test("UI — happy path: the page shows title, subtitle, the Transcript and History views, Call info docked and the stored transcript", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);
-    // the real core sends no participants yet (CallRow.participants is empty), so its subtitle ends at the length
-    await expect(toolbar(page)).toContainText(STDIO ? /52 min/ : /52 min · Dmitri S\., Oleg M\., You/);
+    await expect(toolbar(page)).toContainText(/52 min · Dmitri S\., Oleg M\., You/);
     await expect(button(page, /^Back$/)).toBeEnabled();
     await expect(toolbar(page).getByText("Transcript", { exact: true })).toBeVisible(); // the view control lists what is delivered
     await expect(toolbar(page).getByText("History", { exact: true })).toBeVisible(); // delivered by history-undo (M2)

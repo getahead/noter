@@ -38,8 +38,8 @@ describe("items_list and item_get", () => {
   it("item_get answers the item with its evidence and history, and not_found for a stranger", async () => {
     const detail = ok(await main.itemGet({ item_id: "itm_spec" }));
     expect(detail.item).toMatchObject({ id: "itm_spec", kind: "action_item", review: "accepted" });
-    expect(Array.isArray(detail.evidence)).toBe(true);
-    expect(Array.isArray(detail.history)).toBe(true);
+    expect(detail.evidence).toEqual([]);
+    expect(detail.history).toEqual([]);
     expect(refused(await main.itemGet({ item_id: "itm_nobody" })).code).toBe("not_found");
   });
 
@@ -79,8 +79,11 @@ describe("item mutations", () => {
     const result = ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] }));
     expect(result.items.length).toBeGreaterThan(0);
     expect(result.items.every((i: ItemView) => i.review === "accepted")).toBe(true);
+    const changes = ok(await main.historyList({ target: { type: "all" }, actor: "all", job_id: null, from: null, to: null, page: {} }));
+    expect(changes.rows.find((row) => row.entity.id === result.items[0].id)?.field).toBe("review_state");
     expect(result).toHaveProperty("skipped");
     expect(ok(await main.itemsReviewAll({ call_id: LIVE_CALL, kinds: [] })).items).toEqual([]);
+    expect(refused(await main.itemsReviewAll({ call_id: "call_nobody", kinds: [] })).code).toBe("not_found");
   });
 
   it("item_edit changes the text and refuses an empty one", async () => {
@@ -119,8 +122,7 @@ describe("item mutations", () => {
 describe("today_get", () => {
   it("answers the whole Today view", async () => {
     const today = ok(await main.todayGet({}));
-    for (const key of ["banners", "calendar", "date", "done_today", "due_without_call", "first_use"]) expect(today).toHaveProperty(key);
-    expect(Array.isArray(today.banners)).toBe(true);
+    expect(today).toMatchObject({ date: expect.any(String), banners: [], calendar: "granted", done_today: [], due_without_call: [], first_use: false });
   });
 });
 
@@ -154,7 +156,7 @@ describe("call_tags_set and tags_list", () => {
 describe("share_copy and calls_export", () => {
   it("share_copy answers the copy and its counts, and refuses a call that is gone", async () => {
     const done = ok(await main.shareCopy({ call_id: PAST_CALL, scope: everyone, format: "slack" }));
-    expect(done.text.length).toBeGreaterThan(0);
+    expect(done.text).toContain("Rotate the staging Jira token");
     expect(done.sections).toBeGreaterThan(0);
     expect(done).toMatchObject({ sensitive: false });
     expect(refused(await main.shareCopy({ call_id: "call_nobody", scope: everyone, format: "markdown" })).code).toBe("not_found");
