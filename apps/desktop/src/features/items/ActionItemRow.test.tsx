@@ -309,7 +309,6 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
 });
 
 describe("rowKey (flow inst-action)", () => {
-  const spy = () => ({ prevent: vi.fn() });
   it("A accepts and R rejects a suggested row; E opens the draft", async () => {
     await ready();
     const seen = sent();
@@ -413,7 +412,6 @@ describe("rowKey (flow inst-action)", () => {
     rowKey(bridge, item("itm_spec"), {}, key("KeyI", { metaKey: true }));
     expect(inspect).toHaveBeenCalledWith(bridge, "itm_spec");
   });
-  void spy;
 });
 
 describe("focusNext", () => {

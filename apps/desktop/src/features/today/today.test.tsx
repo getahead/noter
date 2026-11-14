@@ -89,7 +89,6 @@ async function open(mutate: (w: World["app"]) => void = () => {}) {
   bridge = createBridge("main", fake);
   await bridge.open();
 }
-const seen = () => sentCommands(fake);
 const setCalendar = (c: string) => () => {
   (fake.world as unknown as { today: { calendar: string } }).today.calendar = c;
 };
@@ -108,7 +107,7 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     setCalendar("not_asked")();
     await loadToday(bridge);
     expect(renderToString(<TodayPage bridge={bridge} />)).toContain("Allow Calendar Access");
-    const out = seen();
+    const out = sentCommands(fake);
     await allowCalendar(bridge);
     expect(out.map((c) => c[0])).toEqual(["permission_request", "today_get"]);
     expect(out[0]![1]).toEqual({ kind: "calendar" });
@@ -137,7 +136,7 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
   });
   it("sends Open System Settings, Record and show-call with the core's arguments", async () => {
     await open();
-    const out = seen();
+    const out = sentCommands(fake);
     await openCalendarSettings(bridge);
     await record(bridge);
     await showCall(bridge);
@@ -192,7 +191,7 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
   });
   it("loads Call Type choices when More opens before any Call page has been visited", async () => {
     await open();
-    const out = seen();
+    const out = sentCommands(fake);
     const card = { variant: "today" as const, event: fake.world.today.today[0]!, live: null };
     const tree = rendered(UpcomingCallCard, { bridge, card, expanded: true, onToggle() {} });
     await (find(tree, (p) => p.icon === "ellipsis").props.onAction as () => Promise<void>)();
@@ -237,7 +236,7 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
   });
   it("opens the previous call's Summary", async () => {
     await open();
-    const out = seen();
+    const out = sentCommands(fake);
     await showPreviousCall(bridge, "call_1");
     expect(out).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: "call_1", tab: "summary" } }]);
   });
@@ -270,7 +269,7 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
   });
   it("TD-R8 links each call with suggested items or unnamed speakers to its Summary", async () => {
     await open();
-    const out = seen();
+    const out = sentCommands(fake);
     Object.assign(today(), { first_use: false });
     await loadToday(bridge);
     const html = renderToString(<TodayPage bridge={bridge} />);
@@ -330,7 +329,7 @@ it("Today row keys tick, open typed evidence, and preserve the last focused item
   const item = fake.world.items[0]!;
   fake.world.today.due_without_call = [item];
   await loadToday(bridge);
-  const out = seen();
+  const out = sentCommands(fake);
   const tree = rendered(TodayPage, { bridge });
   const click = vi.fn();
   const focus = vi.fn();
