@@ -9,7 +9,7 @@ const none = () => {};
 describe("InlineStatus (cpt-noter-dod-ui-primitives-feedback)", () => {
   it("renders the prototype's markup: a check, the text and a status role", () => {
     const html = renderToString(<InlineStatus text="Copied" onExpire={none} />);
-    expect(html).toMatch(/^<span data-component="cpt-noter-component-ui-inline-status" data-variant="trailing" data-state="shown" class="np-istatus np-istatus--trailing" role="status"><svg/);
+    expect(html).toMatch(/^<span data-component="cpt-noter-component-ui-inline-status" data-variant="trailing" data-state="shown" class="np-istatus np-istatus--trailing"><span class="np-istatus__message" role="status" aria-label="Copied"><svg/);
     expect(html).toContain('<span class="np-istatus__text">Copied</span>');
   });
 
@@ -17,6 +17,12 @@ describe("InlineStatus (cpt-noter-dod-ui-primitives-feedback)", () => {
     expect(renderToString(<InlineStatus variant="notice" text="Saved as draft" onExpire={none} />)).toContain("np-istatus--notice");
     expect(renderToString(<InlineStatus variant="row-outcome" text="Moved to Done" actionLabel="Undo" onExpire={none} />)).toContain('class="np-link"');
     expect(renderToString(<InlineStatus variant="blind" text="Marked" kbd="⌘M" onExpire={none} />)).toContain("np-kbd");
+  });
+
+  it("keeps a row Undo link outside the live status so native accessibility can expose the action", () => {
+    const html = renderToString(<InlineStatus variant="row-outcome" text="Accepted" actionLabel="Undo" actionAriaLabel="Undo: Deploy" onExpire={none} />);
+    expect(html).toMatch(/<span class="np-istatus__message" role="status" aria-label="Accepted">[\s\S]*?<\/span><a href="#" class="np-link"/);
+    expect(html).toContain('aria-label="Undo: Deploy"');
   });
 
   it("renders nothing without text", () => {

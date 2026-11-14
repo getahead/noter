@@ -118,9 +118,10 @@ final class NativeAppMenuTests: NoterTestCase {
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_action_item() {
         let main = openMenuReviewCall()
-        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
-        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
-        let suggestion = main.staticTexts["Replay buffer for websocket reconnects"]
+        let title = "Replay buffer for websocket reconnects"
+        let rowUndo = main.links["Undo: \(title)"]
+        XCTAssertFalse(rowUndo.exists, "the fresh action row has no Undo action")
+        let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested action item is visible")
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
@@ -129,14 +130,15 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused action item")
         attachScreenshot("app-menu-edit-focused-action")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "accepting the focused action shows its row-level Undo link")
+        assertReviewedRowUndo(main: main, row: suggestion, title: title, rowUndo: rowUndo)
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_rejects_focused_decision() {
         let main = openMenuReviewCall()
-        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
-        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
-        let suggestion = main.staticTexts["Drawer events go through the notification service."]
+        let title = "Drawer events go through the notification service."
+        let rowUndo = main.links["Undo: \(title)"]
+        XCTAssertFalse(rowUndo.exists, "the fresh decision row has no Undo action")
+        let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested decision is visible")
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
@@ -145,14 +147,15 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused decision")
         attachScreenshot("app-menu-edit-focused-decision")
         app.menuItems["Reject Item"].click()
-        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "rejecting the focused decision shows its row-level Undo link")
+        assertReviewedRowUndo(main: main, row: suggestion, title: title, rowUndo: rowUndo)
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
         let main = openMenuReviewCall()
-        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
-        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
-        let suggestion = main.staticTexts["Who owns the acceptance criteria for the reconnect?"]
+        let title = "Who owns the acceptance criteria for the reconnect?"
+        let rowUndo = main.links["Undo: \(title)"]
+        XCTAssertFalse(rowUndo.exists, "the fresh question row has no Undo action")
+        let suggestion = main.staticTexts[title]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested question is visible")
         suggestion.click()
         let edit = app.menuBars.menuBarItems["Edit"]
@@ -161,7 +164,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
         attachScreenshot("app-menu-edit-focused-question")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "accepting the focused question shows its row-level Undo link")
+        assertReviewedRowUndo(main: main, row: suggestion, title: title, rowUndo: rowUndo)
     }
 
     func test_cpt_noter_dod_ui_main_window_shell_navigation__native_menu_copy_for_slack_writes_once() throws {
@@ -243,6 +246,47 @@ final class NativeAppMenuTests: NoterTestCase {
         last.click()
         XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable }, "the ready summary arrives in the main window")
         return main
+    }
+
+    private func assertReviewedRowUndo(main: XCUIElement, row: XCUIElement, title: String, rowUndo: XCUIElement) {
+        bringRowIntoView(main: main, row: row)
+        row.click()
+        let edit = app.menuBars.menuBarItems["Edit"]
+        edit.click()
+        XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && !app.menuItems["Accept Item"].isEnabled && !app.menuItems["Reject Item"].isEnabled }, "the selected reviewed item is no longer Suggested")
+        app.typeKey(.escape, modifierFlags: [])
+
+        XCTAssertTrue(waitUntil(5) { rowUndo.exists && rowUndo.isHittable }, "the selected row exposes its own accessible, hittable Undo link")
+        XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
+        let hierarchy = main.debugDescription
+        let accessibility = XCTAttachment(string: hierarchy)
+        accessibility.name = "reviewed-row-accessibility-\(title)"
+        accessibility.lifetime = .keepAlways
+        add(accessibility)
+        XCTAssertTrue(hierarchy.contains(title) && hierarchy.contains("Undo: \(title)"), "the native accessibility tree names this row's outcome and its specific Undo action")
+
+        rowUndo.click()
+        XCTAssertTrue(waitUntil(10) { !rowUndo.exists }, "activating the row Undo clears only that row outcome action")
+        bringRowIntoView(main: main, row: row)
+        row.click()
+        edit.click()
+        XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && app.menuItems["Accept Item"].isEnabled && app.menuItems["Reject Item"].isEnabled }, "row Undo restores this selected item to Suggested")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
+    private func bringRowIntoView(main: XCUIElement, row: XCUIElement) {
+        let scroll = main.scrollViews.firstMatch
+        for _ in 0..<4 where !row.isHittable {
+            if scroll.exists && scroll.isHittable {
+                if row.frame.minY < scroll.frame.minY { scroll.swipeDown() }
+                else { scroll.swipeUp() }
+            } else if row.frame.midY < main.frame.midY {
+                main.swipeDown()
+            } else {
+                main.swipeUp()
+            }
+        }
+        XCTAssertTrue(row.isHittable, "the selected item row is scrolled into view before checking its outcome actions")
     }
 
     private static func clipboardWriteCount(at path: URL) -> Int {

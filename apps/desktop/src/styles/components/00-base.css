@@ -281,6 +281,7 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-banner.is-compact .np-banner__main { flex: 1 1 0; }
 .np-banner.is-compact .np-banner__actions { width: 100%; justify-content: flex-start; padding-left: 25px; }
 .np-istatus { display: inline-flex; align-items: center; gap: 5px; color: var(--success); font-size: 12px; white-space: nowrap; max-width: 100%; }
+.np-istatus__message { display: inline-flex; align-items: center; gap: 5px; min-width: 0; }
 .np-istatus--notice { color: var(--label-2); }
 .np-istatus__text { overflow: hidden; text-overflow: ellipsis; }
 

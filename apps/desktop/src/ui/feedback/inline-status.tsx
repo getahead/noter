@@ -13,6 +13,8 @@ export interface InlineStatusProps {
   // @cpt-end:cpt-noter-flow-ui-primitives-inline-status:p1:inst-receive-status
   /** Undo on a row outcome. */
   actionLabel?: string;
+  /** A row-specific accessible name when more than one Undo action is visible. */
+  actionAriaLabel?: string;
   onAction?: () => void;
   kbd?: string;
   /** How long it shows, when the variant's time does not fit (**Accepted** 4 s on a row outcome). */
@@ -51,7 +53,7 @@ export function startStatusTimer(ms: number, cb: { current: () => void }, held: 
 
 // @cpt-flow:cpt-noter-flow-ui-primitives-inline-status:p1
 // @cpt-dod:cpt-noter-dod-ui-primitives-feedback:p1
-export function InlineStatus({ text, variant = "trailing", actionLabel, onAction, kbd, ms, onExpire }: InlineStatusProps) {
+export function InlineStatus({ text, variant = "trailing", actionLabel, actionAriaLabel, onAction, kbd, ms, onExpire }: InlineStatusProps) {
   const timer = useRef<StatusTimer | null>(null);
   const held = useRef({ hover: false, focus: false });
   const expire = useRef(onExpire);
@@ -74,12 +76,13 @@ export function InlineStatus({ text, variant = "trailing", actionLabel, onAction
       data-variant={variant}
       data-state="shown"
       className={`np-istatus np-istatus--${variant}`}
-      role="status"
       {...statusHandlers(timer, held.current, !!actionLabel)}
     >
-      <Icon name={variant === "notice" ? "info" : "check"} size={12} />
-      <span className="np-istatus__text">{text}</span>
-      {actionLabel && <Link label={actionLabel} onAction={undo} />}
+      <span className="np-istatus__message" role="status" aria-label={text}>
+        <Icon name={variant === "notice" ? "info" : "check"} size={12} />
+        <span className="np-istatus__text">{text}</span>
+      </span>
+      {actionLabel && <Link label={actionLabel} ariaLabel={actionAriaLabel} onAction={undo} />}
       {kbd && <KeyCap keys={kbd} />}
     </span>
   );

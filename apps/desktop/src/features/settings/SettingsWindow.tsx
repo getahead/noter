@@ -91,6 +91,7 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
     <div className="st-win" data-component="cpt-noter-component-screen-settings" data-variant={win.pane} data-state={kind.toLowerCase()}>
       <div className="st-body">
         <nav className="st-panes" aria-label={t("settings.panes")} data-region="ST-R1" onKeyDown={onListKey}>
+          <div className="st-titlebar-reserve" data-tauri-drag-region aria-hidden="true" />
           <SearchField placeholder={t("settings.search")} value={win.search} onChange={(text) => dispatch({ type: "search", text })} />
           {found.kind === "none" ? (
             <div className="st-nomatch" role="status">

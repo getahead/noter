@@ -181,7 +181,7 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
   const asking = completion(it, !!local.asking) === "HANDOFF_QUESTION";
 
   const outcome = local.outcome && (
-    <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
+    <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} actionAriaLabel={local.outcome.target ? `${t("items.undo")}: ${it.text}` : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
   );
   // a rejected row shows its outcome as a ghost line, then folds into the section's **Rejected (n)** list
   if (state === "REJECTED") return null;
