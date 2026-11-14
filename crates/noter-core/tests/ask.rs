@@ -1,7 +1,7 @@
 //! FEATURE cpt-noter-feature-core-retrieval-ask, slice 2: Ask threads, cited streamed answers,
 //! Stop and delete, on the real store with the scripted runtime (TL-13) and the scripted engine.
 
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc, Arc, Mutex};
 use std::time::Duration;
 
 use noter_core::{Adapters, Clock, Core, CoreDeps, EventEmitter, Scripted, LAG_LIMIT};
@@ -280,6 +280,53 @@ async fn the_handle_comes_first_then_started_deltas_citations_and_done() {
     assert!(matches!(terminal(&got), AskEvent::Done { .. }));
     assert!(w.packets()[1].contains("Earlier answer: Scripted answer [1]."));
     assert_eq!(w.thread(&handle.thread_id).await.unwrap().turns.len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn stop_after_final_answer_claim_keeps_its_citations() {
+    let w = world("").await;
+    let (at_citation_tx, at_citation_rx) = mpsc::channel();
+    let (continue_tx, continue_rx) = mpsc::channel();
+    let continue_rx = Mutex::new(continue_rx);
+    let got: Messages = Arc::default();
+    let seen = got.clone();
+    let sink = Sink::new(move |msg: AskMsg| {
+        if matches!(&msg.event, AskEvent::Citation { .. }) {
+            at_citation_tx.send(()).unwrap();
+            continue_rx.lock().unwrap().recv().unwrap();
+        }
+        seen.lock().unwrap().push(msg.event);
+        true
+    });
+    let handle = w
+        .core
+        .ask_start(
+            &main_window(),
+            AskStartArgs {
+                thread_id: None,
+                question: "What did we decide about websockets?".into(),
+                scope: AskScope::default(),
+            },
+            sink,
+        )
+        .await
+        .unwrap();
+
+    at_citation_rx
+        .recv_timeout(Duration::from_secs(5))
+        .expect("the final answer reached citation delivery");
+    let core = Arc::clone(&w.core);
+    let turn_id = handle.turn_id.clone();
+    let stop =
+        tokio::spawn(async move { core.ask_stop(&main_window(), AskTurnArgs { turn_id }).await });
+    tokio::task::yield_now().await;
+    continue_tx.send(()).unwrap();
+    stop.await.unwrap().unwrap();
+    w.settle().await;
+
+    let thread = w.thread(&handle.thread_id).await.unwrap();
+    assert!(thread.turns[0].found);
+    assert_eq!(thread.turns[0].citations.len(), 1);
 }
 
 #[tokio::test(start_paused = true)]

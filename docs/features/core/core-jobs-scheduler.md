@@ -2,7 +2,7 @@
 title: "Feature: Job scheduler and pipeline jobs"
 description: "Durable pipeline jobs with call and battery guards, progress, bounded writes and cancellation."
 status: PROPOSED
-version: "0.1"
+version: "0.2"
 date: "2026-10-18"
 milestone: M2
 lane: core
@@ -32,6 +32,7 @@ design: docs/DESIGN-core.md
   - [Bounded logged work and tests](#bounded-logged-work-and-tests)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 - [7. M2 decisions](#7-m2-decisions)
+- [8. Change log](#8-change-log)
 
 <!-- /toc -->
 
@@ -109,6 +110,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 **Success Scenarios**:
 - A new capture pauses archive and regeneration at a safe boundary, while another call's PostCall yields to live ASR and continues.
 - Continue Recording cancels the same call's pending analysis and stale completions cannot write into it.
+- A stop that arrives while the cancelled generation is still winding down queues fresh work; an on-demand Regeneration also creates a distinct run when one is already active.
 
 **Error Scenarios**:
 - The worker dies: the run records failure; a restart does not pretend an unfinished run succeeded.
@@ -226,3 +228,7 @@ The system **MUST** use logged batches of at most 200 rows, yield between them a
 - The nightly window is read in UTC hours (`"HH-HH"`, wrapping midnight); the user's time zone comes with the maintenance jobs (M5).
 - `models_download` queues one `ModelDownload` run per start (subject `download-N`); a live call holds the download (bundles show paused) and it goes on by itself when the call ends. Pausing it yourself during a call keeps it paused.
 - Power: the scheduler reads a `PowerSource` from `CoreDeps` (mains by default). The macOS battery reading arrives with 2.21 native-services; the harness answers `--power battery|ac`.
+
+## 8. Change log
+
+- 2026-11-14: Clarified that canceled work winding down does not absorb a fresh stop trigger, and a new on-demand Regeneration gets its own run.

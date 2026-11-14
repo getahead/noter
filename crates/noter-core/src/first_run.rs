@@ -769,12 +769,16 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-if-no-update
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-update-call
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-if-recording
-        if self.app().capture.phase != CapturePhase::Idle {
+        if !matches!(
+            self.app().capture.phase,
+            CapturePhase::Idle | CapturePhase::Stopped | CapturePhase::Failed
+        ) {
             // shortcut: capture (M1) installs it on the next stop from `install_pending`.
             lock(&self.first_run).install_pending = true;
             return Ok(Ack {});
         }
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-if-recording
+        self.take_pending_update();
         // Install first: a failed install leaves the core running. Then shut down in order
         // and relaunch into the new version.
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-install
@@ -785,5 +789,10 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-first-run-update:p2:inst-return-update
         Ok(Ack {})
         // @cpt-end:cpt-noter-flow-core-first-run-update:p2:inst-return-update
+    }
+
+    pub(crate) fn take_pending_update(&self) -> bool {
+        let mut first_run = lock(&self.first_run);
+        std::mem::take(&mut first_run.install_pending)
     }
 }

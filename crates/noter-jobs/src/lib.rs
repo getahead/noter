@@ -246,7 +246,7 @@ impl Scheduler {
             return Ok(None);
         }
         // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-trigger
-        let id = self.0.enqueue(&def, req.subject)?;
+        let id = self.0.enqueue(&def, req.subject, req.trigger)?;
         self.0.apply();
         // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-return
         Ok(Some(id))
@@ -369,7 +369,7 @@ impl Inner {
         }
         for (kind, subject) in retries {
             if let Some(def) = defs.iter().find(|d| d.kind == kind && d.enabled) {
-                self.enqueue(def, subject)?;
+                self.enqueue(def, subject, def.trigger)?;
             }
         }
         Ok(())
@@ -390,7 +390,7 @@ impl Inner {
                 _ => 0,
             };
             if def.last_run_at.map_or(true, |last| now - last >= gap) {
-                self.enqueue(&def, None)?;
+                self.enqueue(&def, None, def.trigger)?;
             }
         }
         Ok(())
@@ -402,13 +402,23 @@ impl Inner {
     }
 
     // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-enqueue
-    fn enqueue(&self, def: &Def, subject: Option<String>) -> Result<JobRunId, CoreError> {
+    fn enqueue(
+        &self,
+        def: &Def,
+        subject: Option<String>,
+        trigger: Trigger,
+    ) -> Result<JobRunId, CoreError> {
         let now = self.deps.clock.now();
         let row = {
             let mut open = lock(&self.open);
-            let same = open
-                .values()
-                .find(|e| e.row.kind == def.kind && e.subject == subject);
+            let same = open.values().find(|e| {
+                !e.cancel
+                    && e.row.kind == def.kind
+                    && e.subject == subject
+                    && (e.row.status == JobRunStatus::Queued
+                        || trigger != Trigger::OnDemand
+                        || def.kind != JobKind::Regeneration)
+            });
             if let Some(e) = same {
                 return Ok(e.row.id.clone());
             }

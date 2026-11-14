@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use noter_core::{
     detection, BoxFuture, Clock, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices,
@@ -575,6 +576,57 @@ async fn update_install_needs_a_ready_update() {
         *s.updater.relaunched.lock().unwrap(),
         "relaunched after the in-order shutdown"
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn update_install_requested_during_recording_runs_after_capture_stops() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    *s.updater.ready.lock().unwrap() = Some(UpdateInfo {
+        version: "1.0.1".into(),
+        notes_md: "Fixes.".into(),
+        ready: true,
+    });
+    let ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let mut capture = s.core.app_snapshot(&ctx, NoArgs {}).await.unwrap().capture;
+    capture.phase = CapturePhase::Recording;
+    capture.call_id = Some(CallId::new("call_pending_update"));
+    noter_core::testing::seed_capture(&s.core, capture)
+        .await
+        .unwrap();
+
+    s.core.update_install(&ctx, NoArgs {}).await.unwrap();
+    assert_eq!(*s.updater.installs.lock().unwrap(), 0);
+
+    s.core
+        .capture_stop(
+            &ctx,
+            CallIdArgs {
+                call_id: CallId::new("call_pending_update"),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(*s.updater.installs.lock().unwrap(), 0);
+    assert_eq!(
+        s.core
+            .app_snapshot(&ctx, NoArgs {})
+            .await
+            .unwrap()
+            .capture
+            .phase,
+        CapturePhase::Stopped
+    );
+    tokio::time::advance(Duration::from_secs(5 * 60)).await;
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    assert_eq!(*s.updater.installs.lock().unwrap(), 1);
+    assert!(*s.updater.relaunched.lock().unwrap());
 }
 
 /// R25: a whole-state kind has one version, shared by its snapshot slice and its events.

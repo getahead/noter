@@ -654,6 +654,10 @@ impl Core {
                 // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-idle
                 // @cpt-end:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-continue
             }
+            drop(session);
+            if same {
+                core.finish_pending_update().await;
+            }
         });
     }
 

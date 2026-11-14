@@ -2,7 +2,7 @@
 title: "Feature: Retrieval, search, Ask and topics"
 description: "Shared hybrid retrieval, sectioned search, cited Ask threads and topic threads across calls."
 status: PROPOSED
-version: "0.2"
+version: "0.3"
 date: "2026-11-13"
 milestone: M3
 lane: core
@@ -38,6 +38,7 @@ design: docs/DESIGN-core.md
   - [Topics and undoable edits](#topics-and-undoable-edits)
   - [Retrieval evaluation and harness](#retrieval-evaluation-and-harness)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
+- [7. Change log](#7-change-log)
 
 <!-- /toc -->
 
@@ -149,6 +150,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 **Success Scenarios**:
 - Stop cancels the active turn; recent threads reopen with their turns in order.
+- The answer's final write and Stop claim the turn once: either the complete cited answer is stored, or the stopped partial answer is stored, never a mixture.
 - A deleted source is shown as deleted in an old citation; asking again retrieves only current evidence.
 
 **Error Scenarios**:
@@ -357,3 +359,7 @@ Owner item (Backend Teamlead TL-35): the golden sets and the two performance sce
 - [x] Stop, timeout, lag and thread deletion release work and subscriptions; late output cannot recreate deleted rows or emit a second terminal result (stop, deletion and lag in the real-core story; the 60 s deadline in noter-core tests/ask.rs on paused time, because the deadline is a timer and `harness.advance_clock` moves only the clock).
 - [x] Each of the twelve frozen commands succeeds at least once in real-core E2E runs; stale renames and failed merge transactions change nothing.
 - [ ] Both retrieval performance scenarios and citation evaluations pass; `just gate-fast` and `just gate` pass.
+
+## 7. Change log
+
+- 2026-11-14: Clarified that Ask Stop and final answer persistence settle the turn atomically.
