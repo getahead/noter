@@ -18,7 +18,7 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertEqual(main.frame, originalFrame, "reopening should preserve the window frame")
     }
 
-    func test_menu_mark_closes_then_pause_resume_stop_continue() {
+    func test_cpt_noter_seq_menu_bar_control_recording__mark_pause_resume_stop_continue() {
         launch("idle")
         startRecording()
         let main = window("Noter")
