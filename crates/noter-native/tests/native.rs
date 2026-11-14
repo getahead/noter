@@ -196,7 +196,7 @@ fn watch_reports_a_change_and_stops_when_dropped() {
     drop(w);
     assert!(matches!(
         rx.try_recv(),
-        Err(std::sync::mpsc::TryRecvError::Empty)
+        Err(std::sync::mpsc::TryRecvError::Disconnected)
     ));
 }
 

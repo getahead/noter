@@ -65,7 +65,7 @@ export function PermissionCheckRow({ id, label, allowLabel, state, variant = "se
         </div>
         {variant !== "status" && why && <div className="fr-perm__why">{why}</div>}
         {variant !== "status" && howto && state !== "GRANTED" && <div className="fr-perm__how">{howto}</div>}
-        {variant !== "status" && (hearing || id === "mic") && (
+        {variant !== "status" && (hearing || (id === "mic" && state === "GRANTED")) && (
           <span className="fr-perm__meter">
             {hearing ? (
               <>
