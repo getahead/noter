@@ -867,7 +867,12 @@ async fn copy_puts_the_markdown_on_the_clipboard_and_records_the_edited_version(
 
     // The clipboard refuses: nothing counts as used.
     *w.ops.clipboard_fails.lock().unwrap() = true;
-    assert!(w.core.handoff_copy(&ctx(), id("itm_anna")).await.is_err());
+    let refused = w
+        .core
+        .handoff_copy(&ctx(), id("itm_anna"))
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::Internal);
     assert_eq!(w.item_row("itm_anna").0, "open");
     *w.ops.clipboard_fails.lock().unwrap() = false;
 

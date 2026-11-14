@@ -2,6 +2,8 @@
 //! `noter_core::Core` through its own write path, behind scripted platform seams, and the
 //! scenario controls of docs/TEST-PLAN.md (W12–W15) work against it.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -17,9 +19,10 @@ use tokio::task::JoinHandle;
 struct Runner {
     input: DuplexStream,
     output: LineReader<BufReader<DuplexStream>>,
-    served: JoinHandle<std::io::Result<()>>,
+    served: Option<JoinHandle<std::io::Result<()>>>,
     next: u64,
     core: Arc<Core>,
+    data_dir: PathBuf,
 }
 
 async fn start() -> Runner {
@@ -40,13 +43,17 @@ async fn start_with(options: Options) -> Runner {
         .expect("the harness boots on the fixture world");
     let core = harness.core();
     let served = tokio::spawn(serve_with(core.clone(), harness, core_in, out));
-    Runner {
+    let mut runner = Runner {
         input,
         output: BufReader::new(output).lines(),
-        served,
+        served: Some(served),
         next: 1,
         core,
-    }
+        data_dir: PathBuf::new(),
+    };
+    let data = runner.ok("main", "harness.data_dir", json!({})).await;
+    runner.data_dir = PathBuf::from(data["path"].as_str().unwrap());
+    runner
 }
 
 impl Runner {
@@ -114,9 +121,17 @@ impl Runner {
 
     async fn finish(mut self) {
         self.input.shutdown().await.unwrap();
-        drop(self.input);
         while self.output.next_line().await.unwrap().is_some() {}
-        self.served.await.unwrap().unwrap();
+        self.served.take().unwrap().await.unwrap().unwrap();
+    }
+}
+
+impl Drop for Runner {
+    fn drop(&mut self) {
+        if let Some(served) = self.served.take() {
+            served.abort();
+        }
+        let _ = std::fs::remove_dir_all(&self.data_dir);
     }
 }
 
@@ -605,15 +620,13 @@ async fn hold_next_download_stops_at_the_fraction_until_released() {
     .await;
     r.ok("first-run", "models_download", json!({ "action": "start" }))
         .await;
-    let held = until_speech(&mut r, |m| m["done_mb"].as_u64().unwrap_or(0) >= 1).await;
+    let held = until_speech(&mut r, |m| {
+        m["done_mb"].as_u64().unwrap_or(0) >= m["size_mb"].as_u64().unwrap_or(u64::MAX) / 2
+    })
+    .await;
     assert_eq!(held["state"], "downloading", "{held}");
     assert!(held["done_mb"].as_u64().unwrap() < held["size_mb"].as_u64().unwrap());
-    tokio::time::sleep(Duration::from_millis(700)).await;
-    assert_eq!(
-        speech_model(&mut r).await["state"],
-        "downloading",
-        "still held"
-    );
+    assert_eq!(held["done_mb"], held["size_mb"].as_u64().unwrap() / 2);
     r.ok("main", "harness.release_download", json!({})).await;
     let done = until_speech(&mut r, |m| m["state"] == "ready").await;
     assert_eq!(done["done_mb"], done["size_mb"]);
@@ -683,6 +696,64 @@ async fn an_allowed_notifications_prompt_shows_in_the_environment() {
         r.ok("main", "app_snapshot", json!({})).await["environment"]["notifications"],
         "authorized"
     );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_native_permission_failure_reaches_the_core_as_permission_denied() {
+    let mut r = start().await;
+    r.ok(
+        "main",
+        "harness.native_fail",
+        json!({ "op": "permission_request", "code": "permission_denied" }),
+    )
+    .await;
+    assert_eq!(
+        r.code(
+            "settings",
+            "permission_request",
+            json!({ "kind": "notifications" }),
+        )
+        .await,
+        "permission_denied"
+    );
+    let environment = r.ok("main", "app_snapshot", json!({})).await["environment"].clone();
+    assert_eq!(environment["notifications"], "denied");
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn a_native_login_item_failure_is_logged_and_the_core_keeps_serving() {
+    let mut r = start().await;
+    r.ok(
+        "main",
+        "harness.native_fail",
+        json!({ "op": "set_login_item", "code": "offline" }),
+    )
+    .await;
+    let settings = r.ok("settings", "settings_get", json!({})).await;
+    let mut general = settings["general"].clone();
+    general["launch_at_login"] = json!(true);
+    r.ok(
+        "settings",
+        "settings_update",
+        json!({ "rev": settings["rev"], "section": { "section": "general", "value": general } }),
+    )
+    .await;
+    let data = r.ok("main", "harness.data_dir", json!({})).await;
+    let log = std::fs::read_to_string(
+        std::path::PathBuf::from(data["path"].as_str().unwrap()).join("logs/noter.log"),
+    )
+    .unwrap();
+    assert!(
+        log.lines().any(|line| {
+            let row: Value = serde_json::from_str(line).unwrap();
+            row["level"] == "warn" && row["module"] == "first_run"
+        }),
+        "the core logs the typed native failure: {log}"
+    );
+    let snapshot = r.ok("main", "app_snapshot", json!({})).await;
+    assert!(snapshot["contract_version"].is_string(), "{snapshot}");
     r.finish().await;
 }
 
@@ -794,12 +865,37 @@ async fn update_install_answers_and_the_harness_keeps_serving() {
     world["app"]["banners"]["banners"] = json!([{ "type": "update_ready", "version": "1.0.1" }]);
     r.ok("main", "harness.world_set", json!({ "world": world }))
         .await;
+    let capture = r.ok("main", "app_snapshot", json!({})).await["capture"].clone();
+    if capture["call_id"].is_string() {
+        let stop = r
+            .call(
+                "main",
+                "capture_stop",
+                json!({ "call_id": capture["call_id"] }),
+            )
+            .await
+            .0;
+        assert!(stop.get("ok").is_some(), "{stop}");
+    }
     assert_eq!(
         r.ok("main", "app_snapshot", json!({})).await["banners"]["banners"][0]["type"],
         "update_ready"
     );
-    r.ok("settings", "update_install", json!({})).await;
-    r.ok("main", "app_snapshot", json!({})).await;
+    r.ok(
+        "main",
+        "harness.native_fail",
+        json!({ "op": "updater_install", "code": "offline" }),
+    )
+    .await;
+    assert_eq!(
+        r.code("settings", "update_install", json!({})).await,
+        "offline"
+    );
+    assert_eq!(
+        r.ok("main", "app_snapshot", json!({})).await["banners"]["banners"][0]["type"],
+        "update_ready",
+        "a failed updater leaves the harness core serving with its update ready"
+    );
     r.finish().await;
 }
 
@@ -862,6 +958,18 @@ async fn data_dir_names_the_folder_the_running_core_keeps_its_database_in() {
     r.finish().await;
 }
 
+#[tokio::test]
+async fn dropping_a_runner_removes_its_harness_data_directory() {
+    let r = start().await;
+    let path = r.data_dir.clone();
+    assert!(path.join("noter.db").is_file(), "{path:?}");
+    drop(r);
+    assert!(
+        !path.exists(),
+        "Runner leaked its harness directory: {path:?}"
+    );
+}
+
 // W15
 #[tokio::test]
 async fn push_reaches_the_running_self_test_as_an_engine_fact() {
@@ -874,8 +982,7 @@ async fn push_reaches_the_running_self_test_as_an_engine_fact() {
         .write_all(format!("{req}\n").as_bytes())
         .await
         .unwrap();
-    // Manual events must still control the result after the normal 1.5 s script finishes.
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // The held script cannot report its own result, so this injected event controls the outcome.
     let push = r
         .call(
             "main",
@@ -1312,6 +1419,81 @@ async fn world_set_puts_todays_events_in_the_calendar_the_core_reads() {
 }
 
 #[tokio::test]
+async fn capture_start_uses_overlapping_calendar_attendees_as_participants() {
+    let mut r = start().await;
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let now = world["now"].as_i64().unwrap();
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = Value::Null;
+    world["today"]["today"] = json!([{
+        "event_id": "evt_overlap",
+        "title": "Seeded overlapping meeting",
+        "starts_at": now - 60_000,
+        "ends_at": now + 60_000,
+        "platform": "zoom",
+        "sensitive": false,
+        "call_id": null,
+        "last_time": null,
+        "items": [],
+        "questions": [],
+        "handed_off": [],
+        "open_count": 0,
+        "attendees": [{ "person": null, "name": "Dmitri S.", "email": "dmitris@example.com" }]
+    }]);
+    world["today"]["this_week"] = json!([]);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    let today = r.ok("main", "today_get", json!({})).await;
+    assert!(
+        today["today"].as_array().unwrap().iter().any(|event| {
+            event["event_id"] == "evt_overlap" && event["starts_at"] == now - 60_000
+        }),
+        "{today}"
+    );
+
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({ "source": "today", "sensitive": false }),
+        )
+        .await;
+    let call_id = started["call_id"].as_str().expect("started call id");
+    let mut segment =
+        r.ok("main", "harness.world_get", json!({})).await["transcripts"][0]["segments"][0].clone();
+    segment["call_id"] = json!(call_id);
+    segment["id"] = json!("seg_calendar_attendee");
+    segment["state"] = json!("confirmed");
+    let pushed = r
+        .call(
+            "main",
+            "harness.push",
+            json!({
+                "cmd": "transcript_subscribe",
+                "body": { "event": { "type": "confirmed", "segment": segment } }
+            }),
+        )
+        .await
+        .0;
+    assert!(pushed.get("ok").is_some(), "{pushed}");
+    let participants: Vec<String> = r
+        .core
+        .store()
+        .read(|c| {
+            let mut q = c.prepare(
+                "SELECT person_id FROM call_participants WHERE call_id = ?1 ORDER BY person_id",
+            )?;
+            let rows = q.query_map([call_id], |row| row.get(0))?.collect();
+            rows
+        })
+        .unwrap();
+    assert_eq!(participants, ["per_dmitri"]);
+    r.ok("main", "capture_stop", json!({ "call_id": call_id }))
+        .await;
+    r.finish().await;
+}
+
+#[tokio::test]
 async fn an_edited_section_is_seeded_with_the_users_edit_as_its_current_version() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
@@ -1671,6 +1853,50 @@ async fn the_fixture_calls_are_seeded_as_capture_rows() {
         .sum();
     assert!(segments > 0);
     assert_eq!(count("segments"), segments);
+    let expected: HashMap<String, (String, String)> = world["transcripts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|transcript| {
+            let call_id = transcript["call_id"].as_str().unwrap().to_owned();
+            transcript["segments"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(move |segment| {
+                    (
+                        segment["id"].as_str().unwrap().to_owned(),
+                        (
+                            call_id.clone(),
+                            segment["speaker"]["speaker_id"]
+                                .as_str()
+                                .unwrap()
+                                .to_owned(),
+                        ),
+                    )
+                })
+        })
+        .collect();
+    let actual: HashMap<String, (String, String)> = harness
+        .core()
+        .store()
+        .read(|c| {
+            let mut stmt = c.prepare("SELECT id, call_id, speaker_id FROM segments")?;
+            let rows = stmt
+                .query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        (row.get::<_, String>(1)?, row.get::<_, String>(2)?),
+                    ))
+                })?
+                .collect::<Result<_, _>>();
+            rows
+        })
+        .unwrap();
+    assert_eq!(
+        actual, expected,
+        "each segment keeps its fixture call and speaker"
+    );
     let changes: i64 = harness
         .core()
         .store()

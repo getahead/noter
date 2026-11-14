@@ -63,8 +63,10 @@ struct Bundles {
     drop_after: Mutex<HashMap<String, usize>>,
     /// Every fetch, as (`<bundle>/<path>`, from_byte).
     fetches: Mutex<Vec<(String, u64)>>,
-    /// Every fetch waits at its start while this is set.
+    /// When no hold offset is set, every fetch waits at its start while this is set.
     hold: std::sync::atomic::AtomicBool,
+    /// A held fetch serves these bytes before waiting for `hold` to clear.
+    hold_after: Mutex<Option<usize>>,
 }
 
 const CHUNK: usize = 64;
@@ -135,12 +137,20 @@ impl ModelSource for Bundles {
             // `https://<host>/<bundle>/<path>` → `<bundle>/<path>`
             let key = file.url.splitn(4, '/').nth(3).unwrap().to_string();
             self.fetches.lock().unwrap().push((key.clone(), from_byte));
-            while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
-                tokio::time::sleep(Duration::from_millis(1)).await;
+            let hold_after = *self.hold_after.lock().unwrap();
+            if hold_after.is_none() {
+                while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
             }
             let data = &self.content[&key][from_byte as usize..];
             let drop_after = self.drop_after.lock().unwrap().remove(&key);
             for (i, part) in data.chunks(CHUNK).enumerate() {
+                if hold_after.is_some_and(|n| i * CHUNK >= n) {
+                    while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
+                        tokio::time::sleep(Duration::from_millis(1)).await;
+                    }
+                }
                 if drop_after.is_some_and(|n| i * CHUNK >= n) {
                     return Err(FetchError::Offline);
                 }
@@ -434,13 +444,31 @@ async fn pause_stops_the_download_and_keeps_the_partial_file() {
     let big = vec![5u8; 64 * 4000];
     let source = Bundles::default().with("whisper-turbo", &big, "huggingface.co", &big, true);
     let s = open(dir.path(), source, 90_000);
+    let partial = dir
+        .path()
+        .join("models/whisper-turbo.partial/model.bin.part");
+    let chunked = 3 * CHUNK;
+    *s.source.hold_after.lock().unwrap() = Some(chunked);
+    s.source
+        .hold
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     download(&s.core, DownloadAction::Start).await.unwrap();
-    let paused = download(&s.core, DownloadAction::Pause).await.unwrap();
-    assert_ne!(state(&paused, "whisper-turbo"), BundleState::Ready);
+    for _ in 0..500 {
+        if std::fs::metadata(&partial).map(|m| m.len()).unwrap_or(0) >= chunked as u64 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(std::fs::metadata(&partial).unwrap().len(), chunked as u64);
+    download(&s.core, DownloadAction::Pause).await.unwrap();
+    s.source
+        .hold
+        .store(false, std::sync::atomic::Ordering::SeqCst);
     until(&s.core, "paused", |st| {
         state(st, "whisper-turbo") == BundleState::Paused
     })
     .await;
+    assert_eq!(std::fs::metadata(&partial).unwrap().len(), chunked as u64);
     download(&s.core, DownloadAction::Resume).await.unwrap();
     until(&s.core, "ready", |st| {
         state(st, "whisper-turbo") == BundleState::Ready
@@ -450,6 +478,16 @@ async fn pause_stops_the_download_and_keeps_the_partial_file() {
         std::fs::read(dir.path().join("models/whisper-turbo/model.bin")).unwrap(),
         big
     );
+    let fetches: Vec<_> = s
+        .source
+        .fetches
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(name, _)| name == "whisper-turbo/model.bin")
+        .map(|(_, offset)| *offset)
+        .collect();
+    assert_eq!(fetches, [0, chunked as u64]);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

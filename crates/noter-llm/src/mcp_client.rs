@@ -46,6 +46,8 @@ pub type Audit<'a> = &'a (dyn Fn(&str, &[u8]) -> bool + Send + Sync);
 pub enum McpClientError {
     /// The user refused or never finished the sign-in.
     Cancelled,
+    /// The OAuth server explicitly refused authorization (`error=access_denied`).
+    AccessDenied,
     /// The server or its authorization server cannot be reached.
     Offline,
     /// The token was rejected and could not be refreshed: sign in again.
@@ -56,7 +58,7 @@ pub enum McpClientError {
     Unaudited,
 }
 
-use McpClientError::{Cancelled, Invalid, Offline, Unaudited, Unauthorized};
+use McpClientError::{AccessDenied, Cancelled, Invalid, Offline, Unaudited, Unauthorized};
 
 /// One request to an indexed server, with the token [`McpClient::sign_in`] returned.
 pub struct Call<'a> {
@@ -737,19 +739,26 @@ async fn redirected(listener: &TcpListener, state: &str) -> Result<String, McpCl
         };
         let ours = url.as_ref().is_some_and(|u| u.path() == "/callback")
             && param("state").as_deref() == Some(state);
-        let (status, text, outcome) = match (ours, param("code")) {
-            (false, _) => ("404 Not Found", "Not found.", None),
-            (true, Some(code)) => (
+        // @cpt-begin:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
+        let (status, text, outcome) = match (ours, param("error"), param("code")) {
+            (false, _, _) => ("404 Not Found", "Not found.", None),
+            (true, Some(error), _) if error == "access_denied" => (
+                "200 OK",
+                "The sign-in was not completed. You can close this window.",
+                Some(Err(AccessDenied)),
+            ),
+            (true, _, Some(code)) => (
                 "200 OK",
                 "Signed in. You can close this window and return to Noter.",
                 Some(Ok(code)),
             ),
-            (true, None) => (
+            (true, _, None) => (
                 "200 OK",
                 "The sign-in was not completed. You can close this window.",
                 Some(Err(Cancelled)),
             ),
         };
+        // @cpt-end:cpt-noter-flow-core-knowledge-mcp:p1:inst-mcp-oauth
         let reply = format!(
             "HTTP/1.1 {status}\r\nContent-Type: text/plain; charset=utf-8\r\n\
              Content-Length: {}\r\nConnection: close\r\n\r\n{text}",

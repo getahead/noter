@@ -6,8 +6,6 @@
 import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AccountProvider, AccountsView, AuditEntry, ExportResult, KeyProvider, Page, RuntimeChoice, SignInProgress } from "../../src/core/bindings";
@@ -15,6 +13,7 @@ import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { idle } from "../support/world-presets";
+import { rows, wire } from "./history-support";
 
 const KEY = "sk-story-key-aaaaaaaaaaaaaaaa";
 const BAD = "sk-story-bad-bbbbbbbbbbbbbbbb";
@@ -44,24 +43,13 @@ function open(script: string[] = [], setup?: (w: Parameters<typeof idle>[0]) => 
 }
 
 /** The scenario's harness: controls are requests on the same wire. */
-const harness = () => (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process;
-const control = (name: string, args: unknown = {}) => harness().invoke("main", `harness.${name}`, args);
+const control = (name: string, args: unknown = {}) => wire(s).invoke("main", `harness.${name}`, args);
 const cli = (tool: string, fields: Record<string, unknown> = {}) => control("account_cli", { tool, installed: true, path: `/bin/${tool}`, version: "2.1.296", ...fields });
 const claudeCli = (login: Record<string, unknown> = {}, plan = ANN.plan) =>
   cli("claude_code", { login_identity: { ...ANN, plan }, login: { code: CODE, ...login } });
 const codexCli = (login: Record<string, unknown> = {}, plan = BOB.plan) =>
   cli("codex", { version: "0.163.0", login_identity: { ...BOB, plan }, login: { url: "https://chatgpt.com/device", ...login } });
 
-/** Rows of the real core's database, read-only. */
-async function rows<T>(sql: string, ...params: string[]): Promise<T[]> {
-  const { path } = (await control("data_dir")) as { path: string };
-  const db = new DatabaseSync(join(path, "noter.db"), { readOnly: true });
-  try {
-    return db.prepare(sql).all(...params) as T[];
-  } finally {
-    db.close();
-  }
-}
 /** Stable snapshot of every file below the harness data directory, including logs and exports. */
 function dataFiles(root: string): Array<{ path: string; size: number; mtimeMs: number; ino: number }> {
   const files: Array<{ path: string; size: number; mtimeMs: number; ino: number }> = [];
@@ -271,7 +259,7 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     const free = await signIn("chatgpt");
     expect((await ended(free.steps)).error).toBe("plan_not_eligible");
     expect(await accounts()).toMatchObject({ accounts: before.accounts, keys: before.keys });
-    expect(await rows("SELECT value FROM settings WHERE key = 'accounts'")).toEqual([]);
+    expect(await rows(s, "SELECT value FROM settings WHERE key = 'accounts'")).toEqual([]);
   });
 
   it("use an existing sign-in, test it, bind and Undo, install the CLI; sign out falls back to the key runtime", async () => {
@@ -285,7 +273,7 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     // The test request reports ok and its latency.
     expect(ok(await s.core("settings").accountTest({ provider: "chatgpt" }))).toMatchObject({ ok: true, error: null });
     // Bind: the preference is one undoable change; Undo restores it. Agent ids need core-agents (M4).
-    const preference = async () => JSON.stringify(await rows("SELECT value FROM settings WHERE key = 'accounts'"));
+    const preference = async () => JSON.stringify(await rows(s, "SELECT value FROM settings WHERE key = 'accounts'"));
     const unbound = await preference();
     const bound = ok(await s.core("settings").accountBindAgents({ provider: "chatgpt", agent_ids: [], default_for_new_agents: true }));
     expect(bound.change_id).toBeTruthy();

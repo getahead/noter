@@ -163,6 +163,17 @@ async fn removing_a_key_empties_the_keychain_and_the_runtime_loses_it() {
     assert_eq!(key(&view, KeyProvider::Anthropic), KeyStatus::NotSet);
     assert!(view.version > before.version);
     assert!(w.secrets.get("anthropic").unwrap().is_none());
+    let anthropic = w
+        .core
+        .llm()
+        .availability()
+        .into_iter()
+        .find(|runtime| runtime.runtime == RuntimeChoice::ClaudeApiKey)
+        .expect("Anthropic API-key runtime is listed");
+    assert!(
+        anthropic.unavailable.is_some(),
+        "removing the key also makes its runtime unavailable"
+    );
     let statuses = w.events.key_statuses("anthropic");
     assert_eq!(statuses.last().map(String::as_str), Some("not_set"));
     // The next read agrees; the removal went through the change-log writer, not undoable.
@@ -273,16 +284,32 @@ fn list(from: Option<i64>, to: Option<i64>, cursor: Option<&str>, limit: u32) ->
 async fn the_audit_pages_in_time_order_inside_the_date_range() {
     let dir = tempfile::tempdir().unwrap();
     let w = open(dir.path(), None);
-    for ts in [1_000, 2_000, 3_000, 4_000, 5_000] {
+    for ts in [1_000, 1_000, 1_000, 2_000, 2_000] {
         run_at(&w, ts).await;
     }
+    let all = w
+        .core
+        .audit_list(&settings(), list(None, None, None, 10))
+        .await
+        .unwrap();
+    assert_eq!(
+        all.rows.iter().map(|r| r.at.0).collect::<Vec<_>>(),
+        [1_000, 1_000, 1_000, 2_000, 2_000]
+    );
+    assert!(all.rows.windows(2).all(|pair| {
+        pair[0].at < pair[1].at || (pair[0].at == pair[1].at && pair[0].id <= pair[1].id)
+    }));
     let page = w
         .core
         .audit_list(&settings(), list(None, None, None, 2))
         .await
         .unwrap();
     let at: Vec<i64> = page.rows.iter().map(|r| r.at.0).collect();
-    assert_eq!(at, [1_000, 2_000]);
+    assert_eq!(at, [1_000, 1_000]);
+    assert_eq!(
+        page.rows.iter().map(|r| &r.id).collect::<Vec<_>>(),
+        all.rows[..2].iter().map(|r| &r.id).collect::<Vec<_>>()
+    );
     let first = &page.rows[0];
     assert_eq!(first.kind, AuditKind::Run);
     assert!(first.llm_run_id.is_some());
@@ -299,15 +326,22 @@ async fn the_audit_pages_in_time_order_inside_the_date_range() {
         .await
         .unwrap();
     let at: Vec<i64> = rest.rows.iter().map(|r| r.at.0).collect();
-    assert_eq!(at, [3_000, 4_000, 5_000]);
+    assert_eq!(at, [1_000, 2_000, 2_000]);
+    assert_eq!(
+        rest.rows.iter().map(|r| &r.id).collect::<Vec<_>>(),
+        all.rows[2..].iter().map(|r| &r.id).collect::<Vec<_>>()
+    );
     assert!(rest.next_cursor.is_none());
     // The range is inclusive on both ends; an empty range is an empty page, not an error.
     let range = w
         .core
-        .audit_list(&settings(), list(Some(2_000), Some(4_000), None, 10))
+        .audit_list(&settings(), list(Some(1_000), Some(2_000), None, 10))
         .await
         .unwrap();
-    assert_eq!(range.rows.len(), 3);
+    assert_eq!(
+        range.rows.iter().map(|r| &r.id).collect::<Vec<_>>(),
+        all.rows.iter().map(|r| &r.id).collect::<Vec<_>>()
+    );
     let none = w
         .core
         .audit_list(&settings(), list(Some(9_000), None, None, 10))

@@ -14,17 +14,17 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#392](https://github.com/getahead/noter/issues/392) | First-run self-test lifecycle (E2E, visual) | 83 / 33 | [#423](https://github.com/getahead/noter/pull/423) | closed |
 | [#398](https://github.com/getahead/noter/issues/398) | Call-page navigation, missing-call Back | 36 / 4 | [#430](https://github.com/getahead/noter/pull/430) | closed |
 | [#396](https://github.com/getahead/noter/issues/396) | Native menu and record prompt | 33 / 14 | #558 and [#809](https://github.com/getahead/noter/pull/809) | closed |
-| [#399](https://github.com/getahead/noter/issues/399) | Live and stored transcript navigation, replay | 31 / 3 | none yet | closed |
-| [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | none yet | closed |
+| [#399](https://github.com/getahead/noter/issues/399) | Live and stored transcript navigation, replay | 31 / 3 | [#430](https://github.com/getahead/noter/pull/430) | closed |
+| [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | [#434](https://github.com/getahead/noter/pull/434) | closed |
 | [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#431](https://github.com/getahead/noter/pull/431), [#558](https://github.com/getahead/noter/pull/558), [#809](https://github.com/getahead/noter/pull/809) | closed |
 | [#562](https://github.com/getahead/noter/issues/562) | WebView recovery test initial-load timeout | 2 / 0 | [#809](https://github.com/getahead/noter/pull/809) | closed |
 | [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | closed |
-| [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | none yet | closed |
+| [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | [#451](https://github.com/getahead/noter/pull/451), [#458](https://github.com/getahead/noter/pull/458) | closed |
 | [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | closed |
-| [#438](https://github.com/getahead/noter/issues/438) | Undo on Rejected reads `lastChange` before `item_review` lands (`m2-items-ui.spec.ts`) | 1 / 0 | none yet | closed |
+| [#438](https://github.com/getahead/noter/issues/438) | Undo on Rejected reads `lastChange` before `item_review` lands (`m2-items-ui.spec.ts`) | 1 / 0 | [#440](https://github.com/getahead/noter/pull/440) | closed |
 | [#395](https://github.com/getahead/noter/issues/395) | MCP token revocation after closing a run | 1 / 1 | [#442](https://github.com/getahead/noter/pull/442) | closed |
 | [#414](https://github.com/getahead/noter/issues/414) | Knowledge token-revocation event count | local | [#457](https://github.com/getahead/noter/pull/457) | closed |
-| [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | none yet | closed |
+| [#418](https://github.com/getahead/noter/issues/418) | Independent account sign-in progress ordering | local | [#446](https://github.com/getahead/noter/pull/446) | closed |
 | [#669](https://github.com/getahead/noter/issues/669) | Sign-in deadline tests racing scripted CLI delays | local | [#809](https://github.com/getahead/noter/pull/809) | closed |
 | [#402](https://github.com/getahead/noter/issues/402) | Calls loading skeleton screenshot | 10 / 2 | [#227](https://github.com/getahead/noter/pull/227) | closed |
 | [#403](https://github.com/getahead/noter/issues/403) | Outputs load and command-log races | 14 / 2 | [#377](https://github.com/getahead/noter/pull/377) | closed |
@@ -40,7 +40,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#406](https://github.com/getahead/noter/issues/406) | Duplicate native delete-dialog tests | about 8s | [#424](https://github.com/getahead/noter/pull/424) | closed |
 | [#407](https://github.com/getahead/noter/issues/407) | 10 s feedback expiry waited in real time | 13-14s each | [#428](https://github.com/getahead/noter/pull/428) | closed |
 | [#410](https://github.com/getahead/noter/issues/410) | Blanket 4 s fake-command latency in screenshots | 5.5-6.6s per case | [#427](https://github.com/getahead/noter/pull/427) | closed |
-| [#408](https://github.com/getahead/noter/issues/408) | All-command probe, fresh real core per command | 53.6s | none yet | closed |
-| [#409](https://github.com/getahead/noter/issues/409) | Archive fixture delays | 24-27s per file | none yet | closed |
+| [#408](https://github.com/getahead/noter/issues/408) | All-command probe, fresh real core per command | 53.6s | [#449](https://github.com/getahead/noter/pull/449) | closed |
+| [#409](https://github.com/getahead/noter/issues/409) | Archive fixture delays | 24-27s per file | [#441](https://github.com/getahead/noter/pull/441) | closed |
 
 Measured costs come from the audit (six successful main runs); a saving is a proposal until a run after the fix shows it, and parallel jobs' savings are never added up as one.

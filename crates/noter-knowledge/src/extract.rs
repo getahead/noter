@@ -79,7 +79,7 @@ pub(crate) fn extract(path: &Path, bytes: &[u8], format: Format) -> Result<Extra
         .file_stem()
         .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
     match format {
-        Format::Markdown => Ok(markdown(&stem, &String::from_utf8_lossy(bytes))),
+        Format::Markdown => Ok(markdown(&stem, &decode_text(bytes))),
         Format::Html => {
             let text = html2text::from_read(bytes, 10_000).map_err(|e| format!("html: {e}"))?;
             Ok(markdown(&stem, &text))
@@ -92,9 +92,40 @@ pub(crate) fn extract(path: &Path, bytes: &[u8], format: Format) -> Result<Extra
                 .map_err(|e| format!("pdf: {e}"))?;
             Ok(plain(stem, text))
         }
-        Format::Text | Format::Code => Ok(plain(stem, String::from_utf8_lossy(bytes).into_owned())),
+        Format::Text | Format::Code => Ok(plain(stem, decode_text(bytes))),
     }
 }
+
+/// Decodes common Unicode byte-order marks while retaining the historical lossy UTF-8 fallback.
+// @cpt-begin:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-extract
+fn decode_text(bytes: &[u8]) -> String {
+    if let Some(text) = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]) {
+        return String::from_utf8_lossy(text).into_owned();
+    }
+    let (little_endian, text) = if let Some(text) = bytes.strip_prefix(&[0xff, 0xfe]) {
+        (true, text)
+    } else if let Some(text) = bytes.strip_prefix(&[0xfe, 0xff]) {
+        (false, text)
+    } else {
+        return String::from_utf8_lossy(bytes).into_owned();
+    };
+    let mut units: Vec<u16> = text
+        .chunks_exact(2)
+        .map(|pair| {
+            let pair = [pair[0], pair[1]];
+            if little_endian {
+                u16::from_le_bytes(pair)
+            } else {
+                u16::from_be_bytes(pair)
+            }
+        })
+        .collect();
+    if text.len() % 2 != 0 {
+        units.push(0xfffd);
+    }
+    String::from_utf16_lossy(&units)
+}
+// @cpt-end:cpt-noter-algo-core-knowledge-sync-v2:p1:inst-sync-extract
 
 /// A document without headings: one section under its file name.
 fn plain(title: String, body: String) -> Extracted {
@@ -280,6 +311,22 @@ mod tests {
         (doc.title, sections)
     }
 
+    /// Encoding-specific fixtures stay separate from the folder-ingestion corpus.
+    fn encoding_fixture(name: &str) -> (String, Vec<(Vec<String>, String)>) {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/encoding-fixtures")
+            .join(name);
+        let bytes = std::fs::read(&path).unwrap();
+        let doc = extract(&path, &bytes, Format::of(&path).unwrap()).unwrap();
+        let sections = doc
+            .sections
+            .into_iter()
+            .filter(|s| !s.body.trim().is_empty())
+            .map(|s| (s.path, s.body))
+            .collect();
+        (doc.title, sections)
+    }
+
     #[test]
     fn the_six_formats_keep_their_title_and_heading_provenance() {
         let (title, sections) = fixture("guide.md");
@@ -314,6 +361,23 @@ mod tests {
         assert_eq!((title.as_str(), sections[0].0.len()), ("notes", 0));
         assert!(sections[0].1.contains("beta on Friday"));
 
+        let (title, sections) = encoding_fixture("cyrillic.txt");
+        assert_eq!(title, "cyrillic");
+        assert!(sections[0].1.contains("Привет, мир"), "{}", sections[0].1);
+
+        let (title, sections) = encoding_fixture("bom.md");
+        assert_eq!(title, "BOM title");
+        assert_eq!(sections[0].0, ["Chapter"]);
+        assert!(sections[0].1.contains("Text"));
+
+        let (title, sections) = encoding_fixture("utf16.txt");
+        assert_eq!(title, "utf16");
+        assert!(
+            sections[0].1.contains("Документ UTF-16"),
+            "{}",
+            sections[0].1
+        );
+
         let (title, sections) = fixture("retry.rs");
         assert_eq!(title, "retry");
         assert!(sections[0].1.contains("pub fn backoff"));
@@ -342,6 +406,7 @@ mod tests {
     fn broken_files_are_errors_without_their_text() {
         let e = extract(Path::new("x.docx"), b"secret words", Format::Docx).unwrap_err();
         assert!(e.starts_with("docx:") && !e.contains("secret"), "{e}");
-        assert!(extract(Path::new("x.pdf"), b"secret", Format::Pdf).is_err());
+        let e = extract(Path::new("x.pdf"), b"secret", Format::Pdf).unwrap_err();
+        assert!(e.starts_with("pdf:") && !e.contains("secret"), "{e}");
     }
 }

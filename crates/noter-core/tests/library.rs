@@ -430,10 +430,31 @@ async fn newest_sort_uses_call_id_as_the_tie_breaker() {
     )
     .unwrap();
 
-    assert_eq!(
-        ids(&core, CallFilter::default(), CallSort::Newest).await,
-        ["call_c", "call_b", "call_a"]
-    );
+    let expected = ids(&core, CallFilter::default(), CallSort::Newest).await;
+    assert_eq!(expected, ["call_c", "call_b", "call_a"]);
+
+    // Force the tied calls onto separate pages so the cursor must include the ID tie-breaker.
+    let first = core
+        .calls_list(
+            &main_window(),
+            list_args(CallFilter::default(), CallSort::Newest, Some(1), None),
+        )
+        .await
+        .unwrap();
+    let mut paged: Vec<String> = first.rows.into_iter().map(|row| row.id.0).collect();
+    let mut cursor = first.next_cursor;
+    while let Some(next) = cursor {
+        let page = core
+            .calls_list(
+                &main_window(),
+                list_args(CallFilter::default(), CallSort::Newest, Some(1), Some(next)),
+            )
+            .await
+            .unwrap();
+        paged.extend(page.rows.into_iter().map(|row| row.id.0));
+        cursor = page.next_cursor;
+    }
+    assert_eq!(paged, expected, "cursor preserves equal-time call ordering");
 }
 
 #[tokio::test]

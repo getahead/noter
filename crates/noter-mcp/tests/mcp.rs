@@ -638,7 +638,7 @@ async fn a_cloud_run_cannot_widen_its_context_or_read_a_sensitive_call() {
                 json!({ "call_id": "call_s", "t0_ms": 0, "t1_ms": 9000 }),
             ),
             claim(2, "get_screen_context", json!({ "call_id": "call_s" })),
-            // A normal call is allowed, but until the release gate exists no cloud result leaves.
+            // A normal call is allowed, but the release gate still withholds cloud results.
             claim(
                 3,
                 "get_transcript_span",
@@ -870,10 +870,19 @@ async fn a_cloud_result_keeps_the_packets_pseudonyms_and_commits_its_audit_row_f
             .len(),
         2
     );
-    // The run's own packet row is the one the pseudonyms came from.
+    // The initial packet row is the one the pseudonyms came from.
     assert_eq!(
-        rig.sql("SELECT id FROM audit_log WHERE kind = 'run' AND llm_run_id = 'x'")
-            .len(),
+        rig.sql(&format!(
+            "SELECT id FROM audit_log WHERE kind = 'run' AND llm_run_id = '{run}'"
+        ))
+        .len(),
+        1
+    );
+    assert_eq!(
+        rig.sql(&format!(
+            "SELECT id FROM audit_log WHERE kind = 'run' AND llm_run_id != '{run}'"
+        ))
+        .len(),
         0
     );
     assert_eq!(
@@ -1175,14 +1184,103 @@ async fn the_router_starts_noter_mcp_under_the_run_and_revokes_it_when_the_run_e
     )
     .await;
     assert_eq!(code(&late[0]), -32001);
-    // A core with no binary configured starts no tool server for a run that asks for tools.
-    let bare = {
-        let dir = tempfile::tempdir().unwrap();
-        let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet));
-        Arc::new(Core::open(dir.path(), deps).unwrap())
+    // A real ask run has no tool-server launch, config file or session when no binary is set.
+    use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
+    use noter_protocol::model::{
+        AskMsg, AskScope, AskStartArgs, SettingsSection, SettingsUpdateArgs, WindowLabel,
     };
-    let _ = bare.serve_socket().await.unwrap();
-    assert_eq!(bare.mcp_session("llm_none"), None);
+    use noter_protocol::NoArgs;
+    use noter_protocol::PrivacyMode;
+
+    let dir = tempfile::tempdir().unwrap();
+    let scripted = Scripted::new();
+    let deps = CoreDeps::new(Arc::new(FixedClock), Arc::new(Quiet))
+        .with_llm(Adapters::scripted(&scripted));
+    let bare = Arc::new(Core::open(dir.path(), deps).unwrap());
+    noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute_batch(SEED)
+        .unwrap();
+    bare.start_first_run();
+    let settings_ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Settings,
+        },
+    };
+    let settings = bare.settings_get(&settings_ctx, NoArgs {}).await.unwrap();
+    let mut privacy = settings.privacy.clone();
+    privacy.mode = PrivacyMode::CloudAllowed;
+    bare.settings_update(
+        &settings_ctx,
+        SettingsUpdateArgs {
+            rev: settings.rev,
+            section: SettingsSection::Privacy(privacy),
+        },
+    )
+    .await
+    .unwrap();
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let turn = bare
+        .ask_start(
+            &main,
+            AskStartArgs {
+                thread_id: None,
+                question: "What is the importer plan?".into(),
+                scope: AskScope::default(),
+            },
+            Sink::new(|_: AskMsg| true),
+        )
+        .await
+        .unwrap();
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while scripted.received().is_empty() {
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the core starts the actual ask run");
+    let request = scripted
+        .received()
+        .into_iter()
+        .find(|request| request.skill == "ask-answer")
+        .expect("the ask reaches the scripted runtime");
+    assert!(
+        request.mcp.is_none(),
+        "no MCP launch is passed without a binary"
+    );
+    let run_id = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        loop {
+            if let Some(run_id) = bare
+                .store()
+                .read({
+                    let turn_id = turn.turn_id.clone();
+                    move |db| {
+                        db.query_row(
+                            "SELECT llm_run_id FROM ask_turns WHERE id = ?1",
+                            [turn_id.as_str()],
+                            |row| row.get::<_, Option<String>>(0),
+                        )
+                    }
+                })
+                .unwrap()
+            {
+                break run_id;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("the completed ask records its runtime run id");
+    assert_eq!(bare.mcp_session(&run_id), None);
+    let mcp_dir = dir.path().join("run/mcp");
+    assert!(
+        std::fs::read_dir(&mcp_dir).map_or(true, |entries| entries.count() == 0),
+        "no MCP config is written when the binary is unavailable"
+    );
 }
 
 // ── slice 2, PR B: the search tools and the D1 live relay ───────────────────────────────────

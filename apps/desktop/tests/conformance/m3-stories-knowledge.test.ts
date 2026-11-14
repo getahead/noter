@@ -13,6 +13,7 @@ import type { Core, EntityChanged, SourceRow } from "../../src/core/bindings";
 import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
+import { wire } from "./history-support";
 
 let s: Scenario;
 let settings: Core;
@@ -20,7 +21,7 @@ let main: Core;
 
 /** The scenario's harness: controls are requests on the same wire. */
 const harness = (cmd: string, args: unknown) =>
-  (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process.invoke("main", `harness.${cmd}`, args);
+  wire(s).invoke("main", `harness.${cmd}`, args);
 
 const sourceOf = (e: EntityChanged, id?: string): SourceRow | undefined => (e.type === "source" && (id === undefined || e.source.id === id) ? e.source : undefined);
 const search = async (query: string) => ok(await main.search({ query, filter: { people: [], call_types: [], tags: [], languages: [], from: null, to: null, has_open_items: null }, limit: null }));

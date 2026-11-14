@@ -83,11 +83,32 @@ impl Stub {
     async fn hanging_pid(&self) -> String {
         for _ in 0..1000 {
             if let Ok(pid) = std::fs::read_to_string(self.dir.path().join("pid")) {
-                return pid.trim().to_owned();
+                let pid = pid.trim();
+                if !pid.is_empty() && pid.parse::<u32>().is_ok() {
+                    return pid.to_owned();
+                }
             }
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            tokio::time::sleep(Duration::from_millis(1)).await;
         }
         panic!("the stub never started");
+    }
+
+    /// Waits for a spawned child without advancing Tokio's paused clock.
+    async fn hanging_pid_before_deadline(&self) -> String {
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        loop {
+            if let Ok(pid) = std::fs::read_to_string(self.dir.path().join("pid")) {
+                let pid = pid.trim();
+                if !pid.is_empty() && pid.parse::<u32>().is_ok() {
+                    return pid.to_owned();
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the stub never started"
+            );
+            tokio::task::yield_now().await;
+        }
     }
 }
 
@@ -817,10 +838,13 @@ async fn a_timed_out_run_leaves_nothing_behind() {
     let stub = Stub::new(CLAUDE_OK);
     stub.set("mode", "hang");
     let llm = world.claude_only(&stub, Some("sk-ant-test"), false);
-    let failed = llm
-        .run_once(world.request(RuntimeChoice::ClaudeApiKey))
-        .await;
+    let request = world.request(RuntimeChoice::ClaudeApiKey);
+    let run = tokio::spawn(async move { llm.run_once(request).await });
+    let pid = stub.hanging_pid_before_deadline().await;
+    tokio::time::advance(Duration::from_secs(600)).await;
+    let failed = run.await.unwrap();
     assert!(matches!(failed, Err(Failure::Timeout)), "{failed:?}");
+    assert!(terminated(&pid).await, "the timed-out child still runs");
     assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
 }
 

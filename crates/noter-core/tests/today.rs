@@ -2,6 +2,7 @@
 //! Today. Calendar reads go through a scripted `NativeServices`.
 
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 use noter_core::{
@@ -51,6 +52,7 @@ impl Clock for FixedClock {
 struct Calendar {
     access: PermissionState,
     events: Result<Vec<CalendarEvent>, ()>,
+    reads: Arc<AtomicUsize>,
 }
 
 impl NativeServices for Calendar {
@@ -74,6 +76,7 @@ impl NativeServices for Calendar {
         _: TimestampMs,
         _: TimestampMs,
     ) -> Result<Vec<CalendarEvent>, CoreError> {
+        self.reads.fetch_add(1, Ordering::SeqCst);
         self.events
             .clone()
             .map_err(|()| CoreError::new(ErrorCode::CalendarUnavailable, "EventKit failed"))
@@ -452,6 +455,7 @@ fn granted(events: Vec<CalendarEvent>) -> Calendar {
     Calendar {
         access: PermissionState::Granted,
         events: Ok(events),
+        reads: Arc::new(AtomicUsize::new(0)),
     }
 }
 
@@ -699,11 +703,13 @@ async fn calendar_not_asked_or_denied_keeps_the_item_sections() {
         (PermissionState::Denied, CalendarAccess::Denied),
     ] {
         let dir = tempfile::tempdir().unwrap();
+        let reads = Arc::new(AtomicUsize::new(0));
         let (core, _) = open_with(
             dir.path(),
             Some(Calendar {
                 access,
                 events: Ok(vec![event("e", "Hidden", NOW + HOUR, &[])]),
+                reads: reads.clone(),
             }),
         );
         people_world(&core);
@@ -716,6 +722,11 @@ async fn calendar_not_asked_or_denied_keeps_the_item_sections() {
         assert_eq!(view.calendar, shown);
         assert!(view.today.is_empty() && view.this_week.is_empty());
         assert_eq!(ids(&view.due_without_call), ["i_new"]);
+        assert_eq!(
+            reads.load(Ordering::SeqCst),
+            0,
+            "calendar is not read without access"
+        );
     }
 }
 
@@ -727,6 +738,7 @@ async fn a_failed_calendar_read_is_calendar_unavailable() {
         Some(Calendar {
             access: PermissionState::Granted,
             events: Err(()),
+            reads: Arc::new(AtomicUsize::new(0)),
         }),
     );
     let err = today(&core).await.unwrap_err();
@@ -798,8 +810,30 @@ async fn reading_today_never_changes_an_item() {
         )])),
     );
     people_world(&core);
+    let before = core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT status || ':' || review_state FROM items WHERE id = 'i_new'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+        })
+        .unwrap();
     today(&core).await.unwrap();
     assert_eq!(count(&core, "changes"), 0);
+    let after = core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT status || ':' || review_state FROM items WHERE id = 'i_new'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(before, "open:accepted");
+    assert_eq!(after, before);
 }
 
 #[tokio::test]

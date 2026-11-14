@@ -53,7 +53,7 @@ async fn the_core_starts_the_scheduler_and_publishes_complete_progress_rows() {
     );
     core.start_first_run();
     tokio::time::sleep(Duration::from_millis(10)).await;
-    // The pipeline kinds have no-op handlers until post-call and archive land: they succeed.
+    // The pipeline kinds have registered handlers in the core composition root.
     let req = Request::for_call(
         JobKind::PostCall,
         Trigger::AfterCall,
