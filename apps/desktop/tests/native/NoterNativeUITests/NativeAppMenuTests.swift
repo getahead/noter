@@ -101,7 +101,7 @@ final class NativeAppMenuTests: NoterTestCase {
 
         let noter = app.menuBars.menuBarItems["Noter"]
         noter.click()
-        app.menuItems["Settings…"].click()
+        noter.menus.firstMatch.menuItems["Settings…"].click()
         let settings = app.windows["Settings"]
         XCTAssertTrue(settings.waitForExistence(timeout: 10), "the native Settings menu opens the Settings window")
         attachScreenshot("settings-native-titlebar")
@@ -118,8 +118,8 @@ final class NativeAppMenuTests: NoterTestCase {
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_action_item() {
         let main = openMenuReviewCall()
-        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Accepted"))
-        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Accepted outcome")
+        let undo = main.buttons.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undo.count, 0, "the fresh fixture has no prior row outcome with Undo")
         let suggestion = main.staticTexts["Replay buffer for websocket reconnects"]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested action item is visible")
         suggestion.click()
@@ -129,13 +129,13 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused action item")
         attachScreenshot("app-menu-edit-focused-action")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused action item produces one Accepted outcome")
+        XCTAssertTrue(waitUntil(3) { undo.count == 1 }, "the focused action item produces its row outcome and Undo")
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_rejects_focused_decision() {
         let main = openMenuReviewCall()
-        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Rejected"))
-        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Rejected outcome")
+        let undo = main.buttons.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undo.count, 0, "the fresh fixture has no prior row outcome with Undo")
         let suggestion = main.staticTexts["Drawer events go through the notification service."]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested decision is visible")
         suggestion.click()
@@ -145,13 +145,13 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused decision")
         attachScreenshot("app-menu-edit-focused-decision")
         app.menuItems["Reject Item"].click()
-        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused decision produces one Rejected outcome")
+        XCTAssertTrue(waitUntil(3) { undo.count == 1 }, "the focused decision produces its row outcome and Undo")
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
         let main = openMenuReviewCall()
-        let outcome = main.staticTexts.matching(NSPredicate(format: "label == %@", "Accepted"))
-        XCTAssertEqual(outcome.count, 0, "the fresh fixture has no prior Accepted outcome")
+        let undo = main.buttons.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undo.count, 0, "the fresh fixture has no prior row outcome with Undo")
         let suggestion = main.staticTexts["Who owns the acceptance criteria for the reconnect?"]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested question is visible")
         suggestion.click()
@@ -161,7 +161,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
         attachScreenshot("app-menu-edit-focused-question")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(10) { outcome.count == 1 }, "the focused question produces one Accepted outcome")
+        XCTAssertTrue(waitUntil(3) { undo.count == 1 }, "the focused question produces its row outcome and Undo")
     }
 
     func test_cpt_noter_dod_ui_main_window_shell_navigation__native_menu_copy_for_slack_writes_once() throws {
@@ -192,7 +192,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "the native menu dispatches to the existing share handler")
         XCTAssertTrue(waitUntil(5) { Self.clipboardWriteCount(at: writeLog) == 1 }, "the menu action writes once to the private pasteboard")
         XCTAssertEqual(Self.clipboardWriteCount(at: writeLog), 1, "the menu action dispatches one clipboard write")
-        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend sync"), "the private pasteboard contains the selected call's Slack payload")
+        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend and QA aligned on the websocket notifications"), "the private pasteboard contains the selected call's Slack summary payload")
         attachScreenshot("app-menu-edit-copy-slack-click-confirmed")
         XCTAssertTrue(waitUntil(10) { !copiedFeedback.exists }, "the click confirmation clears before testing the accelerator")
 
@@ -200,7 +200,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(copiedFeedback.waitForExistence(timeout: 10), "Shift-Command-C dispatches to the same share handler")
         XCTAssertTrue(waitUntil(5) { Self.clipboardWriteCount(at: writeLog) == 2 }, "the accelerator writes once to the private pasteboard")
         XCTAssertEqual(Self.clipboardWriteCount(at: writeLog), 2, "menu click and accelerator each dispatch one clipboard write")
-        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend sync"), "the accelerator refreshes the private pasteboard payload")
+        XCTAssertTrue((pasteboard.string(forType: .string) ?? "").contains("Backend and QA aligned on the websocket notifications"), "the accelerator refreshes the private pasteboard summary payload")
         attachScreenshot("app-menu-edit-copy-slack-shortcut-confirmed")
     }
 
