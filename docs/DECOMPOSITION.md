@@ -743,7 +743,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Purpose**: Show a call's transcript as a virtualised log that follows live speech without jumping, with speaker, time and language on every line, gap and mark rows, **Jump to Live**, and replay that is safe: on headphones during the call, on any output afterwards.
 
-- **Milestone**: M1. **Spec**: [`docs/features/ui/live-transcript.md`](features/ui/live-transcript.md). **Status**: 🔄 IN_PROGRESS.
+- **Milestone**: M1. **Spec**: [`docs/features/ui/live-transcript.md`](features/ui/live-transcript.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`
 

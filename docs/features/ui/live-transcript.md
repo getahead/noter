@@ -37,7 +37,7 @@ milestone: M1
 
 <!-- /toc -->
 
-- [ ] `p2` - **ID**: `cpt-noter-featstatus-ui-live-transcript`
+- [x] `p2` - **ID**: `cpt-noter-featstatus-ui-live-transcript`
 
 ## 1. Feature Context
 
@@ -161,7 +161,7 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 
 ### Follow output
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-live-transcript-follow-output`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-live-transcript-follow-output`
 
 **Input**: the scroll position, the number of rows added since the last flush, the user's last scroll action, and whether the renamed speaker is still present in the current live snapshot
 
@@ -174,8 +174,8 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 2. [x] - `p1` - Add the new confirmed rows to the pill's count - `inst-count`
 3. [x] - `p1` - Never move the rows in view: confirmed rows keep their position - `inst-no-jump`
 4. [x] - `p1` - **RETURN** detached with the count - `inst-return-detached`
-5. [ ] - `p1` - **IF** a live rename is open and its speaker is absent from the current snapshot - `inst-release-renamed-speaker`
-   1. [ ] - `p1` - Release the hold and follow the current call again - `inst-return-renamed-speaker`
+5. [x] - `p1` - **IF** a live rename is open and its speaker is absent from the current snapshot - `inst-release-renamed-speaker`
+   1. [x] - `p1` - Release the hold and follow the current call again - `inst-return-renamed-speaker`
 
 ### Decide the play control
 
