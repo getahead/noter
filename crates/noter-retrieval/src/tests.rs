@@ -2375,3 +2375,67 @@ fn retrieval_upgrade_preserves_aliases_and_indexes_existing_chunks() {
         ["chk_upgrade"]
     );
 }
+
+// cpt-noter-algo-core-storage-migrate: the first retrieval migration backfills pre-existing core rows.
+#[test]
+fn first_retrieval_migration_backfills_existing_keyword_rows() {
+    let lib = library_with_migrations(&[]);
+    lib.segment(
+        "seg_before_retrieval",
+        "call_a",
+        "spk_anna",
+        40_000,
+        "PreexistingSegmentMarker",
+        "en",
+    );
+    lib.item(
+        "itm_before_retrieval",
+        "call_a",
+        "decision",
+        "PreexistingItemMarker",
+        "en",
+        "open",
+        "accepted",
+        None,
+    );
+    lib.chunk(
+        "chk_before_retrieval",
+        "call_a",
+        40_000,
+        43_000,
+        "PreexistingChunkMarker",
+        None,
+    );
+    let path = lib.path();
+    let Library { dir, store, db } = lib;
+    drop(db);
+    drop(store);
+
+    let store = Store::open(
+        &path,
+        &[
+            noter_db::MIGRATIONS,
+            noter_core::MIGRATIONS,
+            crate::MIGRATIONS,
+        ],
+    )
+    .unwrap();
+    let upgraded = Library {
+        dir,
+        store: Arc::new(store),
+        db: Connection::open(path).unwrap(),
+    };
+
+    assert_eq!(
+        ids(&upgraded.find(query("preexistingsegmentmarker")).calls),
+        ["seg_before_retrieval"]
+    );
+    assert_eq!(
+        ids(&upgraded.find(query("preexistingitemmarker")).items),
+        ["itm_before_retrieval"]
+    );
+    assert_eq!(
+        ids(&upgraded.find(query("preexistingchunkmarker")).calls),
+        ["chk_before_retrieval"]
+    );
+}

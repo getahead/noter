@@ -400,21 +400,32 @@ fn live_segments(
 ) -> Result<Vec<EngineSegment>, EngineErrorCode> {
     const AUDIO_EXTENSIONS: [&str; 6] = ["m4a", "aac", "caf", "wav", "pcm", "ring"];
     let dir = root.join(call_dir);
-    let has_audio = std::fs::read_dir(&dir)
-        .map_err(|_| EngineErrorCode::ZeroBuffers)?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .any(|path| {
-            path.is_file()
-                && path
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| {
-                        AUDIO_EXTENSIONS
-                            .iter()
-                            .any(|audio| ext.eq_ignore_ascii_case(audio))
-                    })
-        });
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {
+            return Err(EngineErrorCode::ZeroBuffers);
+        }
+        Err(_) => return Err(EngineErrorCode::Internal),
+    };
+    let mut has_audio = false;
+    for entry in entries {
+        let entry = entry.map_err(|_| EngineErrorCode::Internal)?;
+        let file_type = entry.file_type().map_err(|_| EngineErrorCode::Internal)?;
+        let path = entry.path();
+        if file_type.is_file()
+            && path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| {
+                    AUDIO_EXTENSIONS
+                        .iter()
+                        .any(|audio| ext.eq_ignore_ascii_case(audio))
+                })
+        {
+            has_audio = true;
+            break;
+        }
+    }
     if !has_audio {
         return Err(EngineErrorCode::ZeroBuffers);
     }

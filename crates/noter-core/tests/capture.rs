@@ -2379,7 +2379,7 @@ async fn try_again_restarts_the_engine_on_the_same_call() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_full_disk_disables_audio_writing_while_transcript_capture_stays_live() {
+async fn a_full_disk_disables_audio_writing_without_stopping_the_recording() {
     let r = rig();
     let disk = |free: u32| EnvironmentReading {
         disk_free_mb: free,

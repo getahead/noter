@@ -260,6 +260,22 @@ async fn built_in_archive_fails_when_the_call_has_no_audio() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn built_in_archive_preserves_audio_folder_read_errors() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "audio/call_1", b"not a directory");
+    let engine = ScriptedEngine::new().with_container(dir.path());
+    let c = client(&engine);
+
+    assert!(matches!(
+        pass(&c, "audio/call_1/result.json").await,
+        Err(OfflineError::Engine {
+            code: EngineErrorCode::Internal,
+            ..
+        })
+    ));
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_engine_refusal_fails_the_pending_request() {
     let dir = tempfile::tempdir().unwrap();
     let engine = engine(dir.path()).with_default(Behaviour {
