@@ -21,6 +21,7 @@ import { VersionSwitcher } from "./VersionSwitcher";
 import { OutputItemRow } from "./OutputItemRow";
 import { CallToolbar, moreItems } from "./CallToolbar";
 import { slots } from "./slots";
+import { t } from "../../i18n/format";
 import "./register";
 
 let bridge: Bridge;
@@ -96,6 +97,8 @@ describe("OutputSection", () => {
     expect(waiting).toContain("Waiting for the summary");
     const writing = renderToString(<OutputSection {...props(sec("summary", { state: { type: "writing" } }))} />);
     expect(writing).toContain("Writing summary…");
+    const writingItems = renderToString(<OutputSection {...props(sec("action_items", { state: { type: "writing" } }))} />);
+    expect(writingItems).toContain("Writing Action items…");
     const regenerating = renderToString(<OutputSection {...props(sec("summary", { state: { type: "writing" }, summary_id: "s1", rev: 1, body_md: "The old text stays" }))} />);
     expect(regenerating).toContain("The old text stays");
     expect(regenerating).toContain("Regenerating…");
@@ -121,6 +124,16 @@ describe("OutputSection", () => {
     const tree = rendered(OutputSection, props(renamed, () => void asked.push(false)));
     (find(tree, (p, type) => type === "button" && typeof p.onClick === "function" && p.children === "Regenerate for better wording").props.onClick as () => void)();
     expect(asked).toEqual([false]);
+  });
+
+  it("renders the regenerated-edit notice and its comparison action", async () => {
+    await open([]);
+    const section = sec("summary", { summary_id: "sum_backend", rev: 3, body_md: "Kept edit", regenerated_with_edits: true });
+    const tree = rendered(OutputSection, props(section));
+    const html = renderToString(tree);
+    expect(html).toContain("Regenerated · your 0 edits kept");
+    expect(html).toContain("Show Diff");
+    await (find(tree, (p) => p.className === "np-link" && p.children === "Show Diff").props.onClick as () => void)();
   });
 
   it("counts the rejected suggestions a regeneration will not bring back, in the section's meta line", async () => {
@@ -157,6 +170,8 @@ describe("OutputSection", () => {
     const html = renderToString(<OutputSection {...props(sec("summary", { summary_id: "s1", rev: 1, body_md: "x", user_edited: true, regenerated_with_edits: true }))} />);
     expect(html).toContain("Edited");
     expect(html).toContain("Show Diff");
+    expect(t("outputs.regenerated", { count: 1 })).toBe("Regenerated · your 1 edit kept");
+    expect(t("outputs.regenerated", { count: 2 })).toBe("Regenerated · your 2 edits kept");
   });
 
   it("says Names updated with a Regenerate for better wording link, never regenerating by itself", async () => {

@@ -77,6 +77,17 @@ function dueWorld(w: Parameters<typeof W.idle>[0]) {
   due.forEach((it) => { it.due = "2020-01-01"; });
   Object.assign(w.today, { today: [], this_week: [], live_call: null, due_without_call: due, done_today: [] });
 }
+function manyDueWorld(w: Parameters<typeof W.idle>[0]) {
+  dueWorld(w);
+  const template = w.items.find((item) => item.id === "itm_spec")!;
+  const extra = Array.from({ length: 16 }, (_, index) => ({
+    ...structuredClone(template),
+    id: `itm_focus_${index}`,
+    text: `Focus case ${index}`,
+  }));
+  w.items.push(...extra);
+  w.today.due_without_call.push(...extra);
+}
 const due = (page: Page) => page.locator('[data-region="TD-R5"]');
 const done = (page: Page) => page.locator('[data-region="TD-R7"]');
 
@@ -107,6 +118,26 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
     await page.keyboard.press("Meta+z");
     await expect(row.getByRole("checkbox")).not.toBeChecked();
     expect(await sent(page, "change_undo")).toHaveLength(1);
+  });
+  test("UI — body blur after a blank click keeps the scrolled position on rerender", async ({ page }) => {
+    await openToday(page, manyDueWorld);
+    const row = due(page).locator('[data-item-id="itm_spec"]');
+    const root = page.locator('[data-component="cpt-noter-component-screen-today"]');
+    const scroll = page.locator(".np-content");
+    await scroll.evaluate((element) => element.removeAttribute("tabindex")); // leave blank clicks with no focusable scroll-host destination
+    await row.focus();
+    await expect(row).toBeFocused();
+    const box = await root.boundingBox();
+    if (!box) throw new Error("Today root has no browser bounds");
+    await page.mouse.click(box.x + 1, box.y + 1); // non-focusable padding sends focus to BODY in Chrome
+    await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    await scroll.evaluate((element) => { element.scrollTop = element.scrollHeight; });
+    const before = await scroll.evaluate((element) => element.scrollTop);
+    expect(before).toBeGreaterThan(0);
+    await page.setViewportSize({ width: 700, height: 800 }); // force the real responsive shell to rerender
+    await expect(scroll).toHaveAttribute("data-width", "narrow");
+    await expect.poll(() => page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    await expect.poll(() => scroll.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   });
   test("UI — error — failed completion leaves the row open and retry explicit", async ({ page }) => {
     const steer = await openToday(page, dueWorld);

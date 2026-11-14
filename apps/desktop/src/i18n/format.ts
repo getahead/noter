@@ -167,6 +167,20 @@ export const formatDateTime = (ms: number, prefs: UiPrefs): string =>
 /** The calendar day in the user's zone, YYYY-MM-DD: the key two times share when they fall on one day. */
 export const dayOf = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, {}, prefs, "en-CA");
 
+/** Milliseconds until the user's next calendar day begins, including DST-short and DST-long days. */
+export const untilNextDay = (now: number, prefs: UiPrefs | undefined): number => {
+  const today = dayOf(now, prefs);
+  let low = now;
+  let high = now + 48 * 60 * 60 * 1000;
+  if (dayOf(high, prefs) === today) return 24 * 60 * 60 * 1000;
+  while (high - low > 1) {
+    const mid = low + Math.floor((high - low) / 2);
+    if (dayOf(mid, prefs) === today) low = mid;
+    else high = mid;
+  }
+  return high - now;
+};
+
 /** "10:00" or "10:00 AM": the 12/24-hour setting and zone the core passes. */
 export const clock = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, { timeStyle: "short", hourCycle: hourCycle(prefs) }, prefs);
 

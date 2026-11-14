@@ -80,7 +80,7 @@ export function ModeIndicator({ view, variant = "sidebar", text, runtime, onOpen
   const m = MODE_MSG[view.state];
   const word = t(m.word);
   const root = { "data-component": "cpt-noter-component-ui-mode-indicator", "data-variant": variant, "data-state": view.warning ? "degraded" : "normal" };
-  const label = text ?? (runtime ? `${runtime} · ${word}` : word);
+  const label = text ?? (runtime ? t("mode.runtime", { runtime, mode: word }) : word);
   if (variant === "menu-line")
     return (
       <span {...root} className="np-mode np-mode--line">
