@@ -5,10 +5,12 @@ import { renderToString } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
+import type { CallOutputs } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { pageFor } from "../shell/pages";
 import { holdDeleteError, holdExtras, holdTypes, resetCache } from "./cache";
+import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
@@ -16,6 +18,7 @@ import { CallToolbar, moreItems } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
+import { deleteAudio } from "./share-actions";
 import { slots } from "./slots";
 import { StoredTranscript } from "../transcript/hosts";
 import "./register";
@@ -23,7 +26,7 @@ import "./register";
 let bridge: Bridge;
 let fake: FakeCore;
 let id: string;
-beforeEach(resetCache);
+beforeEach(() => (resetCache(), resetOutputsCache()));
 afterEach(() => {
   slots.deleteCall = null;
   return bridge.close();
@@ -185,6 +188,20 @@ describe("CallBanners", () => {
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
   });
 
+  it("shows a failed audio deletion with a retry action", async () => {
+    await ready();
+    fake.failNext("audio_delete", "internal");
+    const seen = sent();
+    expect(await deleteAudio(bridge, id, async () => true)).toBe("failed");
+
+    const tree = rendered(CallBanners, { route: route(), bridge, appBanners: 0 });
+    expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toContain("Couldn&#x27;t delete the audio. Try again.");
+    const banner = find(tree, (p) => Array.isArray(p.banners)).props.banners as Array<{ actions: Array<{ onAction: () => void }> }>;
+    banner[0]!.actions[0]!.onAction();
+    await settle();
+    expect(seen.filter(([cmd]) => cmd === "audio_delete")).toHaveLength(2);
+  });
+
   it("× closes it for this window without sending anything", async () => {
     await ready();
     holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
@@ -193,6 +210,20 @@ describe("CallBanners", () => {
     (find(tree, (p) => typeof p.onDismiss === "function").props.onDismiss as (id: string) => void)("notify");
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
     expect(seen).toEqual([]);
+  });
+
+  it("does not hide the notification offer when another banner closes", async () => {
+    await ready();
+    holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });
+    holdOutputs({ call_id: id, status: "writing", sections: [], archive: "not_started", review_waiting: 0, sensitive: false, written_locally: false } as CallOutputs);
+    const summaryRoute = { section: "library", key: `call:${id}:summary` } as const;
+    const tree = rendered(CallBanners, { route: summaryRoute, bridge, appBanners: 0 });
+    expect((find(tree, (p) => Array.isArray(p.banners)).props.banners as Array<{ id: string }>).some((b) => b.id === "writing")).toBe(true);
+
+    (find(tree, (p) => typeof p.onDismiss === "function").props.onDismiss as (id: string) => void)("writing");
+
+    const after = rendered(CallBanners, { route: summaryRoute, bridge, appBanners: 0 });
+    expect((find(after, (p) => Array.isArray(p.banners)).props.banners as Array<{ id: string }>).some((b) => b.id === "notify")).toBe(true);
   });
 });
 

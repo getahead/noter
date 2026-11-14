@@ -16,7 +16,7 @@ export const keySetKey = (provider: KeyProvider) => `key:set:${provider}`;
 /** `api_key_set`: verifies and stores in one step (D-3); the answer is the whole accounts view. */
 export function setKey(bridge: Bridge, provider: KeyProvider, key: string) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-set
-  return bridge.act(keySetKey(provider), "api_key_set", () => bridge.core.apiKeySet({ provider, key }), { slice: "accounts" });
+  return bridge.act(keySetKey(provider), "api_key_set", () => bridge.core.apiKeySet({ provider, key }), { slice: "accounts", retainForRetry: false });
   // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-set
 }
 

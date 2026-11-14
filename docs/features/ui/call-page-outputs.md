@@ -116,12 +116,13 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 
 **Error Scenarios**:
 - `job_blocked` during capture: explain regeneration waits for the call to end; no timer retry.
+- If requesting regeneration is refused, keep the failed section visible and show the command's error beside it; preserve **Try Again** and **Use Local Model** where available.
 - A failed runtime leaves old output and offers explicit retry/local fallback.
 
 **Steps**:
 1. [x] - `p1` - User chooses **Regenerate Outputs…**, **With a Different Model…** or **Regenerate with Claude Code…**; dialog host shows Runtime and model, Skill, Sections and **Your edits are kept and shown as a diff.** - `inst-sheet`
 2. [x] - `p1` - User selects at least one section; API: `outputs_regenerate` with selected SectionKind values, runtime/model, call-type skill and local flag; **With Current Settings** sends current defaults - `inst-call`
-3. [x] - `p1` - A section's Try Again requests that section only; Use Local Model sets local true and later shows **Written by the local model after Claude Code timed out** - `inst-section`
+3. [x] - `p1` - A section's Try Again requests that section only; Use Local Model sets local true; if either regeneration request is refused, keep the failed section and show the command error beside it - `inst-section`
 4. [x] - `p1` - Accept the job id as scheduled work, not completion; keep previous content while matching `outputs:progress` updates it; refetch `outputs_get` for final bodies - `inst-job`
 5. [x] - `p1` - Core keeps user prose edits and accepted/edited items, replaces only remaining suggestions and preserves rejected suppression; UI renders the returned notices and counts - `inst-preserve`
 6. [x] - `p1` - User opens the version menu; `output_versions` lists generated and user versions with writer/time; hide the switcher with only one version - `inst-versions`
@@ -166,7 +167,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - Delete Audio Now removes only audio; Delete Old Audio frees older calls' audio while capture continues.
 
 **Error Scenarios**:
-- Duplicate or over-32-character tags are rejected inline. Deletion failure leaves audio controls tied to core availability.
+- Duplicate or over-32-character tags are rejected inline. Deletion failure leaves audio controls tied to core availability and shows a call-page error banner with **Try Again** when the refusal is retryable.
 - Both destructive actions require their designed alert/sheet; neither offers Undo.
 
 **Steps**:
@@ -174,6 +175,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 2. [x] - `p1` - Submit `call_tags_set` with selected call ids and the typed add/remove lists; show returned change or batch target, then refresh Call info - `inst-set`
 3. [x] - `p1` - User chooses **Delete Audio Now…**; native alert **Delete the audio of this call?** explains transcript, summary and items stay, replay stops, and it cannot be undone; Cancel is default - `inst-alert`
 4. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete` with the call id; use core audio state to stop playback and remove play, sample and export-audio controls - `inst-delete`
+   1. [x] - `p1` - **IF** the command fails: show a call-page error banner, with **Try Again** when retryable - `inst-delete-error`
 5. [x] - `p1` - User opens **Delete Old Audio…** from the capture/disk warning; main-window dialog host shows the 30-day choice and **Recording goes on while this runs.** - `inst-old`
 6. [x] - `p1` - **IF** Delete Audio is confirmed: `audio_delete_older` with older_than_days 30; show returned call count and freed MB, never prototype fixture totals - `inst-delete-old`
 7. [x] - `p1` - User fills the sheet and presses the primary button; the dialogs host keeps the button busy with its label while the command runs (from `cpt-noter-flow-ui-dialogs-host-sheet`, owner decision A, 28 Oct 2026) - `inst-sheet-submit`

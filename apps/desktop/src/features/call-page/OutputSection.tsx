@@ -14,7 +14,7 @@ import { TextField } from "../../ui/primitives/text-field";
 import { DiffView } from "../../ui/diff/DiffView";
 import { MarkdownBody } from "./markdown";
 import { OutputItemRow } from "./OutputItemRow";
-import { commitDraft, loadVersions, readVersion } from "./outputs-actions";
+import { commitDraft, loadVersions, outputsRegenerateKey, readVersion } from "./outputs-actions";
 import { bodyOf, useVersions } from "./outputs-cache";
 import { currentItems, isProse, versionName, metaLine, SECTION_LABEL, sectionCounts, sectionId } from "./outputs-logic";
 import { ShareMenu } from "./ShareMenu";
@@ -44,6 +44,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     if (section.regenerated_with_edits && section.summary_id && !versions) void loadVersions(bridge, section.summary_id);
   }, [bridge, section.regenerated_with_edits, section.summary_id, versions]);
   const itemRecords = useWindow(bridge, (s) => s.entities.item);
+  const regenerateError = useWindow(bridge, (s) => s.commands[outputsRegenerateKey(call.id)]?.state === "ERROR" ? s.commands[outputsRegenerateKey(call.id)]?.error : null);
   const counts = sectionCounts({ ...section, items: currentItems(section.items, itemRecords) });
   const Row = section.kind === "action_items" ? slots.actionItemRow : null;
   const RejectedList = slots.rejectedList;
@@ -125,7 +126,7 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
           banner={{
             id: sectionId("failed", section.kind),
             severity: "error",
-            text: t(section.state.type === "failed" && section.state.code === "internal" ? "outputs.failed" : "outputs.failed_timeout", { section: heading.toLowerCase() }),
+            text: regenerateError ? t("outputs.regen.failed") : t(section.state.type === "failed" && section.state.code === "internal" ? "outputs.failed" : "outputs.failed_timeout", { section: heading.toLowerCase() }),
             actions: [{ label: t("outputs.try_again"), onAction: () => onRegenerate(false) }, ...(section.state.type === "failed" && section.state.local_fallback_available ? [{ label: t("outputs.use_local"), onAction: () => onRegenerate(true) }] : [])],
           }}
         />

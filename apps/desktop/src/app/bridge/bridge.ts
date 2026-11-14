@@ -46,6 +46,8 @@ export type NamedStates = Partial<Record<ErrorCode, string>>;
 
 export interface ActOptions {
   named?: NamedStates;
+  /** Keep a retry closure for `bridge.retry` (disable for calls containing secrets). */
+  retainForRetry?: boolean;
   /** The screen that sent the command, for the log (defaults to the window label). */
   screen?: string;
   /** Write the returned whole-state payload into this slice (highest `version` wins). */
@@ -418,8 +420,9 @@ export function createBridge(label: WindowLabel, transport: Transport) {
     run: () => Promise<Result<T>>,
     opts: ActOptions = {},
   ): Promise<Result<T>> {
-    retries.set(key, () => act(key, cmd, run, opts));
     // @cpt-begin:cpt-noter-flow-ui-core-bridge-act:p1:inst-loading
+    if (opts.retainForRetry === false) retries.delete(key);
+    else retries.set(key, () => act(key, cmd, run, opts));
     // @cpt-begin:cpt-noter-state-ui-core-bridge-command:p1:inst-idle-waiting
     setCommand(key, { state: "WAITING", error: null });
     // @cpt-end:cpt-noter-state-ui-core-bridge-command:p1:inst-idle-waiting

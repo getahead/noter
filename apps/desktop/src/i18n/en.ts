@@ -3,6 +3,7 @@
 export const en = {
   "window.error": "Something went wrong",
   "action.try_again": "Try Again",
+  "prompt.action_failed": "Couldn't complete that action. Try again.",
   "announce.recording_started": "Recording started",
   "announce.recording_stopped": "Recording stopped, saved {duration}",
   "announce.cards_held": {

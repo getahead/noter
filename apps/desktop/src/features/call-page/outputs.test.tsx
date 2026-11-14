@@ -80,6 +80,16 @@ describe("OutputsView", () => {
 describe("OutputSection", () => {
   const props = (s: Section, onRegenerate = () => {}) => ({ bridge, call: bridge.store.getState().entities.call[id]!, section: s, prefs: { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never, writing: false, onRegenerate });
 
+  it("shows a refused regeneration beside the failed section", async () => {
+    const failed = sec("summary", { state: { type: "failed", code: "internal", local_fallback_available: false } as never });
+    await open([failed]);
+    fake.failNext("outputs_regenerate", "job_blocked");
+    expect((await regenerate(bridge, { call_id: id, sections: ["summary"], local: false })).status).toBe("error");
+    const html = renderToString(<OutputSection {...props(failed)} />);
+    expect(html).toContain("Couldn&#x27;t start regenerating. Try again.");
+    expect(html).toContain("Try Again");
+  });
+
   it("keeps the old text readable while a section writes again, and shows partial text as it streams", async () => {
     await open([]);
     const waiting = renderToString(<OutputSection {...props(sec("summary", { state: { type: "pending" } }))} />);

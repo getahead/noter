@@ -85,7 +85,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 **Error Scenarios**:
 - No calls yet: the empty state **No calls yet** · **Calls you record appear here with their summary, decisions and action items.**, plus **Run Audio Self-Test…** while the self-test has not passed
 - The list read is slow: skeleton rows after 300 ms
-- The list read fails: the page's inline banner with **Try Again**
+- The first list read fails: the page's inline banner with **Try Again**. A later page read fails: keep the loaded calls, show an inline error at the end of the list, and offer **Try Again** there.
 
 **Steps**:
 1. [x] - `p1` - User selects **Calls** in the sidebar or presses ⌘3 - `inst-user-open`
@@ -95,6 +95,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 4. [x] - `p1` - UI: render the table with sticky month headers and call rows; the subtitle counts calls and hours with plural rules - `inst-render-table`
 5. [x] - `p1` - User scrolls to the end of the loaded page - `inst-user-scroll`
 6. [x] - `p1` - API: `calls_list` for the next page - `inst-api-next`
+   1. [x] - `p1` - **IF** that read fails: keep loaded rows and cursor; show an inline error at the list end with **Try Again** for that page - `inst-next-error`
 7. [x] - `p1` - User clicks a column header - `inst-user-sort`
 8. [x] - `p1` - API: `calls_list` with the new sort; the sort state is announced ("sorted descending") - `inst-api-sort`
 9. [x] - `p1` - User presses Return, double-clicks or clicks › on a row - `inst-user-row`
