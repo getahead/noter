@@ -27,13 +27,17 @@ fn system_audio_is_never_asked_through_the_mac() {
 }
 
 #[test]
-fn a_login_item_macos_refuses_is_an_error_the_core_logs() {
+fn a_login_item_macos_never_registers_a_test_binary() {
     // A test binary is not an app bundle: SMAppService answers an error or "not found".
     let mac = Mac::new(&std::env::temp_dir());
-    let error = mac
-        .set_login_item(false)
-        .expect_err("a test binary is not an app bundle");
-    assert!(!error.message.is_empty());
+    match mac.set_login_item(false) {
+        Ok(()) => assert_ne!(
+            noter_native::login_item(),
+            noter_native::LoginItem::Enabled,
+            "turning off a login item never leaves it enabled"
+        ),
+        Err(error) => assert!(!error.message.is_empty()),
+    }
 }
 
 #[test]
