@@ -684,18 +684,23 @@ impl Core {
         let now = self.deps.clock.now().0;
         let ids = speakers.to_vec();
         let (blobs, profiles) = match rd(self.store(), move |c| {
-            let marks = crate::util::marks(ids.len());
-            let blobs = c
-                .prepare(&format!(
-                    "SELECT id, centroid FROM speakers WHERE id IN ({marks})"
-                ))
-                .map_err(internal)?
-                .query_map(params_from_iter(ids.iter()), |r| {
-                    Ok((r.get::<_, String>(0)?, r.get::<_, Option<Vec<u8>>>(1)?))
-                })
-                .map_err(internal)?
-                .collect::<Result<HashMap<_, _>, _>>()
-                .map_err(internal)?;
+            const BATCH: usize = 400;
+            let mut blobs = HashMap::new();
+            for batch in ids.chunks(BATCH) {
+                let marks = crate::util::marks(batch.len());
+                let rows = c
+                    .prepare(&format!(
+                        "SELECT id, centroid FROM speakers WHERE id IN ({marks})"
+                    ))
+                    .map_err(internal)?
+                    .query_map(params_from_iter(batch.iter()), |r| {
+                        Ok((r.get::<_, String>(0)?, r.get::<_, Option<Vec<u8>>>(1)?))
+                    })
+                    .map_err(internal)?
+                    .collect::<Result<HashMap<_, _>, _>>()
+                    .map_err(internal)?;
+                blobs.extend(rows);
+            }
             Ok((blobs, live_profiles(c, now).map_err(internal)?))
         }) {
             Ok(data) => data,
