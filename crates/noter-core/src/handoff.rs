@@ -18,7 +18,7 @@ use noter_protocol::*;
 use serde_json::Value;
 
 use crate::settings::invalid;
-use crate::{internal, Core};
+use crate::{internal, lock, Core};
 
 /// The handoff skill's version, recorded in `llm_runs`.
 const SKILL_VERSION: &str = "1";
@@ -204,6 +204,7 @@ impl Core {
         );
         req.cancel = cancel;
         req.call_id = Some(view.item.call.id.clone());
+        req.settings.pseudonyms = lock(&self.settings).privacy.pseudonymise_names;
         self.llm().refresh().await;
         let done = self.llm().run_once(req).await.map_err(failure)?;
         // @cpt-end:cpt-noter-algo-core-handoff-build:p1:inst-build-route
@@ -232,7 +233,7 @@ impl Core {
         self.store().read(move |c| {
             let mut quotes = Vec::new();
             let mut stmt = c.prepare(
-                "SELECT s.id, COALESCE(sp.label, ''), s.t0_ms, s.text FROM segments s
+                "SELECT s.id, COALESCE((SELECT display_name FROM people WHERE id = sp.person_id), sp.name, sp.label, ''), s.t0_ms, s.text FROM segments s
                  LEFT JOIN speakers sp ON sp.id = s.speaker_id
                  WHERE s.call_id = ?1 AND s.t1_ms > ?2 AND s.t0_ms < ?3
                    AND (?4 IS NULL OR s.channel = ?4)

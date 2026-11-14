@@ -40,6 +40,18 @@ const label = (speakers: { id: string; label: { type: string; person?: { display
   return l.type === "person" ? l.person!.display_name : l.type;
 };
 const count = async (sql: string, ...params: string[]) => (await rows<{ n: number }>(s, sql, ...params))![0].n;
+const scriptedVoiceVector = (call: string) => {
+  const seed = new TextEncoder().encode(call).reduce((h, b) => (Math.imul(h, 31) + b) >>> 0, 17);
+  const bytes = new Uint8Array(256 * 4);
+  const view = new DataView(bytes.buffer);
+  for (let i = 0; i < 256; i++) {
+    const value = (((seed + Math.imul(i, 2_654_435_761)) >>> 0) >>> 8) % 1000;
+    view.setFloat32(i * 4, value / 1000, true);
+  }
+  return bytes;
+};
+const containsBytes = (haystack: Uint8Array, needle: Uint8Array) =>
+  haystack.some((_, at) => at + needle.length <= haystack.length && needle.every((b, i) => haystack[at + i] === b));
 
 /** The past call gains a third voice nobody named, with one line of its own. */
 const unnamedVoice = (w: World) => {
@@ -185,6 +197,7 @@ describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
       expect(stored.length).toBe(made.centroids);
       // A plaintext centroid is 256 little-endian floats; the stored blob carries the cipher's nonce and tag too.
       expect(stored.every((r) => r.embedding.length > 256 * 4)).toBe(true);
+      expect(stored.every((r) => !containsBytes(r.embedding, scriptedVoiceVector(LIVE_CALL)))).toBe(true);
       expect(await count("SELECT voice_profile_optin AS n FROM people WHERE id = 'per_pavel'")).toBe(1);
     }
   });

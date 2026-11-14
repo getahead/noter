@@ -5,8 +5,8 @@ use std::cell::RefCell;
 
 use noter_db::{ChangeMeta, Migration, Store};
 use noter_handoff::{
-    append, checked, launch, remove_repo, render, repos, resolve, upsert_repo, versions, Begin,
-    Generations, NewVersion,
+    append, checked, launch, packet, remove_repo, render, repos, resolve, upsert_repo, versions,
+    Begin, Facts, Generations, NewVersion, Quote,
 };
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
@@ -90,6 +90,31 @@ fn render_writes_every_section_and_ends_with_the_scope_question() {
 fn checked_keeps_only_permitted_links() {
     let out = checked(output(), &["VSTOR-12".to_string()]);
     assert_eq!(out.links, vec!["VSTOR-12".to_string()]);
+}
+
+#[test]
+fn sensitive_handoff_evidence_is_marked_sensitive_for_the_egress_gate() {
+    let facts = Facts {
+        kind: ItemKind::Decision,
+        text: "Keep the API".into(),
+        call_title: "Planning".into(),
+        linked_issue: None,
+        evidence: vec![Quote {
+            segment_id: "seg_1".into(),
+            speaker: "Anna".into(),
+            at: "1:23".into(),
+            text: "Keep the API".into(),
+        }],
+        decisions: vec![],
+        repo: None,
+        target: HandoffTarget::Codex,
+        sensitive: true,
+    };
+    let packet = packet(&facts);
+    assert!(packet
+        .items
+        .iter()
+        .all(|item| item.source == noter_llm::SourceClass::Sensitive));
 }
 
 #[test]

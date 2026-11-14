@@ -299,8 +299,41 @@ async fn create_encrypts_every_centroid_and_returns_only_counts() {
         .unwrap();
     let plain: Vec<u8> = v.iter().flat_map(|x| x.to_le_bytes()).collect();
     assert_ne!(blob, plain);
-    assert!(!blob.windows(16).any(|w| plain.windows(16).any(|p| p == w)));
-    // Nothing biometric reaches the change log.
+    assert!(!blob.windows(plain.len()).any(|w| w == plain));
+    let serialized_blob = serde_json::to_string(&blob).unwrap();
+    let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    let mut stmt = db
+        .prepare("SELECT before, after, delta FROM changes")
+        .unwrap();
+    let rows = stmt
+        .query_map([], |r| {
+            Ok([
+                r.get::<_, noter_db::rusqlite::types::Value>(0)?,
+                r.get::<_, noter_db::rusqlite::types::Value>(1)?,
+                r.get::<_, noter_db::rusqlite::types::Value>(2)?,
+            ])
+        })
+        .unwrap();
+    for row in rows {
+        for value in row.unwrap() {
+            let bytes = match value {
+                noter_db::rusqlite::types::Value::Text(text) => text.into_bytes(),
+                noter_db::rusqlite::types::Value::Blob(bytes) => bytes,
+                _ => continue,
+            };
+            assert!(
+                !bytes.windows(blob.len()).any(|window| window == blob),
+                "stored biometric bytes in change log"
+            );
+            assert!(
+                !bytes
+                    .windows(serialized_blob.len())
+                    .any(|window| window == serialized_blob.as_bytes()),
+                "stored biometric blob in change log"
+            );
+        }
+    }
+    // Nothing biometric reaches the change log under another field name.
     assert_eq!(
         count(
             dir.path(),

@@ -1783,12 +1783,25 @@ mod tests {
         assert_eq!(core.release(&trusted(true), named("c_s")), Err(FORBIDDEN));
         assert!(core.names_sensitive_call(&named("c_s")));
         assert!(!core.names_sensitive_call(&named("c_n")));
+        noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
+            .unwrap()
+            .execute(
+                "UPDATE calls SET privacy_class = 'sensitive' WHERE id = 'c_n'",
+                [],
+            )
+            .unwrap();
+        assert_eq!(
+            core.release(&trusted(true), named("c_n")),
+            Err(FORBIDDEN),
+            "a call made sensitive while its cloud run is open cannot be released"
+        );
         // A local run may read a sensitive call; no run may carry a secret field.
         assert!(core.release(&trusted(false), named("c_s")).is_ok());
         for key in [
             "audio_path",
             "voice_profile",
             "api_key",
+            "token",
             "redaction_map",
             "credential",
         ] {

@@ -832,9 +832,25 @@ async fn an_export_never_brings_back_what_an_irreversible_delete_removed() {
     )
     .await
     .unwrap();
+    let (from, to): (String, String) = core
+        .store()
+        .read(|c| c.query_row(
+            "SELECT date(min(ts) / 1000, 'unixepoch'), date(max(ts) / 1000, 'unixepoch') FROM changes",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        ))
+        .unwrap();
+    let scope = LogScope::Period {
+        from: LocalDate(from),
+        to: LocalDate(to),
+    };
     for format in [LogFormat::Json, LogFormat::Markdown] {
-        export(&core, LogScope::Today, format).await.unwrap();
+        export(&core, scope.clone(), format).await.unwrap();
         let text = std::fs::read_to_string(&target).unwrap();
+        assert!(
+            text.contains("Deleted call"),
+            "expected the tombstone row: {text}"
+        );
         assert!(!text.contains("Secret title"), "{text}");
         assert!(!text.contains("Call call_a"), "{text}");
     }
@@ -886,10 +902,13 @@ async fn model_bookkeeping_rows_stay_out_of_history_and_export() {
         let page = history(&core, args).await;
         assert!(page.rows.iter().all(|r| r.summary != "Model run started"));
     }
-    export(&core, LogScope::Today, LogFormat::Markdown)
+    export(&core, call_scope("call_a"), LogFormat::Markdown)
         .await
         .unwrap();
-    assert!(!std::fs::read_to_string(&target)
-        .unwrap()
-        .contains("Model run"));
+    let text = std::fs::read_to_string(&target).unwrap();
+    assert!(
+        text.contains("Changed call info"),
+        "export must contain the user row: {text}"
+    );
+    assert!(!text.contains("Model run"));
 }
