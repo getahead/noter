@@ -18,12 +18,13 @@ const ROW = '[data-component="cpt-noter-component-ui-action-item-row"], [data-co
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
 
 /** The written outputs with a suggested decision, then Backend sync the way the core opens it (`window_navigate`) on `tab`. */
-async function openCall(page: Page, tab: "summary" | "history", plan: Pick<CorePlan, "latency" | "latencyFor"> = {}) {
+async function openCall(page: Page, tab: "summary" | "history", plan: Pick<CorePlan, "latency" | "latencyFor"> & { seedHistory?: boolean } = {}) {
+  const { seedHistory = false, ...openPlan } = plan;
   await openWindow(page, "main", {
-    ...plan,
+    ...openPlan,
     world: (w) => {
       O.written(w);
-      w.changes.push(
+      if (seedHistory) w.changes.push(
         { id: "chg_history_you", batch_id: null, batch_size: 1, at: Date.now(), actor: { type: "you" }, entity: { id: W.PAST_CALL, kind: "call", label: O.TITLE }, field: "title", before: "Old title", after: "Backend sync", summary: "Renamed the call", reason: null, evidence: [], confidence: null, status: "applied", undoable: true, redoable: false },
         { id: "chg_history_job", batch_id: null, batch_size: 1, at: Date.now(), actor: { type: "job", job_id: "job_evidence", name: "Evidence" }, entity: { id: W.PAST_CALL, kind: "call", label: O.TITLE }, field: "title", before: "Earlier title", after: "Backend sync", summary: "Updated the call", reason: null, evidence: [], confidence: null, status: "applied", undoable: true, redoable: false },
       );
@@ -41,7 +42,7 @@ async function openCall(page: Page, tab: "summary" | "history", plan: Pick<CoreP
 
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
   test("cpt-noter-seq-call-page-review-outputs — actor and job filters reload history with the selected values", async ({ page }) => {
-    await openCall(page, "history");
+    await openCall(page, "history", { seedHistory: true });
     const history = page.locator(TIMELINE);
     await history.getByRole("radio", { name: "You", exact: true }).click();
     await expect.poll(async () => (await sentCommands(page, "history_list")).at(-1)?.actor).toBe("you");
