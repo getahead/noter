@@ -2,7 +2,7 @@
 title: "Feature — Library: Calls list"
 description: "The Calls page of the Library: every recorded call in a sortable, multi-select table with month groups, its status cell and the Local only tag, opening a call's page and deleting one or several calls after the native alert."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-library-calls
 milestone: M1
@@ -120,7 +120,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 2. [x] - `p1` - User presses ⌘⌫, or opens the row context menu (**Open**, **Delete…**; **Add Tag…**, **Remove Tag** and **Export…** arrive with M2 and M3 features) and chooses **Delete…** - `inst-user-delete`
 3. [x] - `p1` - Flow: `cpt-noter-flow-ui-dialogs-host-delete-call` with the selected ids - `inst-delete-flow`
 4. [x] - `p1` - Store: rows leave as `entity:changed` reports them deleted; the selection clears - `inst-rows-leave`
-5. [x] - `p1` - **RETURN** the list without the deleted calls - `inst-return-delete`
+5. [x] - `p1` - **RETURN** the list without the deleted calls; when the loaded rows become empty while a next cursor or nonzero total remains, read the first page again and show **No calls yet** only if that read confirms there are no calls - `inst-return-delete`
 
 ### Rename or retype a call from its row
 
@@ -137,7 +137,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 **Steps**:
 1. [x] - `p2` - User renames or retypes the call (Call page ⋯ › **Rename…**, **Call Type ▸**) - `inst-user-edit`
 2. [x] - `p2` - API: `call_update` (call id, `rev`, title or type); the call types come from `call_types_list` - `inst-api-update`
-3. [x] - `p2` - Store: `entity:changed` updates the row - `inst-row-update`
+3. [x] - `p2` - Store: `entity:changed` updates the row; an unlisted call is inserted only when it sorts before the newest loaded call in newest-first order, and each newly listed call raises the total once; other sorts wait for the next read - `inst-row-update`
 4. [x] - `p2` - **RETURN** the row with the new values - `inst-return-edit`
 
 ## 3. Processes / Business Logic (CDSL)
@@ -174,7 +174,7 @@ It implements the Calls view of `cpt-noter-component-screen-library` (LC-R1, LC-
 4. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
 5. [x] - `p1` - **FROM** LISTED **TO** SELECTED_SEVERAL **WHEN** more than one row is selected - `inst-listed-several`
 6. [x] - `p1` - **FROM** SELECTED_SEVERAL **TO** LISTED **WHEN** the selection drops to one or none, or the calls are deleted - `inst-several-listed`
-7. [x] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted - `inst-listed-empty`
+7. [x] - `p1` - **FROM** LISTED **TO** EMPTY **WHEN** the last call is deleted; when a deletion leaves a nonzero total, reread the relevant page and discard any in-flight read - `inst-listed-empty`
 8. [x] - `p1` - **FROM** EMPTY **TO** LISTED **WHEN** a recorded call arrives (`entity:changed`) - `inst-empty-listed`
 
 ## 5. Definitions of Done
@@ -196,7 +196,7 @@ The system **MUST** render LC-R1 and LC-R3 as the prototype's Calls view does, w
 **Touches**:
 - Commands: `calls_list`, `call_get`, `call_update`, `call_types_list`
 - Events: `entity:changed`, `outputs:progress`
-- Tests: screenshot specs `default`, `empty`, `selected`, `statuses`, `loading` at Wide, Medium and Narrow; unit tests for the status order and selection
+- Tests: screenshot specs `default`, `empty`, `selected`, `statuses`, `loading` at Wide, Medium and Narrow; unit tests for the status order, selection, paging and entity updates
 
 ### Delete from the list
 
@@ -218,9 +218,12 @@ The system **MUST** delete one or several selected calls through the dialog host
 - [x] The Calls page renders the prototype's Library states **Normal**, **Calls · No calls yet**, **Calls · Several calls selected**, **Calls · Status cells** and **Loading** identically
 - [x] Rows never truncate the status icon; long titles tail-truncate with the full title in a help tag and for VoiceOver
 - [x] Back from a call's page returns to the same scroll position and selection
+- [x] Selection count and delete target include only calls on the currently listed pages after a sort or return from a call page
 - [x] The list makes one `calls_list` call per page, never one call per row
 
 ## 7. Additional Context
+
+**Change log (1.1, 13 Nov 2026).** Clarifies refresh after deleting a loaded page, newest-first event insertion and totals, selection after rows change, and row rendering with paged lists.
 
 **Prototype reuse.** Rewritten in React with the same structure, classes, tokens and data attributes: `C.callRow` (`src/js/40-d-2-components.js`) and the Calls view of `src/js/40-d-3-library.js` (table, month groups, selection, context menu, `lib.deleteAsk`). Styles `.lb-*` (`src/css/40-d.css`) are ported as-is. Not reusable: the sample calls, `L().sel` and `L().deleted` (prototype state), and the filter bar and tag menus, which `cpt-noter-feature-ui-library-search-topics` ports in M3.
 

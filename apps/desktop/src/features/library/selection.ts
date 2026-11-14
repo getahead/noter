@@ -43,6 +43,14 @@ export const selectAll = (order: string[]): Selection => ({
   anchor: order[0] ?? null,
 });
 
+/** Keep only selected rows still present after paging, sorting or returning from a call page. */
+export const retain = (sel: Selection, order: string[]): Selection => {
+  const listed = new Set(order);
+  const ids = sel.ids.filter((id) => listed.has(id));
+  const anchor = sel.anchor && listed.has(sel.anchor) ? sel.anchor : ids[0] ?? null;
+  return ids.length === sel.ids.length && anchor === sel.anchor ? sel : { ids, anchor };
+};
+
 /** The selected row farthest from the anchor: the one ⇧↑ and ⇧↓ move, and keyboard focus follows. */
 export function edgeOf(sel: Selection, order: string[]): string | undefined {
   const anchor =

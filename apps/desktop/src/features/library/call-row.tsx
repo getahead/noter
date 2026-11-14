@@ -1,4 +1,4 @@
-import type { MouseEvent } from "react";
+import { memo, type MouseEvent } from "react";
 import type { CallRow as Call, UiPrefs } from "../../core/bindings";
 import { clock, dayOf, duration, t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
@@ -49,15 +49,15 @@ export interface CallRowProps {
   selected?: boolean;
   /** The table's one Tab stop (the selected row, else the first); the others are reached with ↑/↓. */
   stop?: boolean;
-  onPress: (e: MouseEvent) => void;
-  onOpen: () => void;
-  onContext: (e: MouseEvent) => void;
+  onPress: (id: string, e: MouseEvent) => void;
+  onOpen: (id: string) => void;
+  onContext: (id: string, e: MouseEvent) => void;
   prefs?: UiPrefs;
 }
 
 // @cpt-component:cpt-noter-component-ui-call-row:p1
 /** One row of the Calls table (LC-R3): Return, a double-click or › opens the call; the status cell is the first status that applies. */
-export function CallRowView({
+export const CallRowView = memo(function CallRowView({
   call: c,
   selected,
   stop,
@@ -89,12 +89,12 @@ export function CallRowView({
       aria-selected={!!selected}
       aria-label={title}
       tabIndex={stop ? 0 : -1}
-      onClick={onPress}
+      onClick={(e) => onPress(c.id, e)}
       // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
-      onDoubleClick={onOpen}
-      onContextMenu={onContext}
+      onDoubleClick={() => onOpen(c.id)}
+      onContextMenu={(e) => onContext(c.id, e)}
       onKeyDown={(e) =>
-        e.key === "Enter" && !e.metaKey && (e.preventDefault(), onOpen())
+        e.key === "Enter" && !e.metaKey && (e.preventDefault(), onOpen(c.id))
       }
       // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
     >
@@ -160,7 +160,7 @@ export function CallRowView({
             )}
             {/* @cpt-begin:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-medium */}
             <span className="lb-status__text">
-              {st.link ? <Link label={st.text} onAction={onOpen} /> : st.text}
+              {st.link ? <Link label={st.text} onAction={() => onOpen(c.id)} /> : st.text}
             </span>
             {/* @cpt-end:cpt-noter-algo-ui-library-calls-status-cell:p1:inst-medium */}
           </span>
@@ -178,9 +178,9 @@ export function CallRowView({
           icon="chevronRight"
           label={t("library.row.open", { title })}
           size="inline"
-          onAction={onOpen}
+          onAction={() => onOpen(c.id)}
         />
       </td>
     </tr>
   );
-}
+});

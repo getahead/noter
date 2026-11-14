@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
+  type MouseEvent,
 } from "react";
 import { useAnnounce } from "../../app/a11y/announce";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -24,6 +25,7 @@ import {
   extend,
   NONE,
   press,
+  retain,
   selectAll,
   type Selection,
 } from "./selection";
@@ -64,6 +66,13 @@ export function CallsPage() {
   const sentinel = useRef<HTMLDivElement>(null);
   const known = useRef<Set<string>>(new Set());
 
+  const order = useMemo(() => state.rows.map((r) => r.id), [state.rows]);
+  const orderRef = useRef(order);
+  orderRef.current = order;
+  const selected = useMemo(() => new Set(selection.ids), [selection.ids]);
+  useEffect(() => {
+    setSelection((current) => retain(current, order));
+  }, [order]);
   useEffect(() => void (memory = { state, selection }), [state, selection]);
   // a record the core changed replaces its row, a call it removed leaves the list
   useEffect(() => {
@@ -100,10 +109,9 @@ export function CallsPage() {
 
   // shortcut: the latest progress wins over the row's own status until the next read; the core ends every write with a progress event
   const shown = useMemo(() => ({ ...state, rows: withProgress(state.rows, progress) }), [state, progress]);
-  const order = useMemo(() => state.rows.map((r) => r.id), [state.rows]);
   const chosen = useMemo(
-    () => state.rows.filter((r) => selection.ids.includes(r.id)),
-    [state.rows, selection],
+    () => state.rows.filter((r) => selected.has(r.id)),
+    [state.rows, selected],
   );
 
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-open-call
@@ -180,10 +188,27 @@ export function CallsPage() {
   };
   // @cpt-end:cpt-noter-flow-ui-library-calls-delete:p1:inst-user-delete
 
+  const onPress = useCallback(
+    (id: string, e: MouseEvent) =>
+      setSelection((current) =>
+        press(current, orderRef.current, id, { meta: e.metaKey, shift: e.shiftKey }),
+      ),
+    [],
+  );
+  const onContext = useCallback(
+    (id: string, e: MouseEvent) => {
+      e.preventDefault();
+      setSelection((current) => press(current, orderRef.current, id, { context: true }));
+      setMenu({ x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
   return (
     <CallsView
       state={shown}
       selection={selection}
+      selected={selected}
       slow={slow}
       failed={failed}
       selfTestPassed={selfTestPassed}
@@ -191,17 +216,9 @@ export function CallsPage() {
       menu={menu}
       sentinel={sentinel}
       onSort={sortBy}
-      onPress={(id, e) =>
-        setSelection(
-          press(selection, order, id, { meta: e.metaKey, shift: e.shiftKey }),
-        )
-      }
+      onPress={onPress}
       onOpen={open}
-      onContext={(id, e) => {
-        e.preventDefault();
-        setSelection(press(selection, order, id, { context: true }));
-        setMenu({ x: e.clientX, y: e.clientY });
-      }}
+      onContext={onContext}
       onKeyDown={onKeyDown}
       onRetry={() => void list.load()}
       // @cpt-begin:cpt-noter-flow-ui-dialogs-host-sheet:p1:inst-user-trigger

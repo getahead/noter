@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   type KeyboardEvent,
   type MouseEvent,
   type Ref,
@@ -25,6 +26,7 @@ export const COLUMNS = {
 export interface CallsViewProps {
   state: CallsState;
   selection: Selection;
+  selected: ReadonlySet<string>;
   /** The first read has taken longer than 300 ms: skeleton rows. */
   slow: boolean;
   failed: string | null;
@@ -45,13 +47,13 @@ export interface CallsViewProps {
   onDelete: () => void;
 }
 
-const selectedRows = (rows: CallRow[], s: Selection) =>
-  rows.filter((r) => s.ids.includes(r.id));
+const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
+  rows.filter((r) => selected.has(r.id));
 
 /** Library › Calls as the prototype draws it: LC-R1 (title and counts) and LC-R3 (table, empty state, skeleton or error). */
 export function CallsView(p: CallsViewProps) {
   const { state, selection } = p;
-  const chosen = selectedRows(state.rows, selection);
+  const chosen = selectedRows(state.rows, p.selected);
   return (
     <>
       <div data-region="LC-R1" className="lb-head">
@@ -62,7 +64,7 @@ export function CallsView(p: CallsViewProps) {
           subtitle(
             state.rows,
             state.total ?? state.rows.length,
-            selection.ids.length,
+            chosen.length,
             p.prefs?.time_zone || undefined,
           )}
       </div>
@@ -80,7 +82,7 @@ export function CallsView(p: CallsViewProps) {
         data-region="LC-R3"
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
-        data-state={selection.ids.length > 1 ? "selected-several" : state.status.toLowerCase()}
+        data-state={chosen.length > 1 ? "selected-several" : state.status.toLowerCase()}
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         role="region"
@@ -103,7 +105,11 @@ export function CallsView(p: CallsViewProps) {
 }
 
 function Body(p: CallsViewProps) {
-  const { state, selection } = p;
+  const { state, selected } = p;
+  const groups = useMemo(
+    () => groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined),
+    [state.rows, p.prefs?.time_zone],
+  );
   if (state.status === "ERROR")
     return (
       <InlineBanner
@@ -158,8 +164,7 @@ function Body(p: CallsViewProps) {
         )}
       </div>
     );
-  const groups = groupByMonth(state.rows, undefined, p.prefs?.time_zone || undefined);
-  const stopId = state.rows.find((c) => selection.ids.includes(c.id))?.id ?? groups[0]?.rows[0]?.id;
+  const stopId = state.rows.find((c) => selected.has(c.id))?.id ?? groups[0]?.rows[0]?.id;
   const head = (col: Column, width: string) => (
     <Th
       label={t(COLUMNS[col])}
@@ -211,11 +216,11 @@ function Body(p: CallsViewProps) {
               <CallRowView
                 key={c.id}
                 call={c}
-                selected={selection.ids.includes(c.id)}
+                selected={selected.has(c.id)}
                 stop={c.id === stopId}
-                onPress={(e) => p.onPress(c.id, e)}
-                onOpen={() => p.onOpen(c.id)}
-                onContext={(e) => p.onContext(c.id, e)}
+                onPress={p.onPress}
+                onOpen={p.onOpen}
+                onContext={p.onContext}
                 prefs={p.prefs}
               />
             )),
