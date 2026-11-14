@@ -2,34 +2,23 @@
 //! speaker matching at archive install, and carry-forward.
 
 mod common;
-use common::{call, count, exec, item, part, person, row, speaker, text};
+use common::{call, count, exec, item, part, person, row, speaker, text, Events};
 use std::path::Path;
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use noter_core::testing;
-use noter_core::{
-    Clock, Core, CoreDeps, EventEmitter, KeychainLocked, MemorySecrets, Secret, SecretStore,
-};
+use noter_core::{Clock, Core, CoreDeps, KeychainLocked, MemorySecrets, Secret, SecretStore};
 use noter_db::Insert;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 
 const NOW: i64 = 1_792_137_600_000;
 const DAY: i64 = 86_400_000;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
 
 struct Moving(AtomicI64);
 
