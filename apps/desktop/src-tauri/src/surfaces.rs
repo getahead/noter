@@ -232,7 +232,9 @@ fn window_title(label: WindowLabel) -> &'static str {
     match label {
         WindowLabel::Settings => "Settings",
         WindowLabel::FirstRun => "Noter Setup",
-        _ => "Noter",
+        WindowLabel::CallScreen => "Call",
+        WindowLabel::RecordPrompt => "Recording",
+        WindowLabel::Main => "Noter",
     }
 }
 
@@ -245,6 +247,15 @@ mod window_title_tests {
         assert_eq!(window_title(WindowLabel::Settings), "Settings");
         assert_eq!(window_title(WindowLabel::FirstRun), "Noter Setup");
         assert_eq!(window_title(WindowLabel::Main), "Noter");
+        let titles = [
+            window_title(WindowLabel::Main),
+            window_title(WindowLabel::Settings),
+            window_title(WindowLabel::FirstRun),
+            window_title(WindowLabel::CallScreen),
+            window_title(WindowLabel::RecordPrompt),
+        ];
+        let unique: std::collections::HashSet<_> = titles.into_iter().collect();
+        assert_eq!(unique.len(), titles.len(), "native window titles identify their window");
     }
 }
 

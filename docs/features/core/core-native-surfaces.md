@@ -60,6 +60,7 @@ In `apps/desktop/src-tauri` and the `noter-native` crate (objc2), the core build
 
 - 2026-11-14: Hide and restore transitions keep the core window-state lock free while the native adapter interacts with AppKit, so a main-thread focus callback can complete during the transition.
 - 2026-11-14: Navigation requests for a newly created window are retained until that window's page finishes loading.
+- 2026-11-14: Native windows use distinct titles so accessibility queries and the Window menu identify the correct surface.
 
 ### 1.2 Purpose
 
