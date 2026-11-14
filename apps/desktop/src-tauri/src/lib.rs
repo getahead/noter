@@ -81,9 +81,11 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             {
                 api.prevent_close();
                 let _ = window.hide();
+                surfaces::main_window_will_hide(window.app_handle());
             }
             WindowEvent::Destroyed => {
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
+                surfaces::update_activation_for_visible_windows(window.app_handle());
                 if let Some(pending) = window.try_state::<PendingNavigation>() {
                     pending.page_unloaded(window.label());
                 }

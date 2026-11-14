@@ -590,7 +590,7 @@ async fn announce_navigate_and_external_opens_are_checked_before_the_native_laye
 #[tokio::test]
 async fn a_native_caller_may_show_the_call_window_and_hide_for_presenting() {
     let dir = tempfile::tempdir().unwrap();
-    let (core, _, _) = open(dir.path());
+    let (core, _, rec) = open(dir.path());
     let menu = CommandCtx {
         caller: Caller::Native {
             surface: NativeSurface::MenuBar,
@@ -601,6 +601,16 @@ async fn a_native_caller_may_show_the_call_window_and_hide_for_presenting() {
             .await
             .unwrap()
             .visible
+    );
+    rec.take();
+    let already_open = core.window_show_call(&menu, NoArgs {}).await.unwrap();
+    assert!(
+        !already_open.key,
+        "the menu bar does not activate an already-open call panel"
+    );
+    assert!(
+        rec.take().is_empty(),
+        "the menu bar leaves the call panel non-key"
     );
     let hidden = core
         .app_set_hidden_for_presenting(&menu, HiddenArgs { hidden: true })

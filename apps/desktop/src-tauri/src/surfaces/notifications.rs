@@ -90,8 +90,7 @@ pub fn notification_clicked<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
     }
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-case-nt3
     if let Some(main) = window(app, WindowLabel::Main) {
-        let _ = main.show();
-        let _ = main.set_focus();
+        show(&main, true);
     }
     crate::emit_navigation(app, json!(target));
     // @cpt-end:cpt-noter-flow-ui-notifications-receive:p1:inst-match-click

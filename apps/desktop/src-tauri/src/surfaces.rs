@@ -135,6 +135,14 @@ fn make_panel<R: Runtime>(window: &WebviewWindow<R>) {
 fn show<R: Runtime>(window: &WebviewWindow<R>, key: bool) {
     let app = window.app_handle().clone();
     let label = window.label().to_string();
+    if label == WindowLabel::Main.as_str() {
+        if let Some(surfaces) = app.try_state::<Arc<TauriSurfaces<R>>>() {
+            surfaces.main_hidden.store(false, Ordering::Relaxed);
+        }
+    }
+    if key || !crate::window_label(&label).is_some_and(is_panel) {
+        set_regular_activation(&app);
+    }
     if !(crate::window_label(&label).is_some_and(is_panel) && panels_on(&app)) {
         let _ = window.show();
         if key {
@@ -151,6 +159,56 @@ fn show<R: Runtime>(window: &WebviewWindow<R>, key: bool) {
             let _ = plain.show();
         }
     });
+}
+
+/// With no ordinary window, a status-item click must not make AppKit reopen the last hidden one.
+/// Explicitly showing an ordinary window (or making the call panel key) restores regular policy.
+fn set_regular_activation<R: Runtime>(app: &AppHandle<R>) {
+    #[cfg(target_os = "macos")]
+    let _ = app.set_activation_policy(tauri::ActivationPolicy::Regular);
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+pub(super) fn update_activation_for_visible_windows<R: Runtime>(app: &AppHandle<R>) {
+    #[cfg(target_os = "macos")]
+    {
+        let ordinary_window_visible = [WindowLabel::Main, WindowLabel::Settings, WindowLabel::FirstRun]
+            .into_iter()
+            .filter_map(|label| app.get_webview_window(label.as_str()))
+            .any(|window| window.is_visible().unwrap_or(false));
+        let policy = if ordinary_window_visible {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
+}
+
+pub(super) fn main_window_will_hide<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(surfaces) = app.try_state::<Arc<TauriSurfaces<R>>>() {
+        surfaces.main_hidden.store(true, Ordering::Relaxed);
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // CloseRequested runs before AppKit applies hide(), so do not count Main's current
+        // visibility. Settings and First Run remain ordinary windows if either is open.
+        let another_ordinary_window_visible = [WindowLabel::Settings, WindowLabel::FirstRun]
+            .into_iter()
+            .filter_map(|label| app.get_webview_window(label.as_str()))
+            .any(|window| window.is_visible().unwrap_or(false));
+        let policy = if another_ordinary_window_visible {
+            tauri::ActivationPolicy::Regular
+        } else {
+            tauri::ActivationPolicy::Accessory
+        };
+        let _ = app.set_activation_policy(policy);
+    }
+    #[cfg(not(target_os = "macos"))]
+    let _ = app;
 }
 
 /// The window, created hidden on first use at `index.html?window=<label>`.
@@ -243,19 +301,10 @@ mod window_title_tests {
     use super::*;
 
     #[test]
-    fn settings_and_setup_have_distinct_native_titles() {
-        assert_eq!(window_title(WindowLabel::Settings), "Settings");
-        assert_eq!(window_title(WindowLabel::FirstRun), "Noter Setup");
-        assert_eq!(window_title(WindowLabel::Main), "Noter");
-        let titles = [
-            window_title(WindowLabel::Main),
-            window_title(WindowLabel::Settings),
-            window_title(WindowLabel::FirstRun),
-            window_title(WindowLabel::CallScreen),
-            window_title(WindowLabel::RecordPrompt),
-        ];
+    fn every_native_window_has_a_distinct_title() {
+        let titles = WindowLabel::ALL.map(window_title);
         let unique: std::collections::HashSet<_> = titles.into_iter().collect();
-        assert_eq!(unique.len(), titles.len(), "native window titles identify their window");
+        assert_eq!(unique.len(), titles.len());
     }
 }
 
@@ -272,6 +321,8 @@ pub struct TauriSurfaces<R: Runtime> {
     floating: AtomicBool,
     /// The windows hidden for presenting, shown again on restore.
     hidden: Mutex<Vec<WindowLabel>>,
+    /// A native menu selection must not reopen the main window after the user closed it.
+    main_hidden: AtomicBool,
     frames: SavedFrames,
     /// The display and layout the call window was last placed on, uncollapsed: where a move or
     /// resize by the user is saved.
@@ -305,6 +356,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             wanted: Mutex::new(None),
             floating: AtomicBool::new(false),
             hidden: Mutex::new(Vec::new()),
+            main_hidden: AtomicBool::new(false),
             frames,
             placed: Mutex::new(None),
             prompt_size: Mutex::new(PROMPT),
@@ -390,6 +442,9 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
                 hidden.push(label);
             }
         }
+        drop(hidden);
+        #[cfg(target_os = "macos")]
+        let _ = self.app.set_activation_policy(tauri::ActivationPolicy::Accessory);
     }
 
     fn restore_all(&self) {

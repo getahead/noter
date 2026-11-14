@@ -1,6 +1,6 @@
 use super::{accounts, app, hub, lock, log, Core};
 use noter_db::Direction;
-use noter_protocol::ipc::{CommandCtx, CoreApi, Sink};
+use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, NativeSurface, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 
@@ -659,11 +659,18 @@ impl CoreApi for Core {
 
     async fn window_show_call(
         &self,
-        _ctx: &CommandCtx,
+        ctx: &CommandCtx,
         _args: NoArgs,
     ) -> Result<CallWindowState, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
-        Ok(self.show_call(true))
+        let key_if_visible = match &ctx.caller {
+            Caller::Window { .. } => true,
+            Caller::Native {
+                surface: NativeSurface::Hotkey,
+            } => true,
+            Caller::Native { .. } => false,
+        };
+        Ok(self.show_call(key_if_visible))
         // @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-show-call
     }
 

@@ -294,6 +294,8 @@ impl<R: Runtime> TauriSurfaces<R> {
         // Not the menu lock: this runs on the main thread, which `set_tray` waits for under it.
         let checked =
             action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
+        let app = self.app.clone();
+        let main_was_hidden = self.main_hidden.load(Ordering::Relaxed);
         let Some(core) = self.core.get().and_then(Weak::upgrade) else {
             return;
         };
@@ -316,6 +318,16 @@ impl<R: Runtime> TauriSurfaces<R> {
             // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
             // shows the item disabled at the next update.
             let _ = dispatch_and_record(core.as_ref(), &ctx, name, args).await;
+            if main_was_hidden && name != "window_navigate" {
+                let app = app.clone();
+                let handle = app.clone();
+                let _ = app.run_on_main_thread(move || {
+                    if let Some(main) = handle.get_webview_window(WindowLabel::Main.as_str()) {
+                        let _ = main.hide();
+                    }
+                    update_activation_for_visible_windows(&handle);
+                });
+            }
         });
         // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
