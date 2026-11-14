@@ -107,7 +107,8 @@ class NoterTestCase: XCTestCase {
 
     /// Closes the menu with a second click: Escape does not reach a status menu.
     func closeMenu() {
-        if isOpen(statusItem.menus.firstMatch) { statusItem.click() }
+        // Use AXSelected instead of querying the menu, which can disappear between XCTest snapshots.
+        if statusItem.isSelected { statusItem.click() }
     }
 
     /// A closed status menu can stay in the accessibility tree with an empty frame.
