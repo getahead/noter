@@ -14,6 +14,9 @@ use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
+#[path = "common/row.rs"]
+mod common_row;
+use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
 
@@ -130,13 +133,6 @@ struct World {
     ops: Arc<Ops>,
     llm: Scripted,
     dir: tempfile::TempDir,
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
-    }
 }
 
 fn item(id: &str, kind: &str, review: &str, text: &str, owner: Option<&str>) -> Insert {

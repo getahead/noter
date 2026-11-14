@@ -18,6 +18,7 @@ use crate::tools::McpLaunch;
 
 /// One adapter call: the packet exactly as the gate released (and audited) it.
 pub(crate) struct Invocation {
+    pub(crate) _gate: crate::gate::GateToken,
     pub runtime: RuntimeChoice,
     pub skill: Skill,
     /// The app-owned output schema, the same for every adapter.
