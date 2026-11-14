@@ -672,6 +672,10 @@ fn close_drains_the_queue_checkpoints_and_refuses_later_work() {
     drop(tx);
     let outcomes: Vec<_> = rx.into_iter().collect();
     let accepted = outcomes.iter().filter(|result| result.is_ok()).count();
+    assert!(
+        accepted > 0,
+        "the concurrent writers reached the store before close"
+    );
     assert_eq!(store.state(), StoreState::Closed);
     let wal = PathBuf::from(format!("{}-wal", path.display()));
     assert!(
