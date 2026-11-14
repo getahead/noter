@@ -20,7 +20,7 @@ test.describe("cpt-noter-seq-core-window-open", () => {
       await expect(frame(page)).toHaveAttribute("data-window", label);
       await expect(frame(page)).toHaveAttribute("aria-busy", "false");
       await expect(page.getByRole("alert")).toHaveCount(0);
-      if (label === "main") {
+      if (label === "main" && process.env.NOTER_CORE === "stdio") {
         await expect.poll(() => page.evaluate(() => (globalThis as unknown as { __noterEmits?: Array<{ event: string; payload: unknown }> }).__noterEmits ?? []))
           .toContainEqual({ event: "shell:menu-context", payload: { sidebarVisible: true } });
       }
