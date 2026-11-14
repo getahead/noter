@@ -30,7 +30,6 @@ import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 
 const NO_STATES: readonly DegradedState[] = [];
 const NO_IDS: ReadonlySet<string> = new Set();
-// @cpt-component:cpt-noter-component-shell-call-window:p1
 export function loadParticipants(
   bridge: Bridge,
   callId: string | null,
