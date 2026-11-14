@@ -379,6 +379,48 @@ async fn scripted_start_answer_uses_the_command_call_id() {
     assert_eq!(output, "Fixture Speakers");
 }
 
+// cpt-noter-algo-core-harness-scripted-engine: an explicit stop answer keeps its paths and binds its id.
+#[tokio::test]
+async fn scripted_stop_answer_uses_the_command_call_id() {
+    let script = Script::parse(
+        r#"{"on":"stop","after_ms":0,"event":{"type":"session_stopped","call_id":"placeholder","timeline_path":"fixture/timeline.json","mic_path":"fixture/mic.m4a","sys_path":"fixture/sys.m4a"}}"#,
+    )
+    .unwrap();
+    let engine = ScriptedEngine::new()
+        .with_default(Behaviour {
+            answer_capture_sessions: true,
+            ..Behaviour::default()
+        })
+        .with_script(script);
+    let c = client(&engine);
+    let mut events = c.events();
+    let call_id = CallId::new("actual-call");
+    c.command(EngineCommand::Stop {
+        call_id: call_id.clone(),
+    })
+    .await
+    .unwrap();
+    let stopped = tokio::time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let EngineEvent::SessionStopped {
+                call_id,
+                timeline_path,
+                mic_path,
+                sys_path,
+            } = events.recv().await.unwrap().event
+            {
+                break (call_id, timeline_path, mic_path, sys_path);
+            }
+        }
+    })
+    .await
+    .expect("scripted stop answer is emitted");
+    assert_eq!(stopped.0, call_id);
+    assert_eq!(stopped.1, "fixture/timeline.json");
+    assert_eq!(stopped.2.as_deref(), Some("fixture/mic.m4a"));
+    assert_eq!(stopped.3.as_deref(), Some("fixture/sys.m4a"));
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_new_self_test_cancels_what_is_left_of_the_previous_one() {
     let engine = ScriptedEngine::new().with_default(Behaviour {
