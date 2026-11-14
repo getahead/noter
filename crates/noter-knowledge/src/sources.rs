@@ -287,7 +287,7 @@ pub async fn add_mcp(
             };
             let token = mcp.oauth(&server, &audit).await.map_err(|e| {
                 let failed = unaudited.lock().unwrap_or_else(|p| p.into_inner()).take();
-                failed.unwrap_or_else(|| e.into())
+                failed.unwrap_or_else(|| crate::mcp::mcp_error(e))
             })?;
             let token = Secret::new(token);
             let account = token_account(&id);

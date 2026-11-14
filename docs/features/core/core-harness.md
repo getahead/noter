@@ -2,7 +2,7 @@
 title: "Feature: noter-core-harness and real-core conformance"
 description: "A test binary that runs the real CoreApi without Tauri over JSON Lines, with a fixture database, a scripted engine and a scripted runtime, so the conformance suite and the UI E2E flows count against the real core from M0."
 status: PROPOSED
-version: "0.3"
+version: "0.4"
 date: "2026-11-14"
 milestone: M0
 lane: core
@@ -14,6 +14,7 @@ design: docs/DESIGN-core.md
 
 > **Change log (v0.2):** The fixture seeds engine-named audio files and the scripted stop writes physical recordings.
 > **Change log (v0.3):** The built-in offline archive returns live transcript segments when call audio exists and fails when it does not.
+> **Change log (v0.4):** Protocol fixtures and TypeScript-export dependencies are feature-gated so ordinary application builds omit them; the harness and export binary opt into the needed features.
 
 <!-- toc -->
 
@@ -47,6 +48,8 @@ design: docs/DESIGN-core.md
 ### 1.1 Overview
 
 `crates/noter-core-harness` is a small, unshipped binary. It builds the same `noter-core` composition root the app uses, without Tauri, on a fresh database seeded from `contracts/fixtures/world.json`, with a scripted engine and a scripted runtime behind the real seams. It speaks the JSON Lines wire format of docs/HARNESS.md on stdin and stdout. The conformance suite and the Playwright flows reach it through `apps/desktop/tests/support/stdio-transport.ts`.
+
+Protocol fixture data is enabled only for the harness and contract-export binary; TypeScript-export dependencies and the exporter binary are enabled only by the protocol crate's `export` feature.
 
 ### 1.2 Purpose
 
@@ -231,4 +234,4 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 
 **Verification in this change**: unit tests in `crates/noter-engine-client/tests/offline.rs` cover the built-in success and no-audio answers; real-core tests in `crates/noter-core/tests/postcall_archive.rs` cover installation and failure; conformance coverage in `apps/desktop/tests/conformance/m2-stories-postcall.test.ts` uses no explicit offline script. The call-page review outputs DESIGN story runs against the real core. These additional criteria remain unchecked until `just gate` passes.
 
-**Change log**: 0.3 (2026-11-14) specifies built-in archive behavior and regression criteria; implementation and focused regressions are in this change, with the definition-of-done gate still outstanding. Version 0.2 records fixture audio seeding and physical recordings on scripted stop.
+**Change log**: 0.4 (2026-11-14) records release feature-gating for fixtures/export tooling. Version 0.3 specifies built-in archive behavior and regression criteria; implementation and focused regressions are in that change, with the definition-of-done gate still outstanding. Version 0.2 records fixture audio seeding and physical recordings on scripted stop.

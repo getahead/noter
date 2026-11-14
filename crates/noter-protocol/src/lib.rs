@@ -20,6 +20,7 @@ pub mod common;
 pub mod egress;
 pub mod engine;
 pub mod error;
+#[cfg(feature = "fixtures")]
 pub mod fixtures;
 pub mod ipc;
 pub mod mcp;

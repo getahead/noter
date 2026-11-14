@@ -615,7 +615,7 @@ impl<L: EngineLauncher> Lookups<'_, L> {
             .lock()
             .unwrap_or_else(|p| p.into_inner())
             .take();
-        stopped.unwrap_or_else(|| Stop::Failed(e.into()))
+        stopped.unwrap_or_else(|| Stop::Failed(crate::mcp::mcp_error(e)))
     }
 }
 
@@ -648,12 +648,14 @@ async fn remote<L: EngineLauncher>(
         let ctx = &*ctx;
         let audit = |d: &str, r: &[u8]| lookups.audit(ctx, d, r);
         let remote = Remote {
+            server,
+            token,
             audit: &audit,
             renewed: &renewed,
         };
-        match env.mcp.list_resources(server, token, &remote).await {
+        match env.mcp.list_resources(&remote).await {
             Ok(Some(listing)) => Ok(listing),
-            Ok(None) => crawl(env, server, token, &remote).await,
+            Ok(None) => crawl(env, &remote).await,
             Err(e) => Err(e),
         }
     };
@@ -663,21 +665,23 @@ async fn remote<L: EngineLauncher>(
     for (n, item) in listing.items.iter().enumerate() {
         ctx.checkpoint().await?;
         let before = known.get(&item.uri);
-        if before.is_some_and(|k| item.hash.as_ref() == Some(&k.hash)) {
+        if before.is_some_and(|k| item.version.as_ref() == Some(&k.hash)) {
             continue;
         }
         let page = {
             let ctx = &*ctx;
             let audit = |d: &str, r: &[u8]| lookups.audit(ctx, d, r);
             let remote = Remote {
+                server,
+                token,
                 audit: &audit,
                 renewed: &renewed,
             };
-            let read = env.mcp.read_resource(server, token, &item.uri, &remote);
+            let read = env.mcp.read_resource(&remote, &item.uri);
             read.await.map_err(|e| lookups.failed(e))?
         };
         let hash = item
-            .hash
+            .version
             .clone()
             .unwrap_or_else(|| noter_db::hex(&Sha256::digest(page.text.as_bytes())));
         if before.is_some_and(|k| k.hash == hash) {
@@ -691,7 +695,7 @@ async fn remote<L: EngineLauncher>(
                     "a page could not be read as text",
                 )
             })?;
-        doc.title = [page.title, item.title.clone()]
+        doc.title = [item.title.clone()]
             .into_iter()
             .find(|t| !t.trim().is_empty())
             .unwrap_or(doc.title);
@@ -723,13 +727,11 @@ async fn remote<L: EngineLauncher>(
 /// The server's documents through its search, never complete.
 async fn crawl<L: EngineLauncher>(
     env: &SyncEnv<'_, L>,
-    server: &str,
-    token: &str,
     remote: &Remote<'_>,
 ) -> Result<Listing, McpError> {
     let mut items: Vec<RemoteDoc> = vec![];
     for query in SEED_QUERIES {
-        let found = env.mcp.seed_query(server, token, query, remote).await?;
+        let found = env.mcp.seed_query(remote, query).await?;
         for item in found.items {
             if !items.iter().any(|i| i.uri == item.uri) {
                 items.push(item);

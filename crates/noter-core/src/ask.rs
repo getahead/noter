@@ -9,8 +9,7 @@ use std::time::Duration;
 
 use noter_db::ChangeMeta;
 use noter_llm::{
-    Cancel, Failure, LlmRuntime, Packet, PacketContext, PacketItem, RunRequest, Skill, SourceClass,
-    TaskKind,
+    Cancel, Failure, Packet, PacketContext, PacketItem, RunRequest, Skill, SourceClass, TaskKind,
 };
 use noter_protocol::ipc::{CommandCtx, Sink};
 use noter_protocol::model::settings::AuditWhat;

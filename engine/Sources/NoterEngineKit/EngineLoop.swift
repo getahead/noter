@@ -162,6 +162,12 @@ public final class EngineLoop: @unchecked Sendable {
             writer.emit(.error(cmdId: id, code: .badCommand, message: "a session runs already"))
             return
         }
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
+        guard start.backend == "whisper_turbo" else {
+            writer.emit(.error(cmdId: id, code: .badCommand, message: "unsupported capture backend: \(start.backend)"))
+            return
+        }
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         offline?.releaseArchive()
         do {
             guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }

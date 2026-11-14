@@ -98,7 +98,9 @@ pub struct CallTypeId(pub String);
     JsonSchema,
 )]
 #[serde(transparent)]
-pub struct TimestampMs(#[specta(type = specta_typescript::Number)] pub i64);
+pub struct TimestampMs(
+    #[cfg_attr(feature = "export", specta(type = specta_typescript::Number))] pub i64,
+);
 
 /// Milliseconds from the start of a call (session-relative audio time).
 #[derive(
@@ -160,7 +162,7 @@ pub struct LocalDate(pub String);
     JsonSchema,
 )]
 #[serde(transparent)]
-pub struct Seq(#[specta(type = specta_typescript::Number)] pub u64);
+pub struct Seq(#[cfg_attr(feature = "export", specta(type = specta_typescript::Number))] pub u64);
 
 /// Version of a whole-state payload (`capture:state`, `degraded:changed`, …).
 /// Monotonic per payload kind for the life of the core process; the same
@@ -182,7 +184,9 @@ pub struct Seq(#[specta(type = specta_typescript::Number)] pub u64);
     JsonSchema,
 )]
 #[serde(transparent)]
-pub struct StateVersion(#[specta(type = specta_typescript::Number)] pub u64);
+pub struct StateVersion(
+    #[cfg_attr(feature = "export", specta(type = specta_typescript::Number))] pub u64,
+);
 
 /// Row version for optimistic concurrency. Every editable record carries it;
 /// every edit command sends the `rev` it was based on and gets

@@ -1380,8 +1380,6 @@ impl McpSource for Held {
 
     fn list_resources<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
         remote: &'a McpRemote<'a>,
     ) -> BoxFuture<'a, Result<Option<Listing>, McpError>> {
         Box::pin(async move {
@@ -1389,28 +1387,24 @@ impl McpSource for Held {
             while self.held.load(Ordering::SeqCst) {
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
-            self.inner.list_resources(server, token, remote).await
+            self.inner.list_resources(remote).await
         })
     }
 
     fn read_resource<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        uri: &'a str,
         remote: &'a McpRemote<'a>,
+        uri: &'a str,
     ) -> BoxFuture<'a, Result<McpPage, McpError>> {
-        self.inner.read_resource(server, token, uri, remote)
+        self.inner.read_resource(remote, uri)
     }
 
     fn seed_query<'a>(
         &'a self,
-        server: &'a str,
-        token: &'a str,
-        query: &'a str,
         remote: &'a McpRemote<'a>,
+        query: &'a str,
     ) -> BoxFuture<'a, Result<Listing, McpError>> {
-        self.inner.seed_query(server, token, query, remote)
+        self.inner.seed_query(remote, query)
     }
 }
 

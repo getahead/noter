@@ -121,7 +121,7 @@ pub async fn llm_run(
     items: Vec<(String, String)>,
 ) -> Result<serde_json::Value, CoreError> {
     use noter_llm::{
-        Failure, LlmRuntime, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
+        Failure, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
     };
     use noter_protocol::model::settings::AuditWhat;
     use noter_protocol::{ErrorCode, PrivacyMode};
@@ -254,7 +254,7 @@ pub async fn mcp_run_under(
     ),
     CoreError,
 > {
-    use noter_llm::{LlmRuntime, Packet, PacketItem, RunRequest, Skill, SourceClass};
+    use noter_llm::{Packet, PacketItem, RunRequest, Skill, SourceClass};
     use noter_protocol::model::settings::AuditWhat;
     use noter_protocol::{ErrorCode, RuntimeChoice};
     let socket = core.serve_socket().await?;
