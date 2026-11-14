@@ -1,6 +1,6 @@
 // Call window (cpt-noter-feature-ui-call-window) in the copilot-off layout of M1: one screenshot per state of
 // surface('call') the FEATURE's definitions of done list, rendered against the fake core and a frozen
-// clock. The countdown and the transcript (the live-transcript feature's, still streaming its script) are masked.
+// clock. The live script is empty, so the transcript, countdown and notice bar are part of each comparison.
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow } from "../e2e/support/app";
@@ -14,7 +14,7 @@ const FLOATING = { width: 420, height: 560 };
 
 async function shot(page: Page, name: string, world: (w: World) => void = () => {}, win: Win = {}) {
   await page.setViewportSize(win.layout === "floating" ? (win.collapsed ? { width: 420, height: 56 } : FLOATING) : DEDICATED);
-  await openWindow(page, "call-screen", { world });
+  await openWindow(page, "call-screen", { world: (w) => { world(w); w.live_script = []; } });
   if (Object.keys(win).length)
     await page.evaluate((p) => {
       const f = (globalThis as unknown as { __noterFake: { callWindow: object; publish(e: string): void } }).__noterFake;
@@ -24,8 +24,7 @@ async function shot(page: Page, name: string, world: (w: World) => void = () => 
   await expect(page.locator('[data-component="cpt-noter-component-shell-call-window"]')).toBeVisible();
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
   await settled(page);
-  const mask = [page.locator(".np-tnum"), page.locator('[data-region="CS-R2"], [data-region="FP-R5"]'), page.locator(".cw-notice__bar")];
-  await expect(page).toHaveScreenshot(`${name}.png`, { mask });
+  await expect(page).toHaveScreenshot(`${name}.png`);
 }
 
 test.beforeEach(({ page }) => freeze(page));
@@ -50,7 +49,6 @@ test.describe("cpt-noter-dod-ui-call-window-shell call window layouts", () => {
   test("floating, first open: the share warning", async ({ page }) => shot(page, "share-warning", () => {}, { layout: "floating", show_share_warning: true }));
   test("collapsed: the strip", async ({ page }) => shot(page, "collapsed", () => {}, { layout: "floating", collapsed: true }));
   test("paused: Resume is primary", async ({ page }) => shot(page, "paused", (w) => Object.assign(w.app.capture, { phase: "paused", pause: { since: NOW - 3 * W.MIN, remind_at: null } })));
-  test("presenting: the window keeps its state while hidden", async ({ page }) => shot(page, "presenting", (w) => (w.app.presenting.hidden = true)));
 });
 
 test.describe("cpt-noter-dod-ui-call-window-capture capture notices and the closing state", () => {

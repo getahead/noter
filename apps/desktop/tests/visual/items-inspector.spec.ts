@@ -7,6 +7,7 @@ import { coreReady, openWindow } from "../e2e/support/app";
 import { outputsOf, written } from "../e2e/support/outputs-world";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { freeze } from "./freeze";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const INSPECTOR = '[data-component="cpt-noter-component-ui-item-inspector"]';
@@ -39,6 +40,20 @@ const shot = async (page: Page, name: string) => {
   await expect(page).toHaveScreenshot(`${name}.png`);
 };
 
+test.beforeEach(({ page }) => freeze(page));
+
+const archiveWorld = (archive: "done" | "pending") => (w: World) => {
+  threeSuggested(w);
+  const line = { call_id: W.PAST_CALL, channel: "sys" as const, speaker: { speaker_id: "spk_pavel", label: { type: "person" as const, person: { id: "per_pavel", display_name: "Pavel Romanov", short_name: "Pavel", initials: "PR", is_you: false } } }, crosstalk_with: [], t0_ms: 12_000, t1_ms: 20_000, lang: "en", lang_p: 0.93, confidence: 0.95, state: "confirmed" as const, corrections: [] };
+  const segments = [
+    { ...line, id: "seg_live", pass: "live" as const, text: "ship it friday" },
+    ...(archive === "done" ? [{ ...line, id: "seg_arch", pass: "archive" as const, text: "ship it on Friday" }] : []),
+  ];
+  w.transcripts = w.transcripts.filter((x) => x.call_id !== W.PAST_CALL);
+  w.transcripts.push({ subscription_id: null, call_id: W.PAST_CALL, live: false, pass: archive === "done" ? "archive" : "live", archive, segments, hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: segments.length, audio_available: true } as never);
+  for (const c of [w.calls.find((x) => x.id === W.PAST_CALL)!, w.call_details.find((d) => d.call.id === W.PAST_CALL)!.call]) c.archive = archive;
+};
+
 test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
   test("details: a suggested decision with Linked issue, evidence and review actions", async ({ page }) => {
     await openInspector(page, threeSuggested);
@@ -62,5 +77,25 @@ test.describe("cpt-noter-dod-ui-items-inspector Item inspector", () => {
     await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
     await expect(page.getByText(/Audio deleted on .+ · transcript kept/).first()).toBeVisible();
     await shot(page, "item-inspector-evidence-audio-deleted");
+  });
+
+  test("archive pending: evidence remains on the live transcript", async ({ page }) => {
+    await openInspector(page, (w) => archiveWorld("pending")(w));
+    await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
+    await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
+    await expect(page.getByText("Words changed by the archive pass")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Show Archive Changes" })).toHaveCount(0);
+    await shot(page, "item-inspector-archive-pending");
+  });
+
+  test("archive upgraded: evidence shows the changed words", async ({ page }) => {
+    await openInspector(page, (w) => archiveWorld("done")(w));
+    await page.locator(INSPECTOR).getByRole("button", { name: /Open the source at/ }).click();
+    await expect(page.getByText("Words changed by the archive pass")).toBeVisible();
+    await page.getByRole("button", { name: "Show Archive Changes" }).click();
+    const diff = page.locator('[data-component="cpt-noter-component-ui-diff-view"]');
+    await expect(diff).toContainText("friday");
+    await expect(diff).toContainText("on Friday");
+    await shot(page, "item-inspector-archive-upgraded");
   });
 });

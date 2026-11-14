@@ -6,6 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { coreReady, openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
+import { actionItemsFailed, outputsOf, sectionOf, writing, writingLocally, written } from "../e2e/support/outputs-world";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
 const quiet = (w: World) => {
@@ -22,8 +23,8 @@ async function shortcutsReady(page: Page) {
   await expect(outputBody(page).locator(".pc-sec").first()).toBeVisible();
 }
 
-async function open(page: Page) {
-  await openWindow(page, "main", { world: quiet });
+async function open(page: Page, world: (w: World) => void = quiet) {
+  await openWindow(page, "main", { world });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
   await coreReady(page);
   await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
@@ -61,5 +62,75 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
     await nav(page, { type: "delete_old_audio" });
     await expect(page.getByRole("dialog", { name: /Delete Old Audio/ })).toBeVisible();
     await shot(page, "call-page-delete-old-audio");
+  });
+});
+
+test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
+  test("writing: sections remain visible while outputs are being written", async ({ page }) => {
+    await openWindow(page, "main", { world: writing });
+    await coreReady(page);
+    await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
+    await expect(page.getByText("Writing the outputs · the transcript is ready to read")).toBeVisible();
+    await shot(page, "outputs-writing");
+  });
+
+  test("local: the local writing notice names its runtime", async ({ page }) => {
+    await openWindow(page, "main", { world: writingLocally });
+    await coreReady(page);
+    await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
+    await expect(page.getByText("Writing with the local model · up to 10 min · role reviews follow in the background")).toBeVisible();
+    await shot(page, "outputs-local-writing");
+  });
+
+  test("failed: one section shows retry while its neighbours stay ready", async ({ page }) => {
+    await openWindow(page, "main", { world: actionItemsFailed });
+    await coreReady(page);
+    await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
+    const failed = outputBody(page).locator(".pc-sec").filter({ hasText: "Action items" });
+    await expect(failed.getByRole("button", { name: "Try Again" })).toBeVisible();
+    await expect(outputBody(page)).toContainText("Drawer events will ship behind a flag.");
+    await shot(page, "outputs-section-failed");
+  });
+
+  test("empty: a section with no items has its empty state", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => { written(w); Object.assign(sectionOf(w, "open_questions"), { state: { type: "empty" }, items: [] }); } });
+    await coreReady(page);
+    await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
+    await expect(outputBody(page).locator(".pc-sec").filter({ hasText: "Open questions" })).toContainText(/No open questions|No questions yet|Nothing to show/i);
+    await shot(page, "outputs-empty-section");
+  });
+
+  test("edited: the saved edit and its version control are visible", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => { written(w); const summary = sectionOf(w, "summary"); Object.assign(summary, { body_md: "Edited summary copy.", user_edited: true, version_count: 2 }); outputsOf(w).status = "ready"; } });
+    await coreReady(page);
+    await nav(page, { type: "call_page", call_id: W.PAST_CALL, tab: "summary" });
+    await expect(outputBody(page)).toContainText("Edited summary copy.");
+    await expect(outputBody(page)).toContainText("Edited");
+    await shot(page, "outputs-edited");
+  });
+
+  test("regenerating: the confirmation names the selected sections", async ({ page }) => {
+    await open(page);
+    await shortcutsReady(page);
+    await page.locator('[data-region="PC-R1"]').getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
+    await expect(page.getByRole("dialog", { name: "Regenerate Outputs" })).toBeVisible();
+    await shot(page, "outputs-regenerating");
+  });
+
+  test("comparing: the edited summary exposes its before and after diff", async ({ page }) => {
+    await open(page, (w) => {
+      quiet(w);
+      written(w);
+      Object.assign(sectionOf(w, "summary"), { regenerated_with_edits: true, version_count: 1 });
+    });
+    const summary = outputBody(page).locator(".pc-sec").first();
+    await summary.getByRole("button", { name: "Edit" }).click();
+    await summary.getByRole("textbox").fill("Edited comparison copy.");
+    await page.keyboard.press("Meta+Enter");
+    await expect(summary.locator(".pc-md")).toHaveText("Edited comparison copy.");
+    await summary.getByRole("button", { name: "Show Diff" }).click();
+    await expect(summary.locator(".pc-diff")).toBeVisible();
+    await shot(page, "outputs-comparing");
   });
 });

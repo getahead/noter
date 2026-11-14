@@ -2,7 +2,7 @@
 title: "Feature — Items, review and evidence"
 description: "Review suggested items, edit their details, tick or reopen them, and check their evidence."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-items
 milestone: M2
@@ -233,7 +233,7 @@ The system **MUST** render full, compact, done and read-only action rows; bind r
 
 **Touches**:
 - Commands: all nine M2 item commands listed above
-- Tests: unit review order, timer, focus, patch-clear, rev-conflict and handoff-answer cases; conformance for each command, accepted creation, batch skipped counts and restore; real-core E2E `cpt-noter-seq-call-page-review-suggested-items` (every path), `cpt-noter-seq-today-tick-item`; screenshots of all row states and variants
+- Tests: unit review order, timer, focus, patch-clear, rev-conflict and handoff-answer cases; conformance for each command, accepted creation, batch skipped counts and restore; real-core E2E `cpt-noter-seq-call-page-review-suggested-items` (every path), `cpt-noter-seq-today-tick-item`; screenshots of suggested, accepted, overdue, carried, handed-off and closed rows, plus the handoff question, Today compact/done variants, and the review banner
 
 ### Inspector and evidence
 
@@ -248,7 +248,7 @@ The system **MUST** show Details and History, persist fields at the designed poi
 
 **Touches**:
 - Commands: `item_get`, `item_edit`, `transcript_span`, `audio_play`, `audio_stop`; History commands through its feature
-- Tests: unit kind-specific fields, focus return and stale span resolution; conformance audio-deleted and transcript-upgraded errors; real-core E2E `cpt-noter-seq-call-page-check-evidence` (every path); screenshots of Details, History, evidence, archive pending and upgraded states
+- Tests: unit kind-specific fields, focus return and stale span resolution; conformance audio-deleted and transcript-upgraded errors; real-core E2E `cpt-noter-seq-call-page-check-evidence` (every path); screenshots of Details, History, deleted-audio evidence, and archive-pending and archive-upgraded evidence
 
 **Completion gate.** Write failing tests first; unit and changed-line coverage meet 80% per side. Real-core E2E counts successful frozen commands and named stories toward the 60% bar; fake-only tests do not count. Screenshots meet 98%, due performance coverage meets 60% and scenarios stay within 10% of base instruction counts; trace coverage never falls. `just gate-fast` stays green; `just gate` passes.
 
@@ -272,3 +272,5 @@ The system **MUST** show Details and History, persist fields at the designed poi
 **Data.** Read through core only: `cpt-noter-dbtable-items`, `cpt-noter-dbtable-item-spans`, `cpt-noter-dbtable-evidence`, `cpt-noter-dbtable-suppressions`. Suppression, automatic closure and append-only logging are core responsibilities. The fake's item/batch changes do not prove real suppression, inverse writes or Today regrouping; conformance needs the real core.
 
 **Not applicable.** No new schema, network client, evidence job, credential, migration or deployment is introduced. Activity proposal decisions ship in M5. Logging uses the bridge's ids and error codes, never item or quote text.
+
+**Changelog.** v1.1 (14 Nov 2026): name the row statuses and variants covered by visual regression and distinguish the pending and upgraded archive evidence screenshots.

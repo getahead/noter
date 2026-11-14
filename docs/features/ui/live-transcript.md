@@ -2,7 +2,7 @@
 title: "Feature — Live and stored transcript"
 description: "The virtualised transcript log of a call: confirmed and hypothesis rows with speaker, time and language, gap and mark rows, Jump to Live, the waiting state, and safe replay of a line on headphones during the call and on any output afterwards."
 status: DRAFT
-version: "1.0"
+version: "1.1"
 date: "2026-10-18"
 feature: cpt-noter-feature-ui-live-transcript
 milestone: M1
@@ -255,7 +255,7 @@ The system **MUST** render the transcript view in its live, tail and stored vari
 
 **Touches**:
 - Commands: `transcript_subscribe`, `levels_subscribe`, `transcript_span`
-- Tests: unit tests for append, replace, gap handling, tail row bounds and releasing follow when a renamed speaker leaves the live snapshot; a performance scenario that replays a 90-minute stream (`harness/perf.toml`); screenshot specs `detached` and the waiting state
+- Tests: unit tests for append, replace, gap handling, tail row bounds and releasing follow when a renamed speaker leaves the live snapshot; a performance scenario that replays a 90-minute stream (`harness/perf.toml`); screenshot specs `detached` and the waiting state, including deterministic You and Others meters
 
 ### Speaker label and language tag (display)
 
@@ -304,3 +304,5 @@ The system **MUST** show each row's play control by the output-route table, play
 **States coverage.** Following, Detached (`detached`), Waiting for speech (`nothing-heard`), Replaying on headphones (`replay`), Recording on speakers (`speakers`), Output not identified (`unknown-route`), Output switches to speakers and Noter's own sounds not excluded (strings in `C.playbackBar` and `routeHelp`), Loading and Error (stored, on the Call page). Find active and archive changes are part of the stored variant; archive diff marks arrive with `cpt-noter-feature-ui-call-page-outputs` (M2).
 
 **Not applicable.** Media in the WebView: none; audio plays natively in the core (D6). Data: the view reads segments from the store only.
+
+**Changelog.** v1.1 (14 Nov 2026): the waiting-state screenshot includes both meters; the frozen fake levels and empty live script make the view deterministic without masks.

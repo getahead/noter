@@ -2,7 +2,7 @@
 title: "Feature — Call page outputs and sharing"
 description: "Read outputs as they arrive, preserve edits across regeneration, compare versions and share a visible scope."
 status: DRAFT
-version: "1.1"
+version: "1.2"
 date: "2026-11-07"
 feature: cpt-noter-feature-ui-call-page-outputs
 milestone: M2
@@ -268,7 +268,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 **Touches**:
 - Commands: `outputs_get`, `output_edit`, `outputs_regenerate`, `output_versions`, `output_version_get`
-- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots writing, local, failed, empty, edited, regenerating and comparing
+- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the regeneration sheet and before/after comparison
 
 ### Sharing, tags, audio and notification routing
 
@@ -313,3 +313,5 @@ The system **MUST** show the exact copy/export scope and review/privacy notice, 
 **Data.** Core-owned `cpt-noter-dbtable-summaries`, `cpt-noter-dbtable-summary-versions`, `cpt-noter-dbtable-call-tags`; UI reads through core only. No migration, direct filesystem write, network push, Slack/Jira credential or deployment belongs here. Bridge logs contain ids and error codes, never copied text or transcript content.
 
 **Changelog.** v1.1 (7 Nov 2026): record the owner-approved single-row meaning of M2 selection; its delivery checkbox remains open.
+
+v1.2 (14 Nov 2026): enumerate the seven output section and interaction states in the screenshot checks so each state named by this DoD has a visual regression case.
