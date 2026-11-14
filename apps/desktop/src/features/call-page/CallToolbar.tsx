@@ -71,7 +71,7 @@ export function watchNativeMenuContext(call: CallRow | undefined, outputs: Retur
   window.addEventListener("focus", onFocus);
   window.addEventListener("blur", onBlur);
   document.addEventListener?.("focusin", onFocusIn);
-  if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-review", "data-variant"] });
+  if (observer && document.body) observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-review", "data-state", "data-variant"] });
   return () => {
     window.removeEventListener("focus", onFocus);
     window.removeEventListener("blur", onBlur);

@@ -174,6 +174,35 @@ describe("CallToolbar", () => {
     expect(send).toHaveBeenCalledTimes(callsAfterCleanup);
   });
 
+  it("disables native item review when the focused row enters edit or save state", async () => {
+    await ready();
+    const call = bridge.store.getState().entities.call[id]!;
+    const source = fake.world.items.find((candidate) => candidate.review === "suggested")!;
+    const item = { ...source, call: { ...source.call, id } };
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [item.id]: item } } }));
+    const row = { dataset: { callId: id, itemId: item.id, review: "suggested", state: "suggested" } };
+    let mutation: MutationCallback | undefined;
+    let options: MutationObserverInit | undefined;
+    class TestObserver {
+      constructor(callback: MutationCallback) { mutation = callback; }
+      observe(_target: Node, next: MutationObserverInit) { options = next; }
+      disconnect() {}
+    }
+    vi.stubGlobal("MutationObserver", TestObserver);
+    vi.stubGlobal("window", new EventTarget());
+    vi.stubGlobal("document", { body: {}, activeElement: { closest: () => row }, querySelectorAll: () => [row] });
+    const send = vi.mocked(updateNativeMenuContext);
+    send.mockClear();
+
+    const stop = watchNativeMenuContext(call, { status: "ready", sensitive: false, review_waiting: 1 } as CallOutputs, bridge);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ acceptItemEnabled: true, rejectItemEnabled: true }));
+    expect(options?.attributeFilter).toContain("data-state");
+    row.dataset.state = "editing";
+    mutation?.([], {} as MutationObserver);
+    expect(send).toHaveBeenLastCalledWith(expect.objectContaining({ acceptItemEnabled: false, rejectItemEnabled: false }));
+    stop();
+  });
+
   it("the ⋯ menu offers the M1 items, Delete Call… disabled until the dialogs host registers", async () => {
     await ready();
     const call = fake.world.calls.find((c) => c.id === id)!;
