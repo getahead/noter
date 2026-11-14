@@ -909,25 +909,6 @@ async fn resume_continues_a_recorded_session_and_close_releases_it() {
 // ── one way out ──────────────────────────────────────────────────
 
 #[test]
-fn only_the_gate_hands_a_packet_to_an_adapter() {
-    let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
-    let mut callers = Vec::new();
-    for dir in [src.clone(), src.join("adapters")] {
-        for entry in std::fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            if name.ends_with(".rs") && name != "runtime_tests.rs" {
-                let code = std::fs::read_to_string(&path).unwrap();
-                if code.contains(".invoke(") {
-                    callers.push(name);
-                }
-            }
-        }
-    }
-    assert_eq!(callers, ["gate.rs"]);
-}
-
-#[test]
 fn a_script_line_names_a_skill_and_at_most_one_answer() {
     assert!(Scripted::parse(r#"{"on": "post-call", "output": {}}"#).is_ok());
     assert!(Scripted::parse(r#"{"on": "post-call", "after_ms": 5}"#).is_ok());
@@ -1425,7 +1406,7 @@ mod launch_tests {
     use crate::adapters::codex::Codex;
     use crate::adapters::ollama::OllamaConfig;
     use crate::adapters::{Invocation, RuntimeAdapter};
-    use crate::gate::Adapters;
+    use crate::gate::{Adapters, GateToken};
     use crate::runtime::{Llm, Packet, PacketContext, Privacy, RunRequest, TaskKind};
     use crate::secrets::Secret;
     use crate::tools::McpLaunch;
@@ -1462,6 +1443,7 @@ mod launch_tests {
 
     fn call(runtime: RuntimeChoice, mcp: Option<McpLaunch>) -> Invocation {
         Invocation {
+            _gate: GateToken::for_adapter_test(),
             runtime,
             skill: Skill::AskAnswer,
             schema: serde_json::json!({}),

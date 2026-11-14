@@ -162,6 +162,17 @@ pub(crate) struct Approved {
     audit_id: Option<AuditId>,
 }
 
+/// A runtime invocation can only be constructed inside this module after release through the gate.
+pub(crate) struct GateToken(());
+
+impl GateToken {
+    #[cfg(test)]
+    /// Adapter-only unit tests bypass the gate to isolate process setup and cleanup behavior.
+    pub(crate) fn for_adapter_test() -> Self {
+        Self(())
+    }
+}
+
 /// A run's redaction state after its initial packet: the placeholders and pseudonyms every
 /// tool result of the run reuses, so a name or an address never changes identity mid-run.
 #[derive(Debug, Clone)]
@@ -503,6 +514,7 @@ impl Gate {
             return Box::pin(async { Err("adapter_missing".to_owned()) });
         };
         adapter.invoke(Invocation {
+            _gate: GateToken(()),
             runtime: approved.runtime,
             skill,
             schema: skill.schema(),

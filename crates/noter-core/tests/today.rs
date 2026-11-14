@@ -14,6 +14,9 @@ use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
+#[path = "common/row.rs"]
+mod common_row;
+use common_row::row;
 
 /// 2026-10-16 08:00 UTC.
 const NOW: i64 = 1_792_137_600_000;
@@ -104,13 +107,6 @@ fn window(label: WindowLabel) -> CommandCtx {
 
 fn ctx() -> CommandCtx {
     window(WindowLabel::Main)
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
-    }
 }
 
 fn call(id: &str, started: i64, status: &str) -> Insert {

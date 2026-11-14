@@ -12,6 +12,9 @@ use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
+#[path = "common/row.rs"]
+mod common_row;
+use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
 
@@ -67,13 +70,6 @@ fn collecting<T: Send + 'static>() -> (Sink<T>, Arc<Mutex<Vec<T>>>) {
         }),
         got,
     )
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
-    }
 }
 
 fn call(id: &str) -> Insert {

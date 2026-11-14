@@ -10,6 +10,9 @@ use noter_protocol::ipc::{Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
+#[path = "common/row.rs"]
+mod common_row;
+use common_row::row;
 
 /// The clipboard and the folder panel, scripted: the panel answers `answer` (None = cancelled).
 struct Native {
@@ -69,13 +72,6 @@ fn ctx() -> CommandCtx {
         caller: Caller::Window {
             label: WindowLabel::Main,
         },
-    }
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
     }
 }
 

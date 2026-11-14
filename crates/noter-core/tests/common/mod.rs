@@ -1,7 +1,10 @@
 use std::path::Path;
 
+mod row;
+pub use row::row;
+
 use noter_db::Insert;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use noter_db::rusqlite;
 
@@ -23,13 +26,6 @@ pub fn text(dir: &Path, sql: &str) -> Option<String> {
         .unwrap()
         .query_row(sql, [], |r| r.get(0))
         .unwrap()
-}
-
-pub fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
-    }
 }
 
 pub fn call(id: &str, started: i64) -> Insert {

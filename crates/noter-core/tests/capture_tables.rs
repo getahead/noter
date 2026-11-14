@@ -5,6 +5,9 @@ use noter_db::{ChangeMeta, Insert, Mutation, Store};
 use noter_protocol::model::Actor;
 use noter_protocol::ErrorCode;
 use serde_json::{json, Value};
+#[path = "common/row.rs"]
+mod common_row;
+use common_row::row;
 
 fn open(dir: &tempfile::TempDir) -> Store {
     Store::open(
@@ -45,13 +48,6 @@ fn call(id: &str, extra: &[(&'static str, Value)]) -> Mutation {
         base_rev: None,
         bump_rev: true,
         values,
-    }
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
     }
 }
 
