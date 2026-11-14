@@ -5,6 +5,7 @@ import type { MsgKey } from "../../i18n/en";
 export type ShareTestState = "TABLE" | "ASKING" | "RUNNING" | "RAN" | "NEEDS_PERMISSION" | "FAILED";
 
 export type ShareTestEvent =
+  | { type: "read" }
   /** **Run Capture Test**: with Screen Recording not granted, the test-only permission row asks first. */
   | { type: "run"; screenRecording: PermissionState }
   /** **Continue** on the permission row, and the answer macOS gave. */
@@ -13,11 +14,14 @@ export type ShareTestEvent =
 
 export function shareTestReduce(s: ShareTestState, e: ShareTestEvent): ShareTestState {
   switch (e.type) {
+    case "read":
+      return s === "RUNNING" ? s : "TABLE";
     case "run":
       return s === "RUNNING" ? s : e.screenRecording === "granted" ? "RUNNING" : "ASKING";
     case "answered":
       return s === "ASKING" ? (e.granted ? "RUNNING" : "NEEDS_PERMISSION") : s;
     case "outcome":
+      if (s === "TABLE" && e.outcome.type === "failed") return "FAILED";
       if (s !== "RUNNING") return s;
       return e.outcome.type === "passed" ? "RAN" : e.outcome.type === "failed" ? "FAILED" : "TABLE";
   }
@@ -46,7 +50,7 @@ export function resultRows(rows: readonly ShareTestRow[]): { surface: NoterSurfa
 export async function runShareTest(bridge: Bridge, capture: boolean): Promise<{ result: ShareTestResult | null; outcome: CaptureTestOutcome | null }> {
   const res = await bridge.act("share:run", "share_test_run", () => bridge.core.shareTestRun({ run_capture_test: capture }));
   if (res.status === "ok") return { result: res.data, outcome: capture ? res.data.capture_test : null };
-  return { result: null, outcome: capture ? { type: "failed", code: res.error.code } : null };
+  return { result: null, outcome: { type: "failed", code: res.error.code } };
 }
 // @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-api-share
 
@@ -65,6 +69,7 @@ export interface ShareActionsCtx {
 /** The sheet's three commands: the table, **Run Capture Test**, and **Continue** on the test-only permission row. */
 export function createShareActions(bridge: Bridge, ctx: ShareActionsCtx) {
   const run = async (capture: boolean) => {
+    if (!capture) ctx.dispatch({ type: "read" });
     const { result, outcome } = await runShareTest(bridge, capture);
     if (result) ctx.setResult(result);
     if (outcome) ctx.dispatch({ type: "outcome", outcome });

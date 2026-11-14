@@ -20,7 +20,7 @@ import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
 import { askAlert } from "../../ui/dialogs/alerts";
-import { installCli, removeKey } from "../settings/accounts";
+import { installCli, installKey, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
 import { removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
@@ -230,6 +230,7 @@ function AudioStorage({ wizard, w }: { wizard: Wizard; w: WizardState }) {
 // Step 6's key fields and own-account rows belong to cpt-noter-feature-ui-accounts (M2, M3): this is its frame.
 export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
   const accounts = useSelect(bridge.store, (s) => s.whole.accounts);
+  const installState = useSelect(bridge.store, (s) => s.commands[installKey("ollama")]?.state);
   const local = accounts?.local.running ?? false;
   // **Not Now** on the local runtime line: the offer folds, the explanation below stays until an assistant is connected
   const [notNow, setNotNow] = useState(false);
@@ -267,10 +268,11 @@ export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wiza
         {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
         {!local && !notNow && (
           <>
-            <PushButton label={t("first_run.assistants.install")} size="small" onAction={() => void installCli(bridge, "ollama")} />
+            <PushButton label={t("first_run.assistants.install")} size="small" loading={installState === "WAITING"} disabled={installState === "WAITING"} onAction={() => void installCli(bridge, "ollama")} />
             <PushButton label={t("first_run.assistants.not_now")} size="small" variant="quiet" onAction={() => setNotNow(true)} />
           </>
         )}
+        {installState === "ERROR" && <p className="fr-st__fail" role="alert">{t("settings.local.install_failed")}</p>}
         {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
       </div>
       <div className="fr-privacy">
@@ -316,13 +318,6 @@ function FirstRunWindow({ bridge }: { bridge: Bridge }) {
   const status = useSelect(bridge.store, (s) => s.whole.setup!);
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => wizard.start(), [wizard]);
-  // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-checking
-  useEffect(() => {
-    const back = () => void wizard.returned();
-    addEventListener("focus", back);
-    return () => removeEventListener("focus", back);
-  }, [wizard]);
-  // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-checking
   const shown = useRef(w.current);
   useEffect(() => {
     if (shown.current === w.current) return;

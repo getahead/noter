@@ -11,6 +11,35 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const sent = async (page: Page, name: string): Promise<unknown[]> => (await calls(page)).filter((c) => c.kind === "invoke" && c.name === name).map((c) => c.args);
 
 test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
+  test("the Settings self-test rechecks System Audio Recording when focus returns", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => {
+      for (const p of [w.app.setup.permissions, w.app.environment.permissions]) p.find((row) => row.kind === "system_audio")!.state = "not_asked";
+    } });
+    await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
+    await page.getByRole("button", { name: "Run Audio Self-Test…" }).click();
+    const sheet = page.getByRole("dialog", { name: "Run Audio Self-Test" });
+    await sheet.getByRole("button", { name: "Open System Settings…" }).click();
+    await steer.change((w) => {
+      w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "granted"));
+      w.app.environment.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "granted"));
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await expect.poll(async () => sent(page, "permission_request")).toContainEqual({ kind: "system_audio" });
+    await expect.poll(async () => sent(page, "setup_status")).not.toEqual([]);
+    await expect(sheet).not.toContainText("System audio recording is not allowed yet.");
+  });
+
+  test("a refused Screen Share Test table read shows Try Again and recovers", async ({ page }) => {
+    await openWindow(page, "settings", { fail: [{ cmd: "share_test_run", code: "offline" }] });
+    await panes(page).getByRole("listitem").filter({ hasText: "Privacy" }).click();
+    await page.getByRole("button", { name: "Screen Share Test…" }).click();
+    const sheet = page.getByRole("dialog", { name: "Screen Share Test" });
+    await expect(sheet.getByRole("alert")).toContainText("Couldn’t load the Screen Share Test.");
+    await sheet.getByRole("button", { name: "Try Again" }).click();
+    await expect(sheet.getByRole("alert")).toHaveCount(0);
+    await expect(sheet.getByRole("table").getByRole("row")).toHaveCount(6);
+  });
+
   test("a failed first read shows a pane error with Try Again, and the pane comes back", async ({ page }) => {
     await openWindow(page, "settings", { fail: [{ cmd: "settings_get", code: "offline" }] });
     const banner = page.locator('[data-region="ST-R3"]');
@@ -46,6 +75,17 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await expect(launch).toBeChecked({ checked: before });
     await launch.click({ force: true });
     await expect(launch).toBeChecked({ checked: !before });
+    await expect(pane(page)).not.toContainText("Couldn’t save this change.");
+  });
+
+  test("two fast quick-action changes save against successive settings revisions", async ({ page }) => {
+    await openWindow(page, "settings");
+    await panes(page).getByRole("listitem").filter({ hasText: "Call Screen & Menu Bar" }).click();
+    await page.getByRole("checkbox", { name: "Pause or resume" }).click({ force: true });
+    await page.getByRole("checkbox", { name: "Mark moment" }).click({ force: true });
+    await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(2);
+    await expect(page.getByRole("checkbox", { name: "Pause or resume" })).toBeChecked({ checked: false });
+    await expect(page.getByRole("checkbox", { name: "Mark moment" })).toBeChecked({ checked: false });
     await expect(pane(page)).not.toContainText("Couldn’t save this change.");
   });
 

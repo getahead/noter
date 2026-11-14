@@ -34,9 +34,17 @@ test.describe("cpt-noter-flow-ui-settings-change-setting (glossary)", () => {
     await expect(row).toBeVisible();
     expect(await sent(page, "glossary_upsert")).toContainEqual(expect.objectContaining({ term: "Kubernetes", spoken_forms: ["kubernetis", "koo-ber-net-ees"] }));
 
-    await row.click();
+    await row.focus();
+    await row.press("Enter");
+    await page.getByRole("textbox", { name: "Term" }).fill("Kubernetes Platform");
+    await pane(page).getByRole("button", { name: "Save", exact: true }).click();
+    await expect(glossary.getByRole("row").filter({ hasText: "Kubernetes Platform" })).toBeVisible();
+    expect(await sent(page, "glossary_upsert")).toHaveLength(2);
+    expect((await sent(page, "glossary_upsert"))[1]).toMatchObject({ id: expect.any(String), rev: expect.any(Number), term: "Kubernetes Platform" });
+
+    await glossary.getByRole("row").filter({ hasText: "Kubernetes Platform" }).click();
     await pane(page).getByRole("button", { name: "Remove Term" }).click();
-    await expect(glossary.getByRole("row").filter({ hasText: "Kubernetes" })).toHaveCount(0);
+    await expect(glossary.getByRole("row").filter({ hasText: "Kubernetes Platform" })).toHaveCount(0);
     expect(await sent(page, "glossary_remove")).toHaveLength(1);
   });
 });

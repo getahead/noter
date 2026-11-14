@@ -21,6 +21,8 @@ type Pending = { resolve: (v: unknown) => void; reject: (e: unknown) => void };
 export interface StdioCoreOptions {
   /** Command line of the core harness, e.g. "target/debug/noter-core-harness --fixture world". */
   command: string;
+  /** Extra arguments passed without shell-style quoting. */
+  args?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
 }
@@ -37,7 +39,8 @@ export class StdioCore {
   private closing = false;
 
   constructor(opts: StdioCoreOptions) {
-    const [bin, ...args] = splitCommand(opts.command);
+    const [bin, ...commandArgs] = splitCommand(opts.command);
+    const args = [...commandArgs, ...(opts.args ?? [])];
     this.child = spawn(bin, args, { cwd: opts.cwd, env: { ...process.env, ...opts.env }, stdio: "pipe" });
     this.child.stderr.on("data", (d: Buffer) => {
       this.stderr = (this.stderr + d.toString()).slice(-4000);

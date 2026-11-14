@@ -222,7 +222,7 @@ Labels: `harness-change-approved` (owner accepts a loosened gate), `visual-chang
 | channel message | `{"id": 7, "message": <Channel message>}` — after the result of a subscribing command |
 | event | `{"event": "entity:changed", "payload": <whole state>}` |
 
-Rules: `window` is applied exactly as the IPC host applies the calling window's label (window scope); `--fixture world` loads `contracts/fixtures/world.json` into a fresh database (fixture parity with the fake); end of stdin shuts the core down; nothing but protocol lines goes to stdout (logs to stderr).
+Rules: `window` is applied exactly as the IPC host applies the calling window's label (window scope); `--fixture world` loads `contracts/fixtures/world.json` into a fresh database (fixture parity with the fake); `--hotkey-conflict <shortcut>=<owner>` makes the scripted host refuse that chord during startup registration, for real-core UI flows; end of stdin shuts the core down; nothing but protocol lines goes to stdout (logs to stderr).
 
 ## Not automated: the macOS checklist
 

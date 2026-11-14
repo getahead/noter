@@ -292,6 +292,9 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       started = true;
       generation++;
       const unsubscribeStore = bridge.store.subscribe(onWindowChange);
+      // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-checking
+      const onFocus = () => void this.returned();
+      if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
       lastAction = loadSettings;
       void loadSettings();
       // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
@@ -305,6 +308,8 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
         started = false;
         generation++; // a settings read still on its way is dropped
         unsubscribeStore();
+        if (typeof window !== "undefined") window.removeEventListener("focus", onFocus);
+      // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-checking
         if (levels) void bridge.unsubscribe("levels_subscribe");
         void bridge.unsubscribe("self_test_run");
       };
@@ -313,7 +318,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     continue: () => ((lastAction = () => leave({ type: "continue" })), lastAction()),
     skip: () => ((lastAction = () => leave({ type: "skip" })), lastAction()),
     /** Try Again on a refused save or read. */
-    retry: () => lastAction(),
+    retry: () => (win().commands.settings_get?.state === "ERROR" ? loadSettings() : lastAction()),
     back: () => set((s) => ({ current: nextStep(s.current, { type: "back" }) })),
     goto: (step: SetupStep) => set((s) => ({ current: nextStep(s.current, { type: "goto", step }) })),
     async finish(): Promise<void> {

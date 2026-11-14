@@ -565,6 +565,7 @@ export const en = {
   "settings.share.on_screen": "On your screen",
   "settings.share.what_sees": "What the share sees",
   "settings.share.failed": "Couldn’t capture the display.",
+  "settings.share.read_failed": "Couldn’t load the Screen Share Test.",
   "settings.share.try_again": "Try Again",
   "settings.share.result_hidden": "{surface}: hidden",
   "settings.share.result_visible":
@@ -577,6 +578,10 @@ export const en = {
   "settings.glossary.cyrillic": "Cyrillic variants",
   "settings.glossary.spoken": "Spoken forms",
   "settings.glossary.add": "Add Term",
+  "settings.glossary.edit": "Edit Term",
+  "settings.glossary.edit_save": "Save",
+  "settings.glossary.read_failed": "Couldn’t read the glossary.",
+  "settings.glossary.update_failed": "Couldn’t update the glossary; your changes were not saved.",
   "settings.glossary.remove": "Remove Term",
   "settings.glossary.note": "A new term leads to proposals in Activity.",
   "settings.glossary.save": "Add",

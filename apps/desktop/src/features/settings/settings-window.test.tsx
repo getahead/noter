@@ -73,6 +73,20 @@ describe("saveSection", () => {
     bridge = createBridge("settings", fake);
     expect(await saveSection(bridge, "general", { launch_at_login: true })).toBeNull();
   });
+
+  it("serializes quick edits in one section and computes list changes from the latest value", async () => {
+    const before = await ready();
+    const first = saveSection(bridge, "general", { launch_at_login: !before.general.launch_at_login });
+    const second = saveSection(bridge, "general", { offer_to_record: !before.general.offer_to_record });
+    await Promise.all([first, second]);
+    expect(stored().general).toMatchObject({ launch_at_login: !before.general.launch_at_login, offer_to_record: !before.general.offer_to_record });
+    const actions = stored().menu_bar.hidden_actions;
+    await Promise.all([
+      saveSection(bridge, "menu_bar", (current) => ({ hidden_actions: [...current.hidden_actions, "pause"] })),
+      saveSection(bridge, "menu_bar", (current) => ({ hidden_actions: [...current.hidden_actions, "mark_moment"] })),
+    ]);
+    expect(stored().menu_bar.hidden_actions).toEqual(expect.arrayContaining([...actions, "pause", "mark_moment"]));
+  });
 });
 
 describe("hotkey actions", () => {

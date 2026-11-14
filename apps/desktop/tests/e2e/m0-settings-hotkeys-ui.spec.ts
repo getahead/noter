@@ -79,6 +79,16 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await expect(pane(page)).not.toContainText("is used by another app");
   });
 
+  test("UI — clears a pane-reported conflict as soon as the shortcut is cleared", async ({ page }) => {
+    await openWindow(page, "settings", { hotkeyConflict: { action: "mark_moment", shortcut: "Ctrl+Alt+Super+M", owner: "Zoom" } });
+    await openHotkeys(page);
+    await expect(pane(page)).toContainText("Used by Zoom");
+    await pane(page).locator('[data-component="cpt-noter-component-ui-hotkey-recorder"]').filter({ hasText: "Mark moment" }).getByRole("button", { name: "Clear shortcut" }).click();
+    expect(await sent(page, "hotkey_set")).toContainEqual({ action: "mark_moment", shortcut: null });
+    await expect(field(page, "Mark moment")).toContainText("None");
+    await expect(pane(page)).not.toContainText("Used by Zoom");
+  });
+
   test("UI — error path: Shortcut without a modifier — Add Command, Option or Control, the old chord stays, then ⌃⌥⌘O", async ({ page }) => {
     await openWindow(page, "settings");
     await openHotkeys(page);

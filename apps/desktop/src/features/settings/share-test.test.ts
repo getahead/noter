@@ -4,6 +4,10 @@ import type { ShareTestRow } from "../../core/bindings";
 import { resultRows, shareTestReduce, surfaceKey, visibilityKey } from "./share-test";
 
 describe("shareTestReduce", () => {
+  it("shows refused table reads and clears the failure when retrying", () => {
+    expect(shareTestReduce("TABLE", { type: "outcome", outcome: { type: "failed", code: "offline" } })).toBe("FAILED");
+    expect(shareTestReduce("FAILED", { type: "read" })).toBe("TABLE");
+  });
   it("asks for Screen Recording once before running, and runs at once when it is granted", () => {
     expect(shareTestReduce("TABLE", { type: "run", screenRecording: "not_asked" })).toBe("ASKING");
     expect(shareTestReduce("TABLE", { type: "run", screenRecording: "granted" })).toBe("RUNNING");

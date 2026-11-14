@@ -94,6 +94,8 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Error — Microphone not allowed: **Microphone · not allowed** with **Open System Settings…**, then **Hearing you** when Noter is in front again
 - Error — System audio not allowed: **System audio recording · not allowed yet** with the how-to line; back from System Settings the row shows **Checking…** then **Granted**
 - Error — Self-test hears only one stream: **We hear your microphone but not system audio. Play any sound in another app and try again.**
+- Returning from System Settings rechecks the permission and refreshes a missing or zero-buffer self-test state; retrying a refused settings read reloads settings rather than replaying a later wizard action
+- A refused local runtime install shows its error and busy state until completion
 - Empty — Self-test skipped: step 3 marked with a dash; after **Finish**, the app banner **Call detection is off until the audio self-test passes** · **Run Audio Self-Test…** · **Finish Setup…**; **Record** works as always
 
 **Steps**:

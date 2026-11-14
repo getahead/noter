@@ -33,17 +33,29 @@ export function loadSettings(bridge: Bridge) {
  * A control changed: send the whole section as wanted state with the latest `rev`. The edit holds only
  * the touched leaves, so a newer sibling is never overwritten; a refusal leaves the stored value showing.
  */
-export function saveSection<K extends SectionKey>(bridge: Bridge, section: K, edits: DeepPartial<Settings[K]>) {
-  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
-  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
-  const settings = bridge.store.getState().whole.settings;
-  if (!settings) return Promise.resolve(null);
-  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
-  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
-  // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
-  const args = toUpdateArgs(settings, editDraft(newDraft(section), edits));
-  return bridge.act(rowKey(section, rowPath(edits)), "settings_update", () => bridge.core.settingsUpdate(args), { slice: "settings" });
-  // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
+const sectionSaves = new WeakMap<Bridge, Map<SectionKey, Promise<unknown>>>();
+
+export function saveSection<K extends SectionKey>(bridge: Bridge, section: K, edits: DeepPartial<Settings[K]> | ((current: Settings[K]) => DeepPartial<Settings[K]>)) {
+  const queues = sectionSaves.get(bridge) ?? new Map<SectionKey, Promise<unknown>>();
+  sectionSaves.set(bridge, queues);
+  const previous = queues.get(section) ?? Promise.resolve();
+  const save = previous.catch(() => undefined).then(() => {
+    // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
+    // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
+    const settings = bridge.store.getState().whole.settings;
+    if (!settings) return null;
+    // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-match-control
+    // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-user-change
+    const change = typeof edits === "function" ? edits(settings[section]) : edits;
+    // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
+    const args = toUpdateArgs(settings, editDraft(newDraft(section), change));
+    return bridge.act(rowKey(section, rowPath(change)), "settings_update", () => bridge.core.settingsUpdate(args), { slice: "settings" });
+    // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-api-update
+  });
+  queues.set(section, save);
+  const release = () => { if (queues.get(section) === save) queues.delete(section); };
+  void save.then(release, release);
+  return save;
 }
 
 // @cpt-flow:cpt-noter-flow-ui-settings-set-hotkeys:p1

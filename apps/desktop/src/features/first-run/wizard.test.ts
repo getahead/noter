@@ -315,9 +315,9 @@ describe("createWizard", () => {
     expect(state().privacy).toBe("local_only");
   });
 
-  it("names a refused settings read, and Continue retries it", async () => {
+  it("retries a refused settings read instead of replaying Continue", async () => {
     fake = new FakeCore({ window: "first-run" });
-    fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("audio_storage")(w)));
+    fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("models")(w)));
     bridge = createBridge("first-run", fake);
     await bridge.open();
     wizard = createWizard(bridge, () => {});
@@ -325,6 +325,8 @@ describe("createWizard", () => {
     stop = wizard.start();
     await settle(0);
     expect(bridge.store.getState().commands.settings_get).toMatchObject({ state: "ERROR", error: { tryAgain: true } });
+    await wizard.continue(); // replaces lastAction while the read remains refused
+    expect(state().current).toBe("permissions");
     await wizard.retry();
     expect(state().loaded).toBe(true);
     expect(bridge.store.getState().commands.settings_get?.state).toBe("DONE");

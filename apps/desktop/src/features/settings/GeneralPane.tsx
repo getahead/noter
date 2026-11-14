@@ -36,6 +36,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   const [selfTest, setSelfTest] = useState(false);
   const rowError = useRowErrors(bridge);
+  const setupFailed = useWindow(bridge, (s) => s.commands["window:navigate"]?.state === "ERROR");
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
   return (
     <>
@@ -94,8 +95,8 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         </Row>
       </Group>
       <Group>
-        <Row label={t("settings.general.setup")} note={t("settings.general.setup_note")}>
-          <PushButton label={t("settings.general.run_setup")} onAction={() => void bridge.core.windowNavigate({ target: { type: "first_run" } })} />
+        <Row label={t("settings.general.setup")} note={t("settings.general.setup_note")} error={setupFailed ? t("settings.error.row") : undefined}>
+          <PushButton label={t("settings.general.run_setup")} onAction={() => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "first_run" } }))} />
         </Row>
       </Group>
       {selfTest && <SelfTestSheet bridge={bridge} onClose={() => setSelfTest(false)} />}

@@ -160,6 +160,20 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     expect(seen).toContain("cli_install");
   });
 
+  it("shows a refused local runtime install", async () => {
+    const fake = new FakeCore({ window: "first-run" });
+    fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("assistants")(w), (w.app.accounts.local.running = false)));
+    bridge = createBridge("first-run", fake);
+    await bridge.open();
+    fake.failNext("cli_install", "offline");
+    const wizard = createWizard(bridge, () => {});
+    const tree = rendered(Assistants, { bridge, wizard, w: wizard.store.getState() });
+    const install = find(tree, (p) => p.label === "Install Ollama…" && typeof p.onAction === "function").props.onAction as () => void;
+    install();
+    await vi.waitFor(() => expect(bridge!.store.getState().commands["cli:install:ollama"]?.state).toBe("ERROR"));
+    expect(renderToString(<Assistants bridge={bridge} wizard={wizard} w={wizard.store.getState()} />)).toContain("Couldn’t install Ollama.");
+  });
+
   it("shows a stored key as the Keychain line with Remove instead of the field", async () => {
     const html = await screen((w) => (at("assistants")(w), (w.app.accounts.keys[0]!.status = { type: "configured", verified_at: 1 })));
     expect(html).toContain("Stored in the Keychain");

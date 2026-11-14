@@ -1,26 +1,28 @@
 // The controls of every pane run their commands: each handler a pane gives its controls is called and the
 // core's answer is read back from the store or the fake's world.
 import { renderToString } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { loadSettings } from "./actions";
-import { AudioPane } from "./AudioPane";
+import { AudioPane, registerSystemAudioReturn } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
-import { addTerm, listTerms, removeTerm } from "./glossary";
+import { GlossaryForm, GlossaryGroup } from "./GlossaryGroup";
+import { addTerm, listTerms, newTermArgs, removeTerm } from "./glossary";
 import { HotkeysPane } from "./HotkeysPane";
 import { ModelsGroup } from "./ModelsGroup";
 import { PerformancePane } from "./PerformancePane";
 import { PrivacyPane } from "./PrivacyPane";
 import { askScreenRecording, runShareTest } from "./share-test";
+import { ShareTestFailure } from "./ShareTestSheet";
 import { UpdatesPane } from "./UpdatesPane";
 
 let bridge: Bridge;
 let fake: FakeCore;
-afterEach(() => bridge.close());
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); return bridge.close(); });
 
 async function ready(seed?: (w: FakeCore["world"]) => void) {
   fake = new FakeCore({ window: "settings" });
@@ -96,6 +98,24 @@ describe("Audio", () => {
     expect(seen).toContain("permission_request");
     expect(on(tree, "Run Audio Self-Test…")).toBeTypeOf("function");
   });
+
+  it("rechecks system audio and refreshes the snapshot after returning from System Settings", async () => {
+    await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "not_asked")));
+    const listeners = new Map<string, () => void>();
+    const browserWindow = {
+      addEventListener: (name: string, listener: () => void) => listeners.set(name, listener),
+      removeEventListener: (name: string) => listeners.delete(name),
+    };
+    vi.stubGlobal("window", browserWindow);
+    const pending = { current: true };
+    const stop = registerSystemAudioReturn(bridge, pending);
+    await listeners.get("focus")!();
+    await listeners.get("focus")!();
+    expect(bridge.store.getState().commands["permission:system_audio"]?.state).toBe("DONE");
+    expect(fake.world.app.setup.permissions.find((p) => p.kind === "system_audio")?.state).toBe("granted");
+    (stop as () => void)();
+    expect(listeners.has("focus")).toBe(false);
+  });
 });
 
 describe("Call screen", () => {
@@ -105,6 +125,19 @@ describe("Call screen", () => {
     (find(rendered(CallScreenPane, { bridge, settings: stored() }), (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
     await settle();
     expect(seen).toContain("setup_set_call_display");
+  });
+
+  it("shows a refused display change and a refused Run Setup command", async () => {
+    await ready();
+    fake.failNext("setup_set_call_display", "offline");
+    const tree = rendered(CallScreenPane, { bridge, settings: stored() });
+    (find(tree, (p) => typeof p.onSelect === "function").props.onSelect as (v: string) => void)("auto");
+    await settle();
+    expect(renderToString(<CallScreenPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
+    fake.failNext("window_navigate", "offline");
+    on(rendered(GeneralPane, { bridge, settings: stored() }), "Run Setup Again…")();
+    await settle();
+    expect(renderToString(<GeneralPane bridge={bridge} settings={stored()} />)).toContain("Couldn’t save this change");
   });
 });
 
@@ -181,6 +214,43 @@ describe("glossary commands", () => {
     fake.failNext("glossary_list", "offline");
     expect(await listTerms(bridge)).toBeNull();
   });
+
+  it("shows a refused list read with a working retry and exposes the edit form actions", async () => {
+    await ready();
+    const term = fake.world.glossary.terms[0]!;
+    fake.failNext("glossary_list", "offline");
+    expect(await listTerms(bridge)).toBeNull();
+    const retryTree = rendered(GlossaryGroup, { bridge });
+    expect(renderToString(retryTree)).toContain("Couldn’t read the glossary.");
+    (find(retryTree, (p) => p.label === "Try Again").props.onAction as () => void)();
+    await settle();
+    expect(bridge.store.getState().commands["glossary:list"]?.state).toBe("DONE");
+
+    const save = vi.fn();
+    const cancel = vi.fn();
+    const editTree = rendered(GlossaryForm, { form: { term: term.term, latin: "", cyrillic: "", spoken: "" }, editing: term, mutationFailed: false, onChange: () => {}, onSave: save, onCancel: cancel });
+    expect(renderToString(editTree)).toContain('aria-label="Edit Term"');
+    (find(editTree, (p) => p.label === "Save").props.onAction as () => void)();
+    (find(editTree, (p) => p.label === "Cancel").props.onAction as () => void)();
+    expect(save).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+
+describe("share test sheet", () => {
+  it("retries a refused table read from its visible error", async () => {
+    await ready();
+    fake.failNext("share_test_run", "offline");
+    expect((await runShareTest(bridge, false)).result).toBeNull();
+    const readRetry = vi.fn(async () => {});
+    const captureRetry = vi.fn();
+    const tree = rendered(ShareTestFailure, { failedCapture: false, onCaptureRetry: captureRetry, onReadRetry: readRetry });
+    expect(renderToString(tree)).toContain("Couldn’t load the Screen Share Test.");
+    (find(tree, (p) => p.label === "Try Again").props.onAction as () => void)();
+    await settle();
+    expect(readRetry).toHaveBeenCalledWith(false);
+    expect(captureRetry).not.toHaveBeenCalled();
+  });
 });
 
 describe("share test commands", () => {
@@ -194,7 +264,7 @@ describe("share test commands", () => {
     fake.failNext("share_test_run", "offline");
     expect(await runShareTest(bridge, true)).toEqual({ result: null, outcome: { type: "failed", code: "offline" } });
     fake.failNext("share_test_run", "offline");
-    expect(await runShareTest(bridge, false)).toEqual({ result: null, outcome: null });
+    expect(await runShareTest(bridge, false)).toEqual({ result: null, outcome: { type: "failed", code: "offline" } });
   });
 
   it("asks for Screen Recording once", async () => {
@@ -212,8 +282,6 @@ describe("share test commands", () => {
     }
   });
 });
-
-import { vi } from "vitest";
 
 import { createGlossaryActions } from "./glossary";
 import { handleKeyDown, handleKeyUp, type KeyEvent, type RecorderCtx } from "./recorder-key";
@@ -288,7 +356,7 @@ describe("share test sheet actions", () => {
     expect(s.results).toHaveLength(1);
     a.start();
     await settle();
-    expect(s.events[0]).toEqual({ type: "run", screenRecording: "granted" });
+    expect(s.events).toContainEqual({ type: "run", screenRecording: "granted" });
     expect(s.events).toContainEqual({ type: "outcome", outcome: expect.objectContaining({ type: "passed" }) });
   });
 
@@ -332,6 +400,22 @@ describe("glossary actions", () => {
     await a.add();
     await a.remove();
     expect(setTerms).not.toHaveBeenCalled();
+  });
+
+  it("keeps a refused glossary add open, preserves a refused removal selection, and edits with the stored revision", async () => {
+    await ready();
+    const seed = await listTerms(bridge);
+    const term = seed![0]!;
+    const form = { term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") };
+    expect(newTermArgs(form, term)).toMatchObject({ id: term.id, rev: term.rev, term: term.term });
+    const state: { form: typeof form | null; selected: string | null } = { form: { term: "new term", latin: "", cyrillic: "", spoken: "" }, selected: term.id };
+    const make = () => createGlossaryActions(bridge, { ...state, setTerms: () => {}, setForm: (value) => { state.form = value; }, setSelected: (value) => { state.selected = value; } });
+    fake.failNext("glossary_upsert", "invalid_input");
+    await make().add();
+    expect(state.form).not.toBeNull();
+    fake.failNext("glossary_remove", "offline");
+    await make().remove();
+    expect(state.selected).toBe(term.id);
   });
 });
 

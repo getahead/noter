@@ -14,9 +14,9 @@ export interface TermForm {
 export const EMPTY_FORM: TermForm = { term: "", latin: "", cyrillic: "", spoken: "" };
 
 /** The `glossary_upsert` args for a new term; null while the term itself is empty. */
-export function newTermArgs(f: TermForm): GlossaryUpsertArgs | null {
+export function newTermArgs(f: TermForm, existing?: Pick<GlossaryTerm, "id" | "rev" | "lang" | "always_apply">): GlossaryUpsertArgs | null {
   const term = f.term.trim();
-  return term ? { term, variants_latin: splitVariants(f.latin), variants_cyrillic: splitVariants(f.cyrillic), spoken_forms: splitVariants(f.spoken), always_apply: false } : null;
+  return term ? { ...(existing ? { id: existing.id, rev: existing.rev, lang: existing.lang, always_apply: existing.always_apply } : { always_apply: false }), term, variants_latin: splitVariants(f.latin), variants_cyrillic: splitVariants(f.cyrillic), spoken_forms: splitVariants(f.spoken) } : null;
 }
 
 /** A row's cell text: variants joined as the table shows them. */
@@ -40,9 +40,11 @@ export const removeTerm = async (bridge: Bridge, id: string) => terms(await brid
 
 export interface GlossaryCtx {
   form: TermForm | null;
+  editing?: Pick<GlossaryTerm, "id" | "rev" | "lang" | "always_apply"> | null;
   selected: string | null;
   setTerms: (t: GlossaryTerm[]) => void;
   setForm: (f: TermForm | null) => void;
+  setEditing?: (term: GlossaryTerm | null) => void;
   setSelected: (id: string | null) => void;
 }
 
@@ -50,14 +52,13 @@ export interface GlossaryCtx {
 export function createGlossaryActions(bridge: Bridge, ctx: GlossaryCtx) {
   return {
     add: async () => {
-      const args = ctx.form && newTermArgs(ctx.form);
+      const args = ctx.form && newTermArgs(ctx.form, ctx.editing ?? undefined);
       const list = args && (await addTerm(bridge, args));
-      if (list) (ctx.setTerms(list), ctx.setForm(null));
+      if (list) { ctx.setTerms(list); ctx.setForm(null); ctx.setEditing?.(null); }
     },
     remove: async () => {
       const list = ctx.selected && (await removeTerm(bridge, ctx.selected));
-      if (list) ctx.setTerms(list);
-      ctx.setSelected(null);
+      if (list) { ctx.setTerms(list); ctx.setSelected(null); }
     },
   };
 }

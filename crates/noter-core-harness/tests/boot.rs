@@ -136,6 +136,59 @@ async fn real_core_answers_app_snapshot_from_main_and_refuses_a_settings_command
 }
 
 #[tokio::test]
+async fn scripted_hotkey_conflict_is_registered_by_the_real_core_at_startup() {
+    let mut r = start_with(Options {
+        fixture: true,
+        fixed_clock: true,
+        hotkey_conflict: Some(("Ctrl+Alt+Super+M".into(), "Zoom".into())),
+        ..Options::default()
+    })
+    .await;
+
+    let list = r.ok("settings", "hotkeys_list", json!({})).await;
+    let binding = list["bindings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|binding| binding["action"] == "mark_moment")
+        .unwrap();
+    assert_eq!(binding["shortcut"], "Ctrl+Alt+Super+M");
+    assert_eq!(
+        binding["status"],
+        json!({"type": "conflict", "owner": "Zoom"})
+    );
+    let registered = list["bindings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|binding| binding["action"] == "start_stop")
+        .unwrap();
+    assert_eq!(registered["status"]["type"], "registered");
+    r.ok(
+        "settings",
+        "hotkey_set",
+        json!({"action": "start_stop", "shortcut": null}),
+    )
+    .await;
+    r.finish().await;
+}
+
+#[test]
+fn hotkey_conflict_flag_parses_and_rejects_malformed_values() {
+    let args = |value: &str| vec!["--hotkey-conflict".into(), value.into()];
+    assert_eq!(
+        Options::parse(&args("Ctrl+Alt+Super+M=Zoom"))
+            .unwrap()
+            .hotkey_conflict,
+        Some(("Ctrl+Alt+Super+M".into(), "Zoom".into()))
+    );
+    for value in ["missing-owner", "=Zoom", "Ctrl+Alt+Super+M="] {
+        assert!(Options::parse(&args(value)).is_err(), "accepted {value:?}");
+    }
+    assert!(Options::parse(&["--hotkey-conflict".into()]).is_err());
+}
+
+#[tokio::test]
 async fn fixture_world_is_seeded_through_the_core() {
     let mut r = start().await;
     let settings = r.ok("settings", "settings_get", json!({})).await;
