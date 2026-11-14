@@ -175,6 +175,19 @@ fn the_environment_reports_displays_route_and_disk() {
 }
 
 #[test]
+fn displays_are_readable_without_an_environment_snapshot() {
+    let connected = displays();
+    if cfg!(target_os = "macos") {
+        assert!(connected.iter().filter(|display| display.is_main).count() <= 1);
+        assert!(connected
+            .iter()
+            .all(|display| display.width_pt > 0 && !display.name.is_empty()));
+    } else {
+        assert!(connected.is_empty());
+    }
+}
+
+#[test]
 fn watch_reports_a_change_and_stops_when_dropped() {
     let (tx, rx) = std::sync::mpsc::channel();
     let mut readings = vec![

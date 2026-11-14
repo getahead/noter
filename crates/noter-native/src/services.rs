@@ -14,6 +14,7 @@ use noter_protocol::model::{
     CaptureTestOutcome, HandoffTarget, LaunchPath, LaunchPlan, NoterSurface, ShareTestArgs,
     ShareTestResult, ShareTestRow, ShareVisibility,
 };
+pub use noter_protocol::model::{ClipboardText, LaunchRequest};
 use noter_protocol::{PermissionKind, PermissionState, TimestampMs};
 
 // ── launch ─────────────────────────────────────────────────────────────────
@@ -34,16 +35,6 @@ pub trait LaunchSystem {
     /// its argument (data, never script source). macOS asks for Automation the first time.
     /// `Err` carries the Apple Event status.
     fn run_in_terminal(&self, bundle_id: &str, command: &str) -> Result<(), i32>;
-}
-
-/// An explicit launch the handoff service asked for.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LaunchRequest {
-    pub target: HandoffTarget,
-    /// The mapped repository folder the tool opens in.
-    pub cwd: PathBuf,
-    /// The saved prompt; only its path travels, never its text.
-    pub prompt_file: PathBuf,
 }
 
 /// The path actually used: a URL handler (`claude_cli_link`)
@@ -271,15 +262,6 @@ impl LaunchSystem for NoLaunch {
 }
 
 // ── clipboard ──────────────────────────────────────────────────────────────
-
-/// What `share_copy` and `handoff_copy` put on the clipboard: plain text always, the rich
-/// forms when the caller has them.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ClipboardText {
-    pub plain: String,
-    pub markdown: Option<String>,
-    pub html: Option<String>,
-}
 
 /// The pasteboard types written, plain text first.
 pub fn pasteboard_entries(text: &ClipboardText) -> Vec<(&'static str, &str)> {

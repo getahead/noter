@@ -28,7 +28,7 @@ pub fn boot<R: Runtime>(
             let host = surfaces.clone();
             // The windows are real, so the displays they are placed on are the Mac's own.
             let options = Options {
-                displays: Some(noter_native::environment(&std::env::temp_dir()).displays),
+                displays: Some(noter_native::displays()),
                 ..options?
             };
             tauri::async_runtime::block_on(Harness::start_with(options, events, move |deps| {

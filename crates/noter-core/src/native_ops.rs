@@ -4,6 +4,7 @@
 
 use std::path::PathBuf;
 
+pub use noter_protocol::model::{ClipboardText, LaunchRequest};
 use noter_protocol::model::{
     HandoffTarget, LaunchPath, LaunchPlan, ShareTestArgs, ShareTestResult,
 };
@@ -18,23 +19,6 @@ pub enum SaveKind {
     Json,
     /// Choose a folder (a repository mapping) instead of naming a file.
     Folder,
-}
-
-/// A launch `handoff_open` asks for: the tool opens in `cwd`, pre-filled with a short instruction
-/// to read `prompt_file`. Only the file's path travels, never the prompt's text.
-#[derive(Debug, Clone, PartialEq)]
-pub struct LaunchRequest {
-    pub target: HandoffTarget,
-    pub cwd: PathBuf,
-    pub prompt_file: PathBuf,
-}
-
-/// What a clipboard write carries: plain text always, the rich forms when the caller has them.
-#[derive(Debug, Clone, PartialEq)]
-pub struct ClipboardText {
-    pub plain: String,
-    pub markdown: Option<String>,
-    pub html: Option<String>,
 }
 
 /// Native asks of the commands.

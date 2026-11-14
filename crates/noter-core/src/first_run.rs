@@ -12,6 +12,7 @@ use noter_db::rusqlite::params;
 use noter_db::{Logged, Store};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
+pub use noter_protocol::model::EnvironmentReading;
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde::{Deserialize, Serialize};
@@ -21,30 +22,6 @@ use crate::{internal, lock, settings, Core};
 
 /// A boxed future, so the seams stay object-safe.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
-/// What the Mac reports for `EnvironmentState`; the core adds permissions and the update.
-#[derive(Debug, Clone, PartialEq)]
-pub struct EnvironmentReading {
-    pub displays: Vec<DisplayInfo>,
-    pub output_device: Option<OutputDeviceInfo>,
-    pub output_route: OutputRoute,
-    pub notifications: NotificationAuth,
-    pub online: bool,
-    pub disk_free_mb: u32,
-}
-
-impl Default for EnvironmentReading {
-    fn default() -> Self {
-        Self {
-            displays: vec![],
-            output_device: None,
-            output_route: OutputRoute::Unknown,
-            notifications: NotificationAuth::NotDetermined,
-            online: true,
-            disk_free_mb: 0,
-        }
-    }
-}
 
 /// A calendar event Today shows, as EventKit reports it.
 #[derive(Debug, Clone, PartialEq)]

@@ -16,6 +16,24 @@ fn the_mac_reads_the_environment_of_the_storage_volume() {
 }
 
 #[test]
+fn native_service_payloads_are_shared_through_the_protocol() {
+    let reading: noter_protocol::model::EnvironmentReading = noter_core::EnvironmentReading::default();
+    let _: noter_native::Reading = reading;
+    let request = noter_core::LaunchRequest {
+        target: noter_protocol::model::HandoffTarget::Codex,
+        cwd: PathBuf::from("/tmp/repository"),
+        prompt_file: PathBuf::from("/tmp/handoff.md"),
+    };
+    let _: noter_native::LaunchRequest = request;
+    let text = noter_core::ClipboardText {
+        plain: "plain".into(),
+        markdown: Some("markdown".into()),
+        html: None,
+    };
+    let _: noter_native::ClipboardText = text;
+}
+
+#[test]
 fn system_audio_is_never_asked_through_the_mac() {
     let mac = Mac::new(&std::env::temp_dir());
     assert_eq!(
