@@ -110,6 +110,11 @@ impl Neighbours {
 
     /// The most similar other topic at `SUGGEST_SIMILARITY` or above that was not kept apart.
     fn suggestion(&self, id: &str) -> Option<(String, String)> {
+        self.suggestion_with_score(id)
+            .map(|(target, name, _)| (target, name))
+    }
+
+    fn suggestion_with_score(&self, id: &str) -> Option<(String, String, f32)> {
         let (_, _, own) = self.centroids.iter().find(|(t, ..)| t == id)?;
         self.centroids
             .iter()
@@ -117,7 +122,7 @@ impl Neighbours {
             .map(|(t, name, c)| (cosine(own, c), t, name))
             .filter(|(s, t, ..)| *s >= SUGGEST_SIMILARITY && !self.kept.contains(&pair_key(id, t)))
             .max_by(|a, b| a.0.total_cmp(&b.0))
-            .map(|(_, t, name)| (t.clone(), name.clone()))
+            .map(|(score, t, name)| (t.clone(), name.clone(), score))
     }
 
     fn set(&mut self, id: &str, name: &str, centroid: Option<Vec<f32>>) {
@@ -128,19 +133,92 @@ impl Neighbours {
     }
 }
 
-fn refresh_suggestions(conn: &Connection) -> Db<()> {
+fn save_suggestion(conn: &Connection, id: &str, suggestion: Option<(String, f32)>) -> Db<()> {
+    let (target, similarity) = suggestion
+        .map(|(target, score)| (Some(target), Some(score)))
+        .unwrap_or((None, None));
+    conn.execute(
+        "INSERT INTO topic_suggestions (topic_id, target_id, similarity)
+         VALUES (?1, ?2, ?3)
+         ON CONFLICT(topic_id) DO UPDATE SET
+           target_id = excluded.target_id, similarity = excluded.similarity",
+        params![id, target, similarity],
+    )?;
+    Ok(())
+}
+
+fn refresh_suggestions_after_change(conn: &Connection, changed_ids: &[String]) -> Db<()> {
     let near = Neighbours::read(conn)?;
-    let ids: Vec<String> = conn
-        .prepare("SELECT id FROM topics ORDER BY id")?
+    let existing: BTreeSet<String> = conn
+        .prepare("SELECT id FROM topics")?
         .query_map([], |r| r.get(0))?
         .collect::<Db<_>>()?;
-    conn.execute("DELETE FROM topic_suggestions", [])?;
-    for id in ids {
-        let target = near.suggestion(&id).map(|(target, _)| target);
-        conn.execute(
-            "INSERT INTO topic_suggestions (topic_id, target_id) VALUES (?1, ?2)",
-            params![id, target],
-        )?;
+    let changed: BTreeSet<String> = changed_ids
+        .iter()
+        .filter(|id| existing.contains(*id))
+        .cloned()
+        .collect();
+    let cached: Vec<(String, Option<String>, Option<f64>)> = conn
+        .prepare("SELECT topic_id, target_id, similarity FROM topic_suggestions")?
+        .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+        .collect::<Db<_>>()?;
+    let mut refresh = changed.clone();
+    for (id, target, similarity) in &cached {
+        if target
+            .as_deref()
+            .is_some_and(|target| changed.contains(target))
+            || (target.is_none() && similarity.is_some())
+        {
+            refresh.insert(id.clone());
+        }
+    }
+    let missing: Vec<String> = conn
+        .prepare(
+            "SELECT t.id FROM topics t LEFT JOIN topic_suggestions s ON s.topic_id = t.id
+             WHERE s.topic_id IS NULL",
+        )?
+        .query_map([], |r| r.get(0))?
+        .collect::<Db<_>>()?;
+    refresh.extend(missing);
+    let mut suggestions: BTreeMap<String, (Option<String>, Option<f64>)> = cached
+        .into_iter()
+        .map(|(id, target, similarity)| (id, (target, similarity)))
+        .collect();
+    for id in &refresh {
+        let suggestion = near
+            .suggestion_with_score(id)
+            .map(|(target, _, score)| (target, score));
+        save_suggestion(conn, id, suggestion.clone())?;
+        suggestions.insert(
+            id.clone(),
+            suggestion
+                .map(|(target, score)| (Some(target), Some(score as f64)))
+                .unwrap_or((None, None)),
+        );
+    }
+
+    for candidate in &changed {
+        let Some((_, _, candidate_vector)) = near.centroids.iter().find(|(id, ..)| id == candidate)
+        else {
+            continue;
+        };
+        for (id, _, own_vector) in &near.centroids {
+            if id == candidate || near.kept.contains(&pair_key(id, candidate)) {
+                continue;
+            }
+            let score = cosine(own_vector, candidate_vector);
+            if score < SUGGEST_SIMILARITY {
+                continue;
+            }
+            let current_score = suggestions
+                .get(id)
+                .and_then(|(target, score)| target.as_ref().and(score.as_ref()));
+            if current_score.is_some_and(|current| score as f64 <= *current) {
+                continue;
+            }
+            save_suggestion(conn, id, Some((candidate.clone(), score)))?;
+            suggestions.insert(id.clone(), (Some(candidate.clone()), Some(score as f64)));
+        }
     }
     Ok(())
 }
@@ -432,7 +510,8 @@ pub fn merge(
     refresh(tx, target).map_err(internal)?;
     tx.execute("DELETE FROM topics WHERE id = ?1", [source])
         .map_err(internal)?;
-    refresh_suggestions(tx).map_err(internal)?;
+    refresh_suggestions_after_change(tx, &[target.to_owned(), source.to_owned()])
+        .map_err(internal)?;
     // The removed row, column by column: undo puts it back (its centroid is refreshed then).
     log.push(logged(
         "topic",
@@ -477,7 +556,7 @@ pub fn keep_separate(
         after: Some(KEEP_SEPARATE.into()),
         delta: None,
     };
-    refresh_suggestions(tx).map_err(internal)?;
+    refresh_suggestions_after_change(tx, &[a.to_owned(), b.to_owned()]).map_err(internal)?;
     Ok(((), vec![row]))
     // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-separate
 }
@@ -511,7 +590,7 @@ fn refresh(conn: &Connection, id: &str) -> Db<Option<Vec<f32>>> {
 /// back; a topic that is gone is skipped.
 pub fn refresh_centroids(conn: &Connection, ids: &[String]) -> Db<()> {
     ids.iter().try_for_each(|id| refresh(conn, id).map(drop))?;
-    refresh_suggestions(conn)
+    refresh_suggestions_after_change(conn, ids)
 }
 
 /// A new topic's local name: the item's first clause, at most six words.
@@ -729,7 +808,8 @@ pub fn attach_topics(
     out.topics = touched.into_keys().collect();
     out.suggestions = pairs.into_iter().collect();
     if !out.items.is_empty() {
-        refresh_suggestions(tx).map_err(internal)?;
+        let changed: Vec<String> = centroid_parts.into_keys().collect();
+        refresh_suggestions_after_change(tx, &changed).map_err(internal)?;
     }
     Ok((out, log))
     // @cpt-end:cpt-noter-algo-core-retrieval-ask-attach-topic:p1:inst-attach-return
