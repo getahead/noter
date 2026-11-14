@@ -296,9 +296,8 @@ impl<L: EngineLauncher> EngineClient<L> {
         let mut stopping_restart = false;
         let mut stop_ready_engine = false;
         {
-            // Serialize cancellation with a restart's StartSession write. If it has not
-            // been sent yet the restart will observe Stopped; if it is in flight the
-            // restart's post-reply check will send Stop.
+            // Serialize cancellation with a restart's StartSession write. The restart
+            // write checks the state under this same lock before sending the command.
             let _conn = self.inner.conn.lock().await;
             let mut shared = self.shared();
             if let Some(x) = shared
@@ -453,15 +452,23 @@ impl<L: EngineLauncher> EngineClient<L> {
         };
         let call_id = start.call_id.clone();
         // A failure here is another crash: the reader's close starts the next restart.
-        let resumed = self.command(EngineCommand::StartSession(start)).await;
+        let expected_call_id = call_id.clone();
+        let resumed = self
+            .command_with(EngineCommand::StartSession(start), move |shared, _| {
+                shared
+                    .session
+                    .as_ref()
+                    .is_some_and(|x| x.running() && x.start.call_id == expected_call_id)
+                    .then_some(())
+                    .ok_or(CommandError::Unavailable)
+            })
+            .await;
         let still_running = self
             .shared()
             .session
             .as_ref()
             .is_some_and(|x| x.running() && x.start.call_id == call_id);
         if !still_running {
-            // Stop may win while start_session is in flight. Send stop after its reply too.
-            let _ = self.command(EngineCommand::Stop { call_id }).await;
             return;
         }
         if resumed.is_err() {
@@ -626,5 +633,56 @@ impl<L: EngineLauncher> EngineClient<L> {
             });
         }
         // @cpt-end:cpt-noter-algo-core-engine-capture-degraded:p1:inst-return-degraded
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use noter_protocol::engine::AsrBackend;
+
+    fn start() -> StartSession {
+        StartSession {
+            call_id: CallId::new("call_1"),
+            session_dir: "audio/call_1".into(),
+            store_audio: true,
+            mic_device_uid: None,
+            exclude_bundle_ids: vec![],
+            languages: vec![],
+            backend: AsrBackend::WhisperTurbo,
+            glossary: vec![],
+            speaker_priors: vec![],
+            enrolled_embeddings_path: None,
+            resume_from_ms: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn a_stopped_session_does_not_write_a_restart_start_command() {
+        let engine = crate::scripted::ScriptedEngine::new();
+        let client = EngineClient::new(engine.clone(), crate::Config::default());
+        let start = start();
+        client.start_session(start.clone()).await.unwrap();
+        let before = engine.commands().len();
+        client
+            .shared()
+            .session
+            .as_mut()
+            .unwrap()
+            .stopped(&mut Vec::new());
+
+        let call_id = start.call_id.clone();
+        assert!(client
+            .command_with(EngineCommand::StartSession(start), move |shared, _| {
+                shared
+                    .session
+                    .as_ref()
+                    .is_some_and(|x| x.running() && x.start.call_id == call_id)
+                    .then_some(())
+                    .ok_or(CommandError::Unavailable)
+            })
+            .await
+            .is_err());
+        assert_eq!(engine.commands().len(), before);
     }
 }

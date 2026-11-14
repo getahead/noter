@@ -366,7 +366,7 @@ impl<L: EngineLauncher> EngineClient<L> {
 
     /// Sends a command and waits for its `ack` or `error`.
     pub async fn command(&self, cmd: EngineCommand) -> Result<(), CommandError> {
-        self.command_with(cmd, |_, _| {}).await
+        self.command_with(cmd, |_, _| Ok(())).await
     }
 
     /// [`Self::command`], telling `sent` the command's id under the state lock before the line
@@ -374,7 +374,7 @@ impl<L: EngineLauncher> EngineClient<L> {
     async fn command_with(
         &self,
         cmd: EngineCommand,
-        sent: impl FnOnce(&mut Shared, u64),
+        sent: impl FnOnce(&mut Shared, u64) -> Result<(), CommandError>,
     ) -> Result<(), CommandError> {
         self.ensure_ready()
             .await
@@ -388,8 +388,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             };
             {
                 let mut s = self.shared();
+                sent(&mut s, id)?;
                 s.pending.insert(id, tx);
-                sent(&mut s, id);
             }
             if write_line(&mut *c.stdin, id, cmd).await.is_err() {
                 self.shared().pending.remove(&id);

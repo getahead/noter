@@ -357,8 +357,11 @@ impl<L: EngineLauncher> EngineClient<L> {
             token,
         };
         // @cpt-begin:cpt-noter-state-core-engine-offline-request:p1:inst-st-refused
-        self.command_with(cmd, |s, id| s.offline.sent(&key, token, id))
-            .await?;
+        self.command_with(cmd, |s, id| {
+            s.offline.sent(&key, token, id);
+            Ok(())
+        })
+        .await?;
         // @cpt-end:cpt-noter-state-core-engine-offline-request:p1:inst-st-refused
         let answer = answer.await.map_err(|_| OfflineError::Abandoned)??;
         // @cpt-begin:cpt-noter-state-core-engine-offline-request:p1:inst-st-complete

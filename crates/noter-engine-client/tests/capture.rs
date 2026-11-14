@@ -588,6 +588,25 @@ async fn stop_during_restart_prevents_the_engine_session_from_resuming() {
         "a session started during the stop race must be stopped: {:?}",
         engine.commands()
     );
+    let commands = engine.commands();
+    let stop = commands
+        .iter()
+        .position(|command| matches!(command, EngineCommand::Stop { .. }))
+        .unwrap();
+    assert!(
+        !commands[stop + 1..]
+            .iter()
+            .any(|command| matches!(command, EngineCommand::StartSession(_))),
+        "a restart must not start a session after Stop: {commands:?}"
+    );
+    assert_eq!(
+        commands
+            .iter()
+            .filter(|command| matches!(command, EngineCommand::Stop { .. }))
+            .count(),
+        1,
+        "stopping a restart should send one stop command: {commands:?}"
+    );
 }
 
 #[tokio::test(start_paused = true)]
