@@ -56,6 +56,11 @@ export function isTyping(target: EventTarget | null): boolean {
   return el.tagName === "INPUT" && TEXT_INPUTS.has(el.type ?? "");
 }
 
+// @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-keyboard:p1
+export function isModalOpen(): boolean {
+  return typeof document !== "undefined" && typeof document.querySelector === "function" && document.querySelector('[aria-modal="true"]') !== null;
+}
+
 // @cpt-algo:cpt-noter-algo-ui-accessibility-l10n-physical-key:p1
 export function matchShortcut(
   e: Mods & { target: EventTarget | null },
@@ -85,13 +90,12 @@ export function matchShortcut(
 }
 
 // @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
-// @cpt-dod:cpt-noter-dod-ui-accessibility-l10n-keyboard:p1
 /** Runs the matched action and consumes the event; true when one ran. An event a deeper handler already consumed is left alone (⌘F: the transcript's find bar, not the shell's search). */
 export function handleShortcut(
   e: ShortcutEvent,
   tables: ShortcutTable[],
 ): boolean {
-  if (e.defaultPrevented) return false;
+  if (e.defaultPrevented || isModalOpen()) return false;
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-user-key
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-shortcut
   // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-match-key

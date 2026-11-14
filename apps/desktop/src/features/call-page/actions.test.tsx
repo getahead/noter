@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -214,5 +214,21 @@ describe("opening the page and its controls", () => {
     slots.deleteCall = null;
     key();
     expect(prevented).toBe(1);
+  });
+
+  it("does not run call-page shortcuts while a modal sheet is open", async () => {
+    await ready();
+    const asked: string[] = [];
+    slots.deleteCall = async (_b, callId) => (asked.push(callId), { outcome: "cancelled" });
+    const c1 = fake.world.calls[0]!.id;
+    await readCall(bridge, c1);
+    vi.stubGlobal("document", { querySelector: vi.fn(() => ({})) });
+    const preventDefault = vi.fn();
+    pageKey(bridge, c1, { code: "Backspace", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault, stopPropagation: vi.fn() });
+    pageKey(bridge, c1, { code: "KeyE", metaKey: true, ctrlKey: false, altKey: false, shiftKey: false, repeat: false, target: null, preventDefault, stopPropagation: vi.fn() });
+    pageKey(bridge, c1, { code: "KeyC", metaKey: true, ctrlKey: false, altKey: false, shiftKey: true, repeat: false, target: null, preventDefault, stopPropagation: vi.fn() });
+    expect(asked).toEqual([]);
+    expect(preventDefault).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

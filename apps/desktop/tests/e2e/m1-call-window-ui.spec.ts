@@ -422,7 +422,11 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
     const before = await settled(page);
 
     const hide = header(page).getByRole("button", { name: "Hide", exact: true });
-    await expect(hide).toHaveAttribute("title", "Hide to the menu bar");
+    await expect(hide).toHaveAttribute("data-help-tag", "Hide to the menu bar");
+    const descriptionId = await hide.getAttribute("aria-describedby");
+    expect(descriptionId).toBeTruthy();
+    await expect(page.locator(`[id="${descriptionId}"]`)).toHaveAttribute("role", "tooltip");
+    await expect(page.locator(`[id="${descriptionId}"]`)).toHaveText("Hide to the menu bar");
     await hide.click();
     expect(await sent(page, "window_hide_call")).toHaveLength(1);
     await coreWindow(page, { visible: false });
@@ -435,10 +439,13 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
   test("UI — error path: Panel closed by a crash — a new WebView opens with snapshot, window state, then the transcript", async ({ page }) => {
     await startLive(page);
     const marked = await markMoment(page);
-    const title = await header(page).innerText();
+    const heading = await header(page).getByRole("heading").innerText();
+    const people = header(page).locator('[data-component="cpt-noter-component-ui-person-chip"]');
+    const chips = await people.allInnerTexts();
 
     await page.reload(); // the crashed WebView is recreated
-    await expect(header(page)).toHaveText(title);
+    await expect(header(page).getByRole("heading")).toHaveText(heading);
+    await expect(people).toHaveText(chips);
     const order = (await calls(page)).filter((c) => c.kind === "invoke").map((c) => c.name);
     expect(order.indexOf("app_snapshot")).toBeGreaterThanOrEqual(0);
     expect(order.indexOf("window_call_state")).toBeGreaterThan(order.indexOf("app_snapshot"));

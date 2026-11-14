@@ -21,6 +21,7 @@ const props = (over: Partial<ToolbarProps> = {}): ToolbarProps => ({
   onSearch: vi.fn(),
   onRunSearch: vi.fn(),
   onOpenSearch: vi.fn(),
+  onSearchBlur: vi.fn(),
   ...over,
 });
 const actions = [
@@ -80,6 +81,19 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect([p.onBack, p.onForward, p.onToggleSidebar].every((f) => (f as ReturnType<typeof vi.fn>).mock.calls.length === 1)).toBe(true);
     expect(p.onSearch).toHaveBeenCalledWith("zoom");
     expect(p.onRunSearch).toHaveBeenCalledWith("zoom");
+  });
+
+  it("closes an empty narrow search on blur and keeps a non-empty search open", () => {
+    const empty = props({ narrow: true, searchOpen: true });
+    const emptyTree = rendered(MainToolbar, empty);
+    const emptySearch = find(emptyTree, (x) => x.id === "mw-search");
+    (emptySearch.props.onBlur as () => void)();
+    expect(empty.onSearchBlur).toHaveBeenCalledOnce();
+
+    const typed = props({ narrow: true, searchOpen: true, search: "budget" });
+    const typedSearch = find(rendered(MainToolbar, typed), (x) => x.id === "mw-search");
+    (typedSearch.props.onBlur as () => void)();
+    expect(typed.onSearchBlur).not.toHaveBeenCalled();
   });
 
   it("opens the » menu under its button and runs the chosen action", () => {

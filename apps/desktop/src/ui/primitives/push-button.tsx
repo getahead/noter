@@ -3,6 +3,7 @@ import type { KeyboardEvent, MouseEvent } from "react";
 import { Icon, type IconName } from "../icons";
 import { base, cx, type Common } from "./attrs";
 import { KeyCap } from "./key-cap";
+import { Tooltip } from "./tooltip";
 
 export interface PushButtonProps extends Common {
   label: string;
@@ -75,11 +76,12 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
   // @cpt-end:cpt-noter-flow-ui-primitives-operate-control:p1:inst-user-input
   // @cpt-begin:cpt-noter-flow-ui-primitives-operate-control:p1:inst-return-control
   // @cpt-begin:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
-  return (
+  const button = (
     <button
       type={submit ? "submit" : "button"}
       className={cx("np-btn", `np-btn--${variant}`, `np-btn--${size}`, o.cls)}
       {...base("push-button", { ...o, variant, size, state: buttonState({ loading, disabled, state }) })}
+      title={undefined}
       disabled={disabled}
       aria-keyshortcuts={shortcut}
       aria-label={ariaLabel}
@@ -102,6 +104,7 @@ export function PushButton({ label, variant = "secondary", size = "regular", ico
       {chevron && <Icon name="chevronDown" size={10} cls="np-btn__chev" />}
     </button>
   );
+  return o.help ? <Tooltip text={o.help}>{button}</Tooltip> : button;
   // @cpt-end:cpt-noter-algo-ui-primitives-fit-labels:p1:inst-hug
   // @cpt-end:cpt-noter-flow-ui-primitives-operate-control:p1:inst-return-control
 }

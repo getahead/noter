@@ -3,6 +3,7 @@ import type { KeyboardEvent } from "react";
 import { Icon, type IconName } from "../icons";
 import { base, cx, type Common } from "./attrs";
 import { press } from "./push-button";
+import { Tooltip } from "./tooltip";
 
 export interface IconButtonProps extends Common {
   icon: IconName;
@@ -25,13 +26,13 @@ export interface IconButtonProps extends Common {
 export function IconButton({ icon, label, size = "toolbar", disabled, on, pressed, badge, attrs, onAction, onKeyDown, ...o }: IconButtonProps) {
   const help = o.help || label;
   return (
+    <Tooltip text={help}>
     <button
       type="button"
       className={cx("np-ibtn", `np-ibtn--${size}`, on && "is-on", o.cls)}
       {...base("icon-button", { ...o, size, state: disabled ? "disabled" : o.state })}
       aria-label={label}
-      title={help}
-      data-help-tag={help}
+      title={undefined}
       disabled={disabled}
       aria-pressed={pressed}
       {...attrs}
@@ -41,5 +42,6 @@ export function IconButton({ icon, label, size = "toolbar", disabled, on, presse
       <Icon name={icon} size={size === "inline" ? 13 : 15} />
       {badge && <span className="np-ibtn__badge">{badge}</span>}
     </button>
+    </Tooltip>
   );
 }

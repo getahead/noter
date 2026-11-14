@@ -41,6 +41,7 @@ export interface ToolbarProps {
   onSearch: (value: string) => void;
   onRunSearch: (value: string) => void;
   onOpenSearch: () => void;
+  onSearchBlur?: () => void;
 }
 
 /** The » menu: the page actions that do not fit at Narrow, opened under the overflow button. */
@@ -105,7 +106,7 @@ export function MainToolbar(p: ToolbarProps) {
         (p.narrow && !p.searchOpen ? (
           <IconButton icon="search" label={t("shell.search")} onAction={p.onOpenSearch} />
         ) : (
-          <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} />
+          <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
         ))}
     </Toolbar>
   );

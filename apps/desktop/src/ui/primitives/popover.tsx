@@ -1,7 +1,7 @@
 // popover of the prototype's floating layer (src/js/05-shell.js, positioned as 00-core.js positionFloating does):
 // opens under its anchor, Esc or a click outside closes it, focus moves in and returns to the anchor.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { base } from "./attrs";
+import { base, zoomFactor } from "./attrs";
 import { focusInside } from "./sheet";
 
 type Rect = { left: number; right: number; top: number; bottom: number };
@@ -19,7 +19,11 @@ export function placeFloating(anchor: Rect | null, size: Size, view: Size, align
 
 /** The place of the rendered popover `el` next to `anchor` in the window. */
 export function measure(el: HTMLElement | null, anchor: HTMLElement | null, align?: "start" | "end") {
-  return el && placeFloating(anchor?.getBoundingClientRect() ?? null, { width: el.offsetWidth, height: el.offsetHeight }, { width: innerWidth, height: innerHeight }, align);
+  if (!el) return null;
+  const zoom = zoomFactor(el);
+  const rect = anchor?.getBoundingClientRect();
+  const localAnchor = rect && { left: rect.left / zoom, right: rect.right / zoom, top: rect.top / zoom, bottom: rect.bottom / zoom };
+  return placeFloating(localAnchor ?? null, { width: el.offsetWidth, height: el.offsetHeight }, { width: innerWidth / zoom, height: innerHeight / zoom }, align);
 }
 
 /** Calls `onClose` on a pointer press outside the popover and its anchor; returns the remover. */

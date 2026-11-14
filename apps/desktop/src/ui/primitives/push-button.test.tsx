@@ -4,6 +4,13 @@ import { describe, expect, it, vi } from "vitest";
 import { buttonState, press, PushButton } from "./push-button";
 
 describe("push-button", () => {
+  it("wires help text to the tooltip and accessible description", async () => {
+    const html = renderToString(<PushButton label="Record" disabled help="Free up 500 MB to record" />);
+    expect(html).toMatch(/<button[^>]+aria-describedby="[^"]+"[^>]+data-help-tag="Free up 500 MB to record"/);
+    expect(html).toContain('role="tooltip"');
+    expect(html).not.toContain('title="Free up 500 MB to record"');
+  });
+
   it("renders the prototype's markup and attributes for its variant and size", () => {
     expect(renderToString(<PushButton label="Record" variant="primary" icon="record" kbd="⌘R" />)).toBe(
       '<button type="button" class="np-btn np-btn--primary np-btn--regular" data-component="cpt-noter-component-ui-primitives" data-primitive="push-button" data-variant="primary" data-size="regular">' +
@@ -25,13 +32,15 @@ describe("push-button", () => {
     expect(html).toContain('aria-label="Save the summary"');
   });
 
-  it("keeps a disabled reason as its help tag and takes no action", () => {
+  it("keeps a disabled reason as its help tag and takes no action", async () => {
     const html = renderToString(<PushButton label="Record" disabled help="Free up 500 MB to record" />);
     expect(html).toContain('data-state="disabled"');
-    expect(html).toContain('title="Free up 500 MB to record"');
+    expect(html).toContain('data-help-tag="Free up 500 MB to record"');
     expect(html).toContain('disabled=""');
     const onAction = vi.fn();
-    PushButton({ label: "Record", disabled: true, onAction }).props.onClick();
+    const { find, rendered } = await import("../testing");
+    const button = find(rendered(PushButton, { label: "Record", disabled: true, help: "Unavailable", onAction }), (_, type) => type === "button");
+    (button.props.onClick as () => void)();
     expect(onAction).not.toHaveBeenCalled();
   });
 

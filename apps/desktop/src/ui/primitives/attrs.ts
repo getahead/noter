@@ -34,4 +34,13 @@ export function base(primitive: string, o: BaseOptions) {
   };
 }
 
+/** The main window's CSS zoom scales geometry returned by getBoundingClientRect and fixed-position children. */
+// @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
+export function zoomFactor(el: Element | null): number {
+  if (!el) return 1;
+  const shell = el.closest?.(".np-win") ?? el;
+  const zoom = typeof getComputedStyle === "function" ? Number.parseFloat(getComputedStyle(shell).zoom) : 1;
+  return Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
+}
+
 export const cx = (...parts: (string | false | null | undefined)[]) => parts.filter(Boolean).join(" ");

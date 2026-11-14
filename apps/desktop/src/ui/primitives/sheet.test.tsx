@@ -16,8 +16,8 @@ describe("Sheet (cpt-noter-dod-ui-primitives-controls)", () => {
   });
 });
 
-function key(k: string, target: object, o: { shiftKey?: boolean; metaKey?: boolean; items?: object[] } = {}) {
-  const e = { key: k, target, shiftKey: !!o.shiftKey, metaKey: !!o.metaKey, preventDefault: vi.fn(), currentTarget: { querySelectorAll: () => o.items ?? [] } };
+function key(k: string, target: object, o: { shiftKey?: boolean; metaKey?: boolean; items?: object[]; composing?: boolean } = {}) {
+  const e = { key: k, target, shiftKey: !!o.shiftKey, metaKey: !!o.metaKey, nativeEvent: { isComposing: !!o.composing }, preventDefault: vi.fn(), stopPropagation: vi.fn(), currentTarget: { querySelectorAll: () => o.items ?? [] } };
   return e as unknown as KeyboardEvent<HTMLElement> & { preventDefault: ReturnType<typeof vi.fn> };
 }
 const el = (tagName: string) => ({ tagName, focus: vi.fn() });
@@ -31,8 +31,23 @@ describe("sheetKey", () => {
 
   it("cancels on Esc", () => {
     const onCancel = vi.fn();
-    sheetKey(key("Escape", el("INPUT")), onCancel);
+    const e = key("Escape", el("INPUT"));
+    sheetKey(e, onCancel);
     expect(onCancel).toHaveBeenCalledOnce();
+    expect(e.stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it("keeps composing keys inside the sheet without cancelling or submitting", () => {
+    const onCancel = vi.fn();
+    const onDefault = vi.fn();
+    const enter = key("Enter", el("INPUT"), { composing: true });
+    const escape = key("Escape", el("INPUT"), { composing: true });
+    sheetKey(enter, onCancel, onDefault);
+    sheetKey(escape, onCancel, onDefault);
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onDefault).not.toHaveBeenCalled();
+    expect(enter.stopPropagation).not.toHaveBeenCalled();
+    expect(escape.stopPropagation).toHaveBeenCalledOnce();
   });
 
   it("runs the default button on Return, and on ⌘Return in a multi-line field", () => {

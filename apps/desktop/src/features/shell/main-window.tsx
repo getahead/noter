@@ -24,7 +24,7 @@ import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-in
 import { MODE_MSG } from "./mode-indicator-view";
 import { shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
-import { actionEvent, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
+import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { searchRoute } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
@@ -133,11 +133,14 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
 
   const act = useCallback(
     (a: ShellAction) => {
-      const e = actionEvent(a, overlay, !!pageFor(currentRoute(shellRef.current.history).section, currentRoute(shellRef.current.history)).inspector);
-      if (e) return dispatch(e);
-      if (a.type === "open-settings") return navigate({ type: "settings", pane: "general" });
-      setSearchOpen(true);
-      void setTimeout(() => document.getElementById("mw-search")?.focus());
+      runShellAction(a, overlay, !!pageFor(currentRoute(shellRef.current.history).section, currentRoute(shellRef.current.history)).inspector, {
+        dispatch,
+        openSettings: () => navigate({ type: "settings", pane: "general" }),
+        focusSearch: () => {
+          setSearchOpen(true);
+          void setTimeout(() => document.getElementById("mw-search")?.focus());
+        },
+      });
     },
     [overlay, navigate],
   );
@@ -257,6 +260,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           onSearch={setSearch}
           onRunSearch={(q) => dispatch({ type: "move", move: { type: "push", route: searchRoute(q.trim()) } })}
           onOpenSearch={() => act({ type: "focus-search" })}
+          onSearchBlur={() => setSearchOpen(false)}
         />
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-empty-one */}
         {/* @cpt-begin:cpt-noter-state-ui-main-window-shell-banner-slot:p1:inst-one-several */}

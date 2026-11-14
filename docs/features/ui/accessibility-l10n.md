@@ -207,7 +207,7 @@ The system **MUST** provide one announcement service that follows DESIGN's annou
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-accessibility-l10n-keyboard`
 
-The system **MUST** make every action reachable by keyboard, restore focus to the opener after every overlay, keep focused elements clear of sticky parts, and match single-key and ⌘ shortcuts by physical key.
+The system **MUST** make every action reachable by keyboard, restore focus to the opener after every overlay, keep focused elements clear of sticky parts, and match single-key and ⌘ shortcuts by physical key. While a modal sheet is open, its keyboard events stay within that sheet and page-level shortcuts do not run.
 
 **Implements**:
 - `cpt-noter-flow-ui-accessibility-l10n-keyboard`
