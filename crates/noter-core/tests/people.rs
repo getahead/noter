@@ -1,6 +1,8 @@
 //! FEATURE cpt-noter-feature-core-people (slice 1): `people_list`, `person_get`, `person_create`,
 //! `person_update`, `people_merge` and `person_delete` over the people tables.
 
+mod common;
+use common::{call, count, exec, item, part, person, row, speaker, text};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
@@ -57,62 +59,6 @@ fn ctx() -> CommandCtx {
     }
 }
 
-/// Plain SQL beside the core, for state the commands cannot reach (triggers, raw reads).
-fn exec(dir: &Path, sql: &str) -> noter_db::rusqlite::Result<()> {
-    noter_db::rusqlite::Connection::open(dir.join("noter.db"))
-        .unwrap()
-        .execute_batch(sql)
-}
-
-fn count(dir: &Path, sql: &str) -> i64 {
-    noter_db::rusqlite::Connection::open(dir.join("noter.db"))
-        .unwrap()
-        .query_row(sql, [], |r| r.get(0))
-        .unwrap()
-}
-
-fn text(dir: &Path, sql: &str) -> Option<String> {
-    noter_db::rusqlite::Connection::open(dir.join("noter.db"))
-        .unwrap()
-        .query_row(sql, [], |r| r.get(0))
-        .unwrap()
-}
-
-fn row(table: &'static str, values: &[(&'static str, Value)]) -> Insert {
-    Insert {
-        table,
-        values: values.to_vec(),
-    }
-}
-
-fn call(id: &str, started: i64) -> Insert {
-    row(
-        "calls",
-        &[
-            ("id", json!(id)),
-            ("rev", json!(1)),
-            ("started_at", json!(started)),
-            ("ended_at", json!(started + 600_000)),
-            ("title", json!(format!("Call {id}"))),
-            ("call_type", json!("planning")),
-            ("status", json!("ready")),
-            ("mode_used", json!("cloud_redacted")),
-        ],
-    )
-}
-
-fn person(id: &str, name: &str) -> Insert {
-    row(
-        "people",
-        &[
-            ("id", json!(id)),
-            ("rev", json!(1)),
-            ("display_name", json!(name)),
-            ("short_name", json!(name)),
-        ],
-    )
-}
-
 fn alias(id: &str, person: &str, alias: &str, norm: &str) -> Insert {
     row(
         "person_aliases",
@@ -121,52 +67,6 @@ fn alias(id: &str, person: &str, alias: &str, norm: &str) -> Insert {
             ("person_id", json!(person)),
             ("alias", json!(alias)),
             ("alias_norm", json!(norm)),
-        ],
-    )
-}
-
-fn part(call_id: &str, person: &str) -> Insert {
-    row(
-        "call_participants",
-        &[
-            ("id", json!(format!("cpp_{call_id}_{person}"))),
-            ("call_id", json!(call_id)),
-            ("person_id", json!(person)),
-        ],
-    )
-}
-
-fn speaker(id: &str, call_id: &str, label: &str, person: Option<&str>, n: Option<i64>) -> Insert {
-    row(
-        "speakers",
-        &[
-            ("id", json!(id)),
-            ("call_id", json!(call_id)),
-            ("label", json!(label)),
-            ("n", json!(n)),
-            ("channel", json!("sys")),
-            ("person_id", json!(person)),
-            ("named_by", json!(person.map(|_| "you"))),
-            ("pass", json!("live")),
-        ],
-    )
-}
-
-fn item(id: &str, call_id: &str, kind: &str, owner: Option<&str>) -> Insert {
-    row(
-        "items",
-        &[
-            ("id", json!(id)),
-            ("rev", json!(1)),
-            ("call_id", json!(call_id)),
-            ("kind", json!(kind)),
-            ("text", json!(format!("Text of {id}"))),
-            ("lang", json!("en")),
-            ("status", json!("open")),
-            ("review_state", json!("accepted")),
-            ("created_by", json!("llm")),
-            ("is_engineering", json!(0)),
-            ("owner_person_id", json!(owner)),
         ],
     )
 }
