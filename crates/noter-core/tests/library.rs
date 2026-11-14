@@ -7,7 +7,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter};
+use noter_core::{BoxFuture, Core, CoreDeps, EnvironmentReading, EventEmitter, NativeServices};
 use noter_db::rusqlite::Connection;
 use noter_db::Insert;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
@@ -20,6 +20,26 @@ use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
 const DAY: i64 = 86_400_000;
+
+struct CalendarEventNative(CalendarEventRef);
+
+impl NativeServices for CalendarEventNative {
+    fn permission(&self, _: PermissionKind) -> PermissionState {
+        PermissionState::Granted
+    }
+    fn request_permission(&self, _: PermissionKind) -> BoxFuture<'_, PermissionState> {
+        panic!("call_get never requests calendar access")
+    }
+    fn environment(&self) -> EnvironmentReading {
+        EnvironmentReading::default()
+    }
+    fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
+        Ok(())
+    }
+    fn calendar_event_near(&self, _: TimestampMs) -> Option<CalendarEventRef> {
+        Some(self.0.clone())
+    }
+}
 
 #[derive(Default)]
 struct Events(Mutex<Vec<(&'static str, Value)>>);
@@ -45,6 +65,13 @@ impl Events {
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());
     let deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
+    (Core::open(dir, deps).expect("core opens"), events)
+}
+
+fn open_with_native(dir: &Path, native: impl NativeServices + 'static) -> (Core, Arc<Events>) {
+    let events = Arc::new(Events::default());
+    let mut deps = CoreDeps::new(Arc::new(FixedClock::at(NOW)), events.clone());
+    deps.native = Arc::new(native);
     (Core::open(dir, deps).expect("core opens"), events)
 }
 
@@ -631,6 +658,37 @@ async fn call_get_serves_the_record_with_speakers_marks_and_gaps() {
     assert_eq!(detail.marks[0].note.as_deref(), Some("decision"));
     assert_eq!(detail.gaps.len(), 1);
     assert_eq!(detail.gaps[0].reason, GapReason::Paused);
+}
+
+#[tokio::test]
+async fn call_get_includes_its_linked_calendar_event_when_available() {
+    let dir = tempfile::tempdir().unwrap();
+    let event = CalendarEventRef {
+        id: CalendarEventId("event_a".into()),
+        title: "Planning".into(),
+        starts_at: TimestampMs(NOW - DAY),
+        ends_at: TimestampMs(NOW - DAY + 3_600_000),
+    };
+    let (core, _) = open_with_native(dir.path(), CalendarEventNative(event.clone()));
+    seed(&core);
+    Connection::open(dir.path().join("noter.db"))
+        .unwrap()
+        .execute(
+            "UPDATE calls SET calendar_event_id = ?1 WHERE id = 'call_a'",
+            [event.id.0.as_str()],
+        )
+        .unwrap();
+
+    let detail = core
+        .call_get(
+            &main_window(),
+            CallIdArgs {
+                call_id: CallId::new("call_a"),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(detail.calendar_event, Some(event));
 }
 
 #[tokio::test]

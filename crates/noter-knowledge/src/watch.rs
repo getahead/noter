@@ -79,7 +79,8 @@ impl Watchers {
         lock(&self.dirty).contains(id)
     }
 
-    pub fn is_watching(&self, id: &SourceId) -> bool {
+    #[cfg(test)]
+    fn is_watching(&self, id: &SourceId) -> bool {
         lock(&self.watching).contains_key(id)
     }
 }

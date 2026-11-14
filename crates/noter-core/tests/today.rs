@@ -541,6 +541,59 @@ async fn known_attendees_carry_open_work_from_the_last_two_calls() {
 }
 
 #[tokio::test]
+async fn today_shows_the_last_summary_for_a_known_attendee() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with(
+        dir.path(),
+        Some(granted(vec![event(
+            "e1",
+            "1:1 Anna",
+            NOW + HOUR,
+            &["Anna Koval"],
+        )])),
+    );
+    people_world(&core);
+    insert(
+        &core,
+        vec![
+            row(
+                "summaries",
+                &[
+                    ("id", json!("sum_new")),
+                    ("rev", json!(1)),
+                    ("call_id", json!("new")),
+                    ("kind", json!("summary")),
+                    ("current_version_id", json!("ver_new")),
+                ],
+            ),
+            row(
+                "summary_versions",
+                &[
+                    ("id", json!("ver_new")),
+                    ("summary_id", json!("sum_new")),
+                    ("n", json!(1)),
+                    ("kind", json!("generated")),
+                    (
+                        "body_md",
+                        json!("Agreed to ship the launch plan.\nMore detail follows."),
+                    ),
+                    ("lang", json!("en")),
+                    ("from_pass", json!("live")),
+                    ("created_at", json!(NOW - 3 * DAY)),
+                ],
+            ),
+        ],
+    );
+
+    let card = today(&core).await.unwrap().today.remove(0);
+    let last_time = card
+        .last_time
+        .expect("the previous call has a saved summary");
+    assert_eq!(last_time.call.id.as_str(), "new");
+    assert_eq!(last_time.line, "Agreed to ship the launch plan.");
+}
+
+#[tokio::test]
 async fn attendee_alias_is_resolved_on_the_today_card_and_carry_query() {
     let dir = tempfile::tempdir().unwrap();
     let (core, _) = open_with(
@@ -755,7 +808,7 @@ async fn sections_for_due_done_review_live_call_and_events_by_day() {
          UPDATE items SET due_date = '2026-10-16' WHERE id = 'i_mid';
          UPDATE items SET due_date = '2026-10-17' WHERE id = 'i_old';
          UPDATE items SET done_at = 1792137000000 WHERE id = 'i_done';
-         UPDATE calls SET calendar_event_id = 'e_today' WHERE id = 'bob';",
+         UPDATE calls SET calendar_event_id = 'e_today', privacy_class = 'sensitive' WHERE id = 'bob';",
     );
 
     let view = today(&core).await.unwrap();
@@ -763,6 +816,7 @@ async fn sections_for_due_done_review_live_call_and_events_by_day() {
     assert_eq!(view.live_call.as_ref().unwrap().id.as_str(), "live");
     assert_eq!(view.today.len(), 1);
     assert_eq!(view.today[0].call_id.as_ref().unwrap().as_str(), "bob");
+    assert!(view.today[0].sensitive);
     assert_eq!(view.this_week[0].title, "Review");
     assert_eq!(view.this_week.len(), 1, "the horizon is a week");
     let mut due = ids(&view.due_without_call);
