@@ -118,7 +118,8 @@ final class NativeAppMenuTests: NoterTestCase {
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_action_item() {
         let main = openMenuReviewCall()
-        XCTAssertTrue(accessibilityTreeContains("3 suggested items to review before sharing", in: main), "the fresh call starts with three pending suggestions")
+        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
         let suggestion = main.staticTexts["Replay buffer for websocket reconnects"]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested action item is visible")
         suggestion.click()
@@ -128,12 +129,13 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused action item")
         attachScreenshot("app-menu-edit-focused-action")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("2 suggested items to review before sharing", in: main) }, "accepting the focused action item reduces this call's pending suggestions by one")
+        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "accepting the focused action shows its row-level Undo link")
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_rejects_focused_decision() {
         let main = openMenuReviewCall()
-        XCTAssertTrue(accessibilityTreeContains("3 suggested items to review before sharing", in: main), "the fresh call starts with three pending suggestions")
+        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
         let suggestion = main.staticTexts["Drawer events go through the notification service."]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested decision is visible")
         suggestion.click()
@@ -143,12 +145,13 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused decision")
         attachScreenshot("app-menu-edit-focused-decision")
         app.menuItems["Reject Item"].click()
-        XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("2 suggested items to review before sharing", in: main) }, "rejecting the focused decision reduces this call's pending suggestions by one")
+        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "rejecting the focused decision shows its row-level Undo link")
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
         let main = openMenuReviewCall()
-        XCTAssertTrue(accessibilityTreeContains("3 suggested items to review before sharing", in: main), "the fresh call starts with three pending suggestions")
+        let undoLinks = main.links.matching(NSPredicate(format: "label == %@", "Undo"))
+        XCTAssertEqual(undoLinks.count, 0, "the fresh call has no row outcome links")
         let suggestion = main.staticTexts["Who owns the acceptance criteria for the reconnect?"]
         XCTAssertTrue(suggestion.waitForExistence(timeout: 10), "the suggested question is visible")
         suggestion.click()
@@ -158,7 +161,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
         attachScreenshot("app-menu-edit-focused-question")
         app.menuItems["Accept Item"].click()
-        XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("2 suggested items to review before sharing", in: main) }, "accepting the focused question reduces this call's pending suggestions by one")
+        XCTAssertTrue(waitUntil(3) { undoLinks.count == 1 }, "accepting the focused question shows its row-level Undo link")
     }
 
     func test_cpt_noter_dod_ui_main_window_shell_navigation__native_menu_copy_for_slack_writes_once() throws {
