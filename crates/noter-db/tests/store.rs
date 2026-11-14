@@ -655,6 +655,7 @@ fn close_drains_the_queue_checkpoints_and_refuses_later_work() {
     let store = open(&path);
     let start = Arc::new(Barrier::new(21));
     let (tx, rx) = mpsc::channel();
+    let mut outcomes = Vec::with_capacity(20);
     std::thread::scope(|s| {
         for i in 0..20 {
             let store = &store;
@@ -667,10 +668,15 @@ fn close_drains_the_queue_checkpoints_and_refuses_later_work() {
             });
         }
         start.wait();
+        // Wait for a completed write before closing, proving that the writers reached the queue.
+        while outcomes.len() < 20 && !outcomes.iter().any(Result::is_ok) {
+            let outcome = rx.recv().expect("a concurrent writer reports its result");
+            outcomes.push(outcome);
+        }
         store.close();
     });
     drop(tx);
-    let outcomes: Vec<_> = rx.into_iter().collect();
+    outcomes.extend(rx);
     let accepted = outcomes.iter().filter(|result| result.is_ok()).count();
     assert!(
         accepted > 0,
