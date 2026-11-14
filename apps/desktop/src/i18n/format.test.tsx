@@ -13,6 +13,7 @@ import {
   shortDay,
   t,
   tParts,
+  untilNextDay,
 } from "./format";
 import { Msg } from "./Msg";
 
@@ -109,6 +110,17 @@ describe("value helpers", () => {
     expect(dayOf(at, { ...h12, time_zone: "Pacific/Auckland" })).toBe("2026-11-09");
     expect(shortDay(at, { ...h12, time_zone: "Pacific/Auckland" })).toBe("Nov 9");
     expect(dayOf(at, { ...h12, time_zone: "Not/AZone" })).toMatch(/^2026-11-0[89]$/); // an unknown zone falls back to the system's
+  });
+  it("schedules the next local midnight across ordinary and DST-short/long days", () => {
+    const utc = { time_zone: "UTC" } as Parameters<typeof dayOf>[1];
+    const beforeUtcMidnight = Date.UTC(2026, 10, 8, 23, 59, 30);
+    expect(untilNextDay(beforeUtcMidnight, utc)).toBe(30_000);
+
+    const ny = { time_zone: "America/New_York" } as Parameters<typeof dayOf>[1];
+    const beforeSpringMidnight = Date.UTC(2026, 2, 8, 4, 59, 30);
+    expect(untilNextDay(beforeSpringMidnight, ny)).toBe(30_000);
+    const beforeFallMidnight = Date.UTC(2026, 10, 1, 3, 59, 30);
+    expect(untilNextDay(beforeFallMidnight, ny)).toBe(30_000);
   });
   it("callTime is always HH:MM:SS", () => {
     expect(callTime(0)).toBe("00:00:00");

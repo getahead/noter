@@ -77,7 +77,7 @@ export function InlineBanner({ banner: b, more, stacked, onMore, onDismiss }: In
         {b.progress != null && (
           <div className="np-banner__prog">
             <Progress value={b.progress} label={b.text} />
-            <span className="np-tnum">{`${Math.round(Math.max(0, Math.min(100, b.progress)))} %`}</span>
+            <span className="np-tnum">{t("progress.percent_visible", { value: Math.round(Math.max(0, Math.min(100, b.progress))) })}</span>
           </div>
         )}
       </div>

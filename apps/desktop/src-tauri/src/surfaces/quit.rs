@@ -18,6 +18,17 @@ fn catalogue(key: &str) -> String {
     after.split('"').nth(1).unwrap_or_default().to_string()
 }
 
+#[cfg(test)]
+mod native_menu_catalogue_tests {
+    use super::catalogue;
+
+    #[test]
+    fn native_menu_labels_use_the_shared_ui_catalogue() {
+        assert_eq!(catalogue("menu.quit_noter"), "Quit Noter");
+        assert_eq!(catalogue("speakers.fix.menu"), "Fix Term…");
+    }
+}
+
 /// The quit-while-recording alert: title, message, the default **Cancel** and **Stop and Quit**.
 // @cpt-dod:cpt-noter-dod-ui-dialogs-host-delete:p2
 pub fn quit_alert(call_title: &str) -> [String; 4] {
@@ -117,13 +128,14 @@ static QUIT_ALERT_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// The default app menu with Noter's own **Quit Noter** ⌘Q in place of the predefined one, which
 /// ends the app with no event to stop it (the quit alert could not ask).
+// @cpt-algo:cpt-noter-algo-ui-menu-bar-build-menu:p1
 pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app)?;
     if let Some(MenuItemKind::Submenu(first)) = menu.items()?.into_iter().next() {
         if let Some(quit) = first.items()?.pop() {
             first.remove(&quit)?;
         }
-        let item = MenuItem::with_id(app, APP_QUIT, "Quit Noter", true, Some("CmdOrCtrl+Q"))?;
+        let item = MenuItem::with_id(app, APP_QUIT, catalogue("menu.quit_noter"), true, Some("CmdOrCtrl+Q"))?;
         first.append(&item)?;
     }
     // Fix Term… sits in the Edit menu, disabled until the window reports a confirmed-text selection.
@@ -134,7 +146,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
                 sub.append(&MenuItem::with_id(
                     app,
                     APP_FIX_TERM,
-                    "Fix Term…",
+                    catalogue("speakers.fix.menu"),
                     false,
                     None::<&str>,
                 )?)?;

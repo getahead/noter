@@ -5,6 +5,8 @@ import { find, rendered } from "../../ui/testing";
 import { MODE_MSG, ModeIndicator, ModeInfo } from "./mode-indicator-view";
 import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { en } from "../../i18n/en";
+import { t } from "../../i18n/format";
+import type { MsgKey } from "../../i18n/en";
 
 const view = (state: ModeState) => modeIndicator({ mode: "cloud_redacted", degraded: [], sensitiveCall: false, ...({ CLOUD_REDACTED: {}, CLOUD: { mode: "cloud_allowed" }, LOCAL_ONLY: { mode: "local_only" }, SENSITIVE_LOCAL: { sensitiveCall: true }, SWITCHED_TO_LOCAL: { degraded: [{ type: "switched_to_local" }] }, NO_ASSISTANT: { degraded: [{ type: "no_assistant" }] } } as Record<ModeState, object>)[state] } as never);
 
@@ -40,6 +42,7 @@ describe("ModeIndicator (cpt-noter-dod-ui-main-window-shell-mode-indicator)", ()
       '<span data-component="cpt-noter-component-ui-mode-indicator" data-variant="menu-line" data-state="normal" class="np-mode np-mode--line">Cloud</span>',
     );
     expect(renderToString(<ModeIndicator view={view("CLOUD")} variant="call-header" runtime="Claude Code" />)).toContain("Claude Code · Cloud");
+    expect(t("mode.runtime" as MsgKey, { runtime: "Claude Code", mode: "Cloud" })).toBe("Claude Code · Cloud");
     expect(renderToString(<ModeIndicator view={view("CLOUD")} text="Idle · API key · local fallback ready" />)).toContain("Idle · API key · local fallback ready");
   });
 

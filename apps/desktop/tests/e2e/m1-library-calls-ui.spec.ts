@@ -314,15 +314,49 @@ test.describe("cpt-noter-flow-ui-library-calls-browse (live status)", () => {
     await openCalls(page);
     const row = rowOf(page, "Backend sync").first();
     await expect(glyph(page)).toHaveCount(0);
+
+    if (process.env.NOTER_CORE === "stdio") {
+      // The real core may finish the write in less than Playwright's next polling frame. Record
+      // the committed DOM state instead of requiring that short-lived state to remain visible.
+      await page.evaluate(() => {
+        const root = document.documentElement as HTMLElement & { outputWritingObserver?: MutationObserver };
+        const observer = new MutationObserver(() => {
+          const row = document.querySelector('[data-lib-row="call_backend"]');
+          const spinner = document.querySelector(".np-srclist__item .np-spin");
+          if (row?.textContent?.includes("Writing summary…") && spinner) {
+            observer.disconnect();
+            root.dataset.outputWritingObserved = "true";
+            delete root.outputWritingObserver;
+          }
+        });
+        root.outputWritingObserver = observer;
+        observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+      });
+      try {
+        await steerFor(page).invoke("outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"], local: false });
+        await expect(page.locator("html")).toHaveAttribute("data-output-writing-observed", "true");
+        await expect(row).not.toContainText("Writing summary…");
+        await expect(glyph(page)).toHaveCount(0);
+      } finally {
+        await page.evaluate(() => {
+          const root = document.documentElement as HTMLElement & { outputWritingObserver?: MutationObserver };
+          root.outputWritingObserver?.disconnect();
+          delete root.outputWritingObserver;
+        }).catch(() => {});
+      }
+      return;
+    }
+
+    // Freeze the fake core's 300 ms writing and 600 ms ready events so each state can be checked.
+    await page.clock.install();
+    const now = new Date("2026-11-07T10:00:00Z");
+    await page.clock.setFixedTime(now);
+    await page.clock.pauseAt(now);
     await steerFor(page).invoke("outputs_regenerate", { call_id: W.PAST_CALL, sections: ["summary"], local: false });
-    // Both cores write asynchronously: watch every frame, not every poll.
-    await page.waitForFunction(
-      () =>
-        document.querySelector('[data-lib-row="call_backend"]')?.textContent?.includes("Writing summary…") &&
-        document.querySelector(".np-srclist__item .np-spin"),
-      null,
-      { polling: "raf" },
-    );
+    await page.clock.runFor(300);
+    await expect(row).toContainText("Writing summary…");
+    await expect(glyph(page)).toHaveCount(1);
+    await page.clock.runFor(300);
     await expect(row).not.toContainText("Writing summary…");
     await expect(glyph(page)).toHaveCount(0);
   });
