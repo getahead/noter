@@ -25,11 +25,11 @@ const KIND = { decision: "items.kind.decision", action_item: "items.kind.action_
 type Tab = "details" | "history";
 type Saved = "idle" | "saving" | "saved" | string;
 
-function EvidenceRow({ bridge, e }: { bridge: Bridge; e: EvidenceView }) {
+export function EvidenceRow({ bridge, e }: { bridge: Bridge; e: EvidenceView }) {
   return (
-    <li className="ii-evidence">
-      {e.span && <ProvenanceChip bridge={bridge} span={e.span} variant="chip" />}
-      <span>{e.summary}</span>
+    <li className={`ii-evidence${e.span ? " ii-evidence--linked" : ""}`}>
+      {e.span && <div className="ii-evidence__source"><ProvenanceChip bridge={bridge} span={e.span} variant="chip" /></div>}
+      <span className="ii-evidence__summary">{e.summary}</span>
     </li>
   );
 }

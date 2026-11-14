@@ -12,7 +12,7 @@ import { closeInspector, inspectorOverride, openInspector } from "../shell/inspe
 import { addItem, applyPatch, create, loadDetail, saveFields } from "./actions";
 import { AddItem } from "./AddItem";
 import { evidenceNotes, openEvidence, resolveSpan, spanTime } from "./evidence";
-import { ItemInspector } from "./ItemInspector";
+import { EvidenceRow, ItemInspector } from "./ItemInspector";
 import { ItemTail } from "./ItemTail";
 import { resetLocal } from "./local";
 import { ProvenanceChip } from "./ProvenanceChip";
@@ -43,6 +43,17 @@ describe("ItemInspector (cpt-noter-component-ui-item-inspector)", () => {
     const html = renderToString(<ItemInspector bridge={bridge} itemId="itm_a11y" />);
     expect(html).toContain('data-component="cpt-noter-component-ui-item-inspector"');
     for (const label of ["Details", "History", "Owner", "Due", "Status", "Linked issue", "Engineering", "Save", "Evidence", "Accept", "Reject"]) expect(html).toContain(label);
+  });
+
+  it("keeps a long localized evidence quote separate from its accessible timestamp", async () => {
+    await ready();
+    const found = await loadDetail(bridge, "itm_notif");
+    const evidence = found?.find((entry) => entry.span);
+    if (!evidence) throw new Error("expected span evidence");
+    const html = renderToString(<EvidenceRow bridge={bridge} e={{ ...evidence, summary: "Это длинная локализованная цитата, которая должна переноситься отдельно от отметки времени." }} />);
+    expect(html).toContain('class="ii-evidence__summary"');
+    expect(html).toContain('aria-label="Open the source at 00:');
+    expect(html).toContain("Это длинная локализованная цитата");
   });
 
   it("a decision omits Owner, Due, Status and Engineering and keeps Linked issue and Evidence", async () => {
