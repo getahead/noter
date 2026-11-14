@@ -100,6 +100,7 @@ mod tests {
     fn only_changes_to_indexed_visible_files_count() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
+        std::fs::create_dir(root.join("sub")).unwrap();
         let photo = root.join("photo.png");
         std::fs::write(&photo, b"image").unwrap();
         let modify = EventKind::Modify(notify::event::ModifyKind::Any);
