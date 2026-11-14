@@ -52,7 +52,7 @@ impl Events {
 struct Posted(Mutex<Vec<Notification>>);
 
 impl Surfaces for Posted {
-    fn show_record_prompt(&self) {}
+    fn show_record_prompt(&self, _: &noter_core::Placement) {}
     fn close_record_prompt(&self) {}
     fn show_call_window(&self, _: &Placement) {}
     fn make_call_window_key(&self) {}

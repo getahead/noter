@@ -41,7 +41,7 @@ milestone: M1
 
 ### 1.1 Overview
 
-When the core detects a call (an app opens the microphone, or a calendar event matches), it shows the record prompt at the top right of the main display without making Noter active. **Record** or ⌃⌥⌘R starts capture at once and opens the call window; **Record as Sensitive** starts it with nothing leaving the Mac; **Not Now**, × or 15 s without an answer close it, and the menu bar keeps **Call Detected · Start Recording** for the rest of the call. The same panel carries the call-ended and new-meeting notices while the call window is hidden.
+When the core detects a call (an app opens the microphone, or a calendar event matches), it passes the call-screen placement to the host, which shows the record prompt at the top right of the other display when multiple displays are connected (otherwise the main display), without making Noter active. **Record** or ⌃⌥⌘R starts capture at once and opens the call window; **Record as Sensitive** starts it with nothing leaving the Mac; **Not Now**, × or 15 s without an answer close it, and the menu bar keeps **Call Detected · Start Recording** for the rest of the call. The same panel carries the call-ended and new-meeting notices while the call window is hidden.
 
 ### 1.2 Purpose
 
@@ -90,8 +90,8 @@ Success criteria: a detected call is recorded with one click or one key while th
 - Speech model not downloaded: **The speech model is still downloading (62 %)**, **Record** dimmed (prototype state; see 7)
 
 **Steps**:
-1. [x] - `p1` - Core: detects a call and shows the panel at its position (top right; 72 pt lower under the meeting toolbar; the display without the call app when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
-   The 72 pt offset under a meeting toolbar is not part of the core placement algorithm (`cpt-noter-algo-core-native-surfaces-placement`); recorded as a DESIGN discrepancy for the HoD (28 Oct), not held here.
+1. [x] - `p1` - Core: detects a call, passes the call-screen placement, and shows the panel at its position (top right, inset 12 pt; on the other display when there are two), with `capture:detected` and `app_snapshot.detection` - `inst-core-detect`
+   The host chooses the display other than the call-screen placement when multiple displays are connected, then places the prompt 12 pt from the top-right of that display's visible frame. The frame excludes the menu bar and Dock.
 2. [x] - `p1` - Algorithm: choose the variant with `cpt-noter-algo-ui-record-prompt-variant` - `inst-choose-variant`
 3. [x] - `p1` - UI: render RP-R1 (app icon, **Record this call?**, the source line, ×) and RP-R3 for the variant; the panel never takes focus - `inst-render`
    1. [x] - `p1` - API: `window_fit` with the panel's size in whole points each time it changes: the core fits the panel window to it (360 to 440 pt wide), so every button lies inside the panel - `inst-api-fit`

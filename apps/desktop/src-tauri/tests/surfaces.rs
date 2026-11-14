@@ -7,11 +7,12 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use noter_core::{
-    Core, CoreDeps, EventEmitter, Notification, NotificationKind, Surfaces, SystemClock,
+    Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Surfaces, SystemClock,
     TrayAction, TrayEntry, TrayGlyph, TrayItem, TrayModel,
 };
 use noter_desktop::surfaces::{
     action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
+    prompt_display, prompt_frame,
     posted, quit_alert, running_call, same_shape, settings_url, tray_command, SavedFrames,
     TauriSurfaces,
 };
@@ -65,6 +66,14 @@ fn frames(id: &DisplayId) -> Option<Frame> {
     }
 }
 
+fn prompt_placement() -> Placement {
+    Placement {
+        display_id: None,
+        layout: CallLayout::Floating,
+        chosen_display_missing: false,
+    }
+}
+
 #[test]
 fn the_call_display_is_found_by_identity_and_falls_back_to_the_main_display() {
     let displays = [display("dsp_builtin", true), display("dsp_studio", false)];
@@ -86,19 +95,75 @@ fn the_call_display_is_found_by_identity_and_falls_back_to_the_main_display() {
 }
 
 #[test]
-fn the_call_window_fills_a_dedicated_display_or_floats_in_its_top_right_corner() {
+fn the_call_window_fills_a_dedicated_visible_frame_or_floats_in_its_top_right_corner() {
     assert_eq!(
         call_frame(CallLayout::Dedicated, false, &STUDIO),
-        (1512.0, -168.0, 2560.0, 1408.0)
+        (1512.0, -200.0, 2560.0, 1440.0)
     );
     let (x, y, w, h) = call_frame(CallLayout::Floating, false, &STUDIO);
     assert_eq!((w, h), (380.0, 600.0));
     assert_eq!(x + w, 1512.0 + 2560.0 - 16.0);
-    assert_eq!(y, -200.0 + 32.0 + 16.0);
+    assert_eq!(y, -200.0 + 16.0);
     assert_eq!(
         call_frame(CallLayout::Floating, true, &STUDIO).3,
         56.0,
         "the strip"
+    );
+}
+
+#[test]
+fn a_saved_collapsed_panel_keeps_its_position_and_width() {
+    assert_eq!(
+        noter_desktop::surfaces::collapsed_frame((12.0, 80.0, 500.0, 700.0)),
+        (12.0, 80.0, 500.0, 56.0)
+    );
+}
+
+#[test]
+fn the_record_prompt_uses_the_other_display_and_a_twelve_point_inset() {
+    let displays = [
+        DisplayInfo {
+            holds_call_app: true,
+            ..display("dsp_builtin", true)
+        },
+        display("dsp_studio", false),
+    ];
+    assert_eq!(
+        prompt_display(&displays, Some(&DisplayId::new("dsp_builtin")))
+            .map(|d| d.id.clone()),
+        Some(DisplayId::new("dsp_studio"))
+    );
+    assert_eq!(prompt_frame(&BUILT_IN, (360.0, 132.0)), (1140.0, 12.0, 360.0, 132.0));
+}
+
+#[test]
+fn the_record_prompt_falls_back_to_the_main_display_when_no_call_display_is_marked() {
+    let displays = [display("dsp_builtin", true), display("dsp_studio", false)];
+    assert_eq!(
+        prompt_display(&displays, None).map(|d| d.id.clone()),
+        Some(DisplayId::new("dsp_builtin"))
+    );
+}
+
+#[test]
+fn floating_frames_obey_size_limits_even_when_a_saved_frame_does_not() {
+    assert_eq!(
+        noter_desktop::surfaces::bounded_call_frame(
+            (0.0, 0.0, 120.0, 80.0),
+            CallLayout::Floating,
+            false,
+            &STUDIO,
+        ),
+        (1512.0, 0.0, 340.0, 300.0)
+    );
+    assert_eq!(
+        noter_desktop::surfaces::bounded_call_frame(
+            (1512.0, -200.0, 900.0, 900.0),
+            CallLayout::Floating,
+            false,
+            &STUDIO,
+        ),
+        (1512.0, -200.0, 600.0, 900.0)
     );
 }
 
@@ -431,7 +496,7 @@ fn the_host_creates_the_core_windows_on_first_use() {
     }
     surfaces.close_record_prompt(); // never shown: nothing to close
     surfaces.fit_record_prompt(400, 150); // kept for the prompt's first show
-    surfaces.show_record_prompt();
+    surfaces.show_record_prompt(&prompt_placement());
     surfaces.fit_record_prompt(372, 127);
     assert!(app
         .get_webview_window(WindowLabel::RecordPrompt.as_str())
@@ -448,7 +513,7 @@ fn show_noter_does_not_bring_back_a_surface_the_core_closed_while_hidden() {
     let app = mock_builder().build(mock_context(noop_assets())).unwrap();
     let surfaces = TauriSurfaces::new(app.handle().clone(), std::env::temp_dir());
     surfaces.show_window(WindowLabel::Settings);
-    surfaces.show_record_prompt();
+    surfaces.show_record_prompt(&prompt_placement());
     surfaces.make_call_window_key();
     surfaces.hide_all();
     // The prompt's timer and the call's end both close their surface while Noter is hidden.
@@ -463,7 +528,7 @@ fn show_noter_does_not_bring_back_a_surface_the_core_closed_while_hidden() {
 fn show_noter_restores_the_windows_in_a_fixed_order_panels_last() {
     let app = mock_builder().build(mock_context(noop_assets())).unwrap();
     let surfaces = TauriSurfaces::new(app.handle().clone(), std::env::temp_dir());
-    surfaces.show_record_prompt();
+    surfaces.show_record_prompt(&prompt_placement());
     surfaces.show_window(WindowLabel::Settings);
     surfaces.show_window(WindowLabel::Main);
     surfaces.hide_all();
@@ -484,10 +549,10 @@ fn a_saved_frame_is_clamped_to_the_visible_display() {
         clamp_frame((1600.0, 100.0, 400.0, 500.0), &STUDIO),
         (1600.0, 100.0, 400.0, 500.0)
     );
-    // Off the right edge and too tall: moved in and shortened below the menu bar.
+    // Off the right edge and too tall: moved in and shortened to the visible frame.
     assert_eq!(
         clamp_frame((3900.0, -300.0, 400.0, 2000.0), &STUDIO),
-        (1512.0 + 2560.0 - 400.0, -200.0 + 32.0, 400.0, 1440.0 - 32.0)
+        (1512.0 + 2560.0 - 400.0, -200.0, 400.0, 1440.0)
     );
 }
 

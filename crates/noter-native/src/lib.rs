@@ -329,6 +329,17 @@ pub fn display_frame(id: &DisplayId) -> Option<Frame> {
     }
 }
 
+/// The display's AppKit visible frame, excluding the menu bar and Dock.
+pub fn display_visible_frame(id: &DisplayId) -> Option<Frame> {
+    #[cfg(target_os = "macos")]
+    return mac::display_visible_frame(id);
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = id;
+        None
+    }
+}
+
 // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-post
 /// Posts through `UNUserNotificationCenter`: `threadIdentifier` is the call, `userInfo` the
 /// target. Whether to send is the core's rule; without permission macOS drops it silently.

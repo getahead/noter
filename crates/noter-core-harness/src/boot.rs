@@ -2190,7 +2190,7 @@ impl ScriptedSurfaces {
 }
 
 impl Surfaces for ScriptedSurfaces {
-    fn show_record_prompt(&self) {
+    fn show_record_prompt(&self, _: &Placement) {
         self.note("show_record_prompt");
     }
     fn close_record_prompt(&self) {

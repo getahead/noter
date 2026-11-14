@@ -28,7 +28,9 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
 };
-use tauri_nspanel::{tauri_panel, ManagerExt, StyleMask, WebviewPanelManager, WebviewWindowExt};
+use tauri_nspanel::{
+    tauri_panel, CollectionBehavior, ManagerExt, StyleMask, WebviewPanelManager, WebviewWindowExt,
+};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogResult};
 
 use crate::native::{on_main, Windows};
@@ -51,30 +53,33 @@ const STRIP: (f64, f64) = (380.0, 56.0);
 const PROMPT: (f64, f64) = (360.0, 132.0);
 /// Distance of a panel from the display's top-right corner, below the menu bar.
 const MARGIN: f64 = 16.0;
-const MENU_BAR: f64 = 32.0;
 
 /// The frame of the call display: the chosen display by identity, else (none chosen, or
-/// unplugged) the main display; `frame` is noter-native's `display_frame`.
+/// unplugged) the main display; frames come from noter-native's AppKit visible-frame query.
 // @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
 pub fn frame_of(
     chosen: Option<&DisplayId>,
     displays: &[DisplayInfo],
     frame: impl Fn(&DisplayId) -> Option<Frame>,
 ) -> Option<(DisplayId, Frame)> {
+    let display = display_for(chosen, displays)?;
+    Some((display.id.clone(), frame(&display.id)?))
+}
+
+fn display_for<'a>(chosen: Option<&DisplayId>, displays: &'a [DisplayInfo]) -> Option<&'a DisplayInfo> {
     let main = || displays.iter().find(|d| d.is_main).or(displays.first());
     let display = chosen
         .and_then(|id| displays.iter().find(|d| d.id == *id))
         .or_else(main)?;
-    Some((display.id.clone(), frame(&display.id)?))
+    Some(display)
 }
 // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
 
-/// A frame kept inside the display's visible area, below the menu bar.
+/// A frame kept inside the display's visible area.
 pub fn clamp_frame((x, y, w, h): (f64, f64, f64, f64), visible: &Frame) -> (f64, f64, f64, f64) {
-    let top = visible.y + MENU_BAR;
-    let (w, h) = (w.min(visible.width), h.min(visible.height - MENU_BAR));
+    let (w, h) = (w.min(visible.width), h.min(visible.height));
     let x = x.clamp(visible.x, visible.x + visible.width - w);
-    let y = y.clamp(top, visible.y + visible.height - h);
+    let y = y.clamp(visible.y, visible.y + visible.height - h);
     (x, y, w, h)
 }
 
@@ -140,17 +145,75 @@ pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, 
     match layout {
         CallLayout::Dedicated => (
             screen.x,
-            screen.y + MENU_BAR,
+            screen.y,
             screen.width,
-            screen.height - MENU_BAR,
+            screen.height,
         ),
         CallLayout::Floating => {
             let (w, h) = if collapsed { STRIP } else { PANEL };
             let x = screen.x + screen.width - w - MARGIN;
-            (x, screen.y + MENU_BAR + MARGIN, w, h)
+            (x, screen.y + MARGIN, w, h)
         }
     }
 }
+
+// @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+pub fn collapsed_frame((x, y, w, _): (f64, f64, f64, f64)) -> (f64, f64, f64, f64) {
+    (x, y, w, STRIP.1)
+}
+// @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+
+// @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+pub fn bounded_call_frame(
+    (x, y, w, h): (f64, f64, f64, f64),
+    layout: CallLayout,
+    collapsed: bool,
+    visible: &Frame,
+) -> (f64, f64, f64, f64) {
+    if layout == CallLayout::Dedicated {
+        return clamp_frame((x, y, w, h), visible);
+    }
+    let min_width = if collapsed { 300.0 } else { 340.0 };
+    let max_width = 600.0;
+    let (w, h) = if collapsed {
+        (w.clamp(min_width, max_width), STRIP.1)
+    } else {
+        (w.clamp(min_width, max_width), h.max(300.0))
+    };
+    clamp_frame((x, y, w, h), visible)
+}
+// @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+
+// @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
+pub fn prompt_display<'a>(
+    displays: &'a [DisplayInfo],
+    call_display: Option<&DisplayId>,
+) -> Option<&'a DisplayInfo> {
+    let Some(call_display) = call_display
+        .and_then(|id| display_for(Some(id), displays))
+        .map(|display| display.id.clone())
+    else {
+        return displays
+            .iter()
+            .find(|display| display.is_main)
+            .or_else(|| displays.first());
+    };
+    displays
+        .iter()
+        .find(|display| display.id != call_display)
+        .or_else(|| displays.iter().find(|display| display.is_main))
+        .or_else(|| displays.first())
+}
+
+pub fn prompt_frame(screen: &Frame, (w, h): (f64, f64)) -> (f64, f64, f64, f64) {
+    (
+        screen.x + screen.width - w - 12.0,
+        screen.y + 12.0,
+        w,
+        h,
+    )
+}
+// @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
 
 /// The core command a menu bar item runs, with its arguments from the current snapshot; `None`
 /// when the item needs a call that is gone, or is the host's own (Quit Noter). `checked` is the
@@ -630,6 +693,13 @@ fn make_panel<R: Runtime>(window: &WebviewWindow<R>) {
         // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-convert
         if let Ok(panel) = panel.to_panel::<CallPanel<R>>() {
             let _ = panel.add_style_mask(StyleMask::empty().nonactivating_panel().into());
+            panel.set_collection_behavior(
+                CollectionBehavior::new()
+                    .can_join_all_spaces()
+                    .full_screen_auxiliary()
+                    .stationary()
+                    .into(),
+            );
         }
         // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-convert
     });
@@ -739,6 +809,7 @@ pub struct TauriSurfaces<R: Runtime> {
     placed: Mutex<Option<(DisplayId, CallLayout)>>,
     /// The record prompt's size: its content's, once reported (`window_fit`).
     prompt_size: Mutex<(f64, f64)>,
+    prompt_call_display: Mutex<Option<DisplayId>>,
     this: OnceLock<Weak<TauriSurfaces<R>>>,
 }
 
@@ -757,6 +828,7 @@ impl<R: Runtime> TauriSurfaces<R> {
             frames,
             placed: Mutex::new(None),
             prompt_size: Mutex::new(PROMPT),
+            prompt_call_display: Mutex::new(None),
             this: OnceLock::new(),
         });
         let _ = surfaces.this.set(Arc::downgrade(&surfaces));
@@ -862,19 +934,21 @@ impl<R: Runtime> TauriSurfaces<R> {
         window(&self.app, label)
     }
 
-    /// The call display's frame, or the main display's.
-    fn frame(&self, chosen: Option<&DisplayId>) -> Option<(DisplayId, Frame)> {
-        let displays = noter_native::environment(&self.storage).displays;
-        frame_of(chosen, &displays, noter_native::display_frame)
-    }
-
-    /// The record prompt in the main display's top-right corner, at its size.
-    fn place_prompt(&self, prompt: &WebviewWindow<R>) {
+    /// The record prompt on the display without the call app, 12 pt inside its visible frame.
+    fn place_prompt(&self, prompt: &WebviewWindow<R>, call_display: Option<&DisplayId>) {
         let (w, h) = *self.prompt_size.lock().unwrap_or_else(|e| e.into_inner());
-        if let Some((_, screen)) = self.frame(None) {
-            let x = screen.x + screen.width - w - MARGIN;
-            Self::place(prompt, (x, screen.y + MENU_BAR + MARGIN, w, h));
-        }
+        let displays = noter_native::environment(&self.storage).displays;
+        let Some(display) = prompt_display(&displays, call_display) else {
+            return;
+        };
+        let id = display.id.clone();
+        let app = self.app.clone();
+        let prompt = prompt.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(screen) = noter_native::display_visible_frame(&id) {
+                Self::place(&prompt, prompt_frame(&screen, (w, h)));
+            }
+        });
     }
 
     fn place(window: &WebviewWindow<R>, (x, y, w, h): (f64, f64, f64, f64)) {
@@ -886,20 +960,51 @@ impl<R: Runtime> TauriSurfaces<R> {
         let Some(window) = self.window(WindowLabel::CallScreen) else {
             return;
         };
-        let Some((display, visible)) = self.frame(placement.display_id.as_ref()) else {
+        let layout = placement.layout;
+        let displays = noter_native::environment(&self.storage).displays;
+        let Some(display) =
+            display_for(placement.display_id.as_ref(), &displays).map(|d| d.id.clone())
+        else {
             return;
         };
-        let layout = placement.layout;
-        // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-        // The strip keeps its fixed size; an open call window comes back where the user left it.
-        let frame = match self.frames.get(&display, layout).filter(|_| !collapsed) {
-            Some(saved) => clamp_frame(saved, &visible),
-            None => call_frame(layout, collapsed, &visible),
-        };
+        let saved = self.frames.get(&display, layout);
+        let app = self.app.clone();
+        let window = window.clone();
+        let frame_display = display.clone();
+        let _ = app.run_on_main_thread(move || {
+            let Some(visible) = noter_native::display_visible_frame(&frame_display) else {
+                return;
+            };
+            // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+            let frame = bounded_call_frame(
+                if collapsed {
+                    collapsed_frame(saved.unwrap_or_else(|| call_frame(layout, false, &visible)))
+                } else {
+                    saved.unwrap_or_else(|| call_frame(layout, false, &visible))
+                },
+                layout,
+                collapsed,
+                &visible,
+            );
+            // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+            match layout {
+                CallLayout::Floating if collapsed => {
+                    let _ = window.set_min_size(Some(LogicalSize::new(300.0, STRIP.1)));
+                    let _ = window.set_max_size(Some(LogicalSize::new(600.0, STRIP.1)));
+                }
+                CallLayout::Floating => {
+                    let _ = window.set_min_size(Some(LogicalSize::new(340.0, 300.0)));
+                    let _ = window.set_max_size(Some(LogicalSize::new(600.0, f64::MAX)));
+                }
+                CallLayout::Dedicated => {
+                    let _ = window.set_min_size(None::<LogicalSize<f64>>);
+                    let _ = window.set_max_size(None::<LogicalSize<f64>>);
+                }
+            }
+            Self::place(&window, frame);
+        });
         *self.placed.lock().unwrap_or_else(|e| e.into_inner()) =
             (!collapsed).then_some((display, layout));
-        // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-        Self::place(&window, frame);
     }
 
     /// On quit: the frames the user left are written.
@@ -1057,11 +1162,15 @@ impl<R: Runtime> TauriSurfaces<R> {
 
 impl<R: Runtime> Surfaces for TauriSurfaces<R> {
     // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
-    fn show_record_prompt(&self) {
+    fn show_record_prompt(&self, placement: &Placement) {
         let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
             return;
         };
-        self.place_prompt(&prompt);
+        *self
+            .prompt_call_display
+            .lock()
+            .unwrap_or_else(|e| e.into_inner()) = placement.display_id.clone();
+        self.place_prompt(&prompt, placement.display_id.as_ref());
         show(&prompt, false);
     }
     // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
@@ -1074,7 +1183,12 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             .app
             .get_webview_window(WindowLabel::RecordPrompt.as_str())
         {
-            self.place_prompt(&prompt);
+            let call_display = self
+                .prompt_call_display
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .clone();
+            self.place_prompt(&prompt, call_display.as_ref());
         }
     }
     // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit

@@ -59,7 +59,7 @@ impl Rec {
 }
 
 impl Surfaces for Rec {
-    fn show_record_prompt(&self) {}
+    fn show_record_prompt(&self, _: &Placement) {}
     fn close_record_prompt(&self) {}
     fn show_call_window(&self, _placement: &Placement) {
         self.note("show_call_window");

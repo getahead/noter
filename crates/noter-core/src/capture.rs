@@ -24,7 +24,7 @@ use crate::{internal, lock, Core, Placement, TrayModel};
 /// AppKit; the harness records the calls.
 pub trait Surfaces: Send + Sync {
     /// The record prompt, shown without taking focus.
-    fn show_record_prompt(&self);
+    fn show_record_prompt(&self, placement: &Placement);
     fn close_record_prompt(&self);
     /// The call window on the chosen placement, without taking focus.
     fn show_call_window(&self, placement: &Placement);
@@ -57,7 +57,7 @@ pub trait Surfaces: Send + Sync {
 pub(crate) struct NoSurfaces;
 
 impl Surfaces for NoSurfaces {
-    fn show_record_prompt(&self) {}
+    fn show_record_prompt(&self, _: &Placement) {}
     fn close_record_prompt(&self) {}
     fn show_call_window(&self, _: &Placement) {}
     fn make_call_window_key(&self) {}

@@ -117,12 +117,12 @@ struct LastSummary {
 }
 
 impl Core {
-    fn placement_for(&self, call_screen: &CallScreenSettings) -> Placement {
+    pub(crate) fn placement_for(&self, call_screen: &CallScreenSettings) -> Placement {
         let displays = self.app().environment.displays.clone();
         place(&displays, &call_screen.display_id, call_screen.layout)
     }
 
-    fn call_screen_now(&self) -> CallScreenSettings {
+    pub(crate) fn call_screen_now(&self) -> CallScreenSettings {
         lock(&self.settings).call_screen.clone()
     }
 
