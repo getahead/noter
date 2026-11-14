@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.12](https://github.com/getahead/noter/compare/v0.22.11...v0.22.12) (2026-11-14)
+
+
+### Performance
+
+* **core:** bound reads and stream batch exports ([#830](https://github.com/getahead/noter/issues/830)) ([9fc05ed](https://github.com/getahead/noter/commit/9fc05ede450419403cba7b189a8928c0e65548e2))
+
 ## [0.22.11](https://github.com/getahead/noter/compare/v0.22.10...v0.22.11) (2026-11-14)
 
 
