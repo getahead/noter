@@ -28,9 +28,7 @@ const NAME_WORDS: usize = 6;
 
 type Db<T> = noter_db::rusqlite::Result<T>;
 
-fn internal(e: noter_db::rusqlite::Error) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;
 
 fn not_found() -> CoreError {
     CoreError::new(ErrorCode::NotFound, "no such topic")

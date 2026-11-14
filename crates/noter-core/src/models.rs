@@ -163,14 +163,6 @@ fn inside_bundle(path: &str) -> bool {
             .all(|c| matches!(c, std::path::Component::Normal(_)))
 }
 
-fn private_dir(dir: &Path) -> std::io::Result<()> {
-    let mut builder = std::fs::DirBuilder::new();
-    builder.recursive(true);
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
-    builder.create(dir)
-}
-
 fn sha256_hex(path: &Path) -> std::io::Result<String> {
     let mut hasher = Sha256::new();
     let mut file = std::fs::File::open(path)?;
@@ -561,13 +553,14 @@ impl Core {
             // fetches the rest of the file; the half file is never verified.
             let part = partial.join(format!("{}.part", file.path));
             loop {
-                let opened = private_dir(part.parent().unwrap_or(&partial)).and_then(|_| {
-                    let mut options = std::fs::OpenOptions::new();
-                    options.create(true).append(true);
-                    #[cfg(unix)]
-                    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
-                    options.open(&part)
-                });
+                let opened =
+                    crate::util::private_dir(part.parent().unwrap_or(&partial)).and_then(|_| {
+                        let mut options = std::fs::OpenOptions::new();
+                        options.create(true).append(true);
+                        #[cfg(unix)]
+                        std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+                        options.open(&part)
+                    });
                 let Ok(mut out) = opened else {
                     // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
                     return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);

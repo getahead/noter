@@ -9,7 +9,7 @@ use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
 use noter_db::rusqlite::{params, Connection, OptionalExtension};
 use noter_protocol::engine::EngineSpan;
 use noter_protocol::error::ValidationRule;
-use noter_protocol::ipc::{Caller, CommandCtx};
+use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -53,10 +53,6 @@ impl Drop for SecretKey {
         self.0.fill(0);
         std::hint::black_box(&self.0);
     }
-}
-
-fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
 fn unhex(text: &str) -> Option<Key> {
@@ -247,11 +243,7 @@ fn device_of(channel: AudioChannel) -> &'static str {
 
 /// The context of the writes the core itself makes (matching, embeddings).
 fn job_meta(core: &Core, summary: &str, reason: &str) -> noter_db::ChangeMeta {
-    let ctx = CommandCtx {
-        caller: Caller::Window {
-            label: WindowLabel::Main,
-        },
-    };
+    let ctx = crate::util::main_window_ctx();
     let mut meta = core.change_meta(&ctx, summary.into(), reason);
     meta.actor = Actor::Job {
         job_id: JobId::new("job_voice_profiles"),
@@ -282,7 +274,7 @@ impl Core {
         let fresh = Key::generate();
         self.deps
             .secrets
-            .set(KEY_ACCOUNT, &Secret::new(hex(&fresh)))
+            .set(KEY_ACCOUNT, &Secret::new(noter_db::hex(&fresh)))
             .map_err(locked)?;
         Ok(Some(SecretKey(fresh)))
     }
@@ -816,7 +808,7 @@ mod tests {
     const SEALED_BY_0_10: &str = include_str!("../tests/data/centroid-chacha20poly1305-0.10.hex");
 
     fn golden_key() -> SecretKey {
-        SecretKey(unhex(&hex(&(0u8..32).collect::<Vec<_>>())).unwrap())
+        SecretKey(unhex(&noter_db::hex(&(0u8..32).collect::<Vec<_>>())).unwrap())
     }
 
     #[test]

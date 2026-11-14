@@ -9,6 +9,7 @@ use noter_protocol::model::*;
 use noter_protocol::{CallId, CoreError, ErrorCode};
 
 use crate::settings::invalid;
+use crate::speakers::speaker_name;
 use crate::transcript::segments_of;
 use crate::{internal, ClipboardText, Core, SaveKind};
 
@@ -400,15 +401,6 @@ fn srt_time(ms: u32) -> String {
         ms / 1000 % 60,
         ms % 1000
     )
-}
-
-fn speaker_name(label: &SpeakerLabel) -> String {
-    match label {
-        SpeakerLabel::You => "You".into(),
-        SpeakerLabel::Person { person } => person.display_name.clone(),
-        SpeakerLabel::Unnamed { n } => format!("Speaker {n}"),
-        SpeakerLabel::GuestYourSide => "Guest (your side)".into(),
-    }
 }
 
 fn srt(segments: &[SegmentView]) -> String {

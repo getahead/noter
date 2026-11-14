@@ -361,3 +361,18 @@ impl ErrorCode {
         ErrorCode::Cancelled,
     ];
 }
+
+/// Developer text for the log only, never record content.
+pub fn internal(error: impl std::fmt::Display) -> CoreError {
+    CoreError::new(ErrorCode::Internal, error.to_string())
+}
+
+/// A validation error with the field/rule detail used by the UI.
+pub fn invalid(field: &str, rule: ValidationRule) -> CoreError {
+    CoreError::new(ErrorCode::InvalidInput, format!("{field}: {rule:?}")).with_detail(
+        ErrorDetail::Validation {
+            field: field.into(),
+            rule,
+        },
+    )
+}

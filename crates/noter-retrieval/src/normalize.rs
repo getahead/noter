@@ -15,6 +15,14 @@ pub fn normalize(text: &str) -> String {
         .replace('ß', "ss")
 }
 
+/// Approximate token count used by chunking before a model tokenizer is available.
+// @cpt-algo:cpt-noter-algo-core-knowledge-sync:p1
+pub fn estimate_tokens(text: &str) -> usize {
+    (text.split_whitespace().count() * 4)
+        .div_ceil(3)
+        .max(text.chars().count().div_ceil(4))
+}
+
 /// The words of a text, as `(start, end)` byte ranges: runs of letters and digits.
 pub(crate) fn words(text: &str) -> Vec<(usize, usize)> {
     let mut out = vec![];

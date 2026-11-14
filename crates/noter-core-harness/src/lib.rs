@@ -263,13 +263,9 @@ fn fail_next(fails: &FailNext, args: Value) -> Result<Value, CoreError> {
     Ok(json!({}))
 }
 
-pub(crate) fn lock<T>(m: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
-}
+pub(crate) use noter_db::lock;
 
-pub(crate) fn internal(e: impl std::fmt::Display) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+pub(crate) use noter_protocol::internal;
 
 fn invalid(message: &str) -> CoreError {
     CoreError::new(ErrorCode::InvalidInput, message)

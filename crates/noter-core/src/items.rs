@@ -2,8 +2,6 @@
 //! calls and spans in the core; every intent is one logged change under a `rev` guard.
 
 use std::collections::BTreeSet;
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 
 use noter_db::rusqlite::types::Value as Sql;
 use noter_db::rusqlite::{params_from_iter, Connection, OptionalExtension, Row};
@@ -105,16 +103,6 @@ fn name<T: Serialize>(v: &T) -> String {
     match serde_json::to_value(v) {
         Ok(Value::String(s)) => s,
         _ => String::new(),
-    }
-}
-
-fn sql_of(v: &Value) -> Sql {
-    match v {
-        Value::Null => Sql::Null,
-        Value::Bool(b) => Sql::Integer((*b).into()),
-        Value::Number(n) => Sql::Integer(n.as_i64().unwrap_or_default()),
-        Value::String(s) => Sql::Text(s.clone()),
-        other => Sql::Text(other.to_string()),
     }
 }
 
@@ -541,18 +529,10 @@ impl Core {
         let items = self.items_of_call(call_id)?;
         let dir = self.audio_dir.join(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
-        let tmp = dir.join("items.json.tmp");
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)
-            .map_err(internal)?;
-        file.write_all(&serde_json::to_vec_pretty(&items).map_err(internal)?)
-            .map_err(internal)?;
-        file.sync_all().map_err(internal)?;
-        std::fs::rename(&tmp, dir.join("items.json")).map_err(internal)
+        crate::util::write_private(
+            &dir.join("items.json"),
+            &serde_json::to_vec_pretty(&items).map_err(internal)?,
+        )
     }
     // @cpt-end:cpt-noter-algo-core-items-today-mutate:p1:inst-mutate-publish
 
@@ -938,11 +918,11 @@ impl Core {
                 &format!(
                     "INSERT INTO items (id, rev, {}) VALUES (?, 1, {})",
                     names.join(", "),
-                    vec!["?"; names.len()].join(", ")
+                    crate::util::marks(names.len())
                 ),
                 params_from_iter(
                     std::iter::once(Sql::Text(item_id.clone()))
-                        .chain(columns.iter().map(|(_, v)| sql_of(v))),
+                        .chain(columns.iter().map(|(_, v)| noter_db::to_sql(v))),
                 ),
             )
             .map_err(internal)?;

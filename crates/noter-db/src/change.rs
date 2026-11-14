@@ -574,7 +574,7 @@ fn write_row(
     tx.execute(&sql, params_from_iter(args))
 }
 
-pub(crate) fn to_sql(v: &Value) -> Sql {
+pub fn to_sql(v: &Value) -> Sql {
     match v {
         Value::Null => Sql::Null,
         Value::Bool(b) => Sql::Integer((*b).into()),
@@ -593,5 +593,22 @@ pub(crate) fn from_sql(v: ValueRef) -> Value {
         ValueRef::Real(f) => f.into(),
         ValueRef::Text(t) => String::from_utf8_lossy(t).into(),
         ValueRef::Blob(b) => b.to_vec().into(),
+    }
+}
+
+#[cfg(test)]
+mod conversion_tests {
+    use super::to_sql;
+    use rusqlite::types::Value as Sql;
+    use serde_json::json;
+
+    #[test]
+    fn shared_sql_conversion_preserves_booleans_numbers_and_structured_values() {
+        assert_eq!(to_sql(&json!(true)), Sql::Integer(1));
+        assert_eq!(to_sql(&json!(2.5)), Sql::Real(2.5));
+        assert_eq!(
+            to_sql(&json!({"ok": true})),
+            Sql::Text("{\"ok\":true}".into())
+        );
     }
 }

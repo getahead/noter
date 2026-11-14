@@ -3,8 +3,6 @@
 //! constraints the archive pass reads.
 
 use std::collections::{BTreeMap, HashMap};
-use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 
 use noter_db::rusqlite::{Connection, OptionalExtension};
 use noter_db::Mutation;
@@ -13,7 +11,7 @@ use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::CommandCtx;
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 
 use crate::settings::invalid;
 use crate::transcript::segments_of;
@@ -475,7 +473,7 @@ impl Core {
         } else {
             None
         };
-        let shadow = new_text.to_lowercase().replace('ё', "е").replace('ß', "ss");
+        let shadow = crate::transcript::shadow(&new_text);
         let mut meta = self.change_meta(ctx, "Fixed a term".into(), "term_fix");
         meta.batch_id = Some(batch);
         let written = self.store().write(
@@ -696,18 +694,8 @@ impl Core {
         };
         let dir = self.call_dir(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
-        let tmp = dir.join("constraints.json.tmp");
-        let mut out = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)
-            .map_err(internal)?;
-        let body: Value = serde_json::to_value(&file).map_err(internal)?;
-        write!(out, "{body}").map_err(internal)?;
-        out.sync_all().map_err(internal)?;
-        std::fs::rename(&tmp, dir.join("constraints.json")).map_err(internal)
+        let body = serde_json::to_vec(&file).map_err(internal)?;
+        crate::util::write_private(&dir.join("constraints.json"), &body)
     }
 
     /// The batch a naming or term fix wrote when `change_id` is one of its rows: undo and redo
@@ -727,4 +715,20 @@ impl Core {
             .and_then(|(batch, _)| batch)
             .map(BatchId::new))
     }
+}
+
+/// Stable names for speaker labels used by post-call output, sharing and MCP egress.
+pub(crate) fn speaker_name(label: &SpeakerLabel) -> String {
+    match label {
+        SpeakerLabel::You => "You".into(),
+        SpeakerLabel::Person { person } => person.display_name.clone(),
+        SpeakerLabel::Unnamed { n } => format!("Speaker {n}"),
+        SpeakerLabel::GuestYourSide => "Guest".into(),
+    }
+}
+
+pub(crate) fn is_generic_speaker_name(name: &str) -> bool {
+    [SpeakerLabel::You, SpeakerLabel::GuestYourSide]
+        .iter()
+        .any(|label| speaker_name(label) == name)
 }

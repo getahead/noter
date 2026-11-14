@@ -679,7 +679,7 @@ async fn remote<L: EngineLauncher>(
         let hash = item
             .hash
             .clone()
-            .unwrap_or_else(|| sha256(page.text.as_bytes()));
+            .unwrap_or_else(|| noter_db::hex(&Sha256::digest(page.text.as_bytes())));
         if before.is_some_and(|k| k.hash == hash) {
             continue;
         }
@@ -742,13 +742,6 @@ async fn crawl<L: EngineLauncher>(
     })
 }
 
-fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
-}
-
 /// The file's content hash, text and chunks, or `None` when the content is `stored`.
 fn read_file(
     path: &Path,
@@ -757,7 +750,7 @@ fn read_file(
 ) -> Result<Option<(String, Extracted, Vec<Chunk>)>, Stop> {
     let bytes = std::fs::read(path)
         .map_err(|_| failed(ErrorCode::SourceSyncFailed, "a file could not be read"))?;
-    let hash = sha256(&bytes);
+    let hash = noter_db::hex(&Sha256::digest(&bytes));
     if stored.as_deref() == Some(hash.as_str()) {
         return Ok(None);
     }

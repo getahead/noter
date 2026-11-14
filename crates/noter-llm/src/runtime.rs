@@ -5,11 +5,12 @@
 //! run with its task timeout and cancellation, validated against the app-owned schema with one
 //! repair retry and a simpler fallback, and finished with its usage in `llm_runs`.
 
+pub(crate) use noter_db::{hex, lock};
 use std::collections::{HashMap, HashSet};
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 use noter_db::{ChangeMeta, Mutation, Store};
 use noter_protocol::error::RuntimeUnavailableReason;
@@ -1175,7 +1176,7 @@ impl Inner {
                 json!(req.agent_id.as_ref().map(AgentId::as_str)),
             ),
             ("call_id", json!(req.call_id.as_ref().map(CallId::as_str))),
-            ("prompt_hash", json!(hex(&hash.finalize()))),
+            ("prompt_hash", json!(noter_db::hex(&hash.finalize()))),
         ];
         self.write_run(id, choice, values, "Model run started")
     }
@@ -1414,14 +1415,6 @@ fn failure_code(f: &Failure) -> &'static str {
 
 fn elapsed_ms(since: Instant) -> u64 {
     since.elapsed().as_millis() as u64
-}
-
-pub(crate) fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
-}
-
-pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 #[cfg(test)]

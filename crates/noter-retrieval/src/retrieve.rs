@@ -212,14 +212,7 @@ pub fn prepare(query: Query) -> Result<Prepared, CoreError> {
     })
 }
 
-pub(crate) fn invalid(field: &str, rule: ValidationRule) -> CoreError {
-    CoreError::new(ErrorCode::InvalidInput, format!("{field}: {rule:?}")).with_detail(
-        ErrorDetail::Validation {
-            field: field.into(),
-            rule,
-        },
-    )
-}
+pub(crate) use noter_protocol::invalid;
 
 /// Days since 1970-01-01 of a `YYYY-MM-DD` date; `None` for anything else.
 pub fn day_number(date: &LocalDate) -> Option<i64> {

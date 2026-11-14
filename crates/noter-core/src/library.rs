@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use noter_db::rusqlite::types::Value as Sql;
-use noter_db::rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row};
+use noter_db::rusqlite::{params_from_iter, Connection, OptionalExtension, Row};
 use noter_db::{Mutation, StoreState};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::CommandCtx;
@@ -437,28 +437,9 @@ impl Core {
             let (mode_used, audio_not_stored) = (word(s.mode_used.clone())?, s.audio_not_stored);
             let call = assemble(c, s, now)?;
             let speakers = speakers_of(c, &id)?;
-            let marks = c
-                .prepare("SELECT id, at_ms, note FROM marks WHERE call_id = ?1 ORDER BY at_ms, id")?
-                .query_map([&id], |r| {
-                    Ok(MarkView {
-                        id: MarkId::new(r.get::<_, String>(0)?),
-                        call_id: CallId::new(&id),
-                        at_ms: OffsetMs(r.get(1)?),
-                        note: r.get(2)?,
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
-            let gaps = c
-                .prepare("SELECT t0_ms, t1_ms, reason FROM gaps WHERE call_id = ?1 ORDER BY t0_ms")?
-                .query_map([&id], |r| {
-                    Ok(GapView {
-                        call_id: CallId::new(&id),
-                        t0_ms: OffsetMs(r.get(0)?),
-                        t1_ms: OffsetMs(r.get(1)?),
-                        reason: word(r.get::<_, String>(2)?)?,
-                    })
-                })?
-                .collect::<Result<Vec<_>, _>>()?;
+            let call_id = CallId::new(&id);
+            let marks = crate::transcript::marks_of(c, &call_id)?;
+            let gaps = crate::transcript::gaps_of(c, &call_id)?;
             // shortcut: "the only call so far" stands for the first recorded call; a stored flag
             // replaces it with the notifications feature (M2).
             let calls: u32 = c.query_row("SELECT count(*) FROM calls", [], |r| r.get(0))?;
@@ -782,92 +763,33 @@ fn note_pending(data_dir: &Path, id: &str) {
     }
 }
 
-/// The speakers of a call as the call record shows them.
+/// Speakers of a call use the same current-pass mapping as transcript events.
 pub(crate) fn speakers_of(
     c: &Connection,
     call_id: &str,
 ) -> noter_db::rusqlite::Result<Vec<SpeakerView>> {
-    let mut stmt = c.prepare(&format!(
-        "SELECT s.id, COALESCE((SELECT display_name FROM people WHERE id = s.person_id), s.name, s.label), s.n, s.channel, s.person_id, s.named_by,
-                (SELECT count(*) FROM segments g WHERE g.speaker_id = s.id)
-         FROM speakers s WHERE s.call_id = ?1 AND s.pass = {SHOWN_PASS} ORDER BY s.rowid"
-    ))?;
-    let rows = stmt
-        .query_map([call_id], |r| {
-            Ok((
-                r.get::<_, String>(0)?,
-                r.get::<_, String>(1)?,
-                r.get::<_, Option<u16>>(2)?,
-                r.get::<_, String>(3)?,
-                r.get::<_, Option<String>>(4)?,
-                r.get::<_, Option<String>>(5)?,
-                r.get::<_, u32>(6)?,
-            ))
-        })?
-        .collect::<Result<Vec<_>, _>>()?;
-    rows.into_iter()
-        .map(|(id, label, n, channel, person, named_by, segment_count)| {
-            let you = label == "you";
-            let sample = if you {
-                None
-            } else {
-                c.query_row(
+    let mut speakers = crate::transcript::speaker_views(c, &CallId::new(call_id))?;
+    for speaker in &mut speakers {
+        let id = speaker.id.as_str();
+        speaker.segment_count = c.query_row(
+            "SELECT count(*) FROM segments WHERE speaker_id = ?1",
+            [id],
+            |r| r.get(0),
+        )?;
+        if !matches!(speaker.label, SpeakerLabel::You) {
+            speaker.sample = c
+                .query_row(
                     "SELECT t0_ms, t1_ms FROM segments WHERE speaker_id = ?1 ORDER BY t0_ms LIMIT 1",
-                    params![id],
-                    |r| {
-                        Ok(TimeSpan {
-                            call_id: CallId::new(call_id),
-                            channel: None,
-                            t0_ms: OffsetMs(r.get(0)?),
-                            t1_ms: OffsetMs(r.get(1)?),
-                        })
-                    },
+                    [id],
+                    |r| Ok(TimeSpan {
+                        call_id: CallId::new(call_id),
+                        channel: None,
+                        t0_ms: OffsetMs(r.get(0)?),
+                        t1_ms: OffsetMs(r.get(1)?),
+                    }),
                 )
-                .optional()?
-            };
-            Ok(SpeakerView {
-                label: if you {
-                    SpeakerLabel::You
-                } else if label == "guest_your_side" {
-                    SpeakerLabel::GuestYourSide
-                } else if let Some(person) = person {
-                    SpeakerLabel::Person {
-                        person: chip(person, label),
-                    }
-                } else {
-                    SpeakerLabel::Unnamed { n: n.unwrap_or(0) }
-                },
-                id: SpeakerId::new(id),
-                call_id: CallId::new(call_id),
-                channel: word(channel)?,
-                segment_count,
-                talk_ms: None,
-                sample,
-                // Voice profiles and the calendar suggest names from M2.
-                suggestion: None,
-                named_by: named_by.map(word).transpose()?,
-            })
-        })
-        .collect()
-}
-
-/// A named speaker's chip. shortcut: no `people` table before library-people (M2), so the chip
-/// is made from the stored name; that feature reads the person's own record.
-fn chip(person_id: String, name: String) -> PersonChip {
-    let words: Vec<&str> = name.split_whitespace().collect();
-    PersonChip {
-        id: PersonId::new(person_id),
-        short_name: match words.as_slice() {
-            [first, .., last] => format!("{first} {}.", last.chars().next().unwrap_or_default()),
-            _ => name.clone(),
-        },
-        initials: words
-            .iter()
-            .filter_map(|w| w.chars().next())
-            .take(2)
-            .collect::<String>()
-            .to_uppercase(),
-        display_name: name,
-        is_you: false,
+                .optional()?;
+        }
     }
+    Ok(speakers)
 }

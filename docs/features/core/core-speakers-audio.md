@@ -108,7 +108,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 **Actor**: Primary user (main window or call screen)
 
 **Success Scenarios**:
-- A selected term is replaced, the original is retained in correction metadata and the glossary is updated when requested.
+- A selected term is replaced, the original is retained in correction metadata, the glossary is updated when requested, and the normalized shadow uses the same NFKC normalization as transcript storage and keyword search.
 
 **Error Scenarios**:
 - A range no longer fits the segment or crosses invalid text boundaries: `invalid_input`; a deleted segment: `not_found`.

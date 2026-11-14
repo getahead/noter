@@ -47,6 +47,7 @@ pub mod testing;
 mod today;
 mod transcript;
 mod tray;
+mod util;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -726,9 +727,7 @@ impl Core {
     }
 }
 
-pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-}
+pub(crate) use noter_db::lock;
 
 impl CoreApi for Core {
     async fn setup_status(
@@ -1967,7 +1966,4 @@ fn object(v: Value) -> Map<String, Value> {
     }
 }
 
-/// `internal`: developer text for the log only, never record text.
-pub(crate) fn internal(e: impl std::fmt::Display) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+pub(crate) use noter_protocol::internal;

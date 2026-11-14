@@ -176,10 +176,7 @@ impl Fixture {
 }
 
 fn sha256(bytes: &[u8]) -> String {
-    Sha256::digest(bytes)
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    noter_db::hex(&Sha256::digest(bytes))
 }
 
 fn text(bytes: &[u8]) -> String {

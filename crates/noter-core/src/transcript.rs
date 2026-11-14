@@ -10,7 +10,6 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
-use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -444,20 +443,12 @@ impl Core {
         let segments = self.store.read(|c| segments_of(c, call_id, None))?;
         let dir = self.call_dir(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
-        let tmp = dir.join("transcript.jsonl.tmp");
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&tmp)
-            .map_err(internal)?;
+        let mut bytes = Vec::new();
         for segment in &segments {
-            writeln!(file, "{}", to_json(segment)).map_err(internal)?;
+            writeln!(&mut bytes, "{}", to_json(segment)).map_err(internal)?;
         }
-        file.sync_all().map_err(internal)?;
         // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
-        std::fs::rename(&tmp, dir.join("transcript.jsonl")).map_err(internal)
+        crate::util::write_private(&dir.join("transcript.jsonl"), &bytes)
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
     }
@@ -768,14 +759,15 @@ pub(crate) fn segments_of(
             channel,
             speaker: SpeakerRef {
                 speaker_id: SpeakerId::new(r.get::<_, Option<String>>(8)?.unwrap_or_default()),
-                label: speaker_label(
+                label: speaker_label_of(
+                    c,
                     channel,
                     label.as_deref().unwrap_or(""),
                     r.get(10)?,
                     named_by.as_deref(),
                     r.get::<_, Option<String>>(13)?,
                     None,
-                ),
+                )?,
             },
             crosstalk_with: vec![],
             t0_ms: OffsetMs(r.get(2)?),
@@ -837,14 +829,15 @@ fn speaker_refs(
         let id: String = r.get(0)?;
         let channel: AudioChannel = word(&r.get::<_, String>(3)?).unwrap_or(AudioChannel::Sys);
         let named_by: Option<String> = r.get(4)?;
-        let label = speaker_label(
+        let label = speaker_label_of(
+            c,
             channel,
             &r.get::<_, String>(1)?,
             r.get(2)?,
             named_by.as_deref(),
             r.get(5)?,
             r.get::<_, Option<String>>(6)?.as_deref(),
-        );
+        )?;
         Ok((
             id.clone(),
             SpeakerRef {
@@ -876,14 +869,15 @@ fn speakers_of(
         let named_by: Option<String> = r.get(4)?;
         let speaker = SpeakerRef {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
-            label: speaker_label(
+            label: speaker_label_of(
+                c,
                 channel,
                 &label,
                 r.get(2)?,
                 named_by.as_deref(),
                 r.get::<_, Option<String>>(5)?,
                 r.get::<_, Option<String>>(6)?.as_deref(),
-            ),
+            )?,
         };
         let mut view = speaker_view(call_id, &speaker, channel);
         view.named_by = named_by.as_deref().and_then(word);
@@ -892,7 +886,10 @@ fn speakers_of(
     rows.collect()
 }
 
-fn marks_of(c: &Connection, call_id: &CallId) -> noter_db::rusqlite::Result<Vec<MarkView>> {
+pub(crate) fn marks_of(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<Vec<MarkView>> {
     let mut stmt =
         c.prepare("SELECT id, at_ms, note FROM marks WHERE call_id = ?1 ORDER BY at_ms, rowid")?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
@@ -906,7 +903,10 @@ fn marks_of(c: &Connection, call_id: &CallId) -> noter_db::rusqlite::Result<Vec<
     rows.collect()
 }
 
-fn gaps_of(c: &Connection, call_id: &CallId) -> noter_db::rusqlite::Result<Vec<GapView>> {
+pub(crate) fn gaps_of(
+    c: &Connection,
+    call_id: &CallId,
+) -> noter_db::rusqlite::Result<Vec<GapView>> {
     let mut stmt =
         c.prepare("SELECT t0_ms, t1_ms, reason FROM gaps WHERE call_id = ?1 ORDER BY t0_ms")?;
     let rows = stmt.query_map([call_id.as_str()], |r| {
@@ -993,7 +993,7 @@ fn speaker_label(
 ) -> SpeakerLabel {
     if let Some(id) = person_id {
         return SpeakerLabel::Person {
-            person: chip(id, name.unwrap_or(label)),
+            person: crate::people::chip_from_name(&id, name.unwrap_or(label)),
         };
     }
     match channel {
@@ -1002,6 +1002,24 @@ fn speaker_label(
         AudioChannel::Sys => SpeakerLabel::Unnamed {
             n: n.unwrap_or(0) as u16,
         },
+    }
+}
+
+fn speaker_label_of(
+    c: &Connection,
+    channel: AudioChannel,
+    label: &str,
+    n: Option<i64>,
+    named_by: Option<&str>,
+    person_id: Option<String>,
+    name: Option<&str>,
+) -> noter_db::rusqlite::Result<SpeakerLabel> {
+    let fallback = speaker_label(channel, label, n, named_by, person_id, name);
+    match fallback {
+        SpeakerLabel::Person { person } => Ok(SpeakerLabel::Person {
+            person: crate::people::chip_for(c, person.id.as_str(), &person.display_name)?,
+        }),
+        label => Ok(label),
     }
 }
 
@@ -1083,27 +1101,6 @@ fn lang(word: &str) -> Lang {
 /// An enum column in the protocol's snake_case words.
 fn word<T: serde::de::DeserializeOwned>(s: &str) -> Option<T> {
     serde_json::from_value(Value::String(s.into())).ok()
-}
-
-/// A named speaker's chip. shortcut: no `people` table before library-people (M2), so the chip is
-/// made from the stored name, as the library does; that feature reads the person's own record.
-fn chip(person_id: String, name: &str) -> PersonChip {
-    let words: Vec<&str> = name.split_whitespace().collect();
-    PersonChip {
-        id: PersonId::new(person_id),
-        short_name: match words.as_slice() {
-            [first, .., last] => format!("{first} {}.", last.chars().next().unwrap_or_default()),
-            _ => name.to_string(),
-        },
-        initials: words
-            .iter()
-            .filter_map(|w| w.chars().next())
-            .take(2)
-            .collect::<String>()
-            .to_uppercase(),
-        display_name: name.to_string(),
-        is_you: false,
-    }
 }
 
 #[cfg(test)]

@@ -230,14 +230,7 @@ fn is_clock_time(t: &str) -> bool {
     two_digits(h) && two_digits(m) && h < "24" && m < "60"
 }
 
-pub(crate) fn invalid(field: &str, rule: ValidationRule) -> CoreError {
-    CoreError::new(ErrorCode::InvalidInput, format!("{field}: {rule:?}")).with_detail(
-        ErrorDetail::Validation {
-            field: field.into(),
-            rule,
-        },
-    )
-}
+pub(crate) use noter_protocol::invalid;
 
 /// The section's row key and its value, as stored.
 fn parts(section: &SettingsSection) -> Result<(String, Value), CoreError> {

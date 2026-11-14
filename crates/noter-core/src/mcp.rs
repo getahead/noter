@@ -35,6 +35,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
 use tokio::sync::watch;
 
+use crate::speakers::speaker_name;
 use crate::{internal, lock, to_json, Core};
 
 /// The tools the core answers; a registration keeps only these.
@@ -202,15 +203,8 @@ fn same(a: &str, b: &str) -> bool {
 /// 32 random bytes as hex.
 fn new_token() -> Result<String, CoreError> {
     let mut bytes = [0u8; 32];
-    std::fs::File::open("/dev/urandom")
-        .and_then(|mut f| std::io::Read::read_exact(&mut f, &mut bytes))
-        .map_err(internal)?;
-    Ok(bytes.iter().map(|b| format!("{b:02x}")).collect())
-}
-
-fn private_dir(path: &Path) -> std::io::Result<()> {
-    std::fs::create_dir_all(path)?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
+    getrandom::fill(&mut bytes).map_err(internal)?;
+    Ok(noter_db::hex(&bytes))
 }
 
 impl Core {
@@ -285,8 +279,8 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-mcp-start:p1:inst-start-config
         let run_dir = self.data_dir.join("run");
         let dir = run_dir.join("mcp");
-        private_dir(&run_dir).map_err(internal)?;
-        private_dir(&dir).map_err(internal)?;
+        crate::util::private_dir(&run_dir).map_err(internal)?;
+        crate::util::private_dir(&dir).map_err(internal)?;
         let config = dir.join(format!("{}.json", ctx.llm_run_id));
         let body = json!({
             "socket": self.socket_path(),
@@ -409,7 +403,7 @@ impl Core {
         }
         let _ = self.mcp.core.set(Arc::downgrade(self));
         let path = self.socket_path();
-        private_dir(path.parent().unwrap_or(&self.data_dir)).map_err(internal)?;
+        crate::util::private_dir(path.parent().unwrap_or(&self.data_dir)).map_err(internal)?;
         let _ = std::fs::remove_file(&path);
         let listener = UnixListener::bind(&path).map_err(internal)?;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600))
@@ -581,7 +575,7 @@ impl Core {
         if calls.is_empty() {
             return false;
         }
-        let marks = vec!["?"; calls.len()].join(", ");
+        let marks = crate::util::marks(calls.len());
         let sql = format!(
             "SELECT count(*) FROM calls WHERE id IN ({marks}) AND privacy_class != 'normal'"
         );
@@ -1401,25 +1395,7 @@ fn evidence_in(
 
 /// The person whose display name or alias is `name` (case, spacing and ё folded).
 fn person_by_name(c: &Connection, name: &str) -> noter_db::rusqlite::Result<Option<String>> {
-    let wanted = crate::people::norm(name);
-    let by_alias: Option<String> = c
-        .query_row(
-            "SELECT person_id FROM person_aliases WHERE alias_norm = ?1",
-            [&wanted],
-            |r| r.get(0),
-        )
-        .optional()?;
-    if by_alias.is_some() {
-        return Ok(by_alias);
-    }
-    let people: Vec<(String, String)> = c
-        .prepare("SELECT id, display_name FROM people ORDER BY rowid")?
-        .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
-        .collect::<Result<_, _>>()?;
-    Ok(people
-        .into_iter()
-        .find(|(_, n)| crate::people::norm(n) == wanted)
-        .map(|(id, _)| id))
+    crate::people::by_name(c, name, None)
 }
 
 /// Whether a key names what no response may carry: audio, voice profiles, credentials, raw
@@ -1474,7 +1450,7 @@ fn people_in(value: &Value) -> Vec<String> {
                                 .strip_prefix("Speaker ")
                                 .is_some_and(|d| d.parse::<u32>().is_ok());
                             if !numbered
-                                && !["You", "Guest"].contains(&n.as_str())
+                                && !crate::speakers::is_generic_speaker_name(n)
                                 && !out.contains(n)
                             {
                                 out.push(n.clone());
@@ -1568,20 +1544,11 @@ fn call_access(
     // @cpt-end:cpt-noter-algo-core-mcp-authorize:p1:inst-auth-entity
 }
 
-fn speaker_name(label: &SpeakerLabel) -> String {
-    match label {
-        SpeakerLabel::You => "You".into(),
-        SpeakerLabel::Person { person } => person.display_name.clone(),
-        SpeakerLabel::Unnamed { n } => format!("Speaker {n}"),
-        SpeakerLabel::GuestYourSide => "Guest".into(),
-    }
-}
-
 fn owners_in(clause: &mut String, args: &mut Vec<Sql>, people: &[PersonId]) {
     if people.is_empty() {
         return;
     }
-    let marks = vec!["?"; people.len()].join(", ");
+    let marks = crate::util::marks(people.len());
     clause.push_str(&format!(" AND i.owner_person_id IN ({marks})"));
     args.extend(people.iter().map(|p| Sql::Text(p.as_str().into())));
 }
@@ -1659,23 +1626,15 @@ fn person_of(
                 |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
             )
             .optional()?,
-        (None, Some(name)) => {
-            let wanted = crate::people::norm(name);
-            let people: Vec<(String, String, Option<String>)> = c
-                .prepare("SELECT id, display_name, role FROM people ORDER BY rowid")?
-                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-                .collect::<Result<_, _>>()?;
-            let by_alias: Option<String> = c
-                .query_row(
-                    "SELECT person_id FROM person_aliases WHERE alias_norm = ?1",
-                    [&wanted],
-                    |r| r.get(0),
+        (None, Some(name)) => crate::people::by_name(c, name, None)?
+            .map(|id| {
+                c.query_row(
+                    "SELECT id, display_name, role FROM people WHERE id = ?1",
+                    [id],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
                 )
-                .optional()?;
-            people.into_iter().find(|p| {
-                by_alias.as_deref() == Some(p.0.as_str()) || crate::people::norm(&p.1) == wanted
             })
-        }
+            .transpose()?,
         (None, None) => None,
     };
     let Some((id, display_name, role)) = person else {

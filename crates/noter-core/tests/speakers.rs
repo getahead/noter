@@ -464,6 +464,28 @@ fn text_of(core: &Core, id: &'static str) -> (String, String, String) {
 }
 
 #[tokio::test]
+async fn a_term_fix_keeps_nfkc_search_shadow_for_ligatures() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    core.store()
+        .insert_batch(vec![segment(
+            "seg_nfkc",
+            "call_a",
+            "spk_1",
+            10_000,
+            "ﬁle kubernets",
+        )])
+        .unwrap();
+
+    core.transcript_fix_term(&ctx(), fix("seg_nfkc", 4, 13, "Kubernetes", false))
+        .await
+        .unwrap();
+
+    assert_eq!(text_of(&core, "seg_nfkc").1, "file kubernetes");
+}
+
+#[tokio::test]
 async fn a_term_fix_keeps_the_original_updates_the_search_text_and_teaches_the_glossary() {
     let dir = tempfile::tempdir().unwrap();
     let (core, events) = open(dir.path());

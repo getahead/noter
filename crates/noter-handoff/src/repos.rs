@@ -6,7 +6,7 @@ use noter_db::rusqlite::{params, OptionalExtension, Transaction};
 use noter_db::{ChangeMeta, Logged, Store};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::{HandoffTarget, RepoMapping};
-use noter_protocol::{CoreError, ErrorCode, ErrorDetail, RepoMappingId};
+use noter_protocol::{CoreError, ErrorCode, RepoMappingId};
 use serde::{Deserialize, Serialize};
 
 use crate::internal;
@@ -40,14 +40,7 @@ fn parse(text: Option<String>) -> Result<Vec<Stored>, CoreError> {
     })
 }
 
-fn invalid(field: &str, rule: ValidationRule) -> CoreError {
-    CoreError::new(ErrorCode::InvalidInput, format!("{field}: {rule:?}")).with_detail(
-        ErrorDetail::Validation {
-            field: field.into(),
-            rule,
-        },
-    )
-}
+use noter_protocol::invalid;
 
 /// `VSTOR` or `VSTOR/ui`: a project key, optionally a component; no spaces, one slash at most.
 fn key_ok(key: &str) -> bool {

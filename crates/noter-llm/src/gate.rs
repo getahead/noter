@@ -30,6 +30,17 @@ use crate::runtime::{
 use crate::secrets::Secret;
 use crate::tools::McpLaunch;
 
+fn audit_row(id: &AuditId, values: Vec<(&'static str, Value)>) -> Mutation {
+    Mutation {
+        entity_type: "audit",
+        table: "audit_log",
+        id: id.as_str().into(),
+        base_rev: None,
+        bump_rev: false,
+        values,
+    }
+}
+
 /// A request to one of the user's own MCP servers (`user_configured` hosts): its `lookup` audit
 /// row commits before the request may leave, and `Err` means it must not. The row holds the
 /// request's size and hash, never its bytes.
@@ -44,13 +55,9 @@ pub fn audit_lookup(
     run: Option<(&LlmRunId, Option<&CallId>)>,
 ) -> Result<AuditId, CoreError> {
     let id = AuditId::new(format!("aud_{}", ulid::Ulid::generate()));
-    let row = Mutation {
-        entity_type: "audit",
-        table: "audit_log",
-        id: id.as_str().into(),
-        base_rev: None,
-        bump_rev: false,
-        values: vec![
+    let row = audit_row(
+        &id,
+        vec![
             ("ts", json!(at.0)),
             ("kind", json!("lookup")),
             ("what", json!("live_mcp_query")),
@@ -66,7 +73,7 @@ pub fn audit_lookup(
             ]
         }))
         .collect(),
-    };
+    );
     store.write(row, meta)?;
     Ok(id)
 }
@@ -368,13 +375,9 @@ impl Gate {
         // noter-mcp's tool results take `release_result` and its lookups the same audit path.
         let kind = "run";
         // @cpt-end:cpt-noter-algo-core-llm-gate-egress:p1:inst-egress-future-tools
-        let row = Mutation {
-            entity_type: "audit",
-            table: "audit_log",
-            id: audit_id.as_str().into(),
-            base_rev: None,
-            bump_rev: false,
-            values: vec![
+        let row = audit_row(
+            &audit_id,
+            vec![
                 ("ts", json!((self.now)().0)),
                 ("kind", json!(kind)),
                 ("what", what),
@@ -386,7 +389,7 @@ impl Gate {
                 ("payload_hash", json!(hex(&Sha256::digest(&bytes)))),
                 ("redaction_map_id", json!(redaction_map_id)),
             ],
-        };
+        );
         let summary = format!("Packet released to {destination}");
         let committed = self
             .store
@@ -458,13 +461,9 @@ impl Gate {
             .unwrap_or_default();
         let audit_id = AuditId::new(format!("aud_{}", ulid::Ulid::generate()));
         let in_map = redact || !map.names.is_empty();
-        let row = Mutation {
-            entity_type: "audit",
-            table: "audit_log",
-            id: audit_id.as_str().into(),
-            base_rev: None,
-            bump_rev: false,
-            values: vec![
+        let row = audit_row(
+            &audit_id,
+            vec![
                 ("ts", json!((self.now)().0)),
                 ("kind", json!("tool_result")),
                 ("what", json!(AuditWhat::EvidenceLookup)),
@@ -479,7 +478,7 @@ impl Gate {
                     json!(in_map.then_some(map.map_id.as_str())),
                 ),
             ],
-        };
+        );
         let summary = format!("Tool result released to {destination}");
         // @cpt-end:cpt-noter-algo-core-mcp-release-result:p1:inst-release-audit
         // @cpt-begin:cpt-noter-algo-core-mcp-release-result:p1:inst-release-failed

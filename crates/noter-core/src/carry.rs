@@ -4,45 +4,34 @@
 use std::collections::BTreeSet;
 
 use noter_db::rusqlite::types::Value as Sql;
-use noter_db::rusqlite::{params, params_from_iter, Connection};
+use noter_db::rusqlite::{params, params_from_iter, Connection, OptionalExtension};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
 
-use crate::people::{db, logged, new_id, norm};
+use crate::people::{db, logged, new_id};
 use crate::today::CARRY_CALLS;
 use crate::{internal, lock, Core};
-
-fn marks(n: usize) -> String {
-    vec!["?"; n].join(", ")
-}
 
 /// The people a call's calendar attendees are, by email first and then by name or alias.
 fn attendee_people(
     c: &Connection,
     attendees: &[crate::CalendarAttendee],
 ) -> Result<Vec<String>, CoreError> {
-    let people: Vec<(String, String, Option<String>)> = c
-        .prepare("SELECT id, display_name, email FROM people WHERE is_you = 0")
-        .and_then(|mut q| {
-            q.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
-                .collect()
-        })
-        .map_err(internal)?;
-    let aliases: Vec<(String, String)> = c
-        .prepare("SELECT person_id, alias_norm FROM person_aliases")
-        .and_then(|mut q| q.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?.collect())
-        .map_err(internal)?;
     let mut found = BTreeSet::new();
-    for a in attendees {
-        let email = a.email.as_deref().map(str::to_lowercase);
-        let name = norm(&a.name);
-        for (id, display, mail) in &people {
-            let by_mail = email.is_some() && mail.as_deref().map(str::to_lowercase) == email;
-            let by_name = !name.is_empty()
-                && (norm(display) == name || aliases.iter().any(|(p, n)| p == id && *n == name));
-            if by_mail || by_name {
-                found.insert(id.clone());
+    for attendee in attendees {
+        if let Some(id) = crate::people::by_name(c, &attendee.name, attendee.email.as_deref())
+            .map_err(internal)?
+        {
+            let is_attendee: bool = c
+                .query_row("SELECT is_you = 0 FROM people WHERE id = ?1", [&id], |r| {
+                    r.get(0)
+                })
+                .optional()
+                .map_err(internal)?
+                .unwrap_or(false);
+            if is_attendee {
+                found.insert(id);
             }
         }
     }
@@ -58,11 +47,7 @@ impl Core {
         }
         let id = call.as_str().to_string();
         let mut meta = self.change_meta(
-            &noter_protocol::ipc::CommandCtx {
-                caller: noter_protocol::ipc::Caller::Window {
-                    label: WindowLabel::Main,
-                },
-            },
+            &crate::util::main_window_ctx(),
             "Recorded who took part".into(),
             "call_participants",
         );
@@ -147,11 +132,7 @@ impl Core {
             return Ok(());
         }
         let mut meta = self.change_meta(
-            &noter_protocol::ipc::CommandCtx {
-                caller: noter_protocol::ipc::Caller::Window {
-                    label: WindowLabel::Main,
-                },
-            },
+            &crate::util::main_window_ctx(),
             "Moved open items".into(),
             reason,
         );
@@ -221,7 +202,7 @@ impl Core {
             if people.is_empty() {
                 return Ok(vec![]);
             }
-            let m = marks(people.len());
+            let m = crate::util::marks(people.len());
             let mut args = vec![Sql::Text(id.clone()), Sql::Text(id.clone())];
             args.extend(people.iter().cloned().map(Sql::Text));
             args.extend(people.iter().cloned().map(Sql::Text));
@@ -244,7 +225,7 @@ impl Core {
             c.prepare(&format!(
                 "SELECT id, rev FROM items WHERE call_id IN ({}) AND status = 'open'
                    AND review_state IN ('accepted', 'suggested') ORDER BY id",
-                marks(calls.len())
+                crate::util::marks(calls.len())
             ))
             .and_then(|mut q| {
                 q.query_map(params_from_iter(calls.iter()), |r| {
@@ -282,11 +263,7 @@ impl Core {
         }
         let id = call.as_str().to_string();
         let mut meta = self.change_meta(
-            &noter_protocol::ipc::CommandCtx {
-                caller: noter_protocol::ipc::Caller::Window {
-                    label: WindowLabel::Main,
-                },
-            },
+            &crate::util::main_window_ctx(),
             "Kept talk time".into(),
             "talk_time",
         );

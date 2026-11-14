@@ -7,10 +7,11 @@
 
 mod rows;
 
+use noter_db::lock;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_db::{ChangeMeta, Mutation, Store};
@@ -145,10 +146,6 @@ struct Inner {
 
 #[derive(Clone)]
 pub struct Scheduler(Arc<Inner>);
-
-fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
-    m.lock().unwrap_or_else(|e| e.into_inner())
-}
 
 /// Pipeline work of one call: Continue Recording cancels it.
 fn is_pipeline(kind: JobKind) -> bool {

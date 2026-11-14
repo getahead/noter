@@ -54,43 +54,15 @@ fn not_found() -> CoreError {
     CoreError::new(ErrorCode::NotFound, "this call no longer exists")
 }
 
-/// The calendar day of an instant, `YYYY-MM-DD`.
-// shortcut: UTC, the prefs' time zone is fixed until the first-run feature reads the macOS one.
-fn date_of(ms: i64) -> String {
-    // Days to civil date (Howard Hinnant).
-    let z = ms.div_euclid(DAY_MS) + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    format!("{y:04}-{m:02}-{d:02}")
-}
-
-fn marks(n: usize) -> String {
-    vec!["?"; n].join(", ")
-}
-
 fn texts(values: &[String]) -> Vec<Sql> {
     values.iter().cloned().map(Sql::Text).collect()
 }
 
-/// The person a calendar attendee is, by a named speaker's persisted person identity.
+/// The person a calendar attendee names.
 fn known_person(c: &Connection, name: &str) -> Db<Option<PersonChip>> {
-    let person: Option<String> = c
-        .query_row(
-            "SELECT p.id FROM speakers s JOIN people p ON p.id = s.person_id
-             WHERE lower(p.display_name) = lower(trim(?1))
-                OR EXISTS (SELECT 1 FROM person_aliases a WHERE a.person_id = p.id AND lower(a.alias) = lower(trim(?1)))
-             ORDER BY s.rowid DESC LIMIT 1",
-            [name.trim()],
-            |r| r.get(0),
-        )
-        .optional()?;
-    person.map(|p| owner_chip(c, &p)).transpose()
+    crate::people::by_name(c, name, None)?
+        .map(|id| owner_chip(c, &id))
+        .transpose()
 }
 
 #[derive(Default)]
@@ -118,7 +90,7 @@ fn carry_forward(c: &Connection, people: &[String], before: i64) -> Db<Carried> 
                AND EXISTS (SELECT 1 FROM speakers s WHERE s.call_id = calls.id
                            AND s.person_id IN ({}) AND s.pass = {})
              ORDER BY started_at DESC LIMIT {CARRY_CALLS}",
-            marks(people.len()),
+            crate::util::marks(people.len()),
             SHOWN_PASS.replace("?1", "calls.id"),
         ))?
         .query_map(params_from_iter(args), |r| r.get(0))?
@@ -133,7 +105,7 @@ fn carry_forward(c: &Connection, people: &[String], before: i64) -> Db<Carried> 
         "i.call_id IN ({}) AND ((i.status IN ('open', 'carried')
                                  AND i.review_state IN ('accepted', 'suggested'))
                                 OR (i.status = 'handed_off' AND i.review_state = 'accepted'))",
-        marks(calls.len())
+        crate::util::marks(calls.len())
     );
     let mut seen = BTreeSet::new();
     let mut carried = Carried::default();
@@ -283,7 +255,7 @@ fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections
             this_week.push(card);
         }
     }
-    let date = date_of(w.day_start);
+    let date = crate::history::date_of(w.day_start);
     let mut due_without_call = items_where(
         c,
         "i.status IN ('open', 'carried') AND i.review_state = 'accepted'
@@ -556,7 +528,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-banners
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-return
         Ok(TodayView {
-            date: LocalDate(date_of(now)),
+            date: LocalDate(crate::history::date_of(now)),
             ranking: settings.ranking,
             calendar,
             live_call,

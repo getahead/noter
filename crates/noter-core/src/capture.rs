@@ -10,7 +10,7 @@ use std::time::Duration;
 use noter_db::{Insert, Logged, Mutation};
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::engine::{AsrBackend, EngineCommand, EngineEvent, GlossaryEntry, StartSession};
-use noter_protocol::ipc::{event_names, Caller, CommandCtx};
+use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
@@ -827,12 +827,10 @@ impl Core {
         if state.phase != CapturePhase::Stopping || state.call_id.as_ref() != Some(call_id) {
             return Ok(());
         }
-        let (ended, ctx) = session.stop.clone().unwrap_or_else(|| {
-            let main = Caller::Window {
-                label: WindowLabel::Main,
-            };
-            (self.deps.clock.now().0, CommandCtx { caller: main })
-        });
+        let (ended, ctx) = session
+            .stop
+            .clone()
+            .unwrap_or_else(|| (self.deps.clock.now().0, crate::util::main_window_ctx()));
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-update-call
         // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-processing
         // "processing" stays until the post-call job (M2): there is no "ready" write in M1.
@@ -1056,11 +1054,7 @@ impl Core {
                 } else {
                     "normal"
                 };
-                let main = CommandCtx {
-                    caller: Caller::Window {
-                        label: WindowLabel::Main,
-                    },
-                };
+                let main = crate::util::main_window_ctx();
                 let values = vec![
                     ("started_at", json!(wanted.started_at.map_or(now, |t| t.0))),
                     ("title", json!(wanted.title.as_deref().unwrap_or(UNTITLED))),

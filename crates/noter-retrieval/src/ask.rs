@@ -21,9 +21,7 @@ pub const NOT_FOUND_MD: &str = "I could not find this in your calls.";
 /// Evidence an answer may draw on: the top hits across sections (`Retrieved::ranked`).
 pub const ASK_HITS: usize = 30;
 
-fn internal(e: impl std::fmt::Display) -> CoreError {
-    CoreError::new(ErrorCode::Internal, e.to_string())
-}
+use noter_protocol::internal;
 
 fn not_found(what: &str) -> CoreError {
     CoreError::new(ErrorCode::NotFound, format!("no such {what}"))
