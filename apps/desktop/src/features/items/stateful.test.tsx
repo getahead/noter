@@ -45,7 +45,8 @@ describe("AddItem", () => {
     await settle();
     expect(setError).toHaveBeenCalledWith("Enter some text for the item.");
     (empty.props.onKeyDown as (e: unknown) => void)({ key: "Escape", stopPropagation() {} });
-    expect(setText).toHaveBeenCalledWith(null);
+    expect(setText).toHaveBeenCalledTimes(2);
+    expect(setText).toHaveBeenNthCalledWith(2, null);
   });
 
   it("the closed form offers Add Action Item, which opens the field", () => {
