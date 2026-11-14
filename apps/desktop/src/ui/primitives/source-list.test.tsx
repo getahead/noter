@@ -44,7 +44,9 @@ describe("SourceList keys", () => {
     expect(focus).toHaveBeenCalled();
   });
 
-  it("selects even without an owner handler", () => {
-    SourceListItem({ icon: "calendar", label: "Today" }).props.onClick({ preventDefault: vi.fn() });
+  it("prevents navigation when no owner selection handler is set", () => {
+    const preventDefault = vi.fn();
+    SourceListItem({ icon: "calendar", label: "Today" }).props.onClick({ preventDefault });
+    expect(preventDefault).toHaveBeenCalledOnce();
   });
 });

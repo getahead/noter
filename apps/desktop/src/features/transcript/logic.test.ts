@@ -296,6 +296,29 @@ describe("host effects", () => {
     await read;
     expect(set).not.toHaveBeenCalled();
   });
+
+  it("keeps an older overlapping archive read from replacing the newer span note (cpt-noter-flow-ui-items-evidence)", async () => {
+    let resolveOld!: (value: unknown) => void;
+    let resolveNew!: (value: unknown) => void;
+    const oldRead = new Promise((resolve) => { resolveOld = resolve; });
+    const newRead = new Promise((resolve) => { resolveNew = resolve; });
+    const transcriptSpan = vi.fn().mockReturnValueOnce(oldRead).mockReturnValueOnce(newRead);
+    const set = vi.fn();
+    const bridge = { core: { transcriptSpan } } as never;
+    const cleanupOld = spanArchiveEffect(bridge, { call_id: "call_1", t0_ms: 0, t1_ms: 1000 }, set);
+    const cleanupNew = spanArchiveEffect(bridge, { call_id: "call_1", t0_ms: 1000, t1_ms: 2000 }, set);
+    cleanupOld();
+
+    resolveOld({ status: "ok", data: { archive_change: { before: "old", after: "older" } } });
+    await oldRead;
+    expect(set.mock.calls).toEqual([[null], [null]]);
+
+    const latest = { before: "new", after: "newest" };
+    resolveNew({ status: "ok", data: { archive_change: latest } });
+    await newRead;
+    expect(set).toHaveBeenLastCalledWith({ change: latest });
+    cleanupNew();
+  });
 });
 
 describe("tabStop (one Tab stop for the transcript)", () => {

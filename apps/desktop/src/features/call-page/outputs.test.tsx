@@ -79,7 +79,7 @@ describe("OutputsView", () => {
 });
 
 describe("OutputSection", () => {
-  const props = (s: Section, onRegenerate = () => {}) => ({ bridge, call: bridge.store.getState().entities.call[id]!, section: s, prefs: { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never, writing: false, onRegenerate });
+  const props = (s: Section, onRegenerate: (local: boolean) => void = () => {}) => ({ bridge, call: bridge.store.getState().entities.call[id]!, section: s, prefs: { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never, writing: false, onRegenerate });
 
   it("shows a refused regeneration beside the failed section", async () => {
     const failed = sec("summary", { state: { type: "failed", code: "internal", local_fallback_available: false } as never });
@@ -126,14 +126,13 @@ describe("OutputSection", () => {
     expect(asked).toEqual([false]);
   });
 
-  it("renders the regenerated-edit notice and its comparison action", async () => {
+  it("renders the regenerated-edit notice and its Show Diff action", async () => {
     await open([]);
     const section = sec("summary", { summary_id: "sum_backend", rev: 3, body_md: "Kept edit", regenerated_with_edits: true });
     const tree = rendered(OutputSection, props(section));
     const html = renderToString(tree);
     expect(html).toContain("Regenerated · your 0 edits kept");
     expect(html).toContain("Show Diff");
-    await (find(tree, (p) => p.className === "np-link" && p.children === "Show Diff").props.onClick as () => void)();
   });
 
   it("counts the rejected suggestions a regeneration will not bring back, in the section's meta line", async () => {
@@ -147,11 +146,13 @@ describe("OutputSection", () => {
   it("regenerates a failed section alone, and locally on Use Local Model", async () => {
     await open([]);
     const asked: boolean[] = [];
-    const tree = rendered(OutputSection, props(sec("action_items", { state: { type: "failed", code: "internal", local_fallback_available: true } as never }), () => void asked.push(false)));
+    const tree = rendered(OutputSection, props(sec("action_items", { state: { type: "failed", code: "internal", local_fallback_available: true } as never }), (local) => void asked.push(local)));
     const banner = find(tree, (p) => typeof p.banner === "object");
     const actions = (banner.props.banner as { actions: Array<{ label: string; onAction: () => void }> }).actions;
     actions.find((a) => a.label === "Try Again")!.onAction();
-    expect(asked).toHaveLength(1);
+    expect(asked).toEqual([false]);
+    actions.find((a) => a.label === "Use Local Model")!.onAction();
+    expect(asked).toEqual([false, true]);
   });
 
   it("offers Edit, Version and Regenerate on ready text, hides Version with one version, and Regenerate while writing", async () => {

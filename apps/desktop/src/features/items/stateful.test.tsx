@@ -6,7 +6,11 @@ const queue: unknown[][] = [];
 const effects: Array<() => void> = [];
 vi.mock("react", async (orig) => ({
   ...(await orig<typeof import("react")>()),
-  useState: (init: unknown) => queue.shift() ?? [typeof init === "function" ? (init as () => unknown)() : init, () => {}],
+  useState: () => {
+    const state = queue.shift();
+    if (!state) throw new Error("stateful tests must queue every hook state in order");
+    return state;
+  },
   useEffect: (f: () => (() => void) | void) => void effects.push(() => void f()),
 }));
 
@@ -27,19 +31,23 @@ beforeEach(async () => {
   bridge = createBridge("main", fake);
   await bridge.open();
 });
-afterEach(() => (vi.useRealTimers(), bridge.close()));
+afterEach(() => {
+  expect(queue).toHaveLength(0);
+  vi.useRealTimers();
+  bridge.close();
+});
 const settle = () => new Promise((r) => setTimeout(r));
 
 describe("AddItem", () => {
   it("Return adds the text and closes; an empty one shows its error; Esc closes", async () => {
     const setText = vi.fn();
     const setError = vi.fn();
-    queue.push(["Send it", setText], [null, setError]);
+    queue.push(["Send it", setText], [null, setError], [false, vi.fn()]);
     const tree = rendered(AddItem, { bridge, callId: "call_live" });
     (find(tree, (p) => typeof p.onEnter === "function").props.onEnter as () => void)();
     await settle();
     expect(setText).toHaveBeenCalledWith(null);
-    queue.push(["  ", setText], [null, setError]);
+    queue.push(["  ", setText], [null, setError], [false, vi.fn()]);
     const empty = rendered(AddItem, { bridge, callId: "call_live" });
     (find(empty, (p) => p.label === "Add" && typeof p.onAction === "function").props.onAction as () => void)();
     await settle();
@@ -51,10 +59,23 @@ describe("AddItem", () => {
 
   it("the closed form offers Add Action Item, which opens the field", () => {
     const setText = vi.fn();
-    queue.push([null, setText], [null, vi.fn()]);
+    queue.push([null, setText], [null, vi.fn()], [false, vi.fn()]);
     const tree = rendered(AddItem, { bridge, callId: "call_live" });
     (tree.props.onAction as () => void)();
     expect(setText).toHaveBeenCalledWith("");
+  });
+
+  it("sends only one create when Add is pressed twice before the first request settles (cpt-noter-flow-ui-items-status)", async () => {
+    queue.push(["Send it", vi.fn()], [null, vi.fn()], [false, vi.fn()]);
+    const create = vi.spyOn(bridge.core, "itemCreate");
+    const tree = rendered(AddItem, { bridge, callId: "call_live" });
+    const add = find(tree, (p) => p.label === "Add").props.onAction as () => void;
+
+    add();
+    add();
+    await settle();
+
+    expect(create).toHaveBeenCalledOnce();
   });
 });
 

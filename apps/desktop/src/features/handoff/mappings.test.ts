@@ -50,7 +50,7 @@ describe("cpt-noter-flow-ui-handoff-mapping", () => {
     expect(mappingError("invalid_input")?.field).toBe("key");
     expect(mappingError("repo_path_missing")?.field).toBe("path");
     expect(mappingError("cancelled")).toBeNull();
-    expect(mappingError("internal")?.message).toBeTruthy();
+    expect(mappingError("internal")?.message).toBe("Couldn't save the mapping. Try again.");
   });
 
   it("refreshes mappings when this window regains focus after another window changed them", async () => {
