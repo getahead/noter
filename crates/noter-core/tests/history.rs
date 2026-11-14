@@ -1,44 +1,27 @@
 //! FEATURE cpt-noter-feature-core-history-undo (slice 1): `history_list`, `change_undo` and
 //! `change_redo` over changes the M0/M1 write path logged, with the events that follow a commit.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter};
+use common_events::Events;
+use noter_core::{Core, CoreDeps};
 use noter_db::{ChangeMeta, Insert, Mutation};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
-use serde_json::{json, Value};
+use serde_json::json;
 #[path = "common/row.rs"]
 mod common_row;
 use common_row::row;
 
 const NOW: i64 = 1_792_137_600_000;
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn named(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(e, _)| *e == name);
-        *all = kept;
-        taken.into_iter().map(|(_, p)| p).collect()
-    }
-}
 
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());

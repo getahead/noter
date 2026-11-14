@@ -1,6 +1,8 @@
 //! FEATURE cpt-noter-feature-core-settings: app hotkeys registered at launch, set, cleared and
 //! reset, with chords checked against missing modifiers, reserved chords and conflicts.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::collections::{BTreeSet, HashMap};
@@ -8,31 +10,14 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use test_support::FixedClock;
 
-use noter_core::{Core, CoreDeps, EventEmitter, ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
+use common_events::Events;
+use noter_core::{Core, CoreDeps, ShortcutRegistrar, ShortcutTaken, DEFAULT_HOTKEYS};
 use noter_db::rusqlite::Connection;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn names(&self) -> Vec<&'static str> {
-        std::mem::take(&mut *self.0.lock().unwrap())
-            .into_iter()
-            .map(|(n, _)| n)
-            .collect()
-    }
-}
 
 /// macOS as the harness scripts it: chords other apps hold, and what Noter registered.
 #[derive(Default)]

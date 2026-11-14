@@ -1,33 +1,21 @@
 //! FEATURE cpt-noter-feature-core-ipc-host: the composition root, app snapshot, banners,
 //! whole-state versions and UI logs without content.
 
+#[path = "common/events.rs"]
+mod common_events;
 #[path = "common/test_support.rs"]
 mod test_support;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use test_support::FixedClock;
 
-use noter_core::{Clock, Core, CoreDeps, EventEmitter};
+use common_events::Events;
+use noter_core::{Clock, Core, CoreDeps};
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::{json, Value};
-
-#[derive(Default)]
-struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    fn take(&self) -> Vec<(&'static str, Value)> {
-        std::mem::take(&mut self.0.lock().unwrap())
-    }
-}
 
 fn open(dir: &Path) -> (Core, Arc<Events>) {
     let events = Arc::new(Events::default());

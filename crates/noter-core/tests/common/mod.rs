@@ -3,32 +3,11 @@ use std::path::Path;
 mod row;
 pub use row::row;
 
-use noter_core::EventEmitter;
+mod events;
+pub use events::Events;
+
 use noter_db::Insert;
 use serde_json::json;
-use serde_json::Value;
-use std::sync::Mutex;
-
-#[derive(Default)]
-pub struct Events(Mutex<Vec<(&'static str, Value)>>);
-
-impl EventEmitter for Events {
-    fn emit(&self, event: &'static str, payload: Value) {
-        self.0.lock().unwrap().push((event, payload));
-    }
-}
-
-impl Events {
-    #[allow(dead_code)] // Not every integration test needs to inspect emitted events.
-    pub fn named(&self, name: &str) -> Vec<Value> {
-        let mut all = self.0.lock().unwrap();
-        let (taken, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut *all)
-            .into_iter()
-            .partition(|(event, _)| *event == name);
-        *all = kept;
-        taken.into_iter().map(|(_, payload)| payload).collect()
-    }
-}
 
 use noter_db::rusqlite;
 
