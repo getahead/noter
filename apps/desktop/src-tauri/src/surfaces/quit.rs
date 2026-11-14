@@ -2,6 +2,7 @@
 use super::*;
 use noter_protocol::model::CaptureState;
 use noter_protocol::CallId;
+use tauri::menu::{MenuItem, PredefinedMenuItem};
 use tauri::menu::{MenuItemKind};
 
 

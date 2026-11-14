@@ -4,6 +4,7 @@ use noter_protocol::model::NavTarget;
 use noter_protocol::PermissionKind;
 use noter_core::{TrayAction, TrayEntry, TrayGlyph, TrayModel};
 use tauri::image::Image;
+use tauri::menu::{CheckMenuItem, MenuItem, MenuItemKind, PredefinedMenuItem};
 
 
 /// The core command a menu bar item runs, with its arguments from the current snapshot; `None`
@@ -194,5 +195,192 @@ pub fn settings_url(permission: PermissionKind) -> &'static str {
         PermissionKind::AutomationTerminal | PermissionKind::AutomationBrowser => {
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
         }
+    }
+}
+
+impl<R: Runtime> TauriSurfaces<R> {
+    /// Shows the latest model `set_tray` was given; on the main thread only.
+    pub(super) fn show_tray(&self) {
+        let Some(model) = lock(&self.wanted).take() else {
+            return;
+        };
+        let model = &model;
+        let mut shown = lock(&self.menu);
+        let glyph = (model.glyph, model.hidden);
+        let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
+        let menu = match shown.take() {
+            Some((old, menu)) if same_shape(&old, model) => {
+                let _ = Self::update_menu(&menu, model);
+                Some(menu)
+            }
+            _ => None,
+        };
+        let rebuilt = menu.is_none();
+        let Some(menu) = menu.or_else(|| self.menu(model).ok()) else {
+            return;
+        };
+        let mut tray = lock(&self.tray);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
+        if tray.is_none() {
+            let this = self.this.get().cloned().unwrap_or_default();
+            let builder = TrayIconBuilder::with_id("noter")
+                .icon(glyph_image(model.glyph, model.hidden))
+                .icon_as_template(true)
+                .on_menu_event(move |_, event| {
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
+                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
+                    let surfaces = this.upgrade();
+                    if let (Some(surfaces), Some(action)) =
+                        (surfaces, action_of(event.id().as_ref()))
+                    {
+                        surfaces.menu_clicked(action);
+                    }
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
+                    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
+                });
+            *tray = builder.build(&self.app).ok();
+        }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
+        if let Some(tray) = tray.as_ref() {
+            if rebuilt {
+                let _ = tray.set_menu(Some(menu.clone()));
+            }
+            if new_glyph {
+                let _ = tray.set_icon_with_as_template(Some(glyph_image(glyph.0, glyph.1)), true);
+            }
+            let _ = tray.set_title(model.title.as_deref());
+            let _ = tray.set_tooltip(Some(model.label.as_str()));
+            Self::set_accessibility_label(tray, &model.label);
+        }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
+        let floating = model
+            .item(TrayAction::UseFloatingPanel)
+            .and_then(|i| i.checked);
+        self.floating
+            .store(floating == Some(true), Ordering::Relaxed);
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
+        *shown = Some((model.clone(), menu));
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
+    }
+
+    /// A menu bar click, run as the menu bar surface.
+    // @cpt-flow:cpt-noter-flow-core-native-surfaces-menu-bar:p1
+    // @cpt-dod:cpt-noter-dod-core-native-surfaces-menu-bar:p1
+    pub(super) fn menu_clicked(&self, action: TrayAction) {
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
+        if action == TrayAction::QuitNoter {
+            quit(&self.app);
+            return;
+        }
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
+        // Not the menu lock: this runs on the main thread, which `set_tray` waits for under it.
+        let checked =
+            action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
+        let Some(core) = self.core.get().and_then(Weak::upgrade) else {
+            return;
+        };
+        tauri::async_runtime::spawn(async move {
+            let ctx = native(NativeSurface::MenuBar);
+            let Ok(snap) = core.app_snapshot(&ctx, NoArgs {}).await else {
+                return;
+            };
+            let Some((name, args)) = tray_command(action, checked, &snap) else {
+                return;
+            };
+            // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
+            // Open Call Screen ends hidden mode before it shows the window.
+            if action == TrayAction::OpenCallScreen && snap.presenting.hidden {
+                let show = json!({ "hidden": false });
+                let unhide = "app_set_hidden_for_presenting";
+                let _ = dispatch_json(core.as_ref(), &ctx, unhide, show, None).await;
+            }
+            // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
+            // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
+            // shows the item disabled at the next update.
+            let _ = dispatch_and_record(core.as_ref(), &ctx, name, args).await;
+        });
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
+        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
+        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
+        // Every item runs one command as the menu bar and opens no dialog but the quit alert.
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
+        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
+        // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
+    }
+
+    pub(super) fn menu(&self, tray: &TrayModel) -> tauri::Result<Menu<R>> {
+        let app = &self.app;
+        let menu = Menu::new(app)?;
+        for entry in &tray.entries {
+            match entry {
+                TrayEntry::Line(line) => {
+                    menu.append(&MenuItem::new(app, line, false, None::<&str>)?)?;
+                }
+                TrayEntry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
+                TrayEntry::Item(item) => {
+                    let id = format!("{:?}", item.action);
+                    debug_assert!(action_of(&id).is_some(), "tray action {id} has no click handler");
+                    let (label, key) = (&item.label, item.key.as_deref());
+                    match item.checked {
+                        Some(checked) => menu.append(&CheckMenuItem::with_id(
+                            app,
+                            id,
+                            label,
+                            item.enabled,
+                            checked,
+                            key,
+                        )?)?,
+                        None => {
+                            menu.append(&MenuItem::with_id(app, id, label, item.enabled, key)?)?
+                        }
+                    }
+                }
+            }
+        }
+        Ok(menu)
+    }
+
+    /// The new texts, states and checkmarks into the menu on screen, item by item.
+    pub(super) fn update_menu(menu: &Menu<R>, tray: &TrayModel) -> tauri::Result<()> {
+        for (entry, kind) in tray.entries.iter().zip(menu.items()?) {
+            match (entry, kind) {
+                (TrayEntry::Line(line), MenuItemKind::MenuItem(i)) => i.set_text(line)?,
+                (TrayEntry::Item(item), MenuItemKind::MenuItem(i)) => {
+                    i.set_text(&item.label)?;
+                    i.set_enabled(item.enabled)?;
+                }
+                (TrayEntry::Item(item), MenuItemKind::Check(i)) => {
+                    i.set_text(&item.label)?;
+                    i.set_enabled(item.enabled)?;
+                    i.set_checked(item.checked == Some(true))?;
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    /// The VoiceOver label of the status item's button (tray-icon sets only its tooltip).
+    pub(super) fn set_accessibility_label(tray: &TrayIcon<R>, label: &str) {
+        let label = label.to_string();
+        let _ = tray.with_inner_tray_icon(move |inner| {
+            if let Some(item) = inner.ns_status_item() {
+                let label = objc2_foundation::NSString::from_str(&label);
+                // SAFETY: `button` and `setAccessibilityLabel:` are NSStatusItem and NSView API
+                // taking and returning objects; this runs on the main thread (the tray's).
+                unsafe {
+                    let button: Option<objc2::rc::Retained<objc2::runtime::AnyObject>> =
+                        objc2::msg_send![&*item, button];
+                    if let Some(button) = button {
+                        let _: () = objc2::msg_send![&*button, setAccessibilityLabel: &*label];
+                    }
+                }
+            }
+        });
     }
 }

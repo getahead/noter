@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
-use noter_core::{Core, Notification, Placement, Surfaces, TrayAction, TrayEntry, TrayModel};
+use noter_core::{Core, Notification, Placement, Surfaces, TrayModel};
 use noter_native::ParentWindow;
 use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
@@ -18,7 +18,7 @@ use noter_protocol::model::{
 };
 use noter_protocol::{CoreError, DisplayId, NoArgs};
 use serde_json::{json, Value};
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
+use tauri::menu::Menu;
 use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{
     AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, WebviewUrl, WebviewWindow,
@@ -298,320 +298,28 @@ impl<R: Runtime> TauriSurfaces<R> {
         hidden.retain(|l| *l != label);
     }
 
-    /// Shows the latest model `set_tray` was given; on the main thread only.
-    fn show_tray(&self) {
-        let Some(model) = lock(&self.wanted).take() else {
-            return;
-        };
-        let model = &model;
-        let mut shown = lock(&self.menu);
-        let glyph = (model.glyph, model.hidden);
-        let new_glyph = shown.as_ref().map(|(m, _)| (m.glyph, m.hidden)) != Some(glyph);
-        let menu = match shown.take() {
-            Some((old, menu)) if same_shape(&old, model) => {
-                let _ = Self::update_menu(&menu, model);
-                Some(menu)
-            }
-            _ => None,
-        };
-        let rebuilt = menu.is_none();
-        let Some(menu) = menu.or_else(|| self.menu(model).ok()) else {
-            return;
-        };
-        let mut tray = lock(&self.tray);
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
-        if tray.is_none() {
-            let this = self.this.get().cloned().unwrap_or_default();
-            let builder = TrayIconBuilder::with_id("noter")
-                .icon(glyph_image(model.glyph, model.hidden))
-                .icon_as_template(true)
-                .on_menu_event(move |_, event| {
-                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
-                    // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
-                    let surfaces = this.upgrade();
-                    if let (Some(surfaces), Some(action)) =
-                        (surfaces, action_of(event.id().as_ref()))
-                    {
-                        surfaces.menu_clicked(action);
-                    }
-                    // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-user-start
-                    // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-item
-                });
-            *tray = builder.build(&self.app).ok();
-        }
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-user-check
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-user-open
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
-        if let Some(tray) = tray.as_ref() {
-            if rebuilt {
-                let _ = tray.set_menu(Some(menu.clone()));
-            }
-            if new_glyph {
-                let _ = tray.set_icon_with_as_template(Some(glyph_image(glyph.0, glyph.1)), true);
-            }
-            let _ = tray.set_title(model.title.as_deref());
-            let _ = tray.set_tooltip(Some(model.label.as_str()));
-            Self::set_accessibility_label(tray, &model.label);
-        }
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-core-show
-        let floating = model
-            .item(TrayAction::UseFloatingPanel)
-            .and_then(|i| i.checked);
-        self.floating
-            .store(floating == Some(true), Ordering::Relaxed);
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
-        *shown = Some((model.clone(), menu));
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-check-state:p1:inst-return-check
-    }
-
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
         window(&self.app, label)
     }
 
-    /// The record prompt on the display without the call app, 12 pt inside its visible frame.
-    fn place_prompt(&self, prompt: &WebviewWindow<R>, call_display: Option<&DisplayId>) {
-        let (w, h) = *lock(&self.prompt_size);
-        let displays = noter_native::displays();
-        let Some(display) = prompt_display(&displays, call_display) else {
-            return;
-        };
-        let id = display.id.clone();
-        let app = self.app.clone();
-        let prompt = prompt.clone();
-        let _ = app.run_on_main_thread(move || {
-            if let Some(screen) = noter_native::display_visible_frame(&id) {
-                Self::place(&prompt, prompt_frame(&screen, (w, h)));
-            }
-        });
-    }
 
-    fn place(window: &WebviewWindow<R>, (x, y, w, h): (f64, f64, f64, f64)) {
-        let _ = window.set_size(LogicalSize::new(w, h));
-        let _ = window.set_position(LogicalPosition::new(x, y));
-    }
-
-    fn place_call(&self, placement: &Placement, collapsed: bool) {
-        let Some(window) = self.window(WindowLabel::CallScreen) else {
-            return;
-        };
-        let layout = placement.layout;
-        let displays = noter_native::displays();
-        let Some(display) =
-            display_for(placement.display_id.as_ref(), &displays).map(|d| d.id.clone())
-        else {
-            return;
-        };
-        let saved = self.frames.get(&display, layout);
-        let app = self.app.clone();
-        let window = window.clone();
-        let frame_display = display.clone();
-        let _ = app.run_on_main_thread(move || {
-            let Some(visible) = noter_native::display_visible_frame(&frame_display) else {
-                return;
-            };
-            // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-            let frame = bounded_call_frame(
-                if collapsed {
-                    collapsed_frame(saved.unwrap_or_else(|| call_frame(layout, false, &visible)))
-                } else {
-                    saved.unwrap_or_else(|| call_frame(layout, false, &visible))
-                },
-                layout,
-                collapsed,
-                &visible,
-            );
-            // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-            match layout {
-                CallLayout::Floating if collapsed => {
-                    let _ = window.set_min_size(Some(LogicalSize::new(300.0, STRIP.1)));
-                    let _ = window.set_max_size(Some(LogicalSize::new(600.0, STRIP.1)));
-                }
-                CallLayout::Floating => {
-                    let _ = window.set_min_size(Some(LogicalSize::new(340.0, 300.0)));
-                    let _ = window.set_max_size(Some(LogicalSize::new(600.0, f64::MAX)));
-                }
-                CallLayout::Dedicated => {
-                    let _ = window.set_min_size(None::<LogicalSize<f64>>);
-                    let _ = window.set_max_size(None::<LogicalSize<f64>>);
-                }
-            }
-            Self::place(&window, frame);
-        });
-        *lock(&self.placed) = (!collapsed).then_some((display, layout));
-    }
-
-    /// On quit: the frames the user left are written.
-    pub fn save_frames(&self) {
-        self.frames.save();
-    }
-
-    /// The user moved or resized the call window: its frame is saved for that display and layout.
-    // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-    pub fn call_window_changed(&self, window: &tauri::Window<R>) {
-        let Some((display, layout)) = lock(&self.placed).clone() else {
-            return;
-        };
-        let scale = window.scale_factor().unwrap_or(1.0);
-        let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) else {
-            return;
-        };
-        let (pos, size) = (pos.to_logical::<f64>(scale), size.to_logical::<f64>(scale));
-        self.frames
-            .remember(&display, layout, (pos.x, pos.y, size.width, size.height));
-    }
-    // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
-
-    /// A menu bar click, run as the menu bar surface.
-    // @cpt-flow:cpt-noter-flow-core-native-surfaces-menu-bar:p1
-    // @cpt-dod:cpt-noter-dod-core-native-surfaces-menu-bar:p1
-    fn menu_clicked(&self, action: TrayAction) {
-        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
-        if action == TrayAction::QuitNoter {
-            quit(&self.app);
-            return;
-        }
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-case-quit
-        // Not the menu lock: this runs on the main thread, which `set_tray` waits for under it.
-        let checked =
-            action == TrayAction::UseFloatingPanel && self.floating.load(Ordering::Relaxed);
-        let Some(core) = self.core.get().and_then(Weak::upgrade) else {
-            return;
-        };
-        tauri::async_runtime::spawn(async move {
-            let ctx = native(NativeSurface::MenuBar);
-            let Ok(snap) = core.app_snapshot(&ctx, NoArgs {}).await else {
-                return;
-            };
-            let Some((name, args)) = tray_command(action, checked, &snap) else {
-                return;
-            };
-            // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
-            // Open Call Screen ends hidden mode before it shows the window.
-            if action == TrayAction::OpenCallScreen && snap.presenting.hidden {
-                let show = json!({ "hidden": false });
-                let unhide = "app_set_hidden_for_presenting";
-                let _ = dispatch_json(core.as_ref(), &ctx, unhide, show, None).await;
-            }
-            // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-open-call
-            // A refusal (the call ended meanwhile) is an answer, not a failure: the menu
-            // shows the item disabled at the next update.
-            let _ = dispatch_and_record(core.as_ref(), &ctx, name, args).await;
-        });
-        // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-menu-click
-        // @cpt-begin:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
-        // @cpt-begin:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
-        // Every item runs one command as the menu bar and opens no dialog but the quit alert.
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-return-start
-        // @cpt-end:cpt-noter-flow-ui-menu-bar-control-recording:p1:inst-return-control
-    }
-    // @cpt-end:cpt-noter-flow-core-native-surfaces-menu-bar:p1:inst-return-menu
-
-    fn menu(&self, tray: &TrayModel) -> tauri::Result<Menu<R>> {
-        let app = &self.app;
-        let menu = Menu::new(app)?;
-        for entry in &tray.entries {
-            match entry {
-                TrayEntry::Line(line) => {
-                    menu.append(&MenuItem::new(app, line, false, None::<&str>)?)?;
-                }
-                TrayEntry::Separator => menu.append(&PredefinedMenuItem::separator(app)?)?,
-                TrayEntry::Item(item) => {
-                    let id = format!("{:?}", item.action);
-                    debug_assert!(action_of(&id).is_some(), "tray action {id} has no click handler");
-                    let (label, key) = (&item.label, item.key.as_deref());
-                    match item.checked {
-                        Some(checked) => menu.append(&CheckMenuItem::with_id(
-                            app,
-                            id,
-                            label,
-                            item.enabled,
-                            checked,
-                            key,
-                        )?)?,
-                        None => {
-                            menu.append(&MenuItem::with_id(app, id, label, item.enabled, key)?)?
-                        }
-                    }
-                }
-            }
-        }
-        Ok(menu)
-    }
-
-    /// The new texts, states and checkmarks into the menu on screen, item by item.
-    fn update_menu(menu: &Menu<R>, tray: &TrayModel) -> tauri::Result<()> {
-        for (entry, kind) in tray.entries.iter().zip(menu.items()?) {
-            match (entry, kind) {
-                (TrayEntry::Line(line), MenuItemKind::MenuItem(i)) => i.set_text(line)?,
-                (TrayEntry::Item(item), MenuItemKind::MenuItem(i)) => {
-                    i.set_text(&item.label)?;
-                    i.set_enabled(item.enabled)?;
-                }
-                (TrayEntry::Item(item), MenuItemKind::Check(i)) => {
-                    i.set_text(&item.label)?;
-                    i.set_enabled(item.enabled)?;
-                    i.set_checked(item.checked == Some(true))?;
-                }
-                _ => {}
-            }
-        }
-        Ok(())
-    }
-
-    /// The VoiceOver label of the status item's button (tray-icon sets only its tooltip).
-    fn set_accessibility_label(tray: &TrayIcon<R>, label: &str) {
-        let label = label.to_string();
-        let _ = tray.with_inner_tray_icon(move |inner| {
-            if let Some(item) = inner.ns_status_item() {
-                let label = objc2_foundation::NSString::from_str(&label);
-                // SAFETY: `button` and `setAccessibilityLabel:` are NSStatusItem and NSView API
-                // taking and returning objects; this runs on the main thread (the tray's).
-                unsafe {
-                    let button: Option<objc2::rc::Retained<objc2::runtime::AnyObject>> =
-                        objc2::msg_send![&*item, button];
-                    if let Some(button) = button {
-                        let _: () = objc2::msg_send![&*button, setAccessibilityLabel: &*label];
-                    }
-                }
-            }
-        });
-    }
 }
 
 impl<R: Runtime> Surfaces for TauriSurfaces<R> {
-    // @cpt-begin:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
-    fn show_record_prompt(&self, placement: &Placement) {
-        let Some(prompt) = self.window(WindowLabel::RecordPrompt) else {
-            return;
-        };
-        *lock(&self.prompt_call_display) = placement.display_id.clone();
-        self.place_prompt(&prompt, placement.display_id.as_ref());
-        show(&prompt, false);
-    }
-    // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
-
-    // @cpt-begin:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
     fn fit_record_prompt(&self, width: u32, height: u32) {
-        *lock(&self.prompt_size) = (f64::from(width), f64::from(height));
-        if let Some(prompt) = self
-            .app
-            .get_webview_window(WindowLabel::RecordPrompt.as_str())
-        {
-            let call_display = lock(&self.prompt_call_display).clone();
-            self.place_prompt(&prompt, call_display.as_ref());
-        }
+        self.fit_record_prompt_impl(width, height);
     }
-    // @cpt-end:cpt-noter-algo-core-native-surfaces-panels:p1:inst-fit
 
-    fn set_fix_term_enabled(&self, enabled: bool) {
-        if let Some(MenuItemKind::MenuItem(item)) =
-            self.app.menu().and_then(|menu| menu.get(APP_FIX_TERM))
-        {
-            let _ = item.set_enabled(enabled);
-        }
+    fn show_record_prompt(&self, placement: &Placement) {
+        self.show_record_prompt_impl(placement);
+    }
+
+    fn show_call_window(&self, placement: &Placement) {
+        self.show_call_window_impl(placement);
+    }
+
+    fn place_call_window(&self, placement: &Placement, collapsed: bool) {
+        self.place_call_window_impl(placement, collapsed);
     }
 
     fn close_record_prompt(&self) {
@@ -624,21 +332,10 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
-    fn show_call_window(&self, placement: &Placement) {
-        self.place_call(placement, false);
-        if let Some(window) = self.window(WindowLabel::CallScreen) {
-            show(&window, false);
-        }
-    }
-
     fn make_call_window_key(&self) {
         if let Some(window) = self.window(WindowLabel::CallScreen) {
             show(&window, true);
         }
-    }
-
-    fn place_call_window(&self, placement: &Placement, collapsed: bool) {
-        self.place_call(placement, collapsed);
     }
 
     fn hide_call_window(&self) {
