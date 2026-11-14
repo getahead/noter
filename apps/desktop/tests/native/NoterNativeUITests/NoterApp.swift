@@ -181,14 +181,16 @@ class NoterTestCase: XCTestCase {
     /// The call window: a non-activating panel, which the accessibility tree lists as a dialog, not a window.
     var callWindow: XCUIElement { app.dialogs.matching(NSPredicate(format: "label != %@", "Record this call?")).firstMatch }
 
-    /// The native alert the app shows: a sheet on its window, or a dialog when no window parents it (the one with
-    /// **Cancel**: the call panel is a dialog too). One lazy query, so a wait sees the alert whenever it appears.
-    var alert: XCUIElement {
+    /// The native alert containers (sheets or unparented dialogs) that have a **Cancel** button. Querying these
+    /// containers lets tests count alerts without counting unrelated app buttons that share the same label.
+    var alerts: XCUIElementQuery {
         let sheetOrDialog = NSPredicate(format: "elementType == %d OR elementType == %d",
                                         XCUIElement.ElementType.sheet.rawValue, XCUIElement.ElementType.dialog.rawValue)
         return app.descendants(matching: .any).matching(sheetOrDialog)
-            .containing(NSPredicate(format: "title == 'Cancel' OR label == 'Cancel'")).firstMatch
+            .containing(NSPredicate(format: "title == 'Cancel' OR label == 'Cancel'"))
     }
+
+    var alert: XCUIElement { alerts.firstMatch }
 
     /// The record prompt: a panel titled Noter around the group “Record this call?”.
     var recordPrompt: XCUIElement { app.dialogs.containing(NSPredicate(format: "label == 'Record this call?'")).firstMatch }

@@ -33,11 +33,11 @@ final class DialogsTests: NoterTestCase {
         closeMenu()
         app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5))
-        let cancelButtons = app.buttons.matching(identifier: "Cancel")
+        let quitAlerts = alerts
         app.typeKey("q", modifierFlags: .command)
-        XCTAssertEqual(cancelButtons.count, 1, "a repeated quit request must not queue another alert")
+        XCTAssertEqual(quitAlerts.count, 1, "a repeated quit request must not queue another alert")
         alert.buttons["Cancel"].click()
-        XCTAssertTrue(waitUntil(5) { cancelButtons.count == 0 }, "Cancel should close the only quit alert")
+        XCTAssertTrue(waitUntil(5) { quitAlerts.count == 0 }, "Cancel should close the only quit alert")
         XCTAssertTrue(recordingLine(in: openMenu()).exists, "Cancel keeps the recording active")
     }
 
