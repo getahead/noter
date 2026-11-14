@@ -543,12 +543,12 @@ mod account_tests {
         };
         assert!(matches!(
             cli.login(AccountProvider::Claude).await,
-            Err(CliError::Failed(_))
+            Err(CliError::Failed(message)) if message == "sign-in sessions arrive with slice 2"
         ));
         cli.cancel(AccountProvider::Claude);
         assert!(matches!(
             cli.logout(AccountProvider::Claude).await,
-            Err(CliError::Failed(_))
+            Err(CliError::Failed(message)) if message == "sign-out arrives with slice 2"
         ));
         assert!(!marker.exists(), "placeholder methods must not run the CLI");
     }
