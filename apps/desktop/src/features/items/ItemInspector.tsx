@@ -69,6 +69,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
   const apply = async (item: ItemView, patch: ItemPatch) => {
     const err = await applyPatch(bridge, item, patch);
     if (err) setSaved(err);
+    else if (draftBase.current) draftBase.current = { ...(bridge.store.getState().entities.item[itemId] ?? item) };
   };
   const save = async () => {
     if (saved === "saving") return;

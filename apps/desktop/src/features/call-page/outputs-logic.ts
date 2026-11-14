@@ -1,6 +1,6 @@
 // Pure rules of the call page outputs: section order, counts, progress events and the word diff. Nothing here reads
 // the store or draws.
-import type { CallOutputs, CallRow, OutputSection, OutputsProgress, RuntimeChoice, SectionKind, UiPrefs, VersionMeta } from "../../core/bindings";
+import type { CallOutputs, CallRow, ItemView, OutputSection, OutputsProgress, RuntimeChoice, SectionKind, UiPrefs, VersionMeta } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { clock, t } from "../../i18n/format";
 
@@ -41,6 +41,12 @@ export function sectionCounts(s: OutputSection): { shown: number; review: number
   return { shown: s.items.length - rejected, review, rejected };
   // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-count
 }
+
+/** Use the item store after a review mutation, while keeping the output snapshot as fallback. */
+// @cpt-begin:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-count
+export const currentItems = (items: ItemView[], records: Record<string, ItemView>): ItemView[] =>
+  items.map((item) => (records[item.id]?.rev >= item.rev ? records[item.id]! : item));
+// @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-count
 
 /** `outputs:progress` for this call and section: its state changes and the text it already had stays. Another call's event returns the same array. */
 export function applyProgress(sections: OutputSection[], callId: string, e: OutputsProgress): OutputSection[] {

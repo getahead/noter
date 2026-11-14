@@ -77,6 +77,7 @@ export async function review(bridge: Bridge, item: ItemView, decision: ReviewDec
   // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-restore
   // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-reject
   // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-accept
+  holdUndo({ target: changeOf(res.data), message: t(key ?? "items.restore"), refresh: async () => { await refresh(bridge, it.id); } });
   return res;
 }
 
@@ -139,6 +140,7 @@ export async function reopen(bridge: Bridge, item: ItemView) {
   // @cpt-end:cpt-noter-state-ui-items-completion:p1:inst-reopen
   if (res.status !== "ok") return void (await failed(bridge, it.id, res.error.code));
   patchLocal(it.id, { error: undefined, outcome: { text: t("items.outcome.reopened"), target: changeOf(res.data), ms: OUTCOME_MS } });
+  holdUndo({ target: changeOf(res.data), message: t("items.outcome.reopened"), refresh: async () => { await refresh(bridge, it.id); } });
   // @cpt-end:cpt-noter-flow-ui-items-status:p1:inst-reopen
 }
 
@@ -176,6 +178,7 @@ export async function saveDraft(bridge: Bridge, item: ItemView, draft: Draft, th
       return res.error.code === "conflict" ? "conflict" : "failed";
       // @cpt-end:cpt-noter-algo-ui-items-save:p1:inst-conflict
     }
+    holdUndo({ target: changeOf(res.data), message: t("items.outcome.saved"), refresh: async () => { await refresh(bridge, it.id); } });
   }
   // @cpt-begin:cpt-noter-algo-ui-items-save:p1:inst-return
   // @cpt-begin:cpt-noter-state-ui-items-review:p1:inst-separate
@@ -219,7 +222,10 @@ export async function editItem(bridge: Bridge, item: ItemView, patch: ItemPatch)
   // @cpt-begin:cpt-noter-flow-ui-items-evidence:p1:inst-edit
   const res = await bridge.act(`item:edit:${item.id}`, "item_edit", () => bridge.core.itemEdit({ item_id: item.id, rev: item.rev, patch }), { entity: "item" });
   // @cpt-end:cpt-noter-flow-ui-items-evidence:p1:inst-edit
-  if (res.status === "ok") return "ok";
+  if (res.status === "ok") {
+    holdUndo({ target: changeOf(res.data), message: t("items.outcome.saved"), refresh: async () => { await refresh(bridge, item.id); } });
+    return "ok";
+  }
   if (res.error.code === "conflict") await refresh(bridge, item.id);
   return res.error.code === "conflict" ? "conflict" : res.error.code === "invalid_input" ? "invalid" : "failed";
 }

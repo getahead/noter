@@ -149,7 +149,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 1. [x] - `p1` - User opens Share or invokes ⌘⇧C, ⌥⌘C, ⌥⇧⌘C or ⌘E; resolve scope from the invoking control and current row selection - `inst-scope`
 2. [x] - `p1` - Show the scope first, then unreviewed/sensitive notices, three copy formats and Export; keep normal ⌘C as standard text copy - `inst-menu`
 3. [x] - `p1` - User copies; API: `share_copy` with call id, scope and format; set include_unreviewed only when the shown scope notice makes their inclusion explicit - `inst-copy`
-4. [x] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice and offer Start Review through Items; never silently change the requested inclusion - `inst-review`
+4. [x] - `p1` - **IF** `unreviewed_in_scope`: keep the scope, show its notice beside the invoking control and in the menu, and offer Start Review through Items; never silently change the requested inclusion - `inst-review`
 5. [x] - `p1` - **IF** copy succeeds: core writes rich and plain clipboard formats; show **Copied for Slack**, **Copied for Jira** or **Copied as Markdown** on the invoking control for 2 s, announced politely - `inst-copied`
 6. [x] - `p1` - User exports; open Export with its scope, require at least one content checkbox; call `calls_export` with call_ids, include options and scope, or null scope for whole call - `inst-export`
 7. [x] - `p1` - **IF** save panel is cancelled: **RETURN** no exported status; **IF** export fails: retain options and show retry - `inst-cancel`
@@ -215,7 +215,7 @@ Owner decision (6 Nov): the former step "invalid input focuses the first invalid
 **Steps**:
 1. [x] - `p1` - Keep Summary, Decisions, Action items, Open questions, Per participant, optional Risks, call-type extras and Marked moments in their defined order; role reviews use the separate M4 view - `inst-order`
 2. [x] - `p1` - Apply progress only to its call and section; hydrate bodies with outputs_get and ignore reads superseded by navigation or newer state - `inst-progress`
-3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only; hide review controls while still writing or when none remain - `inst-count`
+3. [x] - `p1` - Count only visible non-rejected rows; review counts include suggestions only and use current store records when newer than output rows; hide review controls while still writing or when none remain - `inst-count`
 4. [x] - `p1` - Resolve invocation scope: section means its SectionKind; row means its id or the selection containing it; toolbar means selected ids or Whole call - `inst-scope`
 5. [x] - `p1` - Remove stale/deleted/rejected ids from the selection and name the remaining scope; do not silently broaden an emptied selection to Whole call - `inst-selection`
 6. [x] - `p1` - **RETURN** the scope and current readiness; core remains responsible for filtering rejected items and formatting the clipboard - `inst-return`

@@ -129,6 +129,26 @@ export function inspectorFocus(quiet: { current: boolean } | undefined, open: bo
   return openFocus(open && mine, inspector, getActive);
 }
 
+/** Focus a transient inspector when its definition replaces the page inspector. Its explicit close handler owns return focus. */
+// @cpt-flow:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1
+export function inspectorDefinitionFocus(
+  quiet: { current: boolean } | undefined,
+  open: boolean,
+  override: boolean,
+  previousOverride: boolean,
+  inspector: Parameters<typeof openFocus>[1],
+  getActive: () => FocusTarget | null,
+): (() => void) | undefined {
+  if (!open) return;
+  if (override) {
+    inspector?.focus();
+    return;
+  }
+  // Closing an override reveals the page's still-open dock; don't take focus away from the override's return target.
+  if (previousOverride) return;
+  return inspectorFocus(quiet, true, inspector, getActive);
+}
+
 /** A page's default inspector docks open without taking focus; there is nothing to silence when it is open already. */
 export function dockQuietly(quiet: { current: boolean }, inspectorOpen: boolean, dispatch: (e: ShellEvent) => void): void {
   quiet.current = !inspectorOpen;

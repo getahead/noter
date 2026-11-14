@@ -277,7 +277,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             )}
             {/* @cpt-end:cpt-noter-flow-ui-core-bridge-open-window:p1:inst-skeleton */}
           </div>
-          <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => (override ? closeInspector() : dispatch({ type: "close-inspector" }))} quietOpen={quietOpen} />
+          <InspectorSlot def={inspector} route={route} bridge={bridge} overlay={layout.inspector === "overlay"} onClose={() => (override ? closeInspector() : dispatch({ type: "close-inspector" }))} quietOpen={quietOpen} isOverride={!!override} />
         </div>
       </div>
     </div>

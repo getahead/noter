@@ -14,7 +14,7 @@ import { runExport } from "./share-actions";
 import { undoMode } from "../history/undo";
 import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { deleteAudio, exportCall, setTags } from "./share-actions";
-import { exportOpener, runShare, setShareStatus } from "./share-run";
+import { exportOpener, runShare, setShareStatus, unreviewedIn } from "./share-run";
 import { SearchField, type SearchFieldProps } from "../../ui/primitives/search-field";
 import { find, rendered } from "../../ui/testing";
 import { ShareMenu, shareItems } from "./ShareMenu";
@@ -75,10 +75,20 @@ describe("Share", () => {
     await runShare(bridge, id, { type: "section", kind: "decisions" }, "slack");
     const copies = () => seen.filter(([c]) => c === "share_copy").map(([, a]) => (a as { scope: { include_unreviewed: boolean } }).scope.include_unreviewed);
     expect(copies()).toEqual([false]);
+    expect(renderToString(<ShareMenu bridge={bridge} callId={id} origin={{ type: "section", kind: "decisions" }} id="section-share" />)).toContain("Includes 2 suggested items not reviewed yet");
     const items = shareItems({ origin: { type: "section", kind: "decisions" }, ready: true, sensitive: false, unreviewed: 2, status: { callId: id, origin: whole, kind: "unreviewed", count: 2, format: "slack" }, copy: () => {}, exportIt: () => {} });
     expect(labels(items)).toEqual(expect.arrayContaining(["Decisions", "Includes 2 suggested items not reviewed yet", "Copy anyway", "Start Review"]));
     await runShare(bridge, id, { type: "section", kind: "decisions" }, "slack", true);
     expect(copies()).toEqual([false, true]);
+  });
+
+  it("counts the newer store item state over the output snapshot for the Share notice", async () => {
+    const suggested = { ...row("A", "suggested"), rev: 1 };
+    await open([sec("decisions", { items: [suggested] })]);
+    setShareStatus({ callId: id, origin: { type: "section", kind: "decisions" }, kind: "unreviewed", count: 1, format: "slack" });
+    bridge.store.setState((s) => ({ ...s, entities: { ...s.entities, item: { ...s.entities.item, [suggested.id]: { ...suggested, review: "accepted", rev: 2 } } } }));
+    expect(unreviewedIn(id, { type: "section", kind: "decisions" }, bridge.store.getState().entities.item)).toBe(0);
+    expect(renderToString(<ShareMenu bridge={bridge} callId={id} origin={{ type: "section", kind: "decisions" }} id="section-share" />)).not.toContain("Includes 1 suggested item");
   });
 
   it("lists the scope, the three copies with their keys and Export…, disabled until ready", () => {
@@ -231,12 +241,17 @@ describe("Tags field actions", () => {
 describe("Share control feedback", () => {
   it("routes each menu format and explicit Copy anyway to the requested copy action", () => {
     const copied: unknown[] = [];
-    const items = shareItems({ origin: whole, ready: true, sensitive: false, unreviewed: 2, status: { callId: "c", origin: whole, kind: "unreviewed", count: 2, format: "jira" }, copy: (format, include) => copied.push([format, include]), exportIt: () => {} });
+    const started: string[] = [];
+    const items = shareItems({ origin: whole, ready: true, sensitive: false, unreviewed: 2, status: { callId: "c", origin: whole, kind: "unreviewed", count: 2, format: "jira" }, copy: (format, include) => copied.push([format, include]), exportIt: () => {}, startReview: () => started.push("review") });
     for (const label of ["Copy for Slack", "Copy for Jira", "Copy as Markdown", "Copy anyway"]) {
       const item = items.find((i) => "label" in i && i.label === label) as { onSelect: () => void };
       item.onSelect();
     }
     expect(copied).toEqual([["slack", undefined], ["jira", undefined], ["markdown", undefined], ["jira", true]]);
+    const startReview = items.find((i) => "label" in i && i.label === "Start Review") as { disabled?: boolean; onSelect?: () => void };
+    expect(startReview.disabled).toBeFalsy();
+    startReview.onSelect?.();
+    expect(started).toEqual(["review"]);
   });
 
   it("expires feedback only on its matching section control", async () => {

@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { Banner } from "../../ui/feedback/inline-banner";
-import { rendered } from "../../ui/testing";
+import { find, rendered } from "../../ui/testing";
 import { loadOutputs } from "../call-page/outputs-actions";
 import { holdOutputs, resetOutputsCache } from "../call-page/outputs-cache";
 import { resetUndo } from "../history/undo";
@@ -119,6 +119,17 @@ describe("review banner (PC-R2)", () => {
     actions[1]!.onAction?.();
     await new Promise((r) => setTimeout(r));
     expect(seen).toContain("items_review_all");
+  });
+
+  it("Start Review from the Transcript banner navigates to Summary when no item row is mounted", async () => {
+    await ready();
+    await loadItems(bridge, "call_live");
+    const tree = rendered(CallBanners, { route: { section: "library", key: "call:call_live:transcript" }, bridge, appBanners: 0 });
+    const banners = find(tree, (p) => Array.isArray(p.banners)).props.banners as Banner[];
+    const navigate = vi.spyOn(bridge.core, "windowNavigate");
+    banners.find((banner) => banner.id === "review")!.actions![0]!.onAction?.();
+    await new Promise((resolve) => setTimeout(resolve));
+    expect(navigate).toHaveBeenCalledWith({ target: { type: "call_page", call_id: "call_live", tab: "summary" } });
   });
 
   it("a call page without suggestions draws no banner slot", async () => {

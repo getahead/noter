@@ -74,7 +74,7 @@ export function useReviewBanner(bridge: Bridge, callId: string): Banner | null {
     dismissible: false,
     text: batch?.error ? errorText(batch.error.code ?? "internal") : t("items.banner", { count: waiting }),
     actions: [
-      { label: t("items.start_review"), onAction: () => void startReview() },
+      { label: t("items.start_review"), onAction: () => startReview() || void openReview(bridge, callId) },
       { label: t(batch?.error ? "action.try_again" : "items.accept_all"), loading: batch?.state === "WAITING", onAction: () => void reviewAll(bridge, callId, []) },
     ],
   };

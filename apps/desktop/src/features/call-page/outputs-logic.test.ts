@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView, OutputSection, SectionKind } from "../../core/bindings";
-import { applyProgress, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
+import { applyProgress, currentItems, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
@@ -30,6 +30,13 @@ describe("sectionCounts", () => {
     const s = sec("action_items", { state: { type: "writing" }, items: [item("suggested")] });
     expect(sectionCounts(s).review).toBe(0);
   });
+});
+
+it("uses the newer current item record for counts after a review", () => {
+  const held = { ...item("suggested"), rev: 1 };
+  const accepted = { ...held, review: "accepted", rev: 2 } as ItemView;
+  expect(sectionCounts(sec("action_items", { items: [held] })).review).toBe(1);
+  expect(sectionCounts(sec("action_items", { items: currentItems([held], { [held.id]: accepted }) })).review).toBe(0);
 });
 
 describe("applyProgress", () => {

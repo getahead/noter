@@ -82,16 +82,17 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 **Actor**: Primary user
 
 **Success Scenarios**:
-- **Start Review** focuses the first suggestion. A accepts; E edits; R rejects; ⇧A accepts the section. **Accept All** in the banner accepts all suggestions as one batch.
+- **Start Review** focuses the first suggestion on Summary; from another call tab it opens Summary, then focuses that suggestion. A accepts; E edits; R rejects; ⇧A accepts the section. **Accept All** in the banner accepts all suggestions as one batch.
 - No suggestions: no banner, review count or Accept All; pinned and user-created items arrive accepted.
+- Review counts and Share notices use the current store item when it is newer than the output snapshot.
 
 **Error Scenarios**:
-- Rejected by mistake: **Rejected · Undo** for 10 s, then **Rejected (1)** with **Restore**.
+- Rejected by mistake: **Rejected · Undo** for 10 s, then **Rejected (1)** with **Restore**; ⌘Z also reverses review, reopen and saved edits before older changes.
 - Regeneration preserves accepted and edited items and rejected suppression; **1 item not suggested again because you rejected it** comes from core state.
 
 **Steps**:
 1. [x] - `p1` - Read `items_list` for the call, with page cursors, and render the core review states; **Start Review** selects the first suggested row in section order - `inst-list`
-2. [x] - `p1` - **MATCH** the focused row action, outside text inputs and input-method composition - `inst-action`
+2. [x] - `p1` - **MATCH** the focused row action, outside text inputs and input-method composition; Space toggles action-item completion and Return opens evidence - `inst-action`
    1. [x] - `p1` - **CASE** A or **Accept**: `item_review` with item id, current rev and **accept**; show **Accepted** for 4 s and move focus to the next suggestion - `inst-accept`
    2. [x] - `p1` - **CASE** R or **Reject**: `item_review` with **reject**; show **Rejected · Undo** for 10 s, then fold into **Rejected (n)**; move focus to the next suggestion - `inst-reject`
    3. [x] - `p1` - **CASE** E on a full action row: fields for text, Owner, Due and Engineering; Cancel or Esc discards the draft; Save or ⌘Return invokes the edit process - `inst-edit`
@@ -122,8 +123,8 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
    1. [x] - `p1` - Show **Yes, Landed**, **Done Another Way**, **Keep Open**; send `item_answer_handoff_landed` with current rev and **landed**, **done_another_way** or **keep_open** - `inst-answer`
 3. [x] - `p1` - **ELSE**: `item_set_done` with current rev and the desired done state; never send a toggle - `inst-done`
 4. [x] - `p1` - Render the returned item and retain its change id for Undo; Today moves it into Done today after the inline feedback - `inst-result`
-5. [x] - `p1` - **IF** the user chooses **Reopen** on closed_by_evidence or answered_in_call: `item_reopen` with current rev, then **Reopened · Undo** - `inst-reopen`
-6. [x] - `p1` - **IF** the user chooses **Add Action Item**: show **What needs doing, and who does it?**; trim and require text; Return or Add calls `item_create` for action_item with the user's existing person reference - `inst-create`
+5. [x] - `p1` - **IF** the user chooses **Reopen** on closed_by_evidence or answered_in_call: `item_reopen` with current rev, register its returned change for ⌘Z and row Undo, then **Reopened · Undo** - `inst-reopen`
+6. [x] - `p1` - **IF** the user chooses **Add Action Item**: show **What needs doing, and who does it?**; trim and require text; Return or Add calls `item_create` for action_item with the user's existing person reference; prevent duplicate submissions while the request is in flight - `inst-create`
 7. [x] - `p1` - **IF** an operation fails: keep the previous view and draft, show the named error and allow explicit retry after refresh - `inst-failure`
 8. [x] - `p1` - **RETURN** the core item; row Undo uses the returned change target through History, preserving prior review and handoff state - `inst-return`
 
@@ -145,7 +146,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 1. [x] - `p1` - User opens (i) or ⌘I; `item_get` returns the item, evidence and initial history - `inst-get`
 2. [x] - `p1` - UI: action details include text, Owner, Due with calendar button, Status, Linked issue and its automatic-close helper, Engineering with Handoff, review actions, Evidence, source quote and handoff record - `inst-details`
 3. [x] - `p1` - For decisions and questions show text, Linked issue, evidence and quote; omit Owner, Due, Status and Engineering - `inst-kind`
-4. [x] - `p1` - User changes Owner, Status or Engineering; apply supported commands immediately; text, Due and Linked issue wait for Save - `inst-edit`
+4. [x] - `p1` - User changes Owner, Status or Engineering; apply supported commands immediately and advance any pending draft's base revision; text, Due and Linked issue wait for Save - `inst-edit`
 5. [x] - `p1` - User chooses History; mount the item variant of the history timeline with actor pop-up, no job filter and no export - `inst-history`
 6. [x] - `p1` - User opens a provenance time; `transcript_span` with its TimeSpan resolves current segments rather than a cached row index; navigate to Transcript and focus the first resolved line - `inst-resolve`
 7. [x] - `p1` - **IF** audio is unavailable: show the deletion or never-stored line and omit play; **ELSE** Space uses the existing playback flow and safety rules - `inst-audio`
@@ -165,7 +166,7 @@ It implements `cpt-noter-component-ui-action-item-row`, `cpt-noter-component-ui-
 
 **Steps**:
 1. [x] - `p1` - Require non-empty trimmed text; map cleared Owner, Due and Linked issue to their typed clear variants, not null which leaves fields unchanged - `inst-normalize`
-2. [x] - `p1` - API: `item_edit` with base rev and only changed fields; retain the draft until success - `inst-edit`
+2. [x] - `p1` - API: `item_edit` with base rev and only changed fields; retain the draft until success and register the returned change for ⌘Z - `inst-edit`
 3. [x] - `p1` - **IF** conflict: fetch `item_get`, keep the draft separate from current values, show **Item changed since** and require the user to save again; **RETURN** the conflict - `inst-conflict`
 4. [x] - `p1` - **IF** another error: show field validation or section retry and **RETURN** the retained draft - `inst-error`
 5. [x] - `p1` - **IF** inline review saved a suggestion: `item_review` with **accept** and the new rev; show **Saved and accepted** for 4 s only after both calls succeed - `inst-accept`

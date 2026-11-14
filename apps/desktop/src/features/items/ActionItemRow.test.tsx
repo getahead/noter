@@ -334,6 +334,17 @@ describe("rowKey (flow inst-action)", () => {
     expect(seen).toEqual([]);
   });
 
+  it("Space completes an action item and Return opens its evidence", async () => {
+    await ready();
+    const seen = sent();
+    const it = item("itm_replay");
+    rowKey(bridge, it, {}, key("Space", { key: " " }));
+    rowKey(bridge, it, {}, key("Enter", { key: "Enter" }));
+    await settle();
+    expect(seen.map(([cmd]) => cmd)).toContain("item_set_done");
+    expect(seen.map(([cmd]) => cmd)).toContain("window_navigate");
+  });
+
   it("⇧A on a suggested row accepts its kind as one batch", async () => {
     await ready();
     const seen = sent();
@@ -408,12 +419,21 @@ describe("rowKey (flow inst-action)", () => {
 describe("focusNext", () => {
   it("focuses the next suggested row in page order", () => {
     const focused: string[] = [];
-    const rows = [["a", "accepted"], ["b", "suggested"], ["c", "suggested"]].map(([id, review]) => ({ dataset: { itemId: id, review }, focus: () => focused.push(id!) }));
+    const rows = [["a", "accepted"], ["b", "suggested"], ["c", "suggested"]].map(([id, review]) => ({ dataset: { itemId: id, review }, focus: () => focused.push(id!), closest: () => null }));
     vi.stubGlobal("document", { querySelectorAll: () => rows });
     expect(focusNext("b")).toBe(true);
     expect(focused).toEqual(["c"]);
     vi.stubGlobal("document", { querySelectorAll: () => rows.slice(0, 2) });
     expect(focusNext("b")).toBe(false);
+  });
+
+  it("moves focus to the output section after the last suggested row", () => {
+    const section = { tabIndex: 0, focus: vi.fn() };
+    const rows = [{ dataset: { itemId: "last", review: "suggested" }, focus: vi.fn(), closest: () => section }];
+    vi.stubGlobal("document", { querySelectorAll: () => rows });
+    expect(focusNext("last")).toBe(false);
+    expect(section).toMatchObject({ tabIndex: -1 });
+    expect(section.focus).toHaveBeenCalled();
   });
 });
 
