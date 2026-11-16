@@ -526,7 +526,12 @@ impl<L: EngineLauncher> EngineClient<L> {
                     }
                     // @cpt-begin:cpt-noter-flow-core-engine-capture-recover:p1:inst-report-gap
                     if let Some(from) = x.gap_from.take() {
-                        out.push(x.gap(from, x.offset(now), GapReason::EngineRestart));
+                        // At least 1 ms: audio was lost, and a gap of no length is dropped (#882).
+                        out.push(x.gap(
+                            from,
+                            x.offset(now).max(from.saturating_add(1)),
+                            GapReason::EngineRestart,
+                        ));
                     }
                     // @cpt-end:cpt-noter-flow-core-engine-capture-recover:p1:inst-report-gap
                 }

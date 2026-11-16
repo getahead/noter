@@ -215,6 +215,30 @@ async fn q7_drill_a_killed_engine_resumes_the_same_call_with_one_short_gap() {
     );
 }
 
+// A restart that finishes within the same millisecond still lost audio: its gap is not rounded
+// to nothing (the core drops gaps of no length), #882.
+#[tokio::test(start_paused = true)]
+async fn a_restart_inside_one_millisecond_still_reports_a_gap_of_at_least_1_ms() {
+    let instant = Script::parse(
+        r#"{"on": "start_session", "after_ms": 0, "event": {"type": "session_started", "call_id": "call_1", "mic_device": "mic", "output_device": "out"}}"#,
+    )
+    .unwrap();
+    let engine = ScriptedEngine::new().with_script(instant);
+    let c = client(&engine);
+    let mut facts = c.capture_facts();
+    c.start_session(start()).await.unwrap();
+    ms(1).await;
+    assert_eq!(c.session(), EngineSession::Capturing);
+    engine.kill_current();
+    ms(2000).await;
+    let facts = drain(&mut facts);
+    let [CaptureFact::Gap(g)] = facts.as_slice() else {
+        panic!("{facts:?}")
+    };
+    assert_eq!(g.reason, GapReason::EngineRestart);
+    assert!(g.t1_ms.0 > g.t0_ms.0, "{g:?}");
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_paused_session_is_paused_again_after_the_restart() {
     let engine = ScriptedEngine::new().with_script(script());
