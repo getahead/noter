@@ -153,6 +153,9 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
+        // An Accepted row outcome shows 4 s; the accessibility queries after the menu click take longer on CI
+        // (the page also scrolls under the pointer), so the launch hook keeps the outcome until Undo runs.
+        app.launchEnvironment["NOTER_TEST_HOLD_STATUS"] = "1"
         let main = openMenuReviewCall()
         let title = "Who owns the acceptance criteria for the reconnect?"
         let rowUndo = main.links["Undo: \(title)"]
@@ -220,12 +223,20 @@ final class NativeAppMenuTests: NoterTestCase {
         last.click()
         XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable })
 
+        // The page pushes its menu state to the host after the call's items load; open the menu only
+        // once the suggestions are on the page, and reopen it if it was validated before the push landed.
+        XCTAssertTrue(main.staticTexts["Who owns the acceptance criteria for the reconnect?"].waitForExistence(timeout: 10), "the suggested items are loaded before the Edit menu opens")
         let edit = app.menuBars.menuBarItems["Edit"]
-        edit.click()
+        let acceptAll = app.menuItems["Accept All Suggestions"]
+        var enabled = false
+        for _ in 0..<3 where !enabled {
+            edit.click()
+            enabled = waitUntil(3) { acceptAll.exists && acceptAll.isEnabled }
+            if !enabled { app.typeKey(.escape, modifierFlags: []) }
+        }
         XCTAssertFalse(app.menuItems["Accept Item"].isEnabled, "Accept Item requires a focused suggested row")
         XCTAssertFalse(app.menuItems["Reject Item"].isEnabled, "Reject Item requires a focused suggested row")
-        let acceptAll = app.menuItems["Accept All Suggestions"]
-        XCTAssertTrue(waitUntil(5) { acceptAll.exists && acceptAll.isEnabled }, "Accept All enables while all three item kinds have suggestions")
+        XCTAssertTrue(enabled, "Accept All enables while all three item kinds have suggestions")
         attachScreenshot("app-menu-edit-all-kinds-suggested")
         acceptAll.click()
         XCTAssertTrue(waitUntil(10) { main.staticTexts["Accepted 3 suggested items"].exists }, "Accept All reviews action items, decisions and questions in one batch")

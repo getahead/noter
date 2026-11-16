@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STATUS_MS, statusTimer, type Clock } from "./status-timer";
+import { STATUS_MS, statusHeldByTest, statusTimer, type Clock } from "./status-timer";
 
 /** A clock the test moves by hand. */
 function fakeClock() {
@@ -67,5 +67,12 @@ describe("statusTimer (cpt-noter-state-ui-primitives-inline-status)", () => {
     statusTimer(1, () => gone++);
     await new Promise((r) => setTimeout(r, 10));
     expect(gone).toBe(1);
+  });
+});
+
+describe("statusHeldByTest", () => {
+  it("is on only when the native test hook set the flag", () => {
+    expect(statusHeldByTest({})).toBe(false);
+    expect(statusHeldByTest({ __NOTER_TEST_HOLD_STATUS__: true })).toBe(true);
   });
 });

@@ -6,7 +6,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
 
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -15,6 +14,7 @@ import { exercised, isFake } from "../support/core";
 import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { StdioCore } from "../support/stdio-transport";
+import { rows as scenarioRows } from "./history-support";
 
 type Launch = { path: string; target: string; cwd: string; prompt_file: string };
 type NativeLog = { launches: Launch[]; clipboard: { plain: string; markdown: string | null }[] };
@@ -27,16 +27,8 @@ const harness = () => (s as unknown as { process: { invoke(window: string, cmd: 
 const nativeLog = async () => (await harness().invoke("main", "harness.native_log", {})) as NativeLog;
 const launchWorld = (plan: LaunchPlan) => harness().invoke("main", "harness.launch_world", { plan });
 
-/** Rows of the real core's database, read-only. */
-async function rows<T>(sql: string, ...params: string[]): Promise<T[]> {
-  const { path } = (await harness().invoke("main", "harness.data_dir", {})) as { path: string };
-  const db = new DatabaseSync(join(path, "noter.db"), { readOnly: true });
-  try {
-    return db.prepare(sql).all(...params) as T[];
-  } finally {
-    db.close();
-  }
-}
+/** Rows of the real core's database, read-only (this file runs only against the real core). */
+const rows = async <T>(sql: string, ...params: string[]): Promise<T[]> => (await scenarioRows<T>(s, sql, ...params)) ?? [];
 const reasons = async (item: string) => (await rows<{ reason: string }>("SELECT reason FROM changes WHERE entity_type = 'item' AND entity_id = ? ORDER BY rowid", item)).map((r) => r.reason);
 
 /** A fresh real core and a folder for the VSTOR project, mapped unless `mapped` is false. */

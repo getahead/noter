@@ -495,7 +495,7 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
             ExternalTarget::Url { url } => vec![url.clone()],
             ExternalTarget::SystemSettings { permission } => vec![settings_url(*permission).into()],
             ExternalTarget::RevealInFinder { path } => vec!["-R".into(), path.clone()],
-            // Documents belong to the sources feature (M3).
+            // Documents open inside the app, not through `open`.
             _ => return,
         };
         let _ = std::process::Command::new("open").args(args).spawn();

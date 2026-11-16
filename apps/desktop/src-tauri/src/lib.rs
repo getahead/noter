@@ -72,6 +72,7 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             if event == PageLoadEvent::Finished {
                 test_hooks::stall_after_load(webview);
                 test_hooks::terminate_after_load(webview);
+                test_hooks::hold_status_outcomes(webview);
             }
         })
         .on_window_event(|window, event| match event {
@@ -199,7 +200,7 @@ pub fn run() {
             test_hooks::watch_hotkey_trigger(app.handle().clone());
             #[cfg(all(debug_assertions, feature = "test-hooks", target_os = "macos"))]
             test_hooks::watch_termination_trigger(app.handle().clone());
-            // Without a feed (M0) the check ends at once and nothing is ever ready.
+            // Without a feed the check ends at once and nothing is ever ready.
             tauri::async_runtime::spawn(async move {
                 let _ = updater.check().await;
             });
@@ -286,7 +287,7 @@ fn browser<R: Runtime>(
 }
 
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
-/// this Mac. Own-account sign-in is M3, so only the API-key and local runtimes run in M2.
+/// this Mac. `signed_in` stays false here: own-account runs are not enabled in the host yet.
 fn runtimes(data: &std::path::Path) -> Adapters {
     let home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
@@ -318,7 +319,7 @@ fn account_cli() -> Arc<CliAccounts> {
 }
 
 /// shortcut: an app started from Finder has no shell PATH, so the usual install folders are
-/// tried first; a CLI elsewhere is found by name on PATH (CLI install, M3, records its path).
+/// tried first; a CLI elsewhere is found by name on PATH (a recorded CLI install path would replace the search).
 fn find_cli(home: &std::path::Path, name: &str) -> std::path::PathBuf {
     let system_dirs = ["/opt/homebrew/bin".into(), "/usr/local/bin".into()];
     find_cli_in(home, name, &system_dirs)

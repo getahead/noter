@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.15](https://github.com/getahead/noter/compare/v0.22.14...v0.22.15) (2026-11-14)
+
+
+### Bug fixes
+
+* **desktop:** deliver native navigation, menus, and window chrome ([#828](https://github.com/getahead/noter/issues/828)) ([9d743c6](https://github.com/getahead/noter/commit/9d743c629b75e957294cebf9404cffae824e4057))
+
 ## [0.22.14](https://github.com/getahead/noter/compare/v0.22.13...v0.22.14) (2026-11-14)
 
 

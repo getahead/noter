@@ -18,6 +18,11 @@ const realClock: Clock = {
 /** The prototype's timings (NP.flash 2 s, call-status 3 s, row outcome 10 s). */
 export const STATUS_MS: Record<StatusVariant, number> = { "on-label": 2000, trailing: 2000, notice: 2000, blind: 3000, "row-outcome": 10000 };
 
+/** The native UI tests' launch hook (`NOTER_TEST_HOLD_STATUS`) sets this flag: a status then stays until its action runs. */
+export function statusHeldByTest(host: object = globalThis): boolean {
+  return (host as { __NOTER_TEST_HOLD_STATUS__?: boolean }).__NOTER_TEST_HOLD_STATUS__ === true;
+}
+
 export interface StatusTimer {
   pause(): void;
   resume(): void;
