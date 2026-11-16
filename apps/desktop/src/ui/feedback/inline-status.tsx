@@ -4,7 +4,7 @@ import { useEffect, useRef, type FocusEvent } from "react";
 import { Icon } from "../icons";
 import { KeyCap } from "../primitives/key-cap";
 import { Link } from "../primitives/link";
-import { STATUS_MS, statusTimer, type Clock, type StatusTimer, type StatusVariant } from "./status-timer";
+import { STATUS_MS, statusHeldByTest, statusTimer, type Clock, type StatusTimer, type StatusVariant } from "./status-timer";
 
 export interface InlineStatusProps {
   // @cpt-begin:cpt-noter-flow-ui-primitives-inline-status:p1:inst-receive-status
@@ -31,7 +31,7 @@ export function statusHandlers(timer: { current: StatusTimer | null }, held: { h
   const set = (k: "hover" | "focus", on: boolean) => {
     held[k] = on;
     if (held.hover || held.focus) timer.current?.pause();
-    else timer.current?.resume();
+    else if (!statusHeldByTest()) timer.current?.resume();
   };
   return {
     onPointerEnter: () => set("hover", true),
@@ -47,7 +47,7 @@ export function statusHandlers(timer: { current: StatusTimer | null }, held: { h
  *  hovered or focused (its text changed under the pointer). */
 export function startStatusTimer(ms: number, cb: { current: () => void }, held: { hover: boolean; focus: boolean }, clock?: Clock) {
   const timer = statusTimer(ms, () => cb.current(), clock);
-  if (held.hover || held.focus) timer.pause();
+  if (held.hover || held.focus || statusHeldByTest()) timer.pause();
   return timer;
 }
 

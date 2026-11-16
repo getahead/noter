@@ -201,6 +201,14 @@ pub fn stall_after_load<R: Runtime>(webview: &Webview<R>) {
     });
 }
 
+/// With `NOTER_TEST_HOLD_STATUS`, the page's inline statuses (row outcomes with their Undo link) stay until
+/// they are used: a UI test's accessibility queries take longer than the 4 s an Accepted outcome shows.
+pub fn hold_status_outcomes<R: Runtime>(webview: &Webview<R>) {
+    if std::env::var_os("NOTER_TEST_HOLD_STATUS").is_some() {
+        let _ = webview.eval("window.__NOTER_TEST_HOLD_STATUS__ = true");
+    }
+}
+
 /// With `NOTER_TEST_TERMINATE_WEB_PROCESS_FILE`, terminates the loaded call page when the test
 /// creates the file. The watcher must then reload the page and restore its snapshot and stream.
 // @cpt-flow:cpt-noter-flow-ui-call-window-hide-reopen:p1
