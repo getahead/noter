@@ -166,7 +166,9 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Accept Item"].waitForExistence(timeout: 5) && app.menuItems["Accept Item"].isEnabled, "Accept Item enables for the focused question")
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
         attachScreenshot("app-menu-edit-focused-question")
+        let hold = pointOverOutcome(main: main, row: suggestion)
         app.menuItems["Accept Item"].click()
+        holdRowOutcome(hold)
         assertReviewedRowUndo(main: main, row: suggestion, title: title, rowUndo: rowUndo)
     }
 
@@ -281,6 +283,21 @@ final class NativeAppMenuTests: NoterTestCase {
         edit.click()
         XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && app.menuItems["Accept Item"].isEnabled && app.menuItems["Reject Item"].isEnabled }, "row Undo restores this selected item to Suggested")
         app.typeKey(.escape, modifierFlags: [])
+    }
+
+    /// Where a question row's "Accepted · Undo" status appears: on the line under its title, where the review
+    /// buttons were. Measured before the menu click, because the accessibility queries after it are slower
+    /// than the status's 4 s (its timer pauses while the pointer is over it).
+    private func pointOverOutcome(main: XCUIElement, row: XCUIElement) -> XCUICoordinate {
+        let f = row.frame
+        let w = main.frame
+        return main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: f.minX + 95 - w.minX, dy: f.midY + 27 - w.minY))
+    }
+
+    /// Moves the pointer over the status twice: the second move is a real pointer event after it rendered.
+    private func holdRowOutcome(_ point: XCUICoordinate) {
+        point.hover()
+        point.withOffset(CGVector(dx: 3, dy: 0)).hover()
     }
 
     private func bringRowIntoView(main: XCUIElement, row: XCUIElement) {
