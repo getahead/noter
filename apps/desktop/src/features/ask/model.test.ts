@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+
+import type { AskAnswer, AskMsg, Citation, CoreError } from "../../core/bindings";
+import { foldTurn, groupThreads, paragraphs, phaseOf } from "./model";
+
+const cite = (n: number): Citation => ({ n, provenance: { type: "model_guess" }, quote: "q", speaker: null, strength: "strong", deleted: false });
+const answer = (o: Partial<AskAnswer> = {}): AskAnswer => ({ turn_id: "t1", question: "Q", answer_md: "A", citations: [cite(1)], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: 0, ...o });
+const msgs = (...events: AskMsg["event"][]): AskMsg[] => events.map((event, i) => ({ seq: i + 1, event }));
+const failed = (code: string): CoreError => ({ code, message: "", retryable: true }) as CoreError;
+
+describe("foldTurn", () => {
+  it("appends deltas and keeps citations by their number", () => {
+    const v = foldTurn(msgs({ type: "delta", text: "Hello " }, { type: "citation", citation: cite(1) }, { type: "delta", text: "world" }, { type: "citation", citation: cite(1) }));
+    expect(v.text).toBe("Hello world");
+    expect(v.citations.map((c) => c.n)).toEqual([1]);
+    expect(phaseOf(v)).toBe("streaming");
+  });
+  it("replaces the partial with the authoritative answer on done", () => {
+    const v = foldTurn(msgs({ type: "delta", text: "par" }, { type: "done", answer: answer({ answer_md: "full" }) }, { type: "ended", reason: "call_stopped" }));
+    expect(v.text).toBe("full");
+    expect(phaseOf(v)).toBe("ready");
+  });
+  it("names not found, weak, stopped, failed and interrupted turns", () => {
+    expect(phaseOf(foldTurn(msgs({ type: "done", answer: answer({ found: false, citations: [] }) })))).toBe("not_found");
+    expect(phaseOf(foldTurn(msgs({ type: "done", answer: answer({ citations: [] }) })))).toBe("not_found");
+    expect(phaseOf(foldTurn(msgs({ type: "done", answer: answer({ only_weak_evidence: true }) })))).toBe("weak");
+    const stopped = foldTurn(msgs({ type: "delta", text: "x" }, { type: "failed", error: failed("answer_stopped") }));
+    expect(phaseOf(stopped)).toBe("stopped");
+    expect(stopped.text).toBe("x");
+    expect(phaseOf(foldTurn(msgs({ type: "failed", error: failed("runtime_unreachable") })))).toBe("error");
+    expect(phaseOf(foldTurn(msgs({ type: "delta", text: "x" }, { type: "ended", reason: "unsubscribed" })))).toBe("interrupted");
+  });
+});
+
+describe("paragraphs", () => {
+  it("splits on blank lines and drops empties", () => {
+    expect(paragraphs("a\nb\n\n\n c \n\n")).toEqual(["a\nb", "c"]);
+  });
+});
+
+describe("groupThreads", () => {
+  const now = new Date(2026, 10, 17, 12).getTime();
+  const row = (id: string, at: Date) => ({ id, title: id, turns: 1, updated_at: at.getTime() });
+  it("groups by local day, newest first", () => {
+    const groups = groupThreads([row("old", new Date(2026, 10, 1)), row("y", new Date(2026, 10, 16, 23)), row("t", new Date(2026, 10, 17, 1))], now);
+    expect(groups.map((g) => [g.key, g.rows.map((r) => r.id)])).toEqual([["today", ["t"]], ["yesterday", ["y"]], ["earlier", ["old"]]]);
+  });
+});
