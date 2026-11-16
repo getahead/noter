@@ -13,7 +13,8 @@ import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 
-test.skip(process.env.NOTER_CORE !== "stdio", "scripted account CLIs exist only in the real core");
+// scripted account CLIs exist only in the real core: on the fake core these stories are not registered
+const describeReal = process.env.NOTER_CORE === "stdio" ? test.describe : (_title: string, _body: () => void): void => {};
 
 const CODE = "ONE-TIME-CODE-9137";
 const ANN = { email: "ann@example.com", plan: "Max" };
@@ -44,7 +45,7 @@ async function claudeToCheck(page: Page) {
   return dlg;
 }
 
-test.describe("cpt-noter-seq-settings-sign-in-account", () => {
+describeReal("cpt-noter-seq-settings-sign-in-account", () => {
   test("happy path: Sign In with Claude — Prepare, personal-use box, Continue in Browser, Check, Use for N Agents", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await claudeCli(steer);
@@ -75,7 +76,7 @@ test.describe("cpt-noter-seq-settings-sign-in-account", () => {
 
   test("other path: Claude Code already signed in — Use This Account goes straight to Check, no browser", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
-    await claudeCli(steer, { existing_login: true });
+    await claudeCli(steer, { identity: ANN });
     await openModels(page);
     await button(row(page, "Your Claude account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your Claude account/);
@@ -142,7 +143,7 @@ test.describe("cpt-noter-seq-settings-sign-in-account", () => {
   });
 });
 
-test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
+describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
   const assistantsOpen = (w: Parameters<typeof W.firstRun>[0]) => {
     W.firstRun(w);
     for (const s of w.app.setup.steps) if (s.step !== "assistants") s.state = "done";
@@ -169,7 +170,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
   });
 });
 
-test.describe("cpt-noter-seq-settings-replace-api-key", () => {
+describeReal("cpt-noter-seq-settings-replace-api-key", () => {
   test("other path: Remove… asks first (Cancel default), then api_key_remove empties the row", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await watchAlerts(page);

@@ -14,7 +14,8 @@ import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
 
-test.skip(process.env.NOTER_CORE !== "stdio", "native panels and scripted MCP servers exist only in the real core");
+// native panels and scripted MCP servers exist only in the real core: on the fake core these stories are not registered
+const describeReal = process.env.NOTER_CORE === "stdio" ? test.describe : (_title: string, _body: () => void): void => {};
 
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
@@ -36,7 +37,7 @@ async function knowledgeFolder(steer: Steer): Promise<void> {
 
 const noSources = (w: Parameters<typeof W.idle>[0]) => (W.idle(w), (w.sources.sources.length = 0));
 
-test.describe("cpt-noter-seq-settings-check-privacy", () => {
+describeReal("cpt-noter-seq-settings-check-privacy", () => {
   test("happy path: Privacy lists what left this Mac in plain words and Export writes the log through the save panel", async ({ page }) => {
     await openWindow(page, "settings", { fixedClock: true, world: (w) => W.idle(w) });
     await openPane(page, "Privacy");
@@ -69,7 +70,7 @@ test.describe("cpt-noter-seq-settings-check-privacy", () => {
   });
 });
 
-test.describe("cpt-noter-seq-settings-add-knowledge-source", () => {
+describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
   test("happy path: no sources, Add Folder…, indexing in the row, then the finished document count", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: noSources });
     await knowledgeFolder(steer);

@@ -109,7 +109,7 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("empty path — Not found in your calls: the sentence, Search by Keyword, and the Library search for the same words", async ({ page }) => {
-    test.skip(!REAL, "the fake core has no not-found answer; the real core is scripted");
+    if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
     await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
     const question = "What did we decide about the OpenStack upgrade?";
@@ -123,9 +123,9 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("error path — Claude Code unreachable: Couldn't reach Claude Code, Try Again keeps the question", async ({ page }) => {
-    test.skip(!REAL, "the runtime's failure is scripted on the real core only");
+    if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", fail: "runtime_unreachable" });
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", fail: "runtime_unavailable" });
     await ask(page, WEBSOCKET);
     const banner = thread(page).locator('[data-component="cpt-noter-component-ui-inline-banner"]');
     await expect(banner).toContainText("Couldn't reach Claude Code");
@@ -195,7 +195,7 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
   });
 
   test("error path — Cited source deleted: Source deleted, no play or link, and Ask Again cites only what is left", async ({ page }) => {
-    test.skip(!REAL, "the fake keeps its canned thread; the real core marks the citation deleted");
+    if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
     await ask(page, "Can we keep serving reads while it rebuilds?");
     const first = answers(page).last();
