@@ -244,6 +244,7 @@ fn boot<R: Runtime>(
         .unwrap_or_else(|| "noter-engine".into());
     let engine = ProcessLauncher::from_env(bundled).app_group(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
+    let accounts = account_cli();
     let deps = CoreDeps {
         power: Arc::new(native::MacPower),
         app_version: env!("CARGO_PKG_VERSION").into(),
@@ -255,9 +256,9 @@ fn boot<R: Runtime>(
         models: Arc::new(PinnedModels::new()),
         updater,
         surfaces: surfaces.clone(),
-        llm: runtimes(&dir),
+        llm: runtimes(&dir, &accounts),
         secrets: Arc::new(keychain::Keychain),
-        account_cli: account_cli(),
+        account_cli: Arc::new(accounts),
         mcp_source: Arc::new(HttpMcp::new(browser(surfaces.clone()))),
         ..CoreDeps::new(Arc::new(SystemClock), events)
     };
@@ -288,12 +289,12 @@ fn browser<R: Runtime>(
 
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
 /// this Mac. `signed_in` stays false here: own-account runs are not enabled in the host yet.
-fn runtimes(data: &std::path::Path) -> Adapters {
+fn runtimes(data: &std::path::Path, accounts: &CliAccounts) -> Adapters {
     let home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_default();
-    let cli = |name: &str| CliConfig {
-        program: find_cli(&home, name),
+    let cli = |program: &std::path::Path| CliConfig {
+        program: program.to_path_buf(),
         home: home.clone(),
         run_root: data.join("runtimes"),
         signed_in: false,
@@ -303,19 +304,19 @@ fn runtimes(data: &std::path::Path) -> Adapters {
         url: "http://127.0.0.1:11434".into(),
         models: Vec::new(),
     };
-    Adapters::real(cli("claude"), cli("codex"), ollama)
+    Adapters::real(cli(&accounts.claude), cli(&accounts.codex), ollama)
 }
 
-/// The pinned CLIs as accounts and installs, found where `runtimes` finds them.
-fn account_cli() -> Arc<CliAccounts> {
+/// The pinned CLIs as accounts and installs, probed once per start and shared with `runtimes`.
+fn account_cli() -> CliAccounts {
     let home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)
         .unwrap_or_default();
-    Arc::new(CliAccounts {
+    CliAccounts {
         claude: find_cli(&home, "claude"),
         codex: find_cli(&home, "codex"),
         ollama: find_cli(&home, "ollama"),
-    })
+    }
 }
 
 /// shortcut: an app started from Finder has no shell PATH, so the usual install folders are
