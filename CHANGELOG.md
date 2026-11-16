@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.16](https://github.com/getahead/noter/compare/v0.22.15...v0.22.16) (2026-11-16)
+
+
+### Bug fixes
+
+* **deps:** bump the cargo-minor group across 1 directory with 2 updates ([#873](https://github.com/getahead/noter/issues/873)) ([72c5052](https://github.com/getahead/noter/commit/72c50521f1e3b05fe6e20dd5280aacb1d289d42e))
+
 ## [0.22.15](https://github.com/getahead/noter/compare/v0.22.14...v0.22.15) (2026-11-14)
 
 
