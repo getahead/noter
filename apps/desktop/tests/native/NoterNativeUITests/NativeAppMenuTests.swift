@@ -220,12 +220,20 @@ final class NativeAppMenuTests: NoterTestCase {
         last.click()
         XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable })
 
+        // The page pushes its menu state to the host after the call's items load; open the menu only
+        // once the suggestions are on the page, and reopen it if it was validated before the push landed.
+        XCTAssertTrue(main.staticTexts["Who owns the acceptance criteria for the reconnect?"].waitForExistence(timeout: 10), "the suggested items are loaded before the Edit menu opens")
         let edit = app.menuBars.menuBarItems["Edit"]
-        edit.click()
+        let acceptAll = app.menuItems["Accept All Suggestions"]
+        var enabled = false
+        for _ in 0..<3 where !enabled {
+            edit.click()
+            enabled = waitUntil(3) { acceptAll.exists && acceptAll.isEnabled }
+            if !enabled { app.typeKey(.escape, modifierFlags: []) }
+        }
         XCTAssertFalse(app.menuItems["Accept Item"].isEnabled, "Accept Item requires a focused suggested row")
         XCTAssertFalse(app.menuItems["Reject Item"].isEnabled, "Reject Item requires a focused suggested row")
-        let acceptAll = app.menuItems["Accept All Suggestions"]
-        XCTAssertTrue(waitUntil(5) { acceptAll.exists && acceptAll.isEnabled }, "Accept All enables while all three item kinds have suggestions")
+        XCTAssertTrue(enabled, "Accept All enables while all three item kinds have suggestions")
         attachScreenshot("app-menu-edit-all-kinds-suggested")
         acceptAll.click()
         XCTAssertTrue(waitUntil(10) { main.staticTexts["Accepted 3 suggested items"].exists }, "Accept All reviews action items, decisions and questions in one batch")
@@ -255,6 +263,9 @@ final class NativeAppMenuTests: NoterTestCase {
         // The menu handler focuses the next suggestion after review, which can scroll this row
         // out of WebKit's accessibility viewport. Bring this exact row back before querying Undo.
         bringRowIntoView(main: main, row: row)
+        // The row outcome lasts 4 s unless it is hovered; the accessibility queries below (a full tree dump)
+        // can take longer on CI. Hover pauses its timer, so the row's Undo stays until it is clicked.
+        if rowUndo.exists && rowUndo.isHittable { rowUndo.hover() }
         XCTAssertTrue(rowUndo.exists && rowUndo.isHittable, "the menu action adds an accessible, visible Undo link to the selected row")
         XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
         let hierarchy = main.debugDescription
