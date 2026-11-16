@@ -31,8 +31,8 @@ export interface SearchFieldProps extends Common {
   onRemoveToken?: (index: number) => void;
 }
 
-/** WebKit's inline predictions (Safari 18+) are not in React's input attributes. With any system text assist on, the first Esc
- *  dismisses the suggestion instead of reaching the field, so Esc does not clear the text until it is pressed twice. */
+/** WebKit's inline predictions (Safari 18+) are not in React's input attributes. CI showed the first Esc after typing
+ *  was swallowed and the second cleared the text (#869); a system suggestion taking the key is the likely cause, so none is offered. */
 const NO_PREDICTIONS = { writingsuggestions: "false" };
 
 export type SearchKeyAction = "run" | "add-token" | "remove-last-token" | "clear" | "leave";
