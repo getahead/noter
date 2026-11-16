@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { invoke, listen } = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn() }));
+const { invoke, listen, emit } = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), emit: vi.fn() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...a), Channel: class {} }));
-vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listen(...a) }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: (...a: unknown[]) => listen(...a), emit: (...a: unknown[]) => emit(...a) }));
 
-const { listenNativeMenuAction, nativeAsk } = await import("./tauri-transport");
+const { listenNativeMenuAction, nativeAsk, updateNativeMenuContext } = await import("./tauri-transport");
 
 const alert = { title: "Delete “Backend sync”?", message: "Its audio and transcript are deleted.", kind: "warning" as const, okLabel: "Delete", cancelLabel: "Cancel" };
 
@@ -36,5 +36,23 @@ describe("nativeAsk (cpt-noter-seq-dialogs-delete-call)", () => {
   it("is true only when the user chose the OK label", async () => {
     invoke.mockResolvedValue("Delete");
     expect(await nativeAsk(alert)).toBe(true);
+  });
+});
+
+describe("updateNativeMenuContext", () => {
+  it("sends contexts one at a time in call order, so a late older one cannot overwrite a newer one in the host", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    let release!: () => void;
+    emit.mockReset().mockReturnValueOnce(new Promise<void>((r) => (release = r))).mockResolvedValue(undefined);
+
+    const first = updateNativeMenuContext({ focused: false });
+    const second = updateNativeMenuContext({ focused: true });
+    await Promise.resolve();
+    expect(emit).toHaveBeenCalledTimes(1);
+
+    release();
+    await Promise.all([first, second]);
+    expect(emit.mock.calls.map((c) => (c[1] as { focused: boolean }).focused)).toEqual([false, true]);
+    vi.unstubAllGlobals();
   });
 });

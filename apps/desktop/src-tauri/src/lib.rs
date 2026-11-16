@@ -288,7 +288,8 @@ fn browser<R: Runtime>(
 }
 
 /// The real runtimes: Claude Code and Codex run locked down from `<data>/runtimes`, Ollama on
-/// this Mac. `signed_in` stays false here: own-account runs are not enabled in the host yet.
+/// this Mac. `signed_in` starts false: Claude Code's own status sets it on each availability
+/// refresh. Codex has no verified status signal yet, so its account runtime stays signed out.
 fn runtimes(data: &std::path::Path, accounts: &CliAccounts) -> Adapters {
     let home = std::env::var_os("HOME")
         .map(std::path::PathBuf::from)

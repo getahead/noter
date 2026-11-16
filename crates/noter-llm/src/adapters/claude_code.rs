@@ -127,6 +127,10 @@ impl RuntimeAdapter for ClaudeCode {
         self.0.refresh();
     }
 
+    fn probe(&self) -> BoxFuture<'_, ()> {
+        Box::pin(self.0.observe_claude_sign_in())
+    }
+
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>> {
         self.0.run(&call, self.prepare(&call), parse)
     }
