@@ -37,7 +37,8 @@ pub struct CliConfig {
     pub home: PathBuf,
     /// A Noter-owned directory for run environments (layout above).
     pub run_root: PathBuf,
-    /// The user signed in through the CLI itself (own-account runtime).
+    /// The user signed in through the CLI itself (own-account runtime): the answer until a
+    /// CLI with a status probe (Claude Code's `auth status`) has told otherwise.
     pub signed_in: bool,
     /// The models offered, preferred first.
     pub models: Vec<String>,
@@ -51,6 +52,8 @@ pub(crate) struct Cli {
     tested: Tested,
     /// `None` until probed; then the version `--version` printed, `None` when it did not run.
     version: Mutex<Option<Option<String>>>,
+    /// What the CLI's own status last said about the sign-in; `None` until it said anything.
+    signed_in: Mutex<Option<bool>>,
     sessions: Sessions,
 }
 
@@ -60,6 +63,7 @@ impl Cli {
             config,
             tested,
             version: Mutex::default(),
+            signed_in: Mutex::default(),
             sessions: Sessions::default(),
         }
     }
@@ -69,7 +73,21 @@ impl Cli {
         *lock(&self.version) = Some(version);
     }
 
+    // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+    /// Asks `claude auth status` whether the user is signed in. A probe that failed or printed
+    /// something unreadable is unknown and keeps the last answer.
+    pub async fn observe_claude_sign_in(&self) {
+        let status = run_text(&self.config.program, &["auth", "status"])
+            .await
+            .and_then(|text| claude_auth_status(&text));
+        if let Some(identity) = status {
+            *lock(&self.signed_in) = Some(identity.is_some());
+        }
+    }
+    // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+
     pub fn availability(&self, runtime: RuntimeChoice, api_key: bool) -> Availability {
+        let signed_in = (*lock(&self.signed_in)).unwrap_or(self.config.signed_in);
         let cached = lock(&self.version).clone();
         let version = match cached {
             Some(version) => version,
@@ -84,7 +102,7 @@ impl Cli {
         } else if api_key {
             None
         } else {
-            (!self.config.signed_in).then_some(RuntimeUnavailableReason::AccountSignedOut)
+            (!signed_in).then_some(RuntimeUnavailableReason::AccountSignedOut)
         };
         Availability {
             runtime,
@@ -471,6 +489,75 @@ mod account_tests {
         assert_eq!(claude_identity("not json"), None);
         assert_eq!(claude_auth_status(r#"{"loggedIn":false}"#), Some(None));
         assert_eq!(claude_auth_status("not json"), None);
+    }
+
+    /// A mock `claude`: `--version` works, `auth status` prints what the `status` file holds.
+    fn mock_claude(dir: &Path) -> Cli {
+        use std::os::unix::fs::PermissionsExt;
+        let program = dir.join("claude");
+        let script = format!(
+            "#!/bin/sh\nif [ \"$1\" = auth ]; then cat {}/status; exit $?; fi\necho '2.1.296 (Claude Code)'\n",
+            dir.display()
+        );
+        std::fs::write(&program, script).unwrap();
+        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        Cli::new(
+            CliConfig {
+                program,
+                home: dir.join("home"),
+                run_root: dir.join("runs"),
+                signed_in: false,
+                models: vec![],
+            },
+            super::super::claude_code::TESTED,
+        )
+    }
+
+    #[tokio::test]
+    async fn the_account_runtime_follows_the_cli_sign_in_without_a_restart() {
+        const SIGNED_IN: &str =
+            r#"{"loggedIn":true,"email":"ann@example.com","subscriptionType":"max"}"#;
+        let dir = tempfile::tempdir().unwrap();
+        let status = dir.path().join("status");
+        let cli = mock_claude(dir.path());
+        let unavailable = |cli: &Cli| {
+            cli.availability(RuntimeChoice::ClaudeAccount, false)
+                .unavailable
+        };
+
+        // Before anything was observed, the configured answer holds.
+        assert_eq!(
+            unavailable(&cli),
+            Some(RuntimeUnavailableReason::AccountSignedOut)
+        );
+
+        std::fs::write(&status, SIGNED_IN).unwrap();
+        cli.observe_claude_sign_in().await;
+        assert_eq!(unavailable(&cli), None);
+
+        // An unreadable answer is unknown: the last one stays.
+        std::fs::write(&status, "not json").unwrap();
+        cli.observe_claude_sign_in().await;
+        assert_eq!(unavailable(&cli), None);
+
+        std::fs::write(&status, r#"{"loggedIn":false}"#).unwrap();
+        cli.observe_claude_sign_in().await;
+        assert_eq!(
+            unavailable(&cli),
+            Some(RuntimeUnavailableReason::AccountSignedOut)
+        );
+
+        std::fs::write(&status, SIGNED_IN).unwrap();
+        cli.observe_claude_sign_in().await;
+        assert_eq!(unavailable(&cli), None);
+        // The API-key runtime never depended on the account.
+        std::fs::write(&status, r#"{"loggedIn":false}"#).unwrap();
+        cli.observe_claude_sign_in().await;
+        assert_eq!(
+            cli.availability(RuntimeChoice::ClaudeApiKey, true)
+                .unavailable,
+            None
+        );
     }
 
     #[test]
