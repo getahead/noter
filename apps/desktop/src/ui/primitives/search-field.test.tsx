@@ -7,9 +7,18 @@ describe("search-field", () => {
   it("is a search field with the glyph, empty or typing", () => {
     const html = renderToString(<SearchField placeholder="Search" id="mw-search" />);
     expect(html).toMatch(/^<label class="np-search np-search--plain" data-component="cpt-noter-component-ui-primitives" data-primitive="search-field" data-variant="plain" data-state="empty"><svg class="np-ic np-search__icon"/);
-    expect(html).toContain('<input type="search" id="mw-search" placeholder="Search" aria-label="Search" autoComplete="off" value=""/>');
+    expect(html).toContain('<input type="search" id="mw-search" placeholder="Search" aria-label="Search" autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck="false" writingsuggestions="false" value=""/>');
     expect(renderToString(<SearchField value="retro" />)).toContain('data-state="typing"');
     expect(renderToString(<SearchField state="searching" />)).toContain('data-state="searching"');
+  });
+
+  it("turns off every system text assist so the first Esc reaches the field, not a native suggestion (#869)", () => {
+    const html = renderToString(<SearchField placeholder="Search" />);
+    expect(html).toContain('autoComplete="off"');
+    expect(html).toContain('autoCorrect="off"');
+    expect(html).toContain('autoCapitalize="off"');
+    expect(html).toContain('spellCheck="false"');
+    expect(html).toContain('writingsuggestions="false"');
   });
 
   it("shows removable capsule tokens; the token field has no glyph", () => {

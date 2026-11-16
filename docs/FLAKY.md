@@ -10,6 +10,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 
 | Issue | Check | Seen | Fix | State |
 | --- | --- | ---: | --- | --- |
+| [#869](https://github.com/getahead/noter/issues/869) | Settings search clear-by-Escape: first Escape after typing is not applied (`WindowSizeTests`, native) | 4 / 4 | [#875](https://github.com/getahead/noter/pull/875) | open |
 | [#882](https://github.com/getahead/noter/issues/882) | Core harness boot Q7 engine-kill drill: restart inside 1 ms recorded a zero-length gap, which the core drops | 7 / 150 under 12-process local load | [#883](https://github.com/getahead/noter/pull/883) | closed |
 | [#870](https://github.com/getahead/noter/issues/870) | Native menu Accept Item: row Undo link gone before the test reads it (4 s row outcome) | retried on 2 runs | [#876](https://github.com/getahead/noter/pull/876) | closed |
 | [#874](https://github.com/getahead/noter/issues/874) | Native menu Accept All validated disabled before the page pushed its state | retried on 1 run | [#876](https://github.com/getahead/noter/pull/876) | closed |

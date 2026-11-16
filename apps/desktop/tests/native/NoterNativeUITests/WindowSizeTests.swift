@@ -51,14 +51,27 @@ final class WindowSizeTests: NoterTestCase {
             }
             XCTAssertEqual(search.frame.width, expectedSearchWidth, accuracy: 14, "the search input fills its available pane width at \(size)")
         }
+        func focused() -> Bool { (search.value(forKey: "hasKeyboardFocus") as? Bool) ?? false }
         func verifySearchInput() {
             XCTAssertTrue(search.isHittable, "the Settings search target can receive a pointer click")
+            let rowsBefore = paneList.descendants(matching: .any).count
             search.click()
             let query = "not-a-settings-pane"
             search.typeText(query)
             XCTAssertTrue(waitUntil(5) { (search.value as? String) == query }, "clicking the field gives it keyboard focus and typing updates the full search query")
-            search.typeKey(.escape, modifierFlags: [])
-            XCTAssertTrue(waitUntil(5) { (search.value as? String) == "" }, "the search remains editable after clearing its text")
+            let rowsFiltered = paneList.descendants(matching: .any).count
+            // The key goes to the app's focused element, as in every other native test, not through the element's own focus probe.
+            app.typeKey(.escape, modifierFlags: [])
+            let cleared = waitUntil(5) { (search.value as? String) == "" }
+            // Only on failure, tell a page that never cleared (list size stays at its filtered count) from a stale AX value
+            // (list size back to its full count), and whether a second Escape clears it (the first key was lost) or not.
+            var diagnosis = ""
+            if !cleared {
+                let rowsAfter = paneList.descendants(matching: .any).count
+                app.typeKey(.escape, modifierFlags: [])
+                diagnosis = "field reads \(String(describing: search.value)), pane list elements before typing \(rowsBefore), filtered \(rowsFiltered), after Escape \(rowsAfter), second Escape clears \(waitUntil(3) { (search.value as? String) == "" }), focused \(focused())"
+            }
+            XCTAssertTrue(cleared, "the search remains editable after clearing its text (\(diagnosis))")
             XCTAssertTrue(pane.waitForExistence(timeout: 5), "clearing the query restores the Settings pane content")
         }
 
