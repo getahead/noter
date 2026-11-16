@@ -67,7 +67,8 @@ jobs:
             chore
             revert
           requireScope: false
-          subjectPattern: ^(?![A-Z]).+$
+          # Dependabot writes "Bump …" whatever its commit-message prefix; let that one word through.
+          subjectPattern: ^(Bump |(?![A-Z])).+$
           subjectPatternError: >-
             Start the subject in lower case, for example "feat(ui): add the call list".
       - name: PR title (dispatched run)
@@ -78,7 +79,7 @@ jobs:
         run: |
           title=$(gh pr view "$PR" -R "$GITHUB_REPOSITORY" --json title -q .title)
           echo "PR #$PR: $title"
-          echo "$title" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([^)]+\))?!?: [^A-Z]' \
+          echo "$title" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|revert)(\([^)]+\))?!?: (Bump |[^A-Z])' \
             || { echo "::error::PR title is not a Conventional Commit: $title"; exit 1; }
 
   approvals:
