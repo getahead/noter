@@ -64,7 +64,7 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(waitUntil(5) { !main.isHittable }, "the main window is hidden before opening the call panel")
         press("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "the call panel opens for Mark Moment feedback")
-        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 5), "the call panel has loaded its page")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call panel has loaded its page") // the host watch restarts a hung first frame after 10 s (#521)
         let menu = openMenu()
         assertItems(["Mark Moment", "Pause", "Stop Recording"], in: menu)
         item("Mark Moment", in: menu).click()

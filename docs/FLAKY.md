@@ -20,6 +20,7 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#394](https://github.com/getahead/noter/issues/394) | Core model lifecycle: immediate pause/resume, seeded state | 12 / 4 | [#434](https://github.com/getahead/noter/pull/434) | closed |
 | [#397](https://github.com/getahead/noter/issues/397) | Native Hide for Presenting query timeouts | 11 / 5 | [#431](https://github.com/getahead/noter/pull/431), [#558](https://github.com/getahead/noter/pull/558), [#809](https://github.com/getahead/noter/pull/809) | closed |
 | [#562](https://github.com/getahead/noter/issues/562) | WebView recovery test initial-load timeout | 2 / 0 | [#809](https://github.com/getahead/noter/pull/809) | closed |
+| [#860](https://github.com/getahead/noter/issues/860) | Call window page-load wait shorter than the web-process watch restart (`CallWindowTests`, `MenuBarTests`) | 1 / 1 | this PR | closed |
 | [#393](https://github.com/getahead/noter/issues/393) | First-run Checking screenshot | 10 / 4 | [#390](https://github.com/getahead/noter/pull/390) (merged), #423 | closed |
 | [#401](https://github.com/getahead/noter/issues/401) | Tab and Shift+Tab reachability | 5 / 1 | [#451](https://github.com/getahead/noter/pull/451), [#458](https://github.com/getahead/noter/pull/458) | closed |
 | [#400](https://github.com/getahead/noter/issues/400) | Speaker naming Undo restoration | 3 / 1 | [#429](https://github.com/getahead/noter/pull/429) | closed |
