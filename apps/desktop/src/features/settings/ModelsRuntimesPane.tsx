@@ -13,7 +13,7 @@ import { saveSection, useRowErrors } from "./actions";
 import { AccountRow, KeyRow } from "./CredentialRow";
 import { Group, Row } from "./form";
 import { KeySheet } from "./KeySheet";
-import { removeAlert, runtimeChoices, TASKS } from "./keys";
+import { keyConfigured, removeAlert, runtimeChoices, TASKS } from "./keys";
 import type { PaneProps } from "./pane-props";
 
 // @cpt-dod:cpt-noter-dod-ui-accounts-keys:p1
@@ -66,7 +66,7 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
       </Group>
       <Group title={t("settings.accounts.title")} foot={t("settings.accounts.foot")}>
         {(accounts?.accounts ?? []).map((a) => (
-          <AccountRow key={a.provider} view={a} />
+          <AccountRow key={a.provider} bridge={bridge} view={a} keyConfigured={keyConfigured(accounts, a.provider)} />
         ))}
       </Group>
       <Group title={t("settings.local.title")}>

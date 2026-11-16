@@ -1,9 +1,10 @@
 // Credential row (DESIGN 3.2): one API key as a row (Settings) or a field form (first run), and one own
 // account as its frame (the sign-in arrives in M3). The key itself is never shown or held.
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { focusFirstAvailable } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
+import { useWindow } from "../../app/use-window";
 import type { AccountProvider, AccountView, KeyView } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
@@ -11,7 +12,10 @@ import { InlineStatus } from "../../ui/feedback/inline-status";
 import type { IconName } from "../../ui/icons";
 import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
+import { accountRowState, providerName, testResultText, toolName, usedByText, type AccountRowState } from "./account-rows";
+import { signOutAccount, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
+import { SignOutSheet } from "./SignOutSheet";
 import { KEY_NAME, KEY_USE, keyRowState, reasonText, type KeyRowState } from "./keys";
 
 const COMPONENT = "cpt-noter-component-ui-credential-row";
@@ -117,20 +121,71 @@ const ACCOUNT: Record<AccountProvider, { title: MsgKey; use: MsgKey; signin: Msg
   claude: { title: "settings.accounts.claude", use: "settings.accounts.use_claude", signin: "settings.accounts.signin_claude" },
   chatgpt: { title: "settings.accounts.chatgpt", use: "settings.accounts.use_chatgpt", signin: "settings.accounts.signin_chatgpt" },
 };
+const ACCOUNT_TAG: Record<AccountRowState, { tone: BadgeProps["tone"]; icon?: IconName }> = {
+  not_signed_in: { tone: "neutral" },
+  signing_in: { tone: "neutral" },
+  signed_in: { tone: "success", icon: "check" },
+  expired: { tone: "warning", icon: "warning" },
+};
 
-/** Account-login variant, M2 frame: the row says the sign-in arrives in M3 (as the later panes do). */
-export function AccountRow({ view }: { view: AccountView }) {
+/** Account-login variant: Not signed in / Finishing in your browser… / Signed in with Test and Sign Out… / Signed out by the provider. */
+export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; view: AccountView; keyConfigured: boolean }) {
   const a = ACCOUNT[view.provider];
+  const state = accountRowState(view);
+  const [testLine, setTestLine] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+  const testing = useWindow(bridge, (s) => s.commands[testKey(view.provider)]?.state) === "WAITING";
+  const status = view.status;
+  const provider = providerName(view.provider);
+  const tagText = {
+    not_signed_in: t("settings.accounts.not_signed_in"),
+    signing_in: t("settings.accounts.signing_in"),
+    signed_in: t("settings.accounts.signed_in"),
+    expired: t("settings.accounts.expired", { provider }),
+  }[state];
+  const runTest = async () => {
+    setTestLine(null);
+    const res = await testAccount(bridge, view.provider);
+    setTestLine(res.status === "ok" ? testResultText(res.data) : t("settings.accounts.test_failed"));
+  };
   return (
-    <div className="e-status st-cred" data-component={COMPONENT} data-variant="account-login" data-state="not_signed_in">
+    <div className="e-status st-cred" role="group" aria-label={t(a.title)} data-component={COMPONENT} data-variant="account-login" data-provider={view.provider} data-state={state}>
       <div className="e-status__main">
         <span className="e-status__title">{t(a.title)}</span>
-        <span className="e-status__sub">{t(a.use)}</span>
-        <Badge text={t("settings.accounts.not_signed_in")} tone="neutral" cls="st-cred__tag" />
+        <Badge text={tagText} tone={ACCOUNT_TAG[state].tone} icon={ACCOUNT_TAG[state].icon} cls="st-cred__tag" />
+        {status.type === "signed_in" ? (
+          <>
+            <span className="e-status__sub">{`${status.identity.email} · ${t("settings.accounts.through", { plan: status.identity.plan, tool: toolName(view.provider) })}`}</span>
+            <span className="e-status__sub">{usedByText(view.agents)}</span>
+          </>
+        ) : status.type === "signed_out_by_provider" ? (
+          <span className="st-row__err">{t("settings.accounts.expired_note", { provider })}</span>
+        ) : (
+          <span className="e-status__sub">{t(a.use)}</span>
+        )}
+        {testLine && <span className="st-cred__dots" role="status">{testLine}</span>}
       </div>
       <div className="st-cred__actions">
-        <PushButton label={t(a.signin)} size="small" disabled help={t("settings.accounts.later")} />
+        {state === "signed_in" ? (
+          <>
+            <PushButton label={t("settings.accounts.test")} size="small" loading={testing} onAction={() => void runTest()} />
+            <PushButton label={t("settings.accounts.sign_out")} size="small" onAction={() => setAsking(true)} />
+          </>
+        ) : (
+          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" disabled={state === "signing_in"} help={t("settings.accounts.later")} />
+        )}
       </div>
+      {asking && (
+        // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
+        <SignOutSheet
+          provider={view.provider}
+          agents={view.agents}
+          keyConfigured={keyConfigured}
+          onCancel={() => setAsking(false)}
+          onConfirm={(also) => (setAsking(false), setTestLine(null), void signOutAccount(bridge, view.provider, also))}
+        />
+        // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
+      )}
     </div>
   );
 }

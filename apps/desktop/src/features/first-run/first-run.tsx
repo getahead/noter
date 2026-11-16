@@ -22,7 +22,7 @@ import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/s
 import { useAlert } from "../../ui/dialogs/host";
 import { installCli, installKey, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
-import { removeAlert } from "../settings/keys";
+import { keyConfigured, removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
 import { dbToLevel, hearing } from "./self-test";
 import { STEP_ORDER, stepperItems, type StepperItemState } from "./steps";
@@ -256,7 +256,7 @@ export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wiza
       </div>
       <div className="fr-keys">
         {accounts?.accounts.map((a) => (
-          <AccountRow key={a.provider} view={a} />
+          <AccountRow key={a.provider} bridge={bridge} view={a} keyConfigured={keyConfigured(accounts, a.provider)} />
         ))}
       </div>
       <div className="fr-runtime">

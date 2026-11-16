@@ -82,7 +82,7 @@ const RUNTIME_LABEL: Record<RuntimeChoice, MsgKey> = {
   local: "settings.runtimes.local",
 };
 
-/** A runtime the core can run on now; the own accounts count only from M3 (sign-in is not delivered), so they read not connected. */
+/** A runtime the core can run on now; an own account counts once it is signed in. */
 export function runtimeConnected(choice: RuntimeChoice, a: AccountsView | undefined): boolean {
   if (!a) return false;
   switch (choice) {
@@ -94,7 +94,7 @@ export function runtimeConnected(choice: RuntimeChoice, a: AccountsView | undefi
       return a.local.running;
     case "claude_account":
     case "chatgpt_account":
-      return false;
+      return a.accounts.some((x) => x.provider === (choice === "claude_account" ? "claude" : "chatgpt") && x.status.type === "signed_in");
   }
 }
 
@@ -106,3 +106,7 @@ export const runtimeChoices = (a: AccountsView | undefined, current: RuntimeChoi
     return { value, label: connected ? t(RUNTIME_LABEL[value]) : t("settings.runtimes.not_connected", { name: t(RUNTIME_LABEL[value]) }), disabled: !connected && value !== current };
   });
 // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-task
+
+/** The key an account falls back to when it signs out: Anthropic for Claude, Codex for ChatGPT. */
+export const keyConfigured = (a: AccountsView | undefined, provider: "claude" | "chatgpt"): boolean =>
+  !!a?.keys.some((k) => k.provider === (provider === "claude" ? "anthropic" : "codex") && k.status.type === "configured");

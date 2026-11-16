@@ -1,7 +1,7 @@
 // The commands of the API-key part of accounts (docs/features/ui/accounts.md, M2): read the accounts view,
 // store a key, remove one, install the local runtime. The key is sent once and held nowhere else.
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CliTool, KeyProvider } from "../../core/bindings";
+import type { AccountProvider, CliTool, KeyProvider } from "../../core/bindings";
 
 // @cpt-flow:cpt-noter-flow-ui-accounts-key:p1
 /** `accounts_get`: keys, own accounts and the local runtime, into the `accounts` slice (highest version wins). */
@@ -34,4 +34,23 @@ export function installCli(bridge: Bridge, tool: CliTool) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-install-local
   return bridge.act(installKey(tool), "cli_install", () => bridge.core.cliInstall({ tool }));
   // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-install-local
+}
+
+export const testKey = (provider: AccountProvider) => `account:test:${provider}`;
+
+// @cpt-flow:cpt-noter-flow-ui-accounts-manage:p1
+/** `account_test`: a real request through the CLI; the answer carries the latency only when it worked. */
+export function testAccount(bridge: Bridge, provider: AccountProvider) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-test
+  return bridge.act(testKey(provider), "account_test", () => bridge.core.accountTest({ provider }));
+  // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-test
+}
+
+export const signOutKey = (provider: AccountProvider) => `account:sign_out:${provider}`;
+
+/** `account_sign_out`: the slice is replaced only by the core's answer; the row never changes on a failure. */
+export function signOutAccount(bridge: Bridge, provider: AccountProvider, alsoInCli: boolean) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
+  return bridge.act(signOutKey(provider), "account_sign_out", () => bridge.core.accountSignOut({ provider, also_in_cli: alsoInCli }), { slice: "accounts" });
+  // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
 }
