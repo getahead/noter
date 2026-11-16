@@ -31,6 +31,10 @@ export interface SearchFieldProps extends Common {
   onRemoveToken?: (index: number) => void;
 }
 
+/** WebKit's inline predictions (Safari 18+) are not in React's input attributes. With any system text assist on, the first Esc
+ *  dismisses the suggestion instead of reaching the field, so Esc does not clear the text until it is pressed twice. */
+const NO_PREDICTIONS = { writingsuggestions: "false" };
+
 export type SearchKeyAction = "run" | "add-token" | "remove-last-token" | "clear" | "leave";
 
 /** What a key does in a search field: Return runs (adds a tag in a token field, as does a comma), ⌫ at the start
@@ -72,7 +76,7 @@ export function SearchField({ variant: v, state, value = "", tokens = [], placeh
           </button>
         </span>
       ))}
-      <input type="search" id={id} placeholder={placeholder} value={value} list={list} aria-label={ariaLabel || placeholder} aria-invalid={invalid || undefined} autoComplete="off" onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} onBlur={onBlur} />
+      <input type="search" id={id} placeholder={placeholder} value={value} list={list} aria-label={ariaLabel || placeholder} aria-invalid={invalid || undefined} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} {...NO_PREDICTIONS} onChange={(e) => onChange?.(e.target.value)} onKeyDown={onKeyDown} onBlur={onBlur} />
     </label>
   );
 }
