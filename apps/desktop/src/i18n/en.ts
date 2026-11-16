@@ -400,6 +400,8 @@ export const en = {
   "audit.export_all_only": "Export covers the whole log, not one call",
   "audit.exported": "Saved to {path}",
   "audit.total": { one: "{count} request · {size}", other: "{count} requests · {size}" },
+  "audit.loading": "Reading the log…",
+  "audit.total_so_far": { one: "{count} request so far · {size}", other: "{count} requests so far · {size}" },
   "audit.what.transcript": "Transcript text", "audit.what.summary": "Summary text", "audit.what.excerpts": "Document excerpts",
   "audit.what.question": "Search question", "audit.what.evidence": "Evidence lookup", "audit.what.lookup": "Live lookup",
   "audit.what.handoff": "Hand-off prompt", "audit.what.tool_result": "Tool result",

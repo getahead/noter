@@ -44,3 +44,55 @@ describe("audit commands", () => {
     expect(await exportAudit(bridge({ status: "error", error: { code: "cancelled" } }), "markdown")).toBeNull();
   });
 });
+
+import { createAudit, type AuditView } from "./audit";
+
+describe("audit store", () => {
+  const page = (ids: string[], next: string | null) => ({ status: "ok", data: { rows: ids.map((i) => row(i)), next_cursor: next, total: null } });
+  function store(answers: unknown[], onExport?: () => unknown) {
+    const gates: (() => void)[] = [];
+    const act = vi.fn((_k: string, cmd: string) => (cmd === "audit_export" ? Promise.resolve(onExport?.() ?? { status: "error", error: { code: "cancelled" } }) : new Promise((res) => gates.push(() => res(answers.shift())))));
+    const views: AuditView[] = [];
+    const s = createAudit({ act, core: { auditList: vi.fn(), auditExport: vi.fn() } } as never, (v) => views.push(v));
+    return { s, act, gates, views };
+  }
+  it("starts loading, then keeps the pages read", async () => {
+    const { s, gates } = store([page(["a"], "c1"), page(["a", "b"], null)]);
+    expect(s.view().status).toBe("loading");
+    const p = s.load(); gates[0](); await p;
+    expect(s.view()).toMatchObject({ status: "ready", cursor: "c1" });
+    const q = s.load(); gates[1](); await q;
+    expect(s.view().rows.map((r) => r.id)).toEqual(["a", "b"]);
+    expect(s.view().cursor).toBeNull();
+  });
+  it("ignores a second read while one is in flight", async () => {
+    const { s, act, gates } = store([page(["a"], null)]);
+    const p = s.load(); void s.load(); void s.load();
+    gates[0](); await p;
+    expect(act).toHaveBeenCalledTimes(1);
+    expect(s.view().busy).toBe(false);
+  });
+  it("a failed read keeps the rows and flags failure", async () => {
+    const { s, gates } = store([page(["a"], "c1"), { status: "error" }, page(["b"], null)]);
+    let p = s.load(); gates[0](); await p;
+    p = s.load(); gates[1](); await p;
+    expect(s.view()).toMatchObject({ failed: true, status: "ready", cursor: "c1" });
+    expect(s.view().rows).toHaveLength(1);
+    p = s.load(); gates[2](); await p;
+    expect(s.view()).toMatchObject({ failed: false });
+    expect(s.view().rows).toHaveLength(2);
+  });
+  it("drops a read that finishes after dispose", async () => {
+    const { s, gates, views } = store([page(["a"], null)]);
+    const p = s.load(); const n = views.length; s.dispose(); gates[0](); await p;
+    expect(views.length).toBe(n);
+  });
+  it("exports once at a time and reports only a returned path", async () => {
+    const { s, act } = store([], () => ({ status: "ok", data: { path: "/x", files: 1 } }));
+    await Promise.all([s.export(), s.export()]);
+    expect(act).toHaveBeenCalledTimes(1);
+    expect(s.view().exported).toBe("/x");
+    const c = store([]); await c.s.export();
+    expect(c.s.view().exported).toBeNull();
+  });
+});

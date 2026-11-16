@@ -81,3 +81,39 @@ export async function exportAudit(bridge: Bridge, format: LogFormat): Promise<Ex
   // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-save-result
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-export
+
+export interface AuditView {
+  rows: AuditEntry[];
+  cursor: string | null;
+  /** `loading` until the first page; a failed read keeps the rows already read and sets `failed`. */
+  status: "loading" | "ready";
+  failed: boolean;
+  busy: boolean;
+  exporting: boolean;
+  exported: string | null;
+}
+
+/** The audit reads and export as a small store: one read or export at a time, and a read that finishes after `dispose` is dropped. */
+export function createAudit(bridge: Bridge, notify: (v: AuditView) => void) {
+  let v: AuditView = { rows: [], cursor: null, status: "loading", failed: false, busy: false, exporting: false, exported: null };
+  let live = true;
+  const set = (p: Partial<AuditView>) => live && notify((v = { ...v, ...p }));
+  return {
+    view: () => v,
+    dispose: () => void (live = false),
+    /** First page, Load More and Try Again: all read from the current cursor. */
+    async load() {
+      if (v.busy) return;
+      set({ busy: true, failed: false });
+      const page = await readAudit(bridge, v.cursor);
+      if (!page) return set({ busy: false, failed: true, status: "ready" });
+      set({ busy: false, status: "ready", rows: mergePage(v.rows, page.rows), cursor: page.next_cursor });
+    },
+    async export() {
+      if (v.exporting) return;
+      set({ exporting: true });
+      const r = await exportAudit(bridge, "markdown");
+      set({ exporting: false, exported: r?.path ?? v.exported });
+    },
+  };
+}
