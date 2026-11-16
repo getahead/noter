@@ -37,9 +37,14 @@ export async function listenNativeMenuAction(handler: (key: string) => void): Pr
 }
 
 /** Calls page availability for context-sensitive native app menu items. */
-export async function updateNativeMenuContext(context: Partial<{ focused: boolean; exportEnabled: boolean; copySlackEnabled: boolean; copyJiraEnabled: boolean; copyMarkdownEnabled: boolean; deleteEnabled: boolean; acceptItemEnabled: boolean; acceptAllSuggestionsEnabled: boolean; rejectItemEnabled: boolean; sidebarVisible: boolean }>): Promise<void> {
-  if (typeof window === "undefined" || typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== "object") return;
-  await emit("shell:menu-context", context);
+let menuContextSent: Promise<unknown> = Promise.resolve();
+export function updateNativeMenuContext(context: Partial<{ focused: boolean; exportEnabled: boolean; copySlackEnabled: boolean; copyJiraEnabled: boolean; copyMarkdownEnabled: boolean; deleteEnabled: boolean; acceptItemEnabled: boolean; acceptAllSuggestionsEnabled: boolean; rejectItemEnabled: boolean; sidebarVisible: boolean }>): Promise<void> {
+  if (typeof window === "undefined" || typeof (window as Window & { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== "object") return Promise.resolve();
+  // Tauri runs concurrent emits on separate threads, so an older context (the effect cleanup's all-disabled one)
+  // could land after a newer one and leave the menu items disabled; one emit at a time keeps the host in call order.
+  const sent = menuContextSent.then(() => emit("shell:menu-context", context));
+  menuContextSent = sent.catch(() => {});
+  return sent;
 }
 
 /** The dialog plugin's native alert (macOS draws it); resolves true when the OK button was chosen. The plugin has no

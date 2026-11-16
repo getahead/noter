@@ -223,17 +223,13 @@ final class NativeAppMenuTests: NoterTestCase {
         last.click()
         XCTAssertTrue(waitUntil(10) { accessibilityTreeContains("Backend sync", in: main) && main.isHittable })
 
-        // The page pushes its menu state to the host after the call's items load; open the menu only
-        // once the suggestions are on the page, and reopen it if it was validated before the push landed.
+        // The page pushes its menu state to the host after the call's items load; open the menu once
+        // the suggestions are on the page and wait for the host to apply the push.
         XCTAssertTrue(main.staticTexts["Who owns the acceptance criteria for the reconnect?"].waitForExistence(timeout: 10), "the suggested items are loaded before the Edit menu opens")
         let edit = app.menuBars.menuBarItems["Edit"]
         let acceptAll = app.menuItems["Accept All Suggestions"]
-        var enabled = false
-        for _ in 0..<3 where !enabled {
-            edit.click()
-            enabled = waitUntil(3) { acceptAll.exists && acceptAll.isEnabled }
-            if !enabled { app.typeKey(.escape, modifierFlags: []) }
-        }
+        edit.click()
+        let enabled = waitUntil(10) { acceptAll.exists && acceptAll.isEnabled }
         XCTAssertFalse(app.menuItems["Accept Item"].isEnabled, "Accept Item requires a focused suggested row")
         XCTAssertFalse(app.menuItems["Reject Item"].isEnabled, "Reject Item requires a focused suggested row")
         XCTAssertTrue(enabled, "Accept All enables while all three item kinds have suggestions")
