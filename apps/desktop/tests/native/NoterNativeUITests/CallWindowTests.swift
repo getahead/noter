@@ -13,7 +13,7 @@ final class CallWindowTests: NoterTestCase {
         other.activate()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the call window")
-        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 5), "the call window has loaded its page")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call window has loaded its page") // a first-frame web process hang is restarted by the host watch after 10 s (#521)
         XCTAssertFalse(main.isHittable, "the call panel opened without restoring the main window")
         XCTAssertEqual(other.state, .runningForeground, "it shows without taking focus")
     }
@@ -27,7 +27,7 @@ final class CallWindowTests: NoterTestCase {
         other.activate()
         hotkey("n")
         XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the call window")
-        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 5), "the call window has loaded its page")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call window has loaded its page") // a first-frame web process hang is restarted by the host watch after 10 s (#521)
         XCTAssertFalse(main.isHittable, "the call panel opened without restoring the main window")
         clickKeepingFocus(callWindow)
         XCTAssertTrue(waitUntil(3) { self.other.state == .runningForeground }, "no click on the call window moves focus from the call app")
