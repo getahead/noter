@@ -153,6 +153,9 @@ final class NativeAppMenuTests: NoterTestCase {
     }
 
     func test_cpt_noter_seq_call_page_review_suggested_items__native_menu_accepts_focused_question() {
+        // An Accepted row outcome shows 4 s; the accessibility queries after the menu click take longer on CI
+        // (the page also scrolls under the pointer), so the launch hook keeps the outcome until Undo runs.
+        app.launchEnvironment["NOTER_TEST_HOLD_STATUS"] = "1"
         let main = openMenuReviewCall()
         let title = "Who owns the acceptance criteria for the reconnect?"
         let rowUndo = main.links["Undo: \(title)"]
@@ -166,9 +169,7 @@ final class NativeAppMenuTests: NoterTestCase {
         XCTAssertTrue(app.menuItems["Accept Item"].waitForExistence(timeout: 5) && app.menuItems["Accept Item"].isEnabled, "Accept Item enables for the focused question")
         XCTAssertTrue(app.menuItems["Reject Item"].isEnabled, "Reject Item enables for the focused question")
         attachScreenshot("app-menu-edit-focused-question")
-        let hold = pointOverOutcome(main: main, row: suggestion)
         app.menuItems["Accept Item"].click()
-        holdRowOutcome(hold)
         assertReviewedRowUndo(main: main, row: suggestion, title: title, rowUndo: rowUndo)
     }
 
@@ -265,9 +266,6 @@ final class NativeAppMenuTests: NoterTestCase {
         // The menu handler focuses the next suggestion after review, which can scroll this row
         // out of WebKit's accessibility viewport. Bring this exact row back before querying Undo.
         bringRowIntoView(main: main, row: row)
-        // The row outcome lasts 4 s unless it is hovered; the accessibility queries below (a full tree dump)
-        // can take longer on CI. Hover pauses its timer, so the row's Undo stays until it is clicked.
-        if rowUndo.exists && rowUndo.isHittable { rowUndo.hover() }
         XCTAssertTrue(rowUndo.exists && rowUndo.isHittable, "the menu action adds an accessible, visible Undo link to the selected row")
         XCTAssertTrue(main.buttons["Undo"].exists, "the global Undo strip remains a separate native button")
         let hierarchy = main.debugDescription
@@ -283,21 +281,6 @@ final class NativeAppMenuTests: NoterTestCase {
         edit.click()
         XCTAssertTrue(waitUntil(5) { app.menuItems["Accept Item"].exists && app.menuItems["Accept Item"].isEnabled && app.menuItems["Reject Item"].isEnabled }, "row Undo restores this selected item to Suggested")
         app.typeKey(.escape, modifierFlags: [])
-    }
-
-    /// Where a question row's "Accepted · Undo" status appears: on the line under its title, where the review
-    /// buttons were. Measured before the menu click, because the accessibility queries after it are slower
-    /// than the status's 4 s (its timer pauses while the pointer is over it).
-    private func pointOverOutcome(main: XCUIElement, row: XCUIElement) -> XCUICoordinate {
-        let f = row.frame
-        let w = main.frame
-        return main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: f.minX + 95 - w.minX, dy: f.midY + 27 - w.minY))
-    }
-
-    /// Moves the pointer over the status twice: the second move is a real pointer event after it rendered.
-    private func holdRowOutcome(_ point: XCUICoordinate) {
-        point.hover()
-        point.withOffset(CGVector(dx: 3, dy: 0)).hover()
     }
 
     private func bringRowIntoView(main: XCUIElement, row: XCUIElement) {

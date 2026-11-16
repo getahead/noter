@@ -72,6 +72,7 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
             if event == PageLoadEvent::Finished {
                 test_hooks::stall_after_load(webview);
                 test_hooks::terminate_after_load(webview);
+                test_hooks::hold_status_outcomes(webview);
             }
         })
         .on_window_event(|window, event| match event {

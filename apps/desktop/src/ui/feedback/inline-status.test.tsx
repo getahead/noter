@@ -109,3 +109,27 @@ describe("startStatusTimer (cpt-noter-state-ui-primitives-inline-status)", () =>
     expect(latest).toHaveBeenCalledOnce();
   });
 });
+
+describe("the native UI tests' hold hook (NOTER_TEST_HOLD_STATUS)", () => {
+  it("keeps a status past its time, even after the pointer has been over it", async () => {
+    const { startStatusTimer } = await import("./inline-status");
+    const flag = globalThis as { __NOTER_TEST_HOLD_STATUS__?: boolean };
+    flag.__NOTER_TEST_HOLD_STATUS__ = true;
+    try {
+      let now = 0;
+      const timers: { at: number; fn: () => void }[] = [];
+      const clock = { now: () => now, setTimeout: (fn: () => void, ms: number) => timers.push({ at: now + ms, fn }) - 1, clearTimeout: (h: unknown) => void (timers[h as number].at = Infinity) };
+      const cb = { current: vi.fn() };
+      const held = { hover: false, focus: false };
+      const timer = { current: startStatusTimer(2000, cb, held, clock) };
+      const h = statusHandlers(timer, held, true);
+      h.onPointerEnter?.();
+      h.onPointerLeave?.();
+      now = 60000;
+      timers.filter((t) => t.at <= now).forEach((t) => t.fn());
+      expect(cb.current).not.toHaveBeenCalled();
+    } finally {
+      flag.__NOTER_TEST_HOLD_STATUS__ = false;
+    }
+  });
+});
