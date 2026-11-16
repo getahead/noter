@@ -1,6 +1,6 @@
 //! The app updater: tauri-plugin-updater behind the core's `Updater`. A check downloads a newer
 //! release from the feed, which is ready once its signature verified; `update_install` installs
-//! it. M0 ships it wired but not released: tauri.conf.json names no feed and no signing key
+//! it. The app ships it wired but not released: tauri.conf.json names no feed and no signing key
 //! (owner decision, 19 Oct 2026), so a check finds nothing and `update_install` answers
 //! `not_found`.
 
