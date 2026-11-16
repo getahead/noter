@@ -77,17 +77,17 @@ jobs:
           fi
       # No build needed: Rust and TypeScript are analysed from source.
       - if: env.ANALYSE == 'true' || steps.base.outputs.found != 'true'
-        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           languages: ${{ matrix.language }}
           build-mode: none
           queries: security-and-quality
       - if: env.ANALYSE == 'true' || steps.base.outputs.found != 'true'
-        uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           category: ${{ env.CATEGORY }}
       - if: env.ANALYSE != 'true' && steps.base.outputs.found == 'true'
-        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         with:
           sarif_file: ${{ runner.temp }}/base.sarif
           category: ${{ env.CATEGORY }}
