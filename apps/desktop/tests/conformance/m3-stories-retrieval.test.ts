@@ -271,7 +271,7 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
     ok(await main.askStop({ turn_id: handle.turn_id }));
     const end = await until(() => got.find((m) => m.event.type === "failed"), "the stop");
     expect(end.event.type === "failed" && end.event.error.code).toBe("answer_stopped");
-    await pause(2500); // past the held answer
+    await pause(1800); // past the held answer (1500 ms)
     expect(types(got)).toEqual(["started", "failed"]);
     const turn = ok(await main.askThreadGet({ thread_id: handle.thread_id })).turns[0];
     expect(turn.found).toBe(false);
@@ -283,7 +283,7 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
     const { handle, got } = await slowTurn(1500);
     ok(await main.askThreadDelete({ thread_id: handle.thread_id }));
     await until(() => got.find((m) => m.event.type === "failed"), "the cancelled turn");
-    await pause(2500);
+    await pause(1800);
     expect(types(got)).toEqual(["started", "failed"]);
     expect(refused(await main.askThreadGet({ thread_id: handle.thread_id })).code).toBe("not_found");
     expect(await rows(s, "SELECT id FROM ask_turns WHERE thread_id = ?", handle.thread_id)).toEqual([]);
