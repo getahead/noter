@@ -10,8 +10,9 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 
 | Issue | Check | Seen | Fix | State |
 | --- | --- | ---: | --- | --- |
-| [#869](https://github.com/getahead/noter/issues/869) | Settings search clear-by-Escape: first Escape after typing is not applied (`WindowSizeTests`, native) | 4 / 4 | [#875](https://github.com/getahead/noter/pull/875) | open |
+| [#869](https://github.com/getahead/noter/issues/869) | Settings search clear-by-Escape: first Escape after typing is not applied (`WindowSizeTests`, native) | 4 / 4 | [#875](https://github.com/getahead/noter/pull/875) | closed |
 | [#882](https://github.com/getahead/noter/issues/882) | Core harness boot Q7 engine-kill drill: restart inside 1 ms recorded a zero-length gap, which the core drops | 7 / 150 under 12-process local load | [#883](https://github.com/getahead/noter/pull/883) | closed |
+| [#890](https://github.com/getahead/noter/issues/890) | Core models `refresh_models_rereads_the_models_folder`: refresh ran while the finishing download task still counted as running, so it was ignored | 1 / 1 CI run (#889), 0 / 300 locally under 24-process load | [#PR](https://github.com/getahead/noter/pull/PR) | closed |
 | [#870](https://github.com/getahead/noter/issues/870) | Native menu Accept Item: row Undo link gone before the test reads it (4 s row outcome) | retried on 2 runs | [#876](https://github.com/getahead/noter/pull/876) | closed |
 | [#874](https://github.com/getahead/noter/issues/874) | Native menu Accept All validated disabled before the page pushed its state | retried on 1 run | [#876](https://github.com/getahead/noter/pull/876) | closed |
 | [#667](https://github.com/getahead/noter/issues/667) | MCP tool router reads the launch before the adapter receives it | 4 / 80 under 16-process local load | [#799](https://github.com/getahead/noter/pull/799) | closed |

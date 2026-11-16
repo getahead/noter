@@ -566,6 +566,8 @@ async fn refresh_models_rereads_the_models_folder() {
             .all(|b| b.state == BundleState::Ready)
     })
     .await;
+    // Every bundle is Ready a moment before the task ends; `refresh_models` ignores a running one.
+    wait_for_model_run_to_stop(&s.core).await;
     // The folder changed outside the core (a restore, the harness's world_set).
     std::fs::remove_dir_all(dir.path().join("models").join("bge-m3")).unwrap();
     s.core.refresh_models();
