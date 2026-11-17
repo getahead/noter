@@ -2757,7 +2757,7 @@ Topic thread:
 
 #### Screen — Ask
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-ask`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-ask`
 
 ##### Why this component exists
 
@@ -6753,7 +6753,7 @@ A document row has: title; source glyph and name (**Confluence**); heading path 
 
 #### Component — Cited answer
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-cited-answer`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-cited-answer`
 
 ##### Why this component exists
 
