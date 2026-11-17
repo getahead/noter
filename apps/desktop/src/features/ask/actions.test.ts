@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { currentStream, isStopKey, isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
+import { afterTurn, currentStream, isStopKey, isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -93,5 +93,24 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     const second = { turn_id: "t2", thread_id: "a" };
     expect(currentStream(second, "t1")).toBe(second);
     expect(currentStream(null, "t1")).toBeNull();
+  });
+  it("carries a conversation through two questions: the second is not settled on the first's stream", async () => {
+    // the page's bookkeeping, step by step: ask 1, its stream arrives and settles, ask 2 while the slice still holds stream 1
+    let previous: string | null = null;
+    let slice: { turn_id: string; thread_id: string } | null = null;
+    const shown = () => currentStream(slice, previous);
+    previous = afterTurn(shown(), previous); // Return on question 1
+    expect(shown()).toBeNull();
+    slice = { turn_id: "t1", thread_id: "a" };
+    expect(shown()).toBe(slice);
+    const set = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };
+    await settleTurn(make(ok({ turns: [1] })).bridge, "a", "ready", set);
+    expect(set.setAsking).toHaveBeenCalledWith(null); // question 1 is settled
+    previous = afterTurn(shown(), previous); // Return on question 2: the slice still holds stream 1
+    expect(shown()).toBeNull(); // nothing to settle: question 2 stays asked, Stop can show
+    slice = { turn_id: "t2", thread_id: "a" };
+    expect(shown()).toMatchObject({ turn_id: "t2" });
+    previous = afterTurn(shown(), previous); // question 3
+    expect(shown()).toBeNull();
   });
 });

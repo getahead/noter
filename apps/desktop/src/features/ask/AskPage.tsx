@@ -7,7 +7,7 @@ import type { AskAnswer, AskThreadRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
-import { currentStream, isStopKey, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, currentStream, isStopKey, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { foldTurn, groupThreads, paragraphs, phaseOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
@@ -62,6 +62,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const send = () => {
     const question = questionOf(draft, busy);
     if (!question) return;
+    previousTurn.current = afterTurn(data, previousTurn.current); // the answered turn's data must not settle or show as the follow-up
     setAsking(question);
     setDraft("");
     startAsk(bridge, thread, question, presets.find((p) => p.id === scopeId)?.scope);

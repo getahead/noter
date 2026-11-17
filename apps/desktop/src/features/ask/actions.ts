@@ -82,3 +82,6 @@ export const isStopKey = (e: { key: string; metaKey: boolean }): boolean => e.me
 
 /** The ask_start stream of the turn now being asked: the previous turn's data stays in the slice until the new subscription replaces it, and must not settle or render as the new answer. */
 export const currentStream = <T extends { turn_id: string }>(data: T | null, previousTurn: string | null): T | null => (data && data.turn_id !== previousTurn ? data : null);
+
+/** The turn a new question follows: the one whose data the stream slice holds now (or the one before it while that has not arrived). */
+export const afterTurn = (current: { turn_id: string } | null, previous: string | null): string | null => current?.turn_id ?? previous;
