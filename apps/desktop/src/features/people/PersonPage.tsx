@@ -11,7 +11,7 @@ import { Table } from "../../ui/primitives/table";
 import { HistoryTimeline } from "../history/HistoryTimeline";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
-import { holdPerson, usePersonTab, type PersonTab } from "./person-store";
+import { holdPerson, usePersonNotice, usePersonReread, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
 
@@ -35,6 +35,8 @@ export function PersonPage({ id }: { id: string }) {
   const [state, setState] = useState<PersonState>({ status: "LOADING", page: null, error: null });
   const [slow, setSlow] = useState(false);
   const [reads, setReads] = useState(0);
+  const reread = usePersonReread();
+  const notice = usePersonNotice();
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
@@ -45,7 +47,7 @@ export function PersonPage({ id }: { id: string }) {
       setState((s) => ({ status: "ERROR", page: s.page, error: res.error }));
     });
     return () => void (current = false);
-  }, [bridge, id, known?.rev, reads]);
+  }, [bridge, id, known?.rev, reads, reread]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     holdPerson(state.page);
@@ -58,7 +60,7 @@ export function PersonPage({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [state.status]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-overview
-  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} />;
+  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} notice={notice} />;
 }
 
 export interface PersonBodyProps {
@@ -69,10 +71,12 @@ export interface PersonBodyProps {
   slow: boolean;
   onRetry: () => void;
   onShowAll?: () => void;
+  /** A refused action of the menu, shown above the view. */
+  notice?: string | null;
 }
 
 /** What the page draws for a read of the person. */
-export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll }: PersonBodyProps) {
+export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll, notice }: PersonBodyProps) {
   const { page } = state;
   if (!page) {
     if (state.status === "ERROR")
@@ -95,6 +99,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
   return (
     <div data-region="PE" data-state={tab}>
       <h2 className="np-sr" tabIndex={-1}>{p.display_name}</h2>
+      {notice && <InlineBanner banner={{ id: "person-notice", severity: "error", text: notice }} />}
       {tab === "calls" ? (
         <div data-region="PE-CALLS" role="region" aria-label={t("person.tab.calls")}>
           <CallsTable bridge={bridge} calls={page.calls} prefs={prefs} name={p.short_name} />
