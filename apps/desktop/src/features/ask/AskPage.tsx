@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { AskAnswer, AskThreadRow, TimeSpan } from "../../core/bindings";
+import type { AskAnswer, AskScope, AskThreadRow, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { navigate } from "../shell/navigate";
 import { PushButton } from "../../ui/primitives/push-button";
@@ -13,7 +13,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startFromRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
@@ -31,6 +31,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const [draft, setDraft] = useState("");
   const [asking, setAsking] = useState<string | null>(null);
   const [announce, setAnnounce] = useState("");
+  const [routeError, setRouteError] = useState(false);
   const stream = useWindow(bridge, (s) => s.streams.ask_start);
   const loadError = useWindow(bridge, (s) => s.commands["ask:list"]?.state === "ERROR");
 
@@ -71,12 +72,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 
-  // `new:<words>` (Ask Instead, a Library question) asks those words once per history entry
+  // `new:<words>` (Ask Instead, a Library question) asks those words once per history entry; `new-topic:<id>` asks about that topic
   useEffect(() => {
-    // started from a timer the cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the
-    // asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing
-    const h = setTimeout(() => startFromRoute(routeKey, (q) => ask(q)), 0);
-    return () => clearTimeout(h);
+    setRouteError(false);
+    return startRoute(bridge, routeKey, ask, () => setRouteError(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
   // ...and once it is stored the entry becomes the thread
@@ -109,12 +108,12 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   }, [asking, data, phase, bridge, refresh]);
 
   // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-submit
-  const ask = (question: string) => {
+  const ask = (question: string, scope?: AskScope) => {
     previousTurn.current = afterTurn(data, previousTurn.current); // the answered turn's data must not settle or show as the follow-up
     setAnnounce("");
     setAsking(question);
     setDraft("");
-    startAsk(bridge, thread, question, presets.find((p) => p.id === scopeId)?.scope);
+    startAsk(bridge, thread, question, scope ?? scopeOf(presets, scopeId));
   };
   // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-submit
   // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-follow-up
@@ -137,6 +136,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       bridge={bridge}
       rows={rows}
       loadError={loadError}
+      routeError={routeError}
       thread={thread}
       turns={turns}
       asking={asking}
@@ -168,6 +168,8 @@ export interface AskViewProps {
   bridge: Bridge;
   rows: AskThreadRow[];
   loadError: boolean;
+  /** The topic a `new-topic:` arrival names could not be read. */
+  routeError?: boolean;
   thread: string | null;
   turns: AskAnswer[];
   asking: string | null;
@@ -191,7 +193,7 @@ export interface AskViewProps {
 }
 
 /** The three regions of the page: recent questions, the thread and the composer. */
-export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, phase, draft, busy, onOpen, onCopyQuestion, onDelete, onDraft, onSend, announce, suggestions, onSuggest, onStop, onRetry, onPlay, bar }: AskViewProps) {
+export function AskView({ bridge, rows, loadError, routeError, thread, turns, asking, turn, phase, draft, busy, onOpen, onCopyQuestion, onDelete, onDraft, onSend, announce, suggestions, onSuggest, onStop, onRetry, onPlay, bar }: AskViewProps) {
   const empty = turns.length === 0 && !asking;
   const groups = groupThreads(rows, Date.now());
   return (
@@ -214,6 +216,7 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
       {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-first */}
       <section className="ak-thread" data-region="AK-R3" aria-label={t("ask.thread")}>
         <div role="status" className="ak-live">{announce}</div>
+        {routeError && <InlineBanner banner={{ id: "ask-topic-error", severity: "error", text: t("ask.topic_error") }} />}
         {empty && <h2 className="ak-first__h">{t("ask.first_heading")}</h2>}
         {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
         {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}

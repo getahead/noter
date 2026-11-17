@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { askState } from "./ask-state";
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, startRoute, topicOfRoute, scopeOf } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -13,6 +14,7 @@ const make = (result: unknown) => {
     askThreadDelete: vi.fn(async () => result),
     audioPlay: vi.fn(async () => result),
     openExternal: vi.fn(async () => result),
+    topicGet: vi.fn(async () => result),
   };
   const bridge = { core, act: (_k: string, _c: string, f: () => unknown) => f(), subscribe: vi.fn() } as unknown as Bridge;
   return { bridge, core, subscribe: bridge.subscribe as ReturnType<typeof vi.fn> };
@@ -231,5 +233,52 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     const { bridge, core } = make(ok({}));
     await openDocument(bridge, "doc_1", "ch_2");
     expect(core.openExternal).toHaveBeenCalledWith({ target: { type: "document", document_id: "doc_1", chunk_id: "ch_2" } });
+  });
+  it("asks about a routed topic once, scoped to it, with its name in the question", async () => {
+    const { bridge } = make(ok({ topic: { name: "Websocket notifications" } }));
+    const ask = vi.fn();
+    expect(topicOfRoute("new-topic:tp_1")).toBe("tp_1");
+    expect(topicOfRoute("new-topic:")).toBeNull();
+    expect(topicOfRoute("new:tp_1")).toBeNull();
+    expect(await startFromTopicRoute(bridge, "new-topic:tp_1", ask)).toBe(true);
+    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about Websocket notifications?", { preset: "topic:tp_1", topic_id: "tp_1" });
+    expect(await startFromTopicRoute(bridge, "new-topic:tp_1", ask)).toBe(false); // remount on the same entry
+    expect(await startFromTopicRoute(bridge, "root", ask)).toBe(false);
+    expect(ask).toHaveBeenCalledOnce();
+    const replace = vi.fn();
+    settleRoute("new-topic:tp_1", "ask_9", true, replace);
+    expect(replace).toHaveBeenCalledWith({ section: "ask", key: "thread:ask_9" });
+  });
+  it("keeps a topic route askable when the topic cannot be read or the page was left", async () => {
+    const ask = vi.fn();
+    const onError = vi.fn();
+    expect(await startFromTopicRoute(make(err).bridge, "new-topic:tp_2", ask, () => true, onError)).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
+    const good = make(ok({ topic: { name: "X" } })).bridge;
+    expect(await startFromTopicRoute(good, "new-topic:tp_2", ask, () => false)).toBe(false);
+    expect(await startFromTopicRoute(good, "new-topic:tp_2", ask)).toBe(true);
+  });
+  it("starts a routed ask from a timer the cleanup cancels", async () => {
+    vi.useFakeTimers();
+    const ask = vi.fn();
+    const { bridge } = make(ok({ topic: { name: "T" } }));
+    startRoute(bridge, "new:Hello", ask)(); // left at once: nothing is asked
+    await vi.runAllTimersAsync();
+    expect(ask).not.toHaveBeenCalled();
+    startRoute(bridge, "new:Hello", ask);
+    startRoute(bridge, "new-topic:tp_7", ask);
+    await vi.runAllTimersAsync();
+    expect(ask).toHaveBeenCalledWith("Hello");
+    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about T?", { preset: "topic:tp_7", topic_id: "tp_7" });
+    vi.useRealTimers();
+  });
+  it("selects the topic scope on arrival and keeps it for follow-ups", async () => {
+    const good = make(ok({ topic: { name: "T" } })).bridge;
+    await startFromTopicRoute(good, "new-topic:tp_9", vi.fn());
+    expect(askState().scopeId).toBe("topic:tp_9");
+    const listed = { id: "topic:tp_9", scope: { preset: "topic:tp_9", topic_id: "tp_9", people: [] } } as never;
+    expect(scopeOf([listed], "topic:tp_9")).toEqual((listed as { scope: unknown }).scope);
+    expect(scopeOf([], "topic:tp_9")).toEqual({ preset: "topic:tp_9", topic_id: "tp_9" }); // the follow-up's scope, not All calls
+    expect(scopeOf([], "all")).toBeUndefined();
   });
 });
