@@ -390,6 +390,7 @@ export const en = {
   "settings.privacy.left_mac": "What left this Mac",
   "settings.privacy.left_mac_later":
     "The log of what left this Mac arrives in a later version.",
+  "status.running": "Running", "status.running_again": "Running…", "status.of": "{done} of {total}",
   "settings.privacy.share_test": "Screen Share Test…",
   "settings.call.screen": "Call screen",
   "settings.call.display": "Call screen display",
