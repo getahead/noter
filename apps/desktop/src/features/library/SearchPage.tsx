@@ -76,6 +76,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     if (status === "NO_MATCHES")
       return (
         <>
+          <p className="np-sr" role="status">{t("search.none", { query })}</p>
           <EmptyState variant="filtered" title={t("search.none", { query })} body={[filtered ? t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length }) + "." : "", t("search.try_fewer")].filter(Boolean).join(" ")} />
           {widen}
         </>
@@ -132,7 +133,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         {/* @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
         {how && (
-          <Popover variant="how-searched" anchor={howAt.current} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
+          <Popover variant="how-searched" anchor={howAt.current?.querySelector<HTMLElement>("a") ?? null} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
             <div className="lb-pop">
               <strong>{t("search.how_title")}</strong>
               <span>{t("search.how_words", { words: r.explain.normalized_query || query })}</span>

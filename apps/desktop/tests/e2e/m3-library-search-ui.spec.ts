@@ -66,6 +66,23 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     await expect(page.locator('[data-state="highlighted"], .np-hl-evidence').first()).toContainText("notification service");
   });
 
+  test("UI — AC2: a search with no matches says so in the live region, as results are counted there", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "Lizenzprüfung im Installer");
+    await expect(page.getByRole("status").filter({ hasText: "No matches for “Lizenzprüfung im Installer”" })).toHaveCount(1);
+  });
+
+  test("UI — AC4: Esc on the mouse-opened Show How Noter Searched popover puts focus back on its link", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "notification service");
+    const how = page.getByRole("link", { name: "Show How Noter Searched" });
+    await how.click(); // by mouse: WebKit leaves no focused element behind
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toHaveCount(0);
+    await expect(how).toBeFocused();
+  });
+
   test("UI — empty path: no matches for “Lizenzprüfung im Installer” offers Try fewer words, Clear Filters and Ask Instead, which asks the same words in a new thread", async ({ page }) => {
     await openCalls(page);
     await button(page, /^Type/).click();
