@@ -80,12 +80,14 @@ export function TopicsBody({ bridge, status, retry, topics, shown, names, words,
         <EmptyState variant="large" icon="thread" heading title={t("topics.empty_title")} body={t("topics.empty_body")} />
       </div>
     );
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-clear-topic
   if (!shown.length)
     return (
       <div data-region="LT-R2" role="region" aria-label={t("topics.title")} data-state="no-match">
         <EmptyState variant="filtered" title={t("topics.no_match", { query: words.trim() })} actionLabel={t("topics.clear_search")} onAction={() => setTopicWords("")} />
       </div>
     );
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-clear-topic
   // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-topics
   return (
     <div data-region="LT-R2" role="region" aria-label={t("topics.title")} data-state="topics">

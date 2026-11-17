@@ -173,6 +173,17 @@ describe("ContextMenu", () => {
     expect(items([]).find((i) => i.label === "Remove Tag")!.disabled).toBe(true);
   });
 
+  it("offers Export… with ⌘E before Delete…, running it after closing the menu", () => {
+    const [onClose, onExport] = [vi.fn(), vi.fn()];
+    const items = find(rendered(ContextMenu, { onClose, single: null, onOpen: vi.fn(), onDelete: vi.fn(), onAddTag: vi.fn(), tags: ["release"], onRemoveTag: vi.fn(), onExport }), (p) => Array.isArray(p.items)).props.items as { label?: string; kbd?: string; onSelect?: () => void }[];
+    expect(items.filter((i) => i.label).map((i) => i.label)).toEqual(["Open", "Add Tag…", "release", "Export…", "Delete…"]);
+    const exp = items.find((i) => i.label === "Export…")!;
+    expect(exp.kbd).toBe("⌘E");
+    exp.onSelect!();
+    expect(onExport).toHaveBeenCalledOnce();
+    expect(onClose).toHaveBeenCalled();
+  });
+
   it("disables Open when several calls are selected", () => {
     const tree = rendered(ContextMenu, {
       onClose: vi.fn(),

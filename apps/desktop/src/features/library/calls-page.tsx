@@ -86,12 +86,16 @@ export function CallsPage() {
   );
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     const { next } = reconcile(fstate, a);
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     setFstate(next);
     holdFilter(next);
   };
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-calls
   const filtered = isFiltered(fstate.filter);
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-calls
   useEffect(() => {
     if (filtered && state.status === "LISTED")
       void announce({ kind: "confirmation", text: t("filters.matches", { count: state.total ?? state.rows.length }), key: `m${state.total}` });
@@ -299,6 +303,7 @@ export function CallsPage() {
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
       onRemoveTag={(tag) => void tagCalls(bridge, chosen.map((c) => c.id), [], [tag]).then((r) => r.status === "ok" && setFresh((n) => n + 1))}
+      onExport={exportStore.run}
       onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );

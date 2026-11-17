@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
-import { SearchResultRow, togglePlay } from "./SearchResultRow";
+import { isPlayingSpan, SearchResultRow, togglePlay } from "./SearchResultRow";
 
 const hit = { target: { type: "item", item_id: "i1" }, title: "Planning", snippet: "<img src=x onerror=alert(1)> websocket", highlights: [{ start: 29, end: 38 }], lang: "ru", strength: "weak", call: { id: "c1", title: "Planning" }, cross_language: true } as never;
 
@@ -60,5 +60,21 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
     expect(await togglePlay(fail("audio_deleted"), span, false)).toEqual({ playing: false, note: "transcript.play.no_audio" });
     expect(await togglePlay(fail("replay_needs_headphones"), span, false)).toMatchObject({ note: "transcript.play.speakers" });
     expect(await togglePlay(fail("internal"), span, false)).toMatchObject({ note: "search.play_failed" });
+  });
+  it("Pause follows the window's playback: only while playing this span, and it goes back to Play when playback ends or moves on", () => {
+    const span = { call_id: "c1", t0_ms: 1000, t1_ms: 4000, channel: null };
+    const on = { playing: true, call_id: "c1", position_ms: 1000 } as never;
+    expect(isPlayingSpan(on, span)).toBe(true);
+    expect(isPlayingSpan({ ...(on as object), position_ms: 4000 } as never, span)).toBe(true);
+    expect(isPlayingSpan({ ...(on as object), playing: false } as never, span)).toBe(false); // ended
+    expect(isPlayingSpan({ ...(on as object), position_ms: 9000 } as never, span)).toBe(false); // another span
+    expect(isPlayingSpan({ ...(on as object), call_id: "c2" } as never, span)).toBe(false);
+    expect(isPlayingSpan(null, span)).toBe(false);
+    expect(isPlayingSpan(on, null)).toBe(false);
+    const seg = { ...(hit as object), target: { type: "segment", span } } as never;
+    const label = (playback: unknown) => renderToString(<SearchResultRow bridge={{} as never} hit={seg} playback={playback as never} />);
+    expect(label(on)).toContain('aria-label="Pause"');
+    expect(label(null)).toContain('aria-label="Play this line"');
+    expect(label({ ...(on as object), playing: false })).toContain('aria-label="Play this line"');
   });
 });
