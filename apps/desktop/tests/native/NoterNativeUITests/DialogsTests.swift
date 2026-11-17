@@ -73,9 +73,10 @@ final class DialogsTests: NoterTestCase {
     // whose default is Cancel; Delete removes the person and returns to People.
     func test_cpt_noter_seq_people_name_unnamed_speaker__delete_a_person() {
         launch("idle")
+        // The page takes keys once it has loaded: right after launch ⌘4 can reach an empty web view.
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
         app.typeKey("4", modifierFlags: .command)
-        let people = app.tables["People"].firstMatch
-        let row = people.descendants(matching: .staticText)["Oleg M."].firstMatch
+        let row = app.staticTexts["Oleg M."].firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "⌘4 shows People with Oleg M.")
         row.click()
         app.typeKey(.return, modifierFlags: [])
@@ -92,8 +93,7 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.buttons["Delete"].waitForExistence(timeout: 5))
         alert.buttons["Delete"].click()
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
-        let list = app.tables["People"].firstMatch
-        XCTAssertTrue(list.waitForExistence(timeout: 5), "the deleted person's page gives way to People")
-        XCTAssertFalse(list.descendants(matching: .staticText)["Oleg M."].firstMatch.waitForExistence(timeout: 3), "Oleg M. is gone from People")
+        XCTAssertTrue(app.staticTexts["Anna K."].firstMatch.waitForExistence(timeout: 5), "the deleted person's page gives way to People")
+        XCTAssertTrue(app.staticTexts["Oleg M."].firstMatch.waitForNonExistence(timeout: 5), "Oleg M. is gone from People")
     }
 }
