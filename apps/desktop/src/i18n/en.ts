@@ -388,7 +388,6 @@ export const en = {
     "Off by default. These rows don’t exist anywhere until you turn this on. They count only calls from the moment you turn it on.",
   "settings.privacy.voice_profiles": "Voice profiles",
   "settings.privacy.left_mac": "What left this Mac",
-  "sources.kind_folder": "Folder", "sources.kind_mcp": "MCP",
   "sources.add_folder_title": "Add Folder",
   "sources.add_folder_note": "Noter keeps this folder indexed and watches it for changes. You choose the folder next.",
   "sources.add_mcp_title": "Add MCP Server",
