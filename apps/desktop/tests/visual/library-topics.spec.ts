@@ -63,3 +63,63 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     });
   });
 }
+
+// Rename, merge and keep separate (cpt-noter-dod-ui-library-search-topics-topics): the thread's ⋯ menu, the merge suggestion
+// banner, the Rename and Merge sheets, the duplicate-name state and the undo strips, at Wide.
+const suggest = (w: World) => {
+  const [a, b] = w.topics;
+  a!.merge_suggestion = { id: b!.id, name: b!.name };
+};
+const thread = async (page: Page) => {
+  await topics(page, WIDTHS.wide, suggest);
+  await page.locator(TOPIC_ROW).first().click();
+  await expect(page.locator('[data-region="TH-R3"]')).toBeVisible();
+};
+const menu = async (page: Page, item: string) => {
+  await page.getByRole("button", { name: "More", exact: true }).click();
+  await page.getByRole("menuitem", { name: item }).click();
+};
+test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at wide", () => {
+  test("thread with the merge suggestion", async ({ page }) => {
+    await thread(page);
+    await expect(page.getByText(/Looks like the same subject as/)).toBeVisible();
+    await shot(page, "topics-thread-suggestion", "wide");
+  });
+  test("Rename sheet", async ({ page }) => {
+    await thread(page);
+    await menu(page, "Rename…");
+    await expect(page.getByRole("dialog", { name: "Rename topic" })).toBeVisible();
+    await shot(page, "topics-rename", "wide");
+  });
+  test("Rename to a name that is taken offers Merge Instead", async ({ page }) => {
+    await thread(page);
+    await menu(page, "Rename…");
+    const other = await page.locator(TOPIC_ROW).nth(1).textContent().catch(() => null);
+    const field = page.getByRole("textbox", { name: "Topic name" });
+    await field.fill(other?.trim() || "Notification service");
+    await page.getByRole("button", { name: "Rename", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Merge Instead" })).toBeVisible();
+    await shot(page, "topics-rename-taken", "wide");
+  });
+  test("Rename done with its undo strip", async ({ page }) => {
+    await thread(page);
+    await menu(page, "Rename…");
+    await page.getByRole("textbox", { name: "Topic name" }).fill("Drawer redesign, renamed");
+    await page.getByRole("button", { name: "Rename", exact: true }).click();
+    await expect(page.getByText(/Renamed topic to/)).toBeVisible();
+    await shot(page, "topics-renamed-undo", "wide");
+  });
+  test("Merge sheet", async ({ page }) => {
+    await thread(page);
+    await menu(page, "Merge With…");
+    await expect(page.getByRole("dialog", { name: "Merge topics" })).toBeVisible();
+    await shot(page, "topics-merge", "wide");
+  });
+  test("Merge done with its undo strip", async ({ page }) => {
+    await thread(page);
+    await page.getByRole("button", { name: "Merge", exact: true }).click();
+    await page.getByRole("button", { name: "Merge", exact: true }).last().click();
+    await expect(page.getByText(/Merged \d+ items? into/)).toBeVisible();
+    await shot(page, "topics-merged-undo", "wide");
+  });
+});

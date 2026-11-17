@@ -123,7 +123,8 @@ describe("toolbars and thread rows", () => {
     const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
     expect(bar.props.title).toBe("Drawer redesign");
     expect(bar.props.subtitle).toBe("3 calls");
-    expect((find(bar, (p) => "trailing" in p).props.trailing as { props: { disabled: boolean } }).props.disabled).toBe(true);
+    const trailing = find(bar, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { disabled: boolean } }] } };
+    expect(trailing.props.children[0].props.disabled).toBe(true);
     expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
     setHead({ title: null, subtitle: null });
   });

@@ -88,13 +88,12 @@ describe("rename and merge sheets (cpt-noter-state-ui-library-search-topics-view
 });
 
 describe("thread actions", () => {
-  it("draws Rename…, Merge With… and the suggestion with Merge and Keep Separate", async () => {
+  it("draws the suggestion with Merge and Keep Separate (Rename… and Merge With… live in the toolbar ⋯ menu)", async () => {
     const [a, b] = await ready();
     const topic = { ...a!, merge_suggestion: { id: b!.id, name: b!.name } };
     const actions = { rename: vi.fn(), merge: vi.fn(), keepSeparate: vi.fn() };
     const h = renderToString(<ThreadView bridge={bridge} status="READY" retry={() => {}} data={{ topic, groups: [] }} months={[]} actions={actions} />);
-    expect(h).toContain("Rename…");
-    expect(h).toContain("Merge With…");
+    expect(h).not.toContain("Rename…");
     expect(h).toContain("Keep Separate");
     expect(h).toContain(`Looks like the same subject as “${b!.name}”`);
   });

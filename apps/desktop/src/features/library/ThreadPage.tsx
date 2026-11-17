@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import { ThreadRow } from "./ThreadRow";
 import { usePublishHead } from "./topics-head";
+import { usePublishThreadMenu, type MenuEntry } from "./thread-menu";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import type { TopicRow, TopicThread, UiPrefs } from "../../core/bindings";
 import { useSheet } from "../../ui/dialogs/host";
 import type { Sheets } from "../../ui/dialogs/sheets";
-import { PushButton } from "../../ui/primitives/push-button";
 import { openTopic } from "./topic-nav";
 import { MergeSheet } from "./MergeSheet";
 import { RenameSheet } from "./RenameSheet";
@@ -39,6 +39,10 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
     sheets.register("topic-merge", MergeSheet as never);
   }, [sheets]);
   const actions = data && threadActions(sheets, bridge, data.topic, all, retry);
+  const latest = useRef(actions);
+  latest.current = actions;
+  const menu = useMemo<MenuEntry[]>(() => [{ label: t("topics.rename"), onAction: () => latest.current?.rename() }, { label: t("topics.merge_with"), onAction: () => latest.current?.merge() }], []);
+  usePublishThreadMenu(data ? menu : null);
   return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} />;
 }
 
@@ -77,12 +81,6 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
   // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-thread
   return (
     <>
-      {actions && (
-        <div data-region="TH-R1" className="lb-thactions">
-          <PushButton label={t("topics.rename")} size="small" onAction={actions.rename} />
-          <PushButton label={t("topics.merge_with")} size="small" onAction={actions.merge} />
-        </div>
-      )}
       {actions && data.topic.merge_suggestion && (
         <div data-region="TH-R2" className="lb-thmerge">
           <InlineBanner
