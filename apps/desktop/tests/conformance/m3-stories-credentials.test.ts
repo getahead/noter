@@ -293,6 +293,12 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     const job = ok(await s.core("settings").cliInstall({ tool: "claude_code" }));
     await until(() => jobs.all.map((j) => j.run).find((r) => r.id === job.job_run_id && r.status === "succeeded"), "the install job");
     expect(cliOf(ok(await s.core("settings").accountsGet({})))).toMatchObject({ installed: true, version: "2.1.300", supported: true });
+    // The local runtime follows a scripted Ollama: not installed hides it, Install Ollama… brings it back.
+    await control("account_cli", { tool: "ollama", installed: false });
+    expect((await accounts()).local).toMatchObject({ cli: { installed: false }, running: false, models: [] });
+    const ollama = ok(await s.core("settings").cliInstall({ tool: "ollama" }));
+    await until(() => jobs.all.map((j) => j.run).find((r) => r.id === ollama.job_run_id && r.status === "succeeded"), "the Ollama install job");
+    expect((await accounts()).local).toMatchObject({ cli: { installed: true }, running: true, models: ["scripted"] });
     // Sign out: roles on the account fall back to its API-key runtime; the account is signed out.
     expect(keyStatus(ok(await s.core("settings").apiKeySet({ provider: "codex", key: KEY })), "codex")).toMatchObject({ type: "configured" });
     await useRoles("chatgpt_account");

@@ -442,6 +442,7 @@ impl Harness {
         let llm = Adapters::scripted(&scripted);
         let secrets = Arc::new(MemorySecrets::default());
         let account_cli = ScriptedAccountCli::new();
+        scripted.follow(&account_cli);
         let now = clock.clone();
         let mcp = Arc::new(ScriptedMcp::new(Arc::new(move || now.now())));
         let panel = Arc::new(ScriptedPanel {

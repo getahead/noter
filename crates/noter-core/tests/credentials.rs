@@ -76,6 +76,7 @@ fn open(dir: &Path, script: Option<&str>) -> World {
     let clock = Arc::new(TickClock(AtomicI64::new(1_790_000_000_000)));
     let panel = Arc::new(Panel(Mutex::new(None)));
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
+    scripted.follow(&cli);
     let deps = CoreDeps {
         llm: Adapters::scripted(&scripted),
         secrets: secrets.clone(),
@@ -541,6 +542,36 @@ async fn the_account_row_reports_the_cli_that_prepare_reports() {
     let claude = &view.accounts[0].cli;
     assert!(claude.installed && claude.supported);
     assert_eq!(claude.path.as_deref(), Some("/bin/claude"));
+}
+
+#[tokio::test]
+async fn the_local_runtime_row_follows_a_scripted_ollama_and_its_install() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    w.cli.set(tool(r#"{"tool":"ollama","installed":false}"#));
+    let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    assert!(!view.local.cli.installed && !view.local.running);
+    assert!(view.local.models.is_empty() && view.local.default_model.is_none());
+    // Install Ollama…: the job ends and the row reads installed and running.
+    w.core
+        .cli_install(
+            &settings(),
+            CliInstallArgs {
+                tool: CliTool::Ollama,
+            },
+        )
+        .await
+        .unwrap();
+    let mut view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    for _ in 0..200 {
+        if view.local.running {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    }
+    assert!(view.local.cli.installed && view.local.running);
+    assert_eq!(view.local.models, ["scripted"]);
 }
 
 #[tokio::test]

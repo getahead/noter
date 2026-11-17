@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use noter_protocol::model::{AccountIdentity, AccountProvider, CliTool};
+use noter_protocol::model::{AccountIdentity, AccountProvider, CliInfo, CliTool};
 use serde::Deserialize;
 use tokio::sync::Notify;
 
@@ -28,6 +28,17 @@ pub struct CliStatus {
 }
 
 impl CliStatus {
+    /// The tool as the account row and the Prepare step show it.
+    pub fn info(&self, tool: CliTool) -> CliInfo {
+        CliInfo {
+            tool,
+            installed: self.installed,
+            path: self.path.clone(),
+            version: self.version.clone(),
+            supported: self.supported,
+        }
+    }
+
     pub fn missing() -> Self {
         Self {
             installed: false,
@@ -227,6 +238,12 @@ pub struct ScriptedAccountCli {
     release: Arc<[Notify; 2]>,
 }
 
+impl std::fmt::Debug for ScriptedAccountCli {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ScriptedAccountCli")
+    }
+}
+
 impl ScriptedAccountCli {
     pub fn new() -> Self {
         Self::default()
@@ -249,7 +266,7 @@ impl ScriptedAccountCli {
         self.release[usize::from(provider == AccountProvider::Chatgpt)].notify_one();
     }
 
-    fn script(&self, tool: CliTool) -> Option<ToolScript> {
+    pub(crate) fn script(&self, tool: CliTool) -> Option<ToolScript> {
         lock(&self.state).tools.get(&tool).cloned()
     }
 }

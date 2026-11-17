@@ -6,6 +6,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use noter_protocol::error::RuntimeUnavailableReason;
+use noter_protocol::model::CliTool;
 use noter_protocol::skills::{
     AnswerCitation, AskAnswerOutput, CouncilTickOutput, ExtractedItem, HandoffPromptOutput,
     Judgement, PostCallOutput, ReconcileJudgementOutput, RoleReviewOutput,
@@ -15,6 +17,7 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use super::{Invocation, Reply, RuntimeAdapter};
+use crate::account_cli::ScriptedAccountCli;
 use crate::runtime::{lock, Availability, BoxFuture, Skill, Tested};
 use crate::secrets::Secret;
 use crate::tools::McpLaunch;
@@ -63,6 +66,8 @@ struct State {
     closed: Vec<String>,
     /// Lines `answer_next` put ahead of the script: the next one goes after them.
     pinned: usize,
+    /// The scripted tools: an Ollama scripted as not installed takes the local runtime away.
+    tools: Option<ScriptedAccountCli>,
 }
 
 /// Every runtime choice, available, answered from the script. Cloning shares it.
@@ -117,6 +122,11 @@ impl Scripted {
         lock(&self.0).closed.clone()
     }
 
+    /// The local runtime is there only while `tools` has Ollama installed (or does not script it).
+    pub fn follow(&self, tools: &ScriptedAccountCli) {
+        lock(&self.0).tools = Some(tools.clone());
+    }
+
     pub(crate) fn availability_all(&self) -> Vec<Availability> {
         RUNTIMES.iter().map(|r| self.availability(*r)).collect()
     }
@@ -129,6 +139,17 @@ impl RuntimeAdapter for Scripted {
 
     fn availability(&self, runtime: RuntimeChoice) -> Availability {
         let cli = runtime != RuntimeChoice::Local;
+        let tools = lock(&self.0).tools.clone();
+        if !cli && tools.is_some_and(|t| t.script(CliTool::Ollama).is_some_and(|s| !s.installed)) {
+            return Availability {
+                runtime,
+                unavailable: Some(RuntimeUnavailableReason::CliMissing),
+                version: None,
+                path: None,
+                tested: None,
+                models: vec![],
+            };
+        }
         Availability {
             runtime,
             unavailable: None,
