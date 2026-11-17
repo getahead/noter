@@ -1,7 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { effects, refs } = vi.hoisted(() => ({
+const { effects, refs, buttons } = vi.hoisted(() => ({
+  buttons: [] as { id?: string; onAction?: () => void }[],
   effects: [] as (() => void)[],
   refs: [] as { current: unknown }[],
 }));
@@ -17,6 +18,7 @@ vi.mock("react", async (importOriginal) => {
     },
   };
 });
+vi.mock("../../ui/primitives/push-button", () => ({ PushButton: (props: { id?: string }) => (buttons.push(props), null) }));
 vi.mock("./KeyField", () => ({ KeyField: () => null, useKeyDraft: () => ({ state: "idle" }) }));
 
 const { KeyFieldRow, KeyRow } = await import("./CredentialRow");
@@ -24,6 +26,7 @@ const { KeyFieldRow, KeyRow } = await import("./CredentialRow");
 afterEach(() => {
   effects.length = 0;
   refs.length = 0;
+  buttons.length = 0;
   vi.unstubAllGlobals();
 });
 
@@ -50,5 +53,23 @@ describe("credential row focus recovery", () => {
     refs[1]!.current = true;
     effects.at(-1)!();
     expect(focus).toHaveBeenCalledOnce();
+  });
+
+  it("notes that Remove started the removal, by a mouse press or the keyboard", () => {
+    for (const [render, id] of [
+      [() => renderToString(<KeyRow view={{ provider: "codex", status: { type: "configured" } } as never} onAdd={() => {}} onReplace={() => {}} onRemove={() => {}} />), "credential-remove-codex"],
+      [() => renderToString(<KeyFieldRow bridge={{} as never} view={{ provider: "codex", status: { type: "configured" } } as never} onRemove={() => {}} />), "first-run-key-remove-codex"],
+    ] as const) {
+      buttons.length = 0;
+      refs.length = 0;
+      const button = { id: "x", focus: vi.fn() };
+      vi.stubGlobal("document", { body: {}, activeElement: button });
+      render();
+      const remove = buttons.find((b) => b.id?.includes("remove"));
+      expect(remove, id).toBeDefined();
+      button.id = remove!.id!;
+      remove!.onAction!();
+      expect(refs[0]!.current).toBe(true);
+    }
   });
 });
