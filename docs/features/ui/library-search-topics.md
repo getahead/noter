@@ -77,7 +77,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 ### Search and check a match
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-search`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-search`
 
 **Actor**: Primary user
 
@@ -93,7 +93,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 **Steps**:
 1. [x] - `p1` - User enters words in Calls and commits the search with Return - `inst-submit`
 2. [x] - `p1` - API: `search` with the words, current `CallFilter` and per-section limit - `inst-search`
-3. [ ] - `p1` - UI: skeleton rows after 300 ms; on failure keep words and filters and offer **Try Again**, which repeats only on request - `inst-loading-error`
+3. [x] - `p1` - UI: skeleton rows after 300 ms; on failure keep words and filters and offer **Try Again**, which repeats only on request - `inst-loading-error`
 4. [x] - `p1` - Algorithm: present the response with `cpt-noter-algo-ui-library-search-topics-results` - `inst-present`
 5. [x] - `p1` - User presses ↓ into results, then Space on a span - `inst-play`
 6. [x] - `p1` - UI: reuse playback with `audio_play` and `playback:state`; Space again pauses; missing audio shows its reason and retained text - `inst-playback`
@@ -106,7 +106,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 ### Filter, tag and export calls
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-filter-tag`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-filter-tag`
 
 **Actor**: Primary user
 
@@ -119,7 +119,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 - No tags: **No tags yet. Add tags in a call's Call info.**; no calls yet retains the first-use self-test action
 
 **Steps**:
-1. [ ] - `p1` - User sets People, Type, Tags, Language, Date or **Has Open Items**; choices come from core people, call types and `tags_list` - `inst-choose`
+1. [x] - `p1` - User sets People, Type, Tags, Language, Date or **Has Open Items**; choices come from core people, call types and `tags_list` - `inst-choose`
 2. [x] - `p1` - Algorithm: reconcile tokens and filters with `cpt-noter-algo-ui-library-search-topics-filters` - `inst-reconcile`
 3. [x] - `p1` - API: `calls_list` with the resulting filter when no words are set, otherwise `search`; show the matching count without moving focus - `inst-query`
 4. [x] - `p1` - User selects three rows and chooses **Add Tag…**; UI shows **Add tag to 3 calls**, **Add tag…**, **In use: release, hotfix**, and **Add Tag** - `inst-add-popover`
@@ -157,7 +157,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
    1. [x] - `p1` - API: `topics_merge` with source and target; navigate to the returned topic, refresh entries and show **Merged 3 items into “Notification service” · Undo** - `inst-merge`
 9. [x] - `p1` - **IF** the user chooses **Keep Separate** - `inst-if-separate`
    1. [x] - `p1` - API: `topics_keep_separate` with both ids; clear the suggestion after success - `inst-separate`
-10. [ ] - `p1` - **IF** all backing calls were deleted - `inst-if-empty-topic`
+10. [x] - `p1` - **IF** all backing calls were deleted - `inst-if-empty-topic`
     1. [x] - `p1` - UI: **Nothing left in this topic** and **The calls behind this topic were deleted.**; **Delete Topic** is a contract gap listed below - `inst-empty-topic`
 11. [x] - `p1` - **RETURN** the kept topic or original route after Cancel; errors keep the sheet and choices - `inst-return-topic`
 
@@ -165,7 +165,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 ### Keep filters and tokens in step
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-library-search-topics-filters`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-library-search-topics-filters`
 
 **Input**: one filter action or token removal, the words and the window's filter state
 
@@ -177,12 +177,12 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 3. [x] - `p1` - **IF** Clear is chosen: clear filters and tokens but keep typed words - `inst-clear`
 4. [x] - `p1` - **IF** a token is removed by × or ⌫ at the field start: remove its filter value - `inst-remove`
 5. [x] - `p1` - Offer # suggestions only from tags in use; a choice adds the tag filter and clears the suggestion draft - `inst-suggest`
-6. [ ] - `p1` - Keep the date menu's Any Time, Last 7 Days, Last 30 Days and Custom range in the same state; issue a new read and ignore responses for superseded words or filters - `inst-read`
-7. [ ] - `p1` - **RETURN** synchronized controls; state survives Back in this window, not an app restart - `inst-return`
+6. [x] - `p1` - Keep the date menu's Any Time, Last 7 Days, Last 30 Days and Custom range in the same state; issue a new read and ignore responses for superseded words or filters - `inst-read`
+7. [x] - `p1` - **RETURN** synchronized controls; state survives Back in this window, not an app restart - `inst-return`
 
 ### Present ranked search results
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-library-search-topics-results`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-library-search-topics-results`
 
 **Input**: `SearchResults`, current filters and expanded call groups
 
@@ -197,31 +197,31 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 6. [x] - `p1` - Render core highlight ranges on escaped original text with its language attribute; do not highlight a normalized copy - `inst-highlights`
 7. [x] - `p1` - Show **How Noter searched** from returned explanation and active filters; never fill missing terms with fixture text - `inst-explain`
 8. [x] - `p1` - Announce the final count once, adding **only weak matches** when applicable - `inst-announce`
-9. [ ] - `p1` - **RETURN** results; when empty keep filters and the Ask bridge - `inst-return`
+9. [x] - `p1` - **RETURN** results; when empty keep filters and the Ask bridge - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Library reads and topic edits
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-library-search-topics-view`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-library-search-topics-view`
 
 **States**: LOADING, CALLS, FILTER_EMPTY, RESULTS, NO_MATCHES, WEAK_ONLY, READ_ERROR, TOPICS, NO_TOPICS, TOPIC_NO_MATCH, THREAD, THREAD_EMPTY, RENAMING, NAME_CLASH, MERGING
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** CALLS **WHEN** a filtered call read returns rows - `inst-calls`
+1. [x] - `p1` - **FROM** LOADING **TO** CALLS **WHEN** a filtered call read returns rows - `inst-calls`
 2. [x] - `p1` - **FROM** LOADING **TO** FILTER_EMPTY **WHEN** calls exist but none meets the filters - `inst-filter-empty`
 3. [x] - `p1` - **FROM** LOADING **TO** RESULTS **WHEN** search returns at least one strong hit - `inst-results`
-4. [ ] - `p1` - **FROM** LOADING **TO** WEAK_ONLY **WHEN** search reports only weak hits - `inst-weak`
+4. [x] - `p1` - **FROM** LOADING **TO** WEAK_ONLY **WHEN** search reports only weak hits - `inst-weak`
 5. [x] - `p1` - **FROM** LOADING **TO** NO_MATCHES **WHEN** search returns no hits - `inst-no-matches`
-6. [ ] - `p1` - **FROM** LOADING **TO** READ_ERROR **WHEN** the read fails; retry returns to LOADING with the same inputs - `inst-error`
+6. [x] - `p1` - **FROM** LOADING **TO** READ_ERROR **WHEN** the read fails; retry returns to LOADING with the same inputs - `inst-error`
 7. [x] - `p1` - **FROM** LOADING **TO** TOPICS **WHEN** topics arrive; zero topics goes to NO_TOPICS, a name filter matching none to TOPIC_NO_MATCH - `inst-topics`
 8. [x] - `p1` - **FROM** TOPIC_NO_MATCH **TO** TOPICS **WHEN** Clear Search restores the list - `inst-clear-topic`
 9. [x] - `p1` - **FROM** LOADING **TO** THREAD **WHEN** a topic has entries; no surviving entries goes to THREAD_EMPTY - `inst-thread`
-10. [ ] - `p1` - **FROM** THREAD **TO** RENAMING **WHEN** Rename is chosen; a collision goes to NAME_CLASH - `inst-rename`
+10. [x] - `p1` - **FROM** THREAD **TO** RENAMING **WHEN** Rename is chosen; a collision goes to NAME_CLASH - `inst-rename`
 11. [x] - `p1` - **FROM** NAME_CLASH **TO** MERGING **WHEN** Merge Instead is chosen - `inst-clash-merge`
-12. [ ] - `p1` - **FROM** THREAD **TO** MERGING **WHEN** Merge is chosen; Cancel returns unchanged, success opens the target THREAD - `inst-merge`
+12. [x] - `p1` - **FROM** THREAD **TO** MERGING **WHEN** Merge is chosen; Cancel returns unchanged, success opens the target THREAD - `inst-merge`
 13. [x] - `p1` - **FROM** RENAMING **TO** THREAD **WHEN** a rename succeeds; failure keeps the draft in RENAMING - `inst-renamed`
 
 ## 5. Definitions of Done

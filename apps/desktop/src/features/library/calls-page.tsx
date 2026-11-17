@@ -302,6 +302,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
+      onExport={exportStore.run}
       onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );

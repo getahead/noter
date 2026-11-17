@@ -55,6 +55,8 @@ export interface CallsViewProps {
   onCloseMenu: () => void;
   onDelete: () => void;
   onAddTag?: () => void;
+  /** Export… of the selection (⌘E), as the toolbar button does. */
+  onExport?: () => void;
 }
 
 const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
@@ -112,6 +114,7 @@ export function CallsView(p: CallsViewProps) {
             onOpen={p.onOpen}
             onDelete={p.onDelete}
             onAddTag={p.onAddTag}
+            onExport={p.onExport}
           />
         </div>
       )}
@@ -276,12 +279,14 @@ export function ContextMenu({
   onOpen,
   onDelete,
   onAddTag,
+  onExport,
 }: {
   onClose: () => void;
   single: CallRow | null;
   onOpen: (id: string) => void;
   onDelete: () => void;
   onAddTag?: () => void;
+  onExport?: () => void;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -300,6 +305,7 @@ export function ContextMenu({
             onSelect: run(() => single && onOpen(single.id)),
           },
           ...(onAddTag ? [{ label: t("library.add_tag"), onSelect: run(onAddTag) }] : []),
+          ...(onExport ? [{ label: t("library.export"), kbd: "⌘E", onSelect: run(onExport) }] : []),
           { divider: true },
           {
             label: t("library.menu.delete"),
