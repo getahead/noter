@@ -298,3 +298,9 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 
 .np-menu__sub { position: relative; display: grid; }
 .np-menu__subpanel { position: absolute; left: 100%; top: -5px; }
+
+/* topic-chip (cpt-noter-component-ui-topic-chip) */
+.np-topic { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 8px; border-radius: 11px; border: 0; background: var(--ctrl-bg); color: inherit; font: inherit; }
+.np-topic--suggestion { height: 28px; border-radius: 14px; padding: 0 12px; }
+button.np-topic { cursor: pointer; }
+.np-topic__merge { color: var(--accent-text); }
