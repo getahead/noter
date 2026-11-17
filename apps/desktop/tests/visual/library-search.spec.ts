@@ -102,7 +102,12 @@ for (const [width, px] of Object.entries(WIDTHS)) {
 
 test("cpt-noter-dod-ui-library-search-topics-search # in the search field lists the tags", async ({ page }) => {
   await open(page, WIDTHS.wide);
+  await expect(async () => {
+    await page.keyboard.press("Meta+Digit3");
+    await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+  }).toPass();
   await focusSearch(page);
   await page.getByRole("searchbox", { name: /Search/ }).fill("#");
+  await expect(page.getByRole("listbox", { name: "Tags" })).toBeVisible();
   await shot(page, "search-tag-suggest", "wide");
 });

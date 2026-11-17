@@ -14,4 +14,10 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
     expect(html).toContain('data-strength="weak"');
     expect(html).toContain("Cross-language match");
   });
+  it("prints an item's text once (title equal to the snippet) and the call with its date", () => {
+    const call = { id: "c1", title: "Backend sync", started_at: Date.UTC(2026, 9, 2, 12), call_type: "ct" };
+    const html = renderToString(<SearchResultRow bridge={{} as never} hit={{ ...(hit as object), title: "Fix it", snippet: "Fix it", highlights: [], call } as never} />);
+    expect(html.match(/Fix it/g)).toHaveLength(1);
+    expect(html).toContain("Backend sync · Oct 2");
+  });
 });

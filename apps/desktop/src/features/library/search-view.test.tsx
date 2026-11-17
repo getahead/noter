@@ -38,6 +38,8 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(h).toContain("only weak matches");
     expect(h).toContain("Only weak matches for “websocket”"); // the warning banner (LS-R3)
     expect(h).toContain("Ask Instead");
+    expect(h).not.toContain("Weaker matches"); // everything is weak: no divider
+    expect(h).toContain("close in meaning");
   });
   it("RESULTS: items before transcripts, strong first, weaker after, three spans per call and More in This Call", () => {
     const strong = [1, 2, 3, 4].map(() => hit("strong"));

@@ -11,6 +11,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { Toolbar, ToolbarSpacer } from "../../ui/primitives/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
+import { tagMatches } from "../library/tag-suggest";
 import type { PageDef } from "./pages";
 import type { Route } from "./history";
 
@@ -108,15 +109,19 @@ export function MainToolbar(p: ToolbarProps) {
         (p.narrow && !p.searchOpen ? (
           <IconButton icon="search" label={t("shell.search")} onAction={p.onOpenSearch} />
         ) : (
-          <SearchField id="mw-search" list={p.tagChoices?.length && p.search.startsWith("#") ? "mw-tags" : undefined} cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+          <span className="np-toolbar__searchhost">
+            <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+            {tagMatches(p.search, p.tagChoices ?? []).length > 0 && (
+              <ul className="np-tagpop" role="listbox" aria-label={t("search.tags_list")}>
+                {tagMatches(p.search, p.tagChoices ?? []).map((x) => (
+                  <li key={x} role="option" aria-selected={false} className="np-tagpop__item" onMouseDown={(e) => (e.preventDefault(), p.onSearch(`#${x}`))}>
+                    {`#${x}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </span>
         ))}
-      {p.tagChoices?.length ? (
-        <datalist id="mw-tags">
-          {p.tagChoices.map((x) => (
-            <option key={x} value={`#${x}`} />
-          ))}
-        </datalist>
-      ) : null}
     </Toolbar>
   );
 }

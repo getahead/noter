@@ -36,15 +36,18 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     const r = read.results;
     const status = statusOf(r);
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
+    const filtered = isFiltered(filter);
+    const clear = { label: t("filters.clear"), onAction: onClear };
+    const ask = { label: t("search.ask_instead"), onAction: () => onAsk() };
     const widen = (
       <div className="lb-actions">
-        {isFiltered(filter) && (
+        {filtered && (
           <>
             <span className="np-dim">{t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}</span>
-            <PushButton label={t("filters.clear")} size="small" onAction={onClear} />
+            <PushButton label={clear.label} size="small" onAction={clear.onAction} />
           </>
         )}
-        <PushButton label={t("search.ask_instead")} size="small" onAction={() => onAsk()} />
+        <PushButton label={ask.label} size="small" onAction={ask.onAction} />
       </div>
     );
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
@@ -61,8 +64,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
         </p>
-        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) }} />}
-        {status === "WEAK_ONLY" && widen}
+        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: filtered ? [clear, ask] : [ask] }} />}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>
@@ -78,7 +80,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             ))}
             {s.weak.length > 0 && (
               <>
-                <h4 className="lb-thmonth__h">{t("search.weaker")}</h4>
+                {status !== "WEAK_ONLY" && <h4 className="lb-thmonth__h">{t("search.weaker")}</h4>}
                 <ul className="lb-items">
                   {s.weak.map((h, i) => (
                     <SearchResultRow key={i} bridge={bridge} hit={h} />

@@ -16,6 +16,13 @@ export function takeTag(text: string, tags: string[]): boolean {
   if (tag) holdFilter(apply(heldFilter(), { type: "add", group: "tags", value: tag }));
   return tag !== null;
 }
+
+/** The tags the list under the field offers for what is typed: while it starts with `#`, those containing the rest (an exact tag is taken as the filter instead). */
+export function tagMatches(text: string, tags: string[], limit = 8): string[] {
+  if (!text.startsWith("#")) return [];
+  const q = text.slice(1).toLowerCase();
+  return tags.filter((x) => x.toLowerCase().includes(q) && x.toLowerCase() !== q).slice(0, limit);
+}
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-suggest
 
 /** The tags in use, read once when the window opens; none when the read fails. */

@@ -1,6 +1,6 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { SearchHit } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { shortDay, t } from "../../i18n/format";
 import { Link } from "../../ui/primitives/link";
 import { openSpan } from "../items/evidence";
 import { segments } from "./search-model";
@@ -17,10 +17,11 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
   };
   return (
     <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && go()}>
-      <span className="lb-hit__title">{hit.title}</span>
+      {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}
       <span className="lb-hit__snippet" lang={lang}>
         {segments(hit.snippet, hit.highlights).map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : s.text))}
       </span>
+      {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
       <Link label={t("search.open")} onAction={go} />
     </li>
