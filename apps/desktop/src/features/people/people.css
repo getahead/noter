@@ -17,3 +17,12 @@
 .pe-skel { display: grid; gap: 1px; border: 1px solid var(--sep); border-radius: var(--r-row); overflow: hidden; }
 .pe-skel__row { display: grid; grid-template-columns: 110px 1fr 120px; gap: 16px; padding: 14px 12px; background: var(--card-bg); }
 .pe-skel__row span { height: 10px; border-radius: var(--r-tag); background: var(--sel-unemph); }
+.pe-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; max-width: 1180px; }
+@media (max-width: 1250px) { .pe-cols { grid-template-columns: minmax(0, 1fr); } }
+.pe-col { display: grid; gap: 22px; align-content: start; min-width: 0; }
+.pe-block { display: grid; gap: 6px; min-width: 0; }
+.pe-topics { display: flex; flex-wrap: wrap; gap: 6px; }
+.pe-topic { border: 1px solid var(--sep); border-radius: 999px; background: var(--card-bg); padding: 2px 10px; font: inherit; cursor: pointer; }
+.pe-identity { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
+.pe-sel { user-select: text; }
+.pe-showall { justify-self: start; border: 0; background: transparent; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; }
