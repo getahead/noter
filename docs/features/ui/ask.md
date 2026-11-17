@@ -33,11 +33,11 @@ milestone: M3
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-ui-ask`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-ui-ask`
 
 ## 1. Feature Context
 
-- [ ] `p4` - `cpt-noter-feature-ui-ask`
+- [x] `p4` - `cpt-noter-feature-ui-ask`
 
 ### 1.1 Overview
 
@@ -253,5 +253,7 @@ The system **MUST** render the cited-answer variants with original-language quot
 **DESIGN versus prototype.** DESIGN enables each citation when resolved; the prototype gates all superscripts until the answer ends. Follow the prototype's disabled-during-stream layout. The prototype's sensitive demo can show both a two-source info line and a one-source not-found note; render the single authoritative core count rather than duplicate fixture messages. DESIGN's responsive Recent pop-up and scope overflow have no corresponding implementation in these modules; apply DESIGN for these missing behaviours. The prototype's Copy handler suppresses clipboard failures; production reports them.
 
 **Contract and fake gaps.** `AskStartArgs` has no per-answer runtime override. **Answer with Local Model** and **Use Local Model** cannot silently select a local runtime through this command; task runtime settings can change through Settings, but that is not an equivalent per-answer override. `AskAnswer` lacks lookup counts, elapsed time, detailed search/read progress, rebuild percentage and persisted ratings; do not fabricate the example meta line or claim a thumbs rating was persisted. Thumbs may toggle only as window view state until a contract exists. Citation contains number, provenance, quote, speaker, strength and deleted flag, but no quote language, audio availability or suggested-item flag. Use the shared transcript span/record data where available; document freshness is not present in document provenance, while live lookup provenance carries its time. Missing detail is not inferred. The default fake emits a simple cited answer and marks a stop as `failed` with `answer_stopped`; scenario overrides cover weak, not-found, skipped-source and interruption states. These gaps block the corresponding full story paths until the contract owner resolves them.
+
+**Delivery (18 Nov 2026).** Recorded gaps, not delivered: `AskAnswer.scope` on a reloaded turn (the scope label of a stored answer is not shown); the meta line counts, the stored thumbs rating and `Citation.speaker` (contract gaps above); and a not-found answer on the default fake, which never produces one (scenario overrides do). Every other flow, algorithm, state and DoD is delivered and marked.
 
 **Not applicable.** Retrieval, source permissions, model prompts, account authentication, persistence, database queries, service deployment and billable retry policy belong to the core. The UI retains only current view state and clears listeners on disposal; safe error logging never includes questions or quotes.

@@ -1407,11 +1407,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.23 Ask — M3 · MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-ui-ask`
+- [x] `p4` - **ID**: `cpt-noter-feature-ui-ask`
 
 - **Purpose**: Answer questions across calls and documents with citations, follow-ups and copy, never guessing when nothing was found.
 
-- **Milestone**: M3. **Spec**: [`docs/features/ui/ask.md`](features/ui/ask.md). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/ask.md`](features/ui/ask.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-main-window-shell`, `cpt-noter-feature-ui-live-transcript`
 
@@ -1437,8 +1437,8 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-screen-ask`
-  - [ ] `p4` - `cpt-noter-component-ui-cited-answer`
+  - [x] `p4` - `cpt-noter-component-screen-ask`
+  - [x] `p4` - `cpt-noter-component-ui-cited-answer`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `ask_start` (Channel `AskMsg`)
