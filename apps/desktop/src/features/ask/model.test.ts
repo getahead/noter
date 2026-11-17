@@ -4,7 +4,7 @@ import type { AskAnswer, AskMsg, Citation, CoreError } from "../../core/bindings
 import { foldTurn, groupThreads, paragraphs, phaseOf } from "./model";
 
 const cite = (n: number): Citation => ({ n, provenance: { type: "model_guess" }, quote: "q", speaker: null, strength: "strong", deleted: false });
-const answer = (o: Partial<AskAnswer> = {}): AskAnswer => ({ turn_id: "t1", question: "Q", answer_md: "A", citations: [cite(1)], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: 0, ...o });
+const answer = (o: Partial<AskAnswer> = {}): AskAnswer => ({ turn_id: "t1", question: "Q", answer_md: "A", citations: [cite(1)], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0, ...o });
 const msgs = (...events: AskMsg["event"][]): AskMsg[] => events.map((event, i) => ({ seq: i + 1, event }));
 const failed = (code: string): CoreError => ({ code, message: "", retryable: true }) as CoreError;
 

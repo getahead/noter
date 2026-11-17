@@ -17,7 +17,7 @@ const bridge = {
 const view = (...events: AskMsg["event"][]) => foldTurn(events.map((event, i) => ({ seq: i + 1, event })));
 const done = (o: Partial<AskAnswer>): AskMsg["event"] => ({
   type: "done",
-  answer: { turn_id: "t", question: "Q", answer_md: "A", citations: [], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: 0, ...o } as AskAnswer,
+  answer: { turn_id: "t", question: "Q", answer_md: "A", citations: [], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0, ...o } as AskAnswer,
 });
 
 describe("AskPage (cpt-noter-flow-ui-ask-question)", () => {
