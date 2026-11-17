@@ -9,7 +9,7 @@ import { confirmDeleteProfile } from "./sheets";
 
 const person = (o: Partial<PersonRow> = {}): PersonRow => ({
   id: "per_a", rev: 1, display_name: "Anna Kuznetsova", short_name: "Anna K.", initials: "AK", email: null, role: null, org: null,
-  aliases: [], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, ...o,
+  aliases: [], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, you_owe: 0, notes: null, ...o,
 });
 const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { voiceProfileCreate: vi.fn(), voiceProfileDelete: vi.fn() } }) as never;
 const enabled = { status: "ok", data: { person_id: "per_a", enabled: true, centroids: 1, opted_in_at: 1 } };
