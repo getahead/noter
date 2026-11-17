@@ -9,3 +9,11 @@
 .pe-unnamed__list { border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--card-bg); }
 .pe-urow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--sep); }
 .pe-urow:last-child { border-bottom: 0; }
+.pe-table td { vertical-align: middle; }
+/* selected cells repeat the fill and bleed 1px sideways: Chromium anti-aliases hairlines at fractional column edges */
+.np-table.pe-table tbody tr.is-sel td { background: var(--accent-fill); box-shadow: 1px 0 0 var(--accent-fill), -1px 0 0 var(--accent-fill); }
+.pe-hint { margin: 8px 2px 0; font-size: 11px; color: var(--label-3); }
+.pe-loading { min-height: 8px; }
+.pe-skel { display: grid; gap: 1px; border: 1px solid var(--sep); border-radius: var(--r-row); overflow: hidden; }
+.pe-skel__row { display: grid; grid-template-columns: 110px 1fr 120px; gap: 16px; padding: 14px 12px; background: var(--card-bg); }
+.pe-skel__row span { height: 10px; border-radius: var(--r-tag); background: var(--sel-unemph); }

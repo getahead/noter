@@ -758,7 +758,6 @@ export const en = {
   "people.col.name": "Name",
   "people.col.role": "Role · org",
   "people.col.theirs": "Their open items",
-  "people.col.owe": "You owe",
   "people.col.last": "Last call",
   "people.col.voice": "Voice profile",
   "people.voice_on": "Voice profile on",

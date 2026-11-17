@@ -12,7 +12,6 @@ import { NONE, press, retain, type Selection } from "../library/selection";
 import { holdCount } from "./count";
 import { view, type PeopleView } from "./identity";
 import { createPeopleList, setPeopleQuery, usePeopleQuery, type PeopleState } from "./model";
-import "../library/library.css";
 import "./people.css";
 
 const SLOW_MS = 300;
@@ -20,11 +19,10 @@ const COLS = [
   ["name", "people.col.name"],
   ["role", "people.col.role"],
   ["theirs", "people.col.theirs"],
-  ["owe", "people.col.owe"],
   ["last", "people.col.last"],
   ["voice", "people.col.voice"],
 ] as const;
-const WIDTH: Record<string, string> = { theirs: "130px", owe: "90px", last: "100px", voice: "110px" };
+const WIDTH: Record<string, string> = { theirs: "130px", last: "100px", voice: "110px" };
 
 const roleOrg = (p: PersonRow) => (p.role && p.org ? t("people.role_org", { role: p.role, org: p.org }) : (p.role ?? p.org ?? ""));
 
@@ -88,20 +86,26 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
     return <InlineBanner banner={{ id: "people-error", severity: "error", text: t("people.error"), actions: [{ label: t("action.try_again"), onAction: onRetry }] }} />;
   if (!shown)
     return (
-      <div className="lb-loading" data-state="loading" aria-busy="true" aria-label={t("people.loading")}>
+      <div className="pe-loading" data-state="loading" aria-busy="true" aria-label={t("people.loading")}>
         {slow && (
-          <div className="lb-skel" data-component="cpt-noter-component-ui-primitives" data-primitive="table">
+          <div className="pe-skel" data-component="cpt-noter-component-ui-primitives" data-primitive="table">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="lb-skel__row"><span /><span /><span /></div>
+              <div key={i} className="pe-skel__row"><span /><span /><span /></div>
             ))}
           </div>
         )}
       </div>
     );
+  // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-error
+  const reloadFailed = status === "ERROR" && (
+    <InlineBanner banner={{ id: "people-error", severity: "error", text: t("people.error"), actions: [{ label: t("action.try_again"), onAction: onRetry }] }} />
+  );
+  // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-error
   const stop = order.find((id) => selection.ids.includes(id)) ?? order[0];
   return (
     <>
       <h2 className="np-sr" tabIndex={-1}>{t("people.title")}</h2>
+      {reloadFailed}
       {/* @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare */}
       <div data-region="PL-R2" role="region" aria-label={t("people.title")} data-state={shown.status.toLowerCase()}>
         {/* @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare */}
@@ -110,7 +114,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
         ) : shown.status === "NO_MATCH" ? (
           <EmptyState variant="filtered" title={t("people.no_match", { query: query.trim() })} actionLabel={t("people.clear")} onAction={() => setPeopleQuery("")} />
         ) : (
-          <Table variant="sortable" label={t("people.title")} cls="lb-table pe-table" wrapCls="lb-tablewrap">
+          <Table variant="sortable" label={t("people.title")} cls="pe-table">
             <thead>
               <tr>
                 {COLS.map(([c, label]) => (
@@ -133,7 +137,6 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
                     </td>
                     <td className="np-muted">{roleOrg(p)}</td>
                     <td className="np-tnum">{p.open_items || ""}</td>
-                    <td className="np-tnum"></td>
                     <td>{p.last_call_at !== null ? shortDay(p.last_call_at, prefs) : ""}</td>
                     <td>{p.voice_profile && <Icon name="wave" size={14} label={t("people.voice_on")} />}</td>
                   </tr>
@@ -142,7 +145,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
             </tbody>
           </Table>
         )}
-        {shown.status === "LISTED" && <p className="lb-hint">{t("people.hint")}</p>}
+        {shown.status === "LISTED" && <p className="pe-hint">{t("people.hint")}</p>}
       </div>
       {shown.unnamed.length > 0 && (
         <div data-region="PL-R3" role="region" aria-label={t("people.unnamed")} className="pe-unnamed">

@@ -33,9 +33,18 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
     expect(h).toContain("No people match “lena”".replace(/[“”]/g, (c) => c));
     expect(h).toContain("Clear Search");
   });
+  it("a failed reload keeps the list on screen and offers Try Again", () => {
+    const h = renderToString(<PeopleBody {...props({ status: "ERROR" })} />);
+    expect(h).toContain("Anna Kuznetsova");
+    expect(h).toContain("Couldn’t read your people");
+    expect(h).toContain("Try Again");
+  });
+  it("has no You owe column until the core counts it", () => {
+    expect(renderToString(<PeopleBody {...props({})} />)).not.toContain("You owe");
+  });
   it("LOADING shows skeleton rows only after the delay; ERROR offers Try Again", () => {
-    expect(renderToString(<PeopleBody {...props({ shown: null, status: "LOADING" })} />)).not.toContain("lb-skel");
-    expect(renderToString(<PeopleBody {...props({ shown: null, status: "LOADING", slow: true })} />)).toContain("lb-skel");
+    expect(renderToString(<PeopleBody {...props({ shown: null, status: "LOADING" })} />)).not.toContain("pe-skel");
+    expect(renderToString(<PeopleBody {...props({ shown: null, status: "LOADING", slow: true })} />)).toContain("pe-skel");
     const onRetry = vi.fn();
     const tree = rendered(PeopleBody, props({ shown: null, status: "ERROR", onRetry }));
     expect(renderToString(<PeopleBody {...props({ shown: null, status: "ERROR" })} />)).toContain("Try Again");
