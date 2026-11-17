@@ -10,7 +10,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { draftChanged, draftOf, removeAlert, removeSource, revokeAlert, revokeToken, updateSource } from "./sources";
+import { ScopeFields, useCallTypes } from "./ScopeFields";
+import { draftChanged, draftOf, removeAlert, removeSource, revokeAlert, revokeToken, scopeValid, updateSource } from "./sources";
 
 type Ask = (a: ReturnType<typeof removeAlert>) => Promise<boolean>;
 
@@ -19,6 +20,7 @@ export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { b
   const confirm = useAlert();
   const asker = ask ?? confirm;
   const [draft, setDraft] = useState(draftOf(row));
+  const types = useCallTypes(bridge);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const working = busy || row.status.type === "indexing";
@@ -54,10 +56,11 @@ export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { b
         </>)}
         <label className="st-row__label" htmlFor="src-d-privacy">{t("sources.privacy")}</label>
         <PopupButton id="src-d-privacy" label={t("sources.privacy")} options={PRIVACY_CHOICES()} value={draft.privacy} onAction={(v) => setDraft({ ...draft, privacy: v as PrivacyClass })} />
+        <ScopeFields types={types} value={draft.scope} onChange={(scope) => setDraft({ ...draft, scope })} />
         <p className="np-dim">{row.has_token ? t("sources.token_present") : t("sources.token_absent")}</p>
         {message && <p className="hd__err" role="alert">{message}</p>}
       </div>
-      <SheetFooter defaultButton={<PushButton label={t("sources.save")} variant="primary" disabled={busy || !draftChanged(row, draft) || !draft.name.trim()} onAction={() => void save()} />}>
+      <SheetFooter defaultButton={<PushButton label={t("sources.save")} variant="primary" disabled={busy || !draftChanged(row, draft) || !draft.name.trim() || !scopeValid(draft.scope)} onAction={() => void save()} />}>
         <PushButton label={t("sources.remove")} disabled={working} onAction={() => void remove()} />
         {row.has_token && <PushButton label={t("sources.revoke")} disabled={working} onAction={() => void revoke()} />}
         <span className="np-tb__spacer" />

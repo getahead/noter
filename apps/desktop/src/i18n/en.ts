@@ -399,6 +399,8 @@ export const en = {
   "sources.privacy_normal_note": "Follows the privacy mode you chose.",
   "sources.privacy_sensitive_note": "Only local models read this source.",
   "sources.scope_all": "Scope: all calls",
+  "sources.scope": "Scope", "sources.scope_all_calls": "All calls", "sources.scope_limited": "Only some call types", "sources.scope_types": "Call types",
+  "sources.error_scope": "Choose at least one call type, or use all calls.",
   "sources.server": "Server", "sources.server_placeholder": "Server name",
   "sources.mode": "Mode", "sources.mode_indexed": "Indexed", "sources.mode_live": "Live",
   "sources.mode_indexed_note": "Noter copies the documents into a local index and you sign in once in the browser.",

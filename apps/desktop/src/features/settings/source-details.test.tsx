@@ -21,6 +21,7 @@ describe("source commands for details", () => {
     expect(draftChanged(r, draftOf(r))).toBe(false);
     expect(draftChanged(r, { ...draftOf(r), privacy: "sensitive" })).toBe(true);
     expect(draftChanged(r, { ...draftOf(r), name: "  Wiki " })).toBe(false);
+    expect(draftChanged(r, { ...draftOf(r), scope: { all: false, callTypes: ["standup"], people: [] } })).toBe(true);
   });
   it("update sends only supported fields with the rev; a conflict is reported", async () => {
     const { b, act } = bridge({ status: "ok", data: row({ rev: 3 }) }, { status: "error", error: { code: "conflict" } }, { status: "error", error: { code: "internal" } });

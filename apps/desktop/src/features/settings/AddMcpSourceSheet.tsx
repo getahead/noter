@@ -9,7 +9,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { scheduleChoices, submitMcp } from "./sources";
+import { ScopeFields, useCallTypes } from "./ScopeFields";
+import { ALL_SCOPE, scheduleChoices, submitMcp, type ScopeDraft } from "./sources";
 
 
 export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
@@ -17,13 +18,15 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
   const [mode, setMode] = useState<SourceMode>("indexed");
   const [schedule, setSchedule] = useState("daily");
   const [privacy, setPrivacy] = useState<PrivacyClass>("normal");
+  const [scope, setScope] = useState<ScopeDraft>(ALL_SCOPE);
+  const types = useCallTypes(bridge);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const message = await submitMcp(bridge, { server, mode, schedule, privacy });
+    const message = await submitMcp(bridge, { server, mode, schedule, privacy, scope });
     setBusy(false);
     if (message) setError(message);
     else onClose();

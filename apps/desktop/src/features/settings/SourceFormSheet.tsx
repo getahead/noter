@@ -8,7 +8,8 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
-import { ALL_CALLS, addFolder } from "./sources";
+import { ScopeFields, useCallTypes } from "./ScopeFields";
+import { ALL_SCOPE, addFolder, scopeOf, scopeValid, type ScopeDraft } from "./sources";
 
 export const PRIVACY_CHOICES = () => [
   { value: "normal", label: t("sources.privacy_normal") },
@@ -17,13 +18,16 @@ export const PRIVACY_CHOICES = () => [
 
 export function AddFolderSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const [privacy, setPrivacy] = useState<PrivacyClass>("normal");
+  const [scope, setScope] = useState<ScopeDraft>(ALL_SCOPE);
+  const types = useCallTypes(bridge);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     if (busy) return;
+    if (!scopeValid(scope)) return setError(t("sources.error_scope"));
     setBusy(true);
     setError(null);
-    const r = await addFolder(bridge, privacy, ALL_CALLS);
+    const r = await addFolder(bridge, privacy, scopeOf(scope));
     setBusy(false);
     if (r.ok) onClose();
     // a cancelled folder panel adds nothing and keeps the form
@@ -37,7 +41,7 @@ export function AddFolderSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         <label className="st-row__label" htmlFor="src-privacy">{t("sources.privacy")}</label>
         <PopupButton id="src-privacy" label={t("sources.privacy")} options={PRIVACY_CHOICES()} value={privacy} onAction={(v) => setPrivacy(v as PrivacyClass)} />
         <p className="np-dim">{privacy === "sensitive" ? t("sources.privacy_sensitive_note") : t("sources.privacy_normal_note")}</p>
-        <p className="np-dim">{t("sources.scope_all")}</p>
+        <ScopeFields types={types} value={scope} onChange={setScope} />
         {error && <p className="hd__err" role="alert">{error}</p>}
       </div>
       <SheetFooter defaultButton={<PushButton label={t("sources.add_source")} variant="primary" disabled={busy} onAction={() => void add()} />}>

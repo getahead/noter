@@ -78,7 +78,8 @@ describe("AddFolderSheet", () => {
   it("shows what the form sends and its note", () => {
     const html = renderToString(<AddFolderSheet bridge={bridge(null)} onClose={() => {}} />);
     expect(html).toContain("Add Folder");
-    expect(html).toContain("Scope: all calls");
+    expect(html).toContain("All calls");
+    expect(html).toContain("Only some call types");
     expect(html).toContain("Add Source");
   });
 });
@@ -129,5 +130,22 @@ describe("the pane and the form handlers", () => {
       await addButton(tree);
       expect(onClose).not.toHaveBeenCalled();
     }
+  });
+});
+
+import { ScopeFields } from "./ScopeFields";
+describe("ScopeFields", () => {
+  const types = [{ id: "standup", label: "Standup", builtin: true, skill_path: "" }];
+  it("all calls hides the types; limited lists them as checkboxes", () => {
+    expect(renderToString(<ScopeFields types={types} value={{ all: true, callTypes: [], people: [] }} onChange={() => {}} />)).not.toContain("Standup");
+    expect(renderToString(<ScopeFields types={types} value={{ all: false, callTypes: ["standup"], people: [] }} onChange={() => {}} />)).toContain("Standup");
+  });
+  it("choices call back with the new scope", () => {
+    const onChange = vi.fn();
+    const tree = rendered(ScopeFields, { types, value: { all: false, callTypes: [], people: [] }, onChange });
+    (find(tree, (p) => p.name === "src-scope").props.onAction as (v: string) => void)("all");
+    (find(tree, (p) => p.label === "Standup").props.onAction as (on: boolean) => void)(true);
+    expect(onChange).toHaveBeenNthCalledWith(1, { all: true, callTypes: [], people: [] });
+    expect(onChange).toHaveBeenNthCalledWith(2, { all: false, callTypes: ["standup"], people: [] });
   });
 });

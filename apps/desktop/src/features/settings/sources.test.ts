@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { addFolder, addMcp, createSources, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
+import { ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
@@ -58,7 +58,7 @@ describe("source commands", () => {
 
 describe("submitMcp", () => {
   const b = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, f: () => unknown) => (void f(), res)), core: { sourceAddMcp: vi.fn() } }) as never;
-  const draft = { server: " wiki ", mode: "indexed" as const, schedule: "daily", privacy: "normal" as const };
+  const draft = { server: " wiki ", mode: "indexed" as const, schedule: "daily", privacy: "normal" as const, scope: ALL_SCOPE };
   it("a blank server is refused before anything is sent", async () => {
     const bridge = b(null);
     expect(await submitMcp(bridge, { ...draft, server: "  " })).toBe("Enter the server name.");
@@ -89,5 +89,34 @@ describe("createSources", () => {
     expect(s.view()).toMatchObject({ failed: true });
     expect(s.view().rows).toHaveLength(1);
     expect(seen).toHaveLength(2);
+  });
+});
+
+describe("scope", () => {
+  it("round-trips all calls and a limited scope, keeping the people", () => {
+    expect(scopeDraftOf({ type: "all_calls" })).toEqual(ALL_SCOPE);
+    const d = scopeDraftOf({ type: "limited", call_types: ["standup"], people: ["p1"] });
+    expect(d).toEqual({ all: false, callTypes: ["standup"], people: ["p1"] });
+    expect(scopeOf(d)).toEqual({ type: "limited", call_types: ["standup"], people: ["p1"] });
+    expect(scopeOf(ALL_SCOPE)).toEqual({ type: "all_calls" });
+  });
+  it("a limited scope needs a call type or a person", () => {
+    expect(scopeValid(ALL_SCOPE)).toBe(true);
+    expect(scopeValid({ all: false, callTypes: [], people: [] })).toBe(false);
+    expect(scopeValid({ all: false, callTypes: [], people: ["p"] })).toBe(true);
+  });
+  it("toggles a call type once", () => {
+    const on = toggleCallType(toggleCallType({ ...ALL_SCOPE, all: false }, "a", true), "a", true);
+    expect(on.callTypes).toEqual(["a"]);
+    expect(toggleCallType(on, "a", false).callTypes).toEqual([]);
+  });
+  it("an empty limited scope is refused by the MCP form before sending", async () => {
+    const b = { act: vi.fn(), core: {} } as never;
+    expect(await submitMcp(b, { server: "x", mode: "indexed", schedule: "daily", privacy: "normal", scope: { all: false, callTypes: [], people: [] } })).toContain("Choose at least one call type");
+  });
+  it("reads the call types, none on failure", async () => {
+    const b = (res: unknown) => ({ act: vi.fn(async () => res), core: {} }) as never;
+    expect(await readCallTypes(b({ status: "ok", data: { call_types: [{ id: "a", label: "A" }] } }))).toHaveLength(1);
+    expect(await readCallTypes(b({ status: "error" }))).toEqual([]);
   });
 });

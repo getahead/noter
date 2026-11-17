@@ -1,5 +1,5 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
+import type { CallTypeInfo, PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
 import { clock, shortDay, t } from "../../i18n/format";
 import type { UiPrefs } from "../../core/bindings";
 import type { IconName } from "../../ui/icons";
@@ -101,13 +101,15 @@ export interface McpDraft {
   mode: SourceMode;
   schedule: string;
   privacy: PrivacyClass;
+  scope: ScopeDraft;
 }
 
 /** Check, send and word the outcome: a message for the field/sheet, or null when the source was added. */
 export async function submitMcp(bridge: Bridge, d: McpDraft): Promise<string | null> {
   const local = mcpServerError(d.server);
   if (local) return local;
-  const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: ALL_CALLS });
+  if (!scopeValid(d.scope)) return t("sources.error_scope");
+  const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: scopeOf(d.scope) });
   if (r.ok) return null;
   if (r.field === "server" && r.rule === "duplicate") return t("sources.error_server_duplicate");
   return r.field === "server" && r.rule === "invalid_format" ? t("sources.error_server_unknown") : t("sources.error_add");
@@ -140,21 +142,42 @@ export const scheduleChoices = () => [
   { value: "weekly", label: t("sources.schedule_weekly") },
 ];
 
+/** Scope as the form edits it: all calls, or the chosen call types (people stay as the source has them). */
+export interface ScopeDraft {
+  all: boolean;
+  callTypes: string[];
+  people: string[];
+}
+
+export const scopeDraftOf = (s: SourceScope): ScopeDraft => (s.type === "all_calls" ? { all: true, callTypes: [], people: [] } : { all: false, callTypes: s.call_types, people: s.people });
+export const ALL_SCOPE: ScopeDraft = { all: true, callTypes: [], people: [] };
+/** A limited scope needs at least one call type or person; the form says so instead of sending an empty one. */
+export const scopeValid = (d: ScopeDraft): boolean => d.all || d.callTypes.length + d.people.length > 0;
+export const scopeOf = (d: ScopeDraft): SourceScope => (d.all ? ALL_CALLS : { type: "limited", call_types: d.callTypes, people: d.people });
+export const toggleCallType = (d: ScopeDraft, id: string, on: boolean): ScopeDraft => ({ ...d, callTypes: on ? [...new Set([...d.callTypes, id])] : d.callTypes.filter((x) => x !== id) });
+const sameScope = (a: ScopeDraft, b: ScopeDraft) => a.all === b.all && a.callTypes.join() === b.callTypes.join() && a.people.join() === b.people.join();
+
+export async function readCallTypes(bridge: Bridge): Promise<CallTypeInfo[]> {
+  const res = await bridge.act("sources:call-types", "call_types_list", () => bridge.core.callTypesList({}));
+  return res.status === "ok" ? res.data.call_types : [];
+}
+
 export interface SourceDraft {
   name: string;
   schedule: string | null;
   privacy: PrivacyClass;
+  scope: ScopeDraft;
 }
 
-export const draftOf = (r: SourceRow): SourceDraft => ({ name: r.name, schedule: r.schedule, privacy: r.privacy });
-export const draftChanged = (r: SourceRow, d: SourceDraft): boolean => d.name.trim() !== r.name || d.schedule !== r.schedule || d.privacy !== r.privacy;
+export const draftOf = (r: SourceRow): SourceDraft => ({ name: r.name, schedule: r.schedule, privacy: r.privacy, scope: scopeDraftOf(r.scope) });
+export const draftChanged = (r: SourceRow, d: SourceDraft): boolean => d.name.trim() !== r.name || d.schedule !== r.schedule || d.privacy !== r.privacy || !sameScope(d.scope, scopeDraftOf(r.scope));
 
 export type UpdateResult = SourceResult | { ok: false; conflict: true };
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
 /** Only supported fields go out (never path or mode); the returned row replaces the draft source only after success. */
 export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft): Promise<UpdateResult> {
-  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate({ source_id: row.id, rev: row.rev, name: d.name.trim(), schedule: d.schedule, privacy: d.privacy }));
+  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate({ source_id: row.id, rev: row.rev, name: d.name.trim(), schedule: d.schedule, privacy: d.privacy, scope: scopeOf(d.scope) }));
   if (res.status === "ok") return { ok: true, row: res.data };
   return res.error.code === "conflict" ? { ok: false, conflict: true } : fail(res);
 }
