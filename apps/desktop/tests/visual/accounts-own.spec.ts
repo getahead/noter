@@ -1,7 +1,8 @@
 // The own-account rows and sheets (cpt-noter-component-ui-credential-row account-login, cpt-noter-component-screen-dialogs
 // sign-in) over the fake core: signed in, signed out by the provider, the sign-in sheet at Prepare for each provider
-// and with the CLI missing, and the sign-out sheet. The waiting and Check steps move with the core's clock, so the
-// E2E covers them instead.
+// and with the CLI missing, the later steps (Sign in, Check, Use), a failed sign-in and the row while it waits, and the
+// sign-out sheet. The fake core's own steps move with its clock, so the later steps park the session it started and
+// emit the progress the render needs.
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -20,6 +21,29 @@ const signedIn = (w: World) => {
   accountOf(w, "claude").agents = [{ id: "agt_pm", name: "Product manager", badge: "agent" }];
 };
 const row = (page: Page, name: string) => page.locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: name });
+type Fake = { world: World; setWorld(f: (w: World) => void): void; emit(e: string, p: unknown): void };
+/** Sign in with ChatGPT up to the waiting step, then park the fake's own step timers (they answer only to the session
+ *  the account names) and return the session id, so the render decides what the core "says" next. */
+async function waiting(page: Page): Promise<string> {
+  await row(page, "Your ChatGPT account").getByRole("button", { name: /Sign In/ }).click();
+  const dlg = page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ });
+  await dlg.getByRole("button", { name: "Continue in Browser" }).click();
+  await expect(dlg).toContainText("ABCD-EFGH");
+  return page.evaluate(() => {
+    const f = (globalThis as unknown as { __noterFake: Fake }).__noterFake;
+    let id = "";
+    f.setWorld((w) => {
+      const a = w.app.accounts.accounts.find((x) => x.provider === "chatgpt")!;
+      if (a.status.type === "signing_in") id = a.status.session_id;
+      a.status = { type: "signing_in", session_id: "sis_parked" };
+    });
+    return id;
+  });
+}
+const progress = (page: Page, id: string, step: string, error: string | null = null) =>
+  page.evaluate(([i, st, er]) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.emit("signin:progress", { session_id: i, provider: "chatgpt", step: st, identity: st === "waiting_for_browser" ? null : { email: "you@example.com", plan: "Plus" }, error: er }), [id, step, error] as const);
+const chatgptDialog = (page: Page) => page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ });
+const codexReady = (w: World) => (W.idle(w), Object.assign(accountOf(w, "chatgpt").cli, { installed: true, path: "/opt/homebrew/bin/codex", version: "0.163.0", supported: true }));
 const states: { id: string; world: (w: World) => void; ready: (page: Page) => Promise<void>; target: (page: Page) => ReturnType<Page["locator"]> }[] = [
   {
     id: "signed-in",
@@ -50,6 +74,51 @@ const states: { id: string; world: (w: World) => void; ready: (page: Page) => Pr
       await expect(page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ })).toContainText("isn’t installed");
     },
     target: (page) => page.getByRole("dialog"),
+  },
+  {
+    id: "signin-waiting",
+    world: codexReady,
+    ready: async (page) => void (await waiting(page)),
+    target: chatgptDialog,
+  },
+  {
+    id: "signin-check",
+    world: codexReady,
+    ready: async (page) => {
+      await progress(page, await waiting(page), "checking_plan");
+      await expect(chatgptDialog(page)).toContainText(/Checking|test request|plan/i);
+    },
+    target: chatgptDialog,
+  },
+  {
+    id: "signin-use",
+    world: codexReady,
+    ready: async (page) => {
+      const id = await waiting(page);
+      await page.evaluate(() => (globalThis as unknown as { __noterFake: Fake }).__noterFake.setWorld((w) => (w.app.accounts.accounts.find((x) => x.provider === "chatgpt")!.status = { type: "signed_in", identity: { email: "you@example.com", plan: "Plus" }, since: 1 })));
+      await progress(page, id, "done");
+      await expect(chatgptDialog(page)).toContainText(/Connected to your ChatGPT account/);
+    },
+    target: chatgptDialog,
+  },
+  {
+    id: "signin-timed-out",
+    world: codexReady,
+    ready: async (page) => {
+      await progress(page, await waiting(page), "waiting_for_browser", "sign_in_timed_out");
+      await expect(chatgptDialog(page)).toContainText("The sign-in timed out");
+    },
+    target: chatgptDialog,
+  },
+  {
+    id: "signin-finishing-row",
+    world: codexReady,
+    ready: async (page) => {
+      await waiting(page);
+      await page.keyboard.press("Escape");
+      await expect(row(page, "Your ChatGPT account")).toContainText("Finishing in your browser");
+    },
+    target: (page) => row(page, "Your ChatGPT account"),
   },
   {
     id: "sign-out",
