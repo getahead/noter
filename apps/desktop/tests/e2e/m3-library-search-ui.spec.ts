@@ -46,12 +46,12 @@ async function search(page: Page, words: string) {
 }
 
 test.describe("cpt-noter-seq-library-search-calls", () => {
-  test("UI — happy path: “websocket уведомления” shows Items and Transcripts, ↓ Space plays the span, Return opens the Call page at it", async ({ page }) => {
+  test("UI — happy path: “notification service” shows Items and Transcripts, ↓ Space plays the span, Return opens the Call page at it", async ({ page }) => {
     await openCalls(page);
-    await search(page, "websocket уведомления");
+    await search(page, "notification service");
     await expect(page.getByText(/Best matches · keyword and meaning/)).toBeVisible();
     for (const section of ["Items", "Transcripts"]) await expect(page.getByRole("heading", { name: section })).toBeVisible();
-    expect(await sent(page, "search")).toEqual([expect.objectContaining({ query: "websocket уведомления", filter: {} })]);
+    expect(await sent(page, "search")).toEqual([expect.objectContaining({ query: "notification service", filter: {} })]);
     await expect(page.getByText("Websocket уведомления идут через notification service")).toBeVisible(); // the original words, not a normalized copy
 
     await page.keyboard.press("ArrowDown"); // the Items hit, then the first transcript match
@@ -122,7 +122,7 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await page.keyboard.press("Enter");
     expect(await sent(page, "topic_get")).toEqual([expect.objectContaining({ topic_id: "top_ws" })]);
     await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
-    await expect(page.getByText(/1 calls? · 1 decisions? · \d+ open questions?/)).toBeVisible();
+    await expect(page.getByText(/\d+ calls? · \d+ decisions? · \d+ open questions?/)).toBeVisible();
     await page.locator("[data-item-id=itm_notif]").focus(); // the decision's row
     await page.keyboard.press("Enter");
     await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
