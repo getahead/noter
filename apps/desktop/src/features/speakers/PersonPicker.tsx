@@ -43,6 +43,8 @@ export interface PersonPickerProps {
   onPick: (ref: PersonRef | null, name: string) => void;
   /** Return on a chosen person, or the New form's confirm. */
   onConfirm?: (ref: PersonRef, name: string, isNew: boolean) => void;
+  /** A host with no confirm button (naming from People): clicking a person names them, as Return does. */
+  confirmOnPick?: boolean;
   /** The error under the field, from the host's command. */
   error?: string | null;
   disabled?: boolean;
@@ -255,7 +257,7 @@ export function PersonPicker(p: PersonPickerProps) {
                 return option(
                   `${list}-${i}`,
                   i === current,
-                  () => pick(e),
+                  () => (pick(e), !multi && p.confirmOnPick && p.onConfirm?.(existing(e), e.display_name, false)),
                   <>
                     <span className="np-person__ini" aria-hidden="true">
                       {e.initials}

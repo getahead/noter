@@ -36,6 +36,7 @@ describe("cpt-noter-flow-ui-people-name", () => {
     const onNamed = vi.fn();
     const tree = rendered(NameSpeakerPopover, { bridge: bridgeOf(named), speaker: u(), people: [], anchor: null, onClose, onNamed });
     const picker = find(tree, (p) => typeof p.onConfirm === "function");
+    expect(picker.props.confirmOnPick).toBe(true); // the popover has no confirm button: a click on a person names them
     await (picker.props.onConfirm as (r: unknown, n: string) => Promise<void>)({ type: "existing", person_id: "per_d" }, "Dmitri");
     await flush();
     expect(onClose).toHaveBeenCalledOnce();

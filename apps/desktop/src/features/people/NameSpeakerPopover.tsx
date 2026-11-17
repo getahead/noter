@@ -71,6 +71,7 @@ export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, o
           confirmLabel={t("speakers.create_name")}
           error={error}
           disabled={busy}
+          confirmOnPick
           onPick={() => setError(null)}
           onConfirm={(ref, name) => void confirm(ref, name)}
           onClose={onClose}
