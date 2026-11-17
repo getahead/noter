@@ -27,9 +27,12 @@ export interface TextFieldProps extends Common {
   trailing?: ReactNode;
   /** Typing: the owner keeps the value (bind/live in the prototype). Without it the field keeps its own. */
   onChange?: (value: string) => void;
-  /** Return in a single-line field (the prototype's enter option). */
+  /** Return in a single-line field (the prototype's enter option); in a multi-line field Return, not ⇧Return, calls it and adds no line. */
   onEnter?: () => void;
 }
+
+/** Return without ⇧ and outside an input-method composition. */
+const submitKey = (e: { key: string; shiftKey: boolean; nativeEvent: { isComposing: boolean } }) => e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing;
 
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 /** text-field: standard editing; text is plain text, never markup. Validation is the owner's, on blur or submit. */
@@ -55,7 +58,7 @@ export function TextField({ variant: v, multiline, value, placeholder, label, sh
   return (
     <span className={cx("np-field", `np-field--${variant}`, invalid && "is-invalid", o.cls)} {...base("text-field", { ...o, variant, state: invalid ? "invalid" : disabled ? "disabled" : readonly ? "read-only" : undefined })}>
       {label && showLabel && <span className="np-field__label">{label}</span>}
-      {variant === "multi" ? <textarea rows={rows} {...common} /> : <input type={type} {...common} min={min} max={max} step={step} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && onEnter?.()} />}
+      {variant === "multi" ? <textarea rows={rows} {...common} onKeyDown={onEnter && ((e) => submitKey(e) && (e.preventDefault(), onEnter()))} /> : <input type={type} {...common} min={min} max={max} step={step} onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && onEnter?.()} />}
       {trailing}
       {described && (
         <span className="np-field__msg" id={msgId}>

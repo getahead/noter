@@ -53,3 +53,21 @@ describe("text-field Return (cpt-noter-flow-ui-primitives-operate-control)", () 
     expect(onEnter).toHaveBeenCalledOnce();
   });
 });
+
+describe("multi-line text-field Return (cpt-noter-flow-ui-primitives-operate-control)", () => {
+  it("sends on Return only: ⇧Return adds a line, a composing Return is ignored", async () => {
+    const { vi } = await import("vitest");
+    const onEnter = vi.fn();
+    const { find, rendered } = await import("../testing");
+    const area = find(rendered(TextField, { variant: "multi", value: "a", ariaLabel: "Q", onEnter }), (p) => typeof p.onKeyDown === "function");
+    const key = (e: object) => (area.props.onKeyDown as (e: unknown) => void)({ key: "Enter", shiftKey: false, preventDefault() {}, nativeEvent: { isComposing: false }, ...e });
+    key({ shiftKey: true });
+    key({ nativeEvent: { isComposing: true } });
+    expect(onEnter).not.toHaveBeenCalled();
+    const preventDefault = vi.fn();
+    key({ preventDefault });
+    expect(onEnter).toHaveBeenCalledOnce();
+    expect(preventDefault).toHaveBeenCalled();
+  });
+});
+

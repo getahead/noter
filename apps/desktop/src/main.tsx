@@ -17,6 +17,7 @@ import "./features/library/register";
 import "./features/people/register";
 import "./features/items/register";
 import "./features/today/register";
+import "./features/ask/register";
 import "./features/handoff/register";
 import { setPseudo, type Pseudo } from "./i18n/format";
 

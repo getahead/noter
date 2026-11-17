@@ -48,8 +48,11 @@ export const searchRoute = (query: string): Route => ({ section: "library", key:
 /** Where a `nav:request` of the core lands in the main window, or null when another window shows it (Settings, first run). */
 export function navRoute(target: NavTarget): Route | null {
   switch (target.type) {
-    case "today":
     case "ask":
+      // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-open
+      return { section: "ask", key: target.thread_id ? `thread:${target.thread_id}` : "root" };
+      // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-open
+    case "today":
     case "activity":
     case "agents":
     case "performance":
