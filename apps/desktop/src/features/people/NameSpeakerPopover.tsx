@@ -7,6 +7,7 @@ import type { PersonRef, PersonRow, UnnamedSpeaker } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
+import { bumpPerson } from "./person-store";
 import { PersonPicker } from "../speakers/PersonPicker";
 import { renameKey } from "../speakers/picker";
 import "../speakers/speakers.css";
@@ -29,7 +30,7 @@ export async function nameSpeaker(bridge: Bridge, u: UnnamedSpeaker, ref: Person
   if (res.status === "error") return false;
   const named = res.data.speakers.find((s) => s.id === u.speaker_id);
   const name = named?.label.type === "person" ? named.label.person.short_name : to;
-  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "speakers.named_new" : "speakers.named", { from: label, to: name, count: named?.segment_count ?? u.segment_count }) });
+  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "speakers.named_new" : "speakers.named", { from: label, to: name, count: named?.segment_count ?? u.segment_count }), refresh: bumpPerson });
   return true;
 }
 // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-name-single

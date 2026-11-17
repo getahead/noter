@@ -15,6 +15,7 @@ import { holdPeople } from "./count";
 import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
 import { NameSpeakerPopover } from "./NameSpeakerPopover";
+import { usePersonReread } from "./person-store";
 import { confirmDelete, usePeopleSheets } from "./sheets";
 import { createPeopleList, setPeopleQuery, usePeopleQuery, type PeopleState } from "./model";
 import "./people.css";
@@ -47,6 +48,8 @@ export function PeoplePage() {
   const [naming, setNaming] = useState<{ u: UnnamedSpeaker; anchor: HTMLElement | null } | null>(null);
   const sheets = usePeopleSheets();
   const seen = useRef(known);
+  const reread = usePersonReread(); // Undo of a naming: the core emits no person change, so the strip's refresh bumps this
+  useEffect(() => void (reread && list.load()), [reread, list]);
   useEffect(() => void list.load(), [list]);
   // the core changed a person (naming, merge, edit): read the list again, keeping it on screen meanwhile
   useEffect(() => {
