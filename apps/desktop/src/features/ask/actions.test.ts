@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -194,5 +194,36 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(unsubscribe).not.toHaveBeenCalled();
     await openThread(m.bridge, null, set);
     expect(unsubscribe).toHaveBeenCalledWith("ask_start");
+  });
+  it("reads the words of a new:<words> route, decoded, and nothing from other routes", () => {
+    expect(questionOfRoute("new:What%20did%20we%20decide%3F")).toBe("What did we decide?");
+    expect(questionOfRoute("new:  spaced  ")).toBe("spaced");
+    expect(questionOfRoute("new:")).toBeNull();
+    expect(questionOfRoute("new:%E0%A4%A")).toBe("%E0%A4%A"); // malformed: the words as they came
+    expect(questionOfRoute("root")).toBeNull();
+    expect(questionOfRoute("thread:a1")).toBeNull();
+  });
+  it("starts the routed question once per history entry, even after the page remounts", () => {
+    const ask = vi.fn();
+    expect(startFromRoute("new:Why%3F", ask)).toBe(true);
+    expect(ask).toHaveBeenCalledWith("Why?");
+    expect(startFromRoute("new:Why%3F", ask)).toBe(false); // Back / Forward / the sidebar remount the page on the same entry
+    expect(ask).toHaveBeenCalledOnce();
+    expect(startFromRoute("new:Next", ask)).toBe(true); // another entry asks its own question
+    expect(startFromRoute("root", ask)).toBe(false);
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+  it("replaces the new: entry with the thread once stored, so a later Ask Instead with the same words asks again", () => {
+    const ask = vi.fn();
+    const replace = vi.fn();
+    startFromRoute("new:Again", ask);
+    settleRoute("new:Again", "ask_1", false, replace); // not stored yet
+    settleRoute("new:Again", null, true, replace);
+    settleRoute("thread:ask_1", "ask_1", true, replace); // not a new: route
+    expect(replace).not.toHaveBeenCalled();
+    settleRoute("new:Again", "ask_1", true, replace);
+    expect(replace).toHaveBeenCalledWith({ section: "ask", key: "thread:ask_1" });
+    expect(startFromRoute("new:Again", ask)).toBe(true);
+    expect(ask).toHaveBeenCalledTimes(2);
   });
 });

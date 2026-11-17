@@ -141,3 +141,36 @@ export function endedWhileAway(raw: { turn_id: string } | null, phase: TurnPhase
   if (!raw || asking !== null || phase === null || phase === "streaming" || raw.turn_id === handled) return null;
   return raw.turn_id;
 }
+
+/** The question a `new:<words>` route carries (Search's **Ask Instead**, a Library question), or null for any other route. */
+export function questionOfRoute(key: string): string | null {
+  if (!key.startsWith("new:")) return null;
+  const words = key.slice("new:".length);
+  let text = words;
+  try {
+    text = decodeURIComponent(words);
+  } catch {
+    // malformed escapes: the words as they came
+  }
+  return text.trim() || null;
+}
+
+// The route keys already asked. A module set, not a ref: the shell unmounts the page on a section change and history
+// keeps the `new:<words>` entry, so Back, Forward or the sidebar remount it and must not ask again.
+const routed = new Set<string>();
+
+/** Ask the routed question once per history entry; false when the key carries none or was asked already. */
+export function startFromRoute(key: string, ask: (question: string) => void): boolean {
+  const question = questionOfRoute(key);
+  if (!question || routed.has(key)) return false;
+  routed.add(key);
+  ask(question);
+  return true;
+}
+
+/** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
+export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
+  if (!key.startsWith("new:") || !threadId || !stored) return;
+  routed.delete(key);
+  replace({ section: "ask", key: `thread:${threadId}` });
+}

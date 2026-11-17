@@ -5,6 +5,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { AskAnswer, AskThreadRow, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { navigate } from "../shell/navigate";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -12,7 +13,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startFromRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
@@ -69,6 +70,19 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     if (id) void open(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
+
+  // `new:<words>` (Ask Instead, a Library question) asks those words once per history entry
+  useEffect(() => {
+    // started from a timer the cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the
+    // asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing
+    const h = setTimeout(() => startFromRoute(routeKey, (q) => ask(q)), 0);
+    return () => clearTimeout(h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey]);
+  // ...and once it is stored the entry becomes the thread
+  useEffect(() => {
+    settleRoute(routeKey, thread, asking === null && turns.length > 0, (route) => navigate(route, true));
+  }, [routeKey, thread, asking, turns]);
 
   const turn: TurnView | null = data ? foldTurn(data.messages) : stream?.error && asking ? failedView(stream.error.code) : null;
   const phase = turn ? phaseOf(turn) : null;

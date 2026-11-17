@@ -26,3 +26,14 @@ describe("navigate (in-window routes without a NavTarget)", () => {
     expect(second).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("navigate with replace", () => {
+  it("takes the place of the current history entry instead of pushing", () => {
+    const dispatch = vi.fn();
+    const release = navigateEffect(dispatch);
+    navigate({ section: "ask", key: "thread:ask_1" }, true);
+    expect(dispatch).toHaveBeenCalledWith({ type: "move", move: { type: "replace", route: { section: "ask", key: "thread:ask_1" } } });
+    release();
+  });
+});
+
