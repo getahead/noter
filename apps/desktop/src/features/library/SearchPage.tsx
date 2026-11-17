@@ -14,7 +14,7 @@ import { apply, heldFilter, holdFilter, isFiltered, reconcile, type FilterAction
 import { FilterBar, useLists } from "./filter-bar";
 import { usePublishHead } from "./topics-head";
 import { SearchResultRow } from "./SearchResultRow";
-import { openTopic } from "./topic-nav";
+import { askAboutTopic, openTopic } from "./topic-nav";
 import { topicCounts } from "./topics-model";
 import { askRoute, groupByCall, once, sections, statusOf } from "./search-model";
 import "./library.css";
@@ -99,6 +99,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>
             <TopicChip size="suggestion" name={topic.name} counts={topicCounts(topic)} merge={topic.merge_suggestion ? t("topics.merge_glyph") : undefined} onOpen={() => openTopic(bridge, topic.id)} />
+            <PushButton label={t("topics.ask_this")} size="small" onAction={() => askAboutTopic(topic.id)} />
           </section>
         )}
         {sections(r).map((s) => (

@@ -1094,7 +1094,7 @@ export const en = {
   "topics.nothing_body": "The calls behind this topic were deleted.",
   "topics.timeline": "Timeline",
   "topics.ask_thread": "Ask About This Thread",
-  "topics.ask_pending": "Asking about a thread arrives with Ask",
+  "topics.ask_this": "Ask About This",
   "topics.from_call": "{title} · {date}",
   "topics.open_call": "Open {title}",
   "topics.rename": "Rename…",

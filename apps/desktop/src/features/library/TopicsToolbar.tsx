@@ -6,6 +6,8 @@ import { SearchField } from "../../ui/primitives/search-field";
 import type { PageToolbarProps } from "../shell/pages";
 import { MainToolbar, OverflowMenu } from "../shell/toolbar";
 import { useThreadMenu } from "./thread-menu";
+import { askAboutTopic } from "./topic-nav";
+import { parseTopicKey } from "./topics-model";
 import { useHead } from "./topics-head";
 import { setTopicWords, useTopicWords } from "./topics-query";
 
@@ -26,7 +28,8 @@ export function TopicsToolbar({ base }: PageToolbarProps) {
 }
 
 /** The thread's toolbar (TH-R1): Back, the topic name with its counts, Ask About This Thread (waits for Ask) and the ⋯ menu with Rename… and Merge With…. */
-export function ThreadToolbar({ base }: PageToolbarProps) {
+export function ThreadToolbar({ base, route }: PageToolbarProps) {
+  const topicId = parseTopicKey(route.key);
   const head = useHead();
   const menu = useThreadMenu();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
@@ -39,7 +42,7 @@ export function ThreadToolbar({ base }: PageToolbarProps) {
       hasSearch={false}
       trailing={
         <>
-          <PushButton label={t("topics.ask_thread")} disabled help={t("topics.ask_pending")} />
+          <PushButton label={t("topics.ask_thread")} disabled={!topicId} onAction={() => topicId && askAboutTopic(topicId)} />
           {menu.length > 0 && (
             <>
               <IconButton id="th-more" icon="ellipsis" label={t("shell.more")} attrs={{ "aria-haspopup": "menu", "aria-expanded": String(anchor !== null) }} onAction={() => setAnchor(anchor ? null : globalThis.document?.getElementById("th-more") ?? null)} />

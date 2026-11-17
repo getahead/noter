@@ -10,6 +10,8 @@ import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
 import { slots } from "../call-page/slots";
 import { closeOnPointer, topicMenu } from "./TopicsPage";
+import { navigateEffect } from "../shell/navigate";
+import { askTopicRoute } from "./topic-nav";
 import { ThreadRow } from "./ThreadRow";
 import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
@@ -132,14 +134,23 @@ describe("useRead", () => {
 });
 
 describe("toolbars and thread rows", () => {
-  it("the toolbars show the published head and the thread's Ask waits for Ask", async () => {
+  it("the toolbars show the published head, and the thread's Ask About This Thread asks about its topic", async () => {
     await ready();
     setHead({ title: "Drawer redesign", subtitle: "3 calls" });
-    const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
+    const bar = rendered(ThreadToolbar as never, { base: {}, route: { section: "topics", key: "topic:top_ws" }, bridge } as never);
     expect(bar.props.title).toBe("Drawer redesign");
     expect(bar.props.subtitle).toBe("3 calls");
-    const trailing = find(bar, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { disabled: boolean } }] } };
-    expect(trailing.props.children[0].props.disabled).toBe(true);
+    const askOf = (b: ReturnType<typeof rendered>) => (find(b, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { label: string; disabled: boolean; onAction: () => void } }] } }).props.children[0].props;
+    const ask = askOf(bar);
+    expect(ask.label).toBe("Ask About This Thread");
+    expect(ask.disabled).toBe(false);
+    const moves: unknown[] = [];
+    const stop = navigateEffect((e) => moves.push(e));
+    ask.onAction();
+    stop();
+    expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "ask", key: "new-topic:top_ws" } } }]);
+    expect(askTopicRoute("top_x")).toEqual({ section: "ask", key: "new-topic:top_x" });
+    expect(askOf(rendered(ThreadToolbar as never, { base: {}, route: { section: "topics", key: "root" }, bridge } as never)).disabled).toBe(true);
     expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
     setHead({ title: null, subtitle: null });
   });

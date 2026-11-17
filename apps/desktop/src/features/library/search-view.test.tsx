@@ -1,6 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
+import { navigateEffect } from "../shell/navigate";
 import { resultCount, SearchView, type Read, type SearchViewProps } from "./SearchPage";
 
 const hit = (strength: "strong" | "weak", call = "c1", title = "T") =>
@@ -67,6 +68,11 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(html(props(results({ topics: [topic, { ...topic, id: "top_9", name: "Other" }] }), { bridge }))).toContain("1 result"); // one chip renders, so one result
     expect(h).not.toContain("0 results");
     (find(rendered(SearchView, p), (x) => typeof x.onOpen === "function").props.onOpen as () => void)();
+    const moves: unknown[] = [];
+    const stop = navigateEffect((e) => moves.push(e));
+    (find(rendered(SearchView, p), (x) => x.label === "Ask About This").props.onAction as () => void)();
+    stop();
+    expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "ask", key: "new-topic:top_1" } } }]);
     expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
   });
   it("↓ on the results title enters the first hit", () => {

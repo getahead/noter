@@ -164,4 +164,15 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await expect(pop.getByRole("textbox")).toHaveValue("Notification service");
   });
 
+  test("UI — other path: Ask About This Thread opens Ask scoped to the topic and asks what was decided and what is still open", async ({ page }) => {
+    await openTopics(page);
+    await page.getByRole("table").getByRole("row", { name: /Websocket notifications/ }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
+    await page.getByRole("button", { name: "Ask About This Thread" }).click();
+    await expect(page.getByRole("heading", { name: "Ask", level: 1 })).toBeVisible();
+    expect(await sent(page, "ask_start")).toEqual([
+      expect.objectContaining({ question: "What was decided and what is still open about Websocket notifications?", scope: expect.objectContaining({ topic_ids: ["top_ws"] }) }),
+    ]);
+  });
 });
