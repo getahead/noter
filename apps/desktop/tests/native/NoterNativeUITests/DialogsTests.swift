@@ -68,4 +68,60 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
         XCTAssertTrue(recordingLine(in: openMenu()).exists, "Return chose Cancel: the recording goes on")
     }
+
+    // M3 People (docs/features/ui/people.md › Edit, merge or delete a person): Delete Person… asks with a native alert
+    // whose default is Cancel; Delete removes the person and returns to People.
+    func test_cpt_noter_seq_people_name_unnamed_speaker__delete_a_person() {
+        launch("idle")
+        // The page takes keys once it has loaded: right after launch ⌘4 can reach an empty web view.
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        app.typeKey("4", modifierFlags: .command)
+        // The web view may expose a row/cell with combined text rather than a bare static text.
+        func person(_ name: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR title CONTAINS %@", name, name)).firstMatch
+        }
+        let row = person("Oleg M.")
+        if !row.waitForExistence(timeout: 10) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PEOPLE AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(row.exists, "⌘4 shows People with Oleg M.")
+        // The ⋯ menu is a web popover: its items are not native menu items.
+        func clickDelete() {
+            let item = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Delete Person' OR title CONTAINS 'Delete Person'")).firstMatch
+            if !item.waitForExistence(timeout: 5) {
+                let tree = XCTAttachment(string: app.debugDescription)
+                tree.lifetime = .keepAlways
+                add(tree)
+                print("MENU AX TREE\n\(app.debugDescription)")
+            }
+            XCTAssertTrue(item.exists, "the ⋯ menu offers Delete Person…")
+            item.click()
+        }
+        row.doubleClick() // opens the person, as Return does
+        // The ⋯ button may be exposed as a button, a pop-up or a menu button: match by label.
+        let more = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'More'")).firstMatch
+        if !more.waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PERSON AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(more.exists, "Oleg M.'s page has its ⋯ menu")
+        more.click()
+        clickDelete()
+        XCTAssertTrue(alert.staticTexts["Delete Oleg M.?"].waitForExistence(timeout: 5), "Delete Person… shows no alert")
+        app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        XCTAssertTrue(more.exists, "Cancel keeps the person's page")
+        more.click()
+        clickDelete()
+        XCTAssertTrue(alert.buttons["Delete"].waitForExistence(timeout: 5))
+        alert.buttons["Delete"].click()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(person("Anna K.").waitForExistence(timeout: 5), "the deleted person's page gives way to People")
+        XCTAssertTrue(person("Oleg M.").waitForNonExistence(timeout: 5), "Oleg M. is gone from People")
+    }
 }

@@ -39,3 +39,13 @@ export function view(read: PeopleList, query: string): PeopleView {
 // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-unnamed
 // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-empty
 // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-list-result
+
+// @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-duplicate
+/** A person the typed name may already be: the same full or short name, or a lone first name ("Lena" for Lena K.). The core keeps the final say. */
+export function possibleDuplicate(people: readonly PersonRow[] | null, name: string): PersonRow | undefined {
+  const q = fold(name.trim());
+  if (!q) return undefined;
+  const lone = !q.includes(" ");
+  return people?.find((p) => [p.display_name, p.short_name].some((n) => fold(n) === q) || (lone && fold(p.display_name).split(" ")[0] === q));
+}
+// @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-duplicate

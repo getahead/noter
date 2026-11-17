@@ -11,7 +11,7 @@ import { Table } from "../../ui/primitives/table";
 import { HistoryTimeline } from "../history/HistoryTimeline";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
-import { holdPerson, setPersonTab, usePersonTab, type PersonTab } from "./person-store";
+import { holdPerson, setPersonTab, usePersonNotice, usePersonReread, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
 
@@ -23,10 +23,20 @@ export interface PersonState {
   error: CoreError | null;
 }
 
-/** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People. */
-export async function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
-  const res = await bridge.act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" });
-  return res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error };
+const reading = new WeakMap<Bridge, Map<string, Promise<PersonState>>>();
+
+/** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People.
+ *  StrictMode mounts a page twice in development: a read in flight is shared, never sent twice. */
+export function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
+  const mine = reading.get(bridge) ?? reading.set(bridge, new Map()).get(bridge)!;
+  const held = mine.get(id);
+  if (held) return held;
+  const read = bridge
+    .act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" })
+    .then((res): PersonState => (res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error }))
+    .finally(() => void mine.delete(id));
+  mine.set(id, read);
+  return read;
 }
 
 /** **Show All** under Last calls opens the person's Calls view. */
@@ -44,13 +54,15 @@ export function PersonPage({ id }: { id: string }) {
   const [state, setState] = useState<PersonState>({ status: "LOADING", page: null, error: null });
   const [slow, setSlow] = useState(false);
   const [reads, setReads] = useState(0);
+  const reread = usePersonReread();
+  const notice = usePersonNotice();
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
     // a failed re-read keeps the page that is on screen
     void readPerson(bridge, id).then((next) => current && setState((s) => (next.status === "ERROR" ? { ...next, page: s.page } : next)));
     return () => void (current = false);
-  }, [bridge, id, known?.rev, reads]);
+  }, [bridge, id, known?.rev, reads, reread]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     holdPerson(state.page);
@@ -63,7 +75,7 @@ export function PersonPage({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [state.status]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-overview
-  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} onShowAll={() => showAll(id)} />;
+  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} onShowAll={() => showAll(id)} notice={notice} />;
 }
 
 export interface PersonBodyProps {
@@ -74,10 +86,12 @@ export interface PersonBodyProps {
   slow: boolean;
   onRetry: () => void;
   onShowAll?: () => void;
+  /** A refused action of the menu, shown above the view. */
+  notice?: string | null;
 }
 
 /** What the page draws for a read of the person. */
-export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll }: PersonBodyProps) {
+export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll, notice }: PersonBodyProps) {
   const { page } = state;
   if (!page) {
     if (state.status === "ERROR")
@@ -101,13 +115,14 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
     // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare
     <div data-region="PE" data-state={tab}>
       <h2 className="np-sr" tabIndex={-1}>{p.display_name}</h2>
+      {notice && <InlineBanner banner={{ id: "person-notice", severity: "error", text: notice }} />}
       {tab === "calls" ? (
         <div data-region="PE-CALLS" role="region" aria-label={t("person.tab.calls")}>
           <CallsTable bridge={bridge} calls={page.calls} prefs={prefs} name={p.short_name} />
         </div>
       ) : tab === "history" ? (
         <div data-region="PE-HISTORY" role="region" aria-label={t("person.tab.history")}>
-          <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" />
+          <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" emptyBody={t("person.history_empty", { name: p.short_name })} />
         </div>
       ) : (
         <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} />
