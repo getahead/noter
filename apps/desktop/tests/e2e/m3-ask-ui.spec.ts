@@ -177,6 +177,27 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     expect(second.scope.preset).toBe("all");
   });
 
+  test("empty path — a routed question asked under a narrowed scope keeps Widen Scope once its route settles into the thread", async ({ page }) => {
+    if (!REAL) return; // the fake core cannot produce this state
+    const steer = await openAsk(page);
+    const scopeSelect = toolbar(page).getByRole("combobox", { name: /scope/i });
+    const narrowed = await scopeSelect.locator("option").evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).find((v) => v !== "all"));
+    expect(narrowed, "the core offers a narrower scope than All calls").toBeTruthy();
+    await scopeSelect.selectOption(narrowed as string);
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
+    const question = "What did we decide about the OpenStack upgrade?";
+    // the route Ask Instead pushes, through the shell's navigate seam: asked once, then its entry becomes thread:<id>
+    await page.evaluate(async (q) => {
+      const module = "/src/features/shell/navigate.ts"; // served by the dev server: the app's own module instance
+      const { navigate } = (await import(/* @vite-ignore */ module)) as { navigate: (route: { section: string; key: string }) => void };
+      navigate({ section: "ask", key: `new:${encodeURIComponent(q)}` });
+    }, question);
+    await expect(thread(page)).toContainText("I could not find this in your calls.");
+    // settled: the turn was stored (one thread read) and the route's thread was opened (a second one)
+    await expect.poll(async () => (await sent(page, "ask_thread_get")).length).toBeGreaterThanOrEqual(2);
+    await expect(button(thread(page), "Widen Scope")).toBeVisible();
+  });
+
   test("error path — Claude Code unreachable: Couldn't reach Claude Code, Try Again keeps the question", async ({ page }) => {
     if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
