@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { ItemKind, TopicRow, TopicThreadGroup } from "../../core/bindings";
+import type { TopicRow, TopicThreadGroup } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import type { SheetProps } from "../../ui/dialogs/sheets";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
+import { KIND_KEY } from "../items/kind";
 import { mergeTopic } from "./topics-actions";
 import { movesOf } from "./topics-model";
 
@@ -21,7 +22,6 @@ type Props = SheetProps & {
   refresh?: () => void;
 };
 
-const KIND: Record<ItemKind, "items.kind.decision" | "items.kind.action_item" | "items.kind.open_question" | "items.kind.risk"> = { decision: "items.kind.decision", action_item: "items.kind.action_item", open_question: "items.kind.open_question", risk: "items.kind.risk" };
 
 /** Merge With… (MERGING): the 520-pt sheet with the target chooser (never this topic), what moves, Cancel and Merge. */
 export function MergeSheet({ close, bridge, source, target, known, onMerged, refresh }: Props) {
@@ -68,7 +68,7 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
               <ul className="lb-mergelist">
                 {moves.rows.map((item) => (
                   <li key={item.id}>
-                    <span className="np-dim">{t(KIND[item.kind])}</span> {item.text}
+                    <span className="np-dim">{t(KIND_KEY[item.kind])}</span> {item.text}
                   </li>
                 ))}
               </ul>

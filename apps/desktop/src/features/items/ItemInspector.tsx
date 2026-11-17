@@ -1,5 +1,6 @@
 // The Item inspector (II-R1/II-R2, 320 pt): Details by kind and the item's History. Owner and Engineering apply at once;
 // text, Due and Linked issue wait for Save. It opens through the shell's inspector override (`register.tsx`).
+import { KIND_KEY } from "./kind";
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
@@ -21,7 +22,6 @@ import { draftOf, draftPatch, langOf } from "./review";
 import { slots } from "./slots";
 
 const STATUS = { open: "items.status.open", carried: "items.status.carried", handed_off: "items.status.handed_off", done: "items.status.done", closed_by_evidence: "items.status.closed_by_evidence", answered_in_call: "items.status.answered_in_call" } as const;
-const KIND = { decision: "items.kind.decision", action_item: "items.kind.action_item", open_question: "items.kind.open_question", risk: "items.kind.risk" } as const;
 type Tab = "details" | "history";
 type Saved = "idle" | "saving" | "saved" | string;
 
@@ -158,7 +158,7 @@ export function ItemInspector({ bridge, itemId }: { bridge: Bridge; itemId: stri
       closeInspector();
     }}>
       <div className="ii-head">
-        <Badge kind="kind" text={t(KIND[it.kind])} />
+        <Badge kind="kind" text={t(KIND_KEY[it.kind])} />
         <SegmentedControl items={[{ value: "details", label: t("items.details") }, { value: "history", label: t("items.history") }]} value={tab} label={t("items.inspector")} onAction={(v) => setTab(v as Tab)} />
       </div>
       {tab === "details" ? details : history}
