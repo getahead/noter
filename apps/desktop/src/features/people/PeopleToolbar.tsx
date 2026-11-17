@@ -4,7 +4,11 @@ import { SearchField } from "../../ui/primitives/search-field";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import type { PageToolbarProps } from "../shell/pages";
 import { MainToolbar } from "../shell/toolbar";
-import { useCount } from "./count";
+import { useState } from "react";
+
+import { IconButton } from "../../ui/primitives/icon-button";
+import { usePeopleHeld } from "./count";
+import { AddPersonPopover, setAddPerson } from "./add-person";
 import { setPeopleQuery, usePeopleQuery } from "./model";
 import { setPersonTab, usePersonHeld, usePersonTab, type PersonTab } from "./person-store";
 
@@ -31,12 +35,22 @@ function PersonToolbar({ base, id }: PageToolbarProps & { id: string }) {
   return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} hasSearch={false} center={control} />;
 }
 
-function ListToolbar({ base }: PageToolbarProps) {
+function ListToolbar({ base, bridge }: PageToolbarProps) {
   const query = usePeopleQuery();
-  const count = useCount();
+  const count = usePeopleHeld()?.length ?? null;
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-search
   const field = <SearchField id="pl-search" cls="pe-search" placeholder={t("people.search")} ariaLabel={t("people.search")} value={query} onChange={setPeopleQuery} />;
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-search
+  const trailing = (
+    <>
+      <span ref={setAnchor}>
+        <IconButton id="pl-add" icon="plus" label={t("people.add")} onAction={() => setAddPerson(true)} />
+      </span>
+      <AddPersonPopover bridge={bridge} anchor={anchor} />
+      {field}
+    </>
+  );
   const subtitle = count === null ? undefined : count ? t("people.subtitle", { count }) : t("people.subtitle_empty");
-  return <MainToolbar {...base} region="PL-R1" title={t("people.title")} subtitle={subtitle} hasSearch={false} trailing={field} />;
+  return <MainToolbar {...base} region="PL-R1" title={t("people.title")} subtitle={subtitle} hasSearch={false} trailing={trailing} />;
 }

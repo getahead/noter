@@ -9,7 +9,8 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Table } from "../../ui/primitives/table";
 import { NONE, press, retain, type Selection } from "../library/selection";
-import { holdCount } from "./count";
+import { holdPeople } from "./count";
+import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
 import { createPeopleList, setPeopleQuery, usePeopleQuery, type PeopleState } from "./model";
 import "./people.css";
@@ -47,9 +48,9 @@ export function PeoplePage() {
   }, [state.status]);
   const shown = useMemo(() => (state.read ? view(state.read, query) : null), [state.read, query]);
   useEffect(() => {
-    holdCount(shown ? (shown.status === "EMPTY" ? 0 : state.read!.people.filter((p) => !p.is_you).length) : null);
-    return () => holdCount(null);
-  }, [shown, state.read]);
+    holdPeople(state.read ? state.read.people.filter((p) => !p.is_you) : null);
+    return () => holdPeople(null);
+  }, [state.read]);
   const order = useMemo(() => shown?.rows.map((r) => r.id) ?? [], [shown]);
   useEffect(() => setSelection((s) => retain(s, order)), [order]);
 
@@ -104,7 +105,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
       {reloadFailed}
       <div data-region="PL-R2" role="region" aria-label={t("people.title")} data-state={shown.status.toLowerCase()}>
         {shown.status === "EMPTY" ? (
-          <EmptyState variant="first-use" icon="people" title={t("people.empty_title")} body={t("people.empty_body")} />
+          <EmptyState variant="first-use" icon="people" title={t("people.empty_title")} body={t("people.empty_body")} actionLabel={t("people.add")} onAction={() => setAddPerson(true)} />
         ) : shown.status === "NO_MATCH" ? (
           <EmptyState variant="filtered" title={t("people.no_match", { query: query.trim() })} actionLabel={t("people.clear")} onAction={() => setPeopleQuery("")} />
         ) : (
