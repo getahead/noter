@@ -15,6 +15,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { accountRowState, providerName, testResultText, toolName, usedByText, type AccountRowState } from "./account-rows";
 import { signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
+import { AccountSignInSheet } from "./AccountSignInSheet";
+import { useSignIn } from "./signin-store";
 import { SignOutSheet } from "./SignOutSheet";
 import { KEY_NAME, KEY_USE, keyRowState, reasonText, type KeyRowState } from "./keys";
 
@@ -129,12 +131,13 @@ const ACCOUNT_TAG: Record<AccountRowState, { tone: BadgeProps["tone"]; icon?: Ic
 };
 
 /** Account-login variant: Not signed in / Finishing in your browser… / Signed in with Test and Sign Out… / Signed out by the provider. */
-export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; view: AccountView; keyConfigured: boolean }) {
+export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: Bridge; view: AccountView; keyConfigured: boolean; onUseKey?: () => void }) {
   const a = ACCOUNT[view.provider];
   const state = accountRowState(view);
   const [testLine, setTestLine] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const signOutError = useWindow(bridge, (s) => s.commands[signOutKey(view.provider)]?.state) === "ERROR";
+  const { machines } = useSignIn(bridge, view.provider);
   const testing = useWindow(bridge, (s) => s.commands[testKey(view.provider)]?.state) === "WAITING";
   const status = view.status;
   const provider = providerName(view.provider);
@@ -179,10 +182,18 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
             <PushButton label={t("settings.accounts.test")} size="small" loading={testing} onAction={() => void runTest()} />
             <PushButton label={t("settings.accounts.sign_out")} size="small" onAction={() => setAsking(true)} />
           </>
+        ) : state === "signing_in" ? (
+          <>
+            {/* @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-hide */}
+            <PushButton label={t("settings.accounts.show")} size="small" onAction={() => machines.dispatch(view.provider, { type: "show" })} />
+            {/* @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-hide */}
+            <PushButton label={t("settings.accounts.cancel")} size="small" variant="quiet" onAction={() => void machines.cancel(view.provider)} />
+          </>
         ) : (
-          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" disabled help={t("settings.accounts.later")} />
+          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" onAction={() => void machines.open(view.provider)} />
         )}
       </div>
+      <AccountSignInSheet bridge={bridge} provider={view.provider} view={view} onUseKey={onUseKey} />
       {asking && (
         // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
         <SignOutSheet

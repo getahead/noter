@@ -66,7 +66,7 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
       </Group>
       <Group title={t("settings.accounts.title")} foot={t("settings.accounts.foot")}>
         {(accounts?.accounts ?? []).map((a) => (
-          <AccountRow key={a.provider} bridge={bridge} view={a} keyConfigured={keyConfigured(accounts, a.provider)} />
+          <AccountRow key={a.provider} bridge={bridge} view={a} keyConfigured={keyConfigured(accounts, a.provider)} onUseKey={() => setSheet({ provider: a.provider === "claude" ? "anthropic" : "codex", mode: "add" })} />
         ))}
       </Group>
       <Group title={t("settings.local.title")}>
