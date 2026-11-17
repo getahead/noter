@@ -61,6 +61,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
         </p>
+        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) }} />}
         {status === "WEAK_ONLY" && widen}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>

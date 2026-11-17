@@ -36,6 +36,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
   it("WEAK_ONLY says so and offers the widening actions", () => {
     const h = html(props(results({ items: [hit("weak")], only_weak: true })));
     expect(h).toContain("only weak matches");
+    expect(h).toContain("Only weak matches for “websocket”"); // the warning banner (LS-R3)
     expect(h).toContain("Ask Instead");
   });
   it("RESULTS: items before transcripts, strong first, weaker after, three spans per call and More in This Call", () => {

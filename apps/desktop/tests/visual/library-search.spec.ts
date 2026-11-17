@@ -64,7 +64,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     });
     test("weak matches under the divider", async ({ page }) => {
       await search(page, px, { weak: true });
-      await expect(page.getByText("Weaker matches")).toBeVisible();
+      await expect(page.getByText("Weaker matches").first()).toBeVisible();
       await shot(page, "search-weak", width);
     });
     test("only weak matches", async ({ page }) => {
