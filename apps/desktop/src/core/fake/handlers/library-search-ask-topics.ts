@@ -132,7 +132,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       run.citations.push(cite);
       fake.push(sub, { event: { type: "citation", citation: cite } });
     });
-    later(400 + words.length * 60 + 100, () => {
+    later(400 + words.length * 60 + 300, () => {
       const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
       save(answer);
       fake.push(sub, { event: { type: "done", answer } });
