@@ -26,6 +26,7 @@ import { MODE_MSG } from "./mode-indicator-view";
 import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
+import { leave } from "../people/leave";
 import { searchRoute } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
@@ -57,6 +58,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
       // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-ready-deleted
       // @cpt-end:cpt-noter-flow-ui-call-page-frame-more-menu:p1:inst-return-more
     );
+  // Delete Person… on a person's page: People replaces the deleted page.
+  leave.toPeople = () => dispatch({ type: "move", move: { type: "replace", route: { section: "people", key: "root" } } });
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [viewport, setViewport] = useState(() => globalThis.innerWidth ?? 1280);
