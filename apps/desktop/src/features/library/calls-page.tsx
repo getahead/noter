@@ -232,8 +232,7 @@ export function CallsPage() {
     <CallsView
       bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} onRun={() => {}} />}
       actions={
-        <div className="lb-actions">
-          <button type="button" className="lb-fbtn" disabled title={t("library.export_hint")}>{t("library.export")}</button>
+        <>
           {tagging && chosen.length > 0 && (
             <AddTagPopover
               anchor={tagging}
@@ -247,7 +246,7 @@ export function CallsPage() {
               }}
             />
           )}
-        </div>
+        </>
       }
       filtered={filtered}
       onClearFilters={() => onFilter({ type: "clear" })}
@@ -273,7 +272,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
-      onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-actions"))}
+      onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );
 }
