@@ -171,6 +171,15 @@ describe("PersonPicker keys and choices", () => {
       "Pavel Romanov",
     );
   });
+  it("a click on an option confirms it only for a host with no confirm button (naming from People)", () => {
+    const click = (over: Partial<Parameters<typeof PersonPicker>[0]>) => {
+      const { calls, tree } = input(undefined, over);
+      (find(tree, (pr) => pr.role === "option" && String(pr.id).endsWith("-0")).props as { onClick: () => void }).onClick();
+      return calls;
+    };
+    expect(click({ confirmOnPick: true }).confirm).toHaveBeenCalledWith({ type: "existing", person_id: "p1" }, "Pavel Romanov", false);
+    expect(click({}).confirm).not.toHaveBeenCalled();
+  });
   it("the New Person… entry opens the form without naming anyone", () => {
     const { calls, tree } = input("Zoya");
     (

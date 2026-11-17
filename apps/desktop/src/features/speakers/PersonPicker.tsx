@@ -43,6 +43,8 @@ export interface PersonPickerProps {
   onPick: (ref: PersonRef | null, name: string) => void;
   /** Return on a chosen person, or the New form's confirm. */
   onConfirm?: (ref: PersonRef, name: string, isNew: boolean) => void;
+  /** A host with no confirm button (naming from People): clicking a person names them, as Return does. */
+  confirmOnPick?: boolean;
   /** The error under the field, from the host's command. */
   error?: string | null;
   disabled?: boolean;
@@ -52,6 +54,8 @@ export interface PersonPickerProps {
   multiple?: true;
   selected?: readonly PersonChip[];
   onChange?: (next: PersonChip[]) => void;
+  /** The New form opened or closed: a host that names its dialog after what is shown follows it. */
+  onForm?: (open: boolean) => void;
 }
 
 // @cpt-component:cpt-noter-component-ui-person-picker:p1
@@ -65,6 +69,7 @@ export function PersonPicker(p: PersonPickerProps) {
   const read = usePeople(p.bridge, p.people !== undefined);
   const people = (p.people !== undefined ? p.people : read) ?? null;
   useEffect(() => setQuery(p.value ?? ""), [p.value]);
+  useEffect(() => p.onForm?.(form !== null), [form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cap = p.variant === "inline" ? CAP_INLINE : CAP_POPOVER;
   const multi = p.multiple === true;
@@ -252,7 +257,7 @@ export function PersonPicker(p: PersonPickerProps) {
                 return option(
                   `${list}-${i}`,
                   i === current,
-                  () => pick(e),
+                  () => (pick(e), !multi && p.confirmOnPick && p.onConfirm?.(existing(e), e.display_name, false)),
                   <>
                     <span className="np-person__ini" aria-hidden="true">
                       {e.initials}
