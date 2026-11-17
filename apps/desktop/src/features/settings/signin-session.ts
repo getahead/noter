@@ -12,6 +12,10 @@ export interface SignIn {
   provider: AccountProvider | null;
   prepare: SignInPrepare | null;
   cliMissing: boolean;
+  /** `cli_version_unsupported` from prepare: the tool is there but too old. */
+  cliUnsupported: boolean;
+  /** The last install job failed or was cancelled. */
+  installFailed: boolean;
   choice: "existing" | "other";
   /** The personal-use box (Claude only). */
   confirmed: boolean;
@@ -26,7 +30,7 @@ export interface SignIn {
   code: ErrorCode | null;
 }
 
-export const closed: SignIn = { phase: "SIGNED_OUT", hidden: false, provider: null, prepare: null, cliMissing: false, choice: "other", confirmed: false, runId: null, session: null, sessionId: null, identity: null, done: false, code: null };
+export const closed: SignIn = { phase: "SIGNED_OUT", hidden: false, provider: null, prepare: null, cliMissing: false, cliUnsupported: false, installFailed: false, choice: "other", confirmed: false, runId: null, session: null, sessionId: null, identity: null, done: false, code: null };
 
 export type SignInEvent =
   | { type: "open" }
@@ -36,6 +40,7 @@ export type SignInEvent =
   | { type: "choose"; choice: "existing" | "other" }
   | { type: "installStarted"; runId: string }
   | { type: "installDone"; runId: string }
+  | { type: "installFailed"; runId: string }
   | { type: "started"; session: SignInSession }
   | { type: "usedExisting"; identity: AccountIdentity }
   | { type: "progress"; progress: SignInProgress; signedIn: boolean }
@@ -54,19 +59,23 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
     case "open":
       return { ...closed, phase: "PREPARE", confirmed: s.confirmed };
     case "prepared":
-      return { ...s, phase: "PREPARE", hidden: false, provider: e.prepare.provider, prepare: e.prepare, cliMissing: false, runId: null, choice: e.prepare.existing ? "existing" : "other" };
+      return { ...s, phase: "PREPARE", hidden: false, provider: e.prepare.provider, prepare: e.prepare, cliMissing: false, cliUnsupported: false, installFailed: false, runId: null, choice: e.prepare.existing ? "existing" : "other" };
     case "prepareFailed":
-      return e.code === "cli_missing" ? { ...s, phase: "PREPARE", cliMissing: true, runId: null } : { ...s, phase: "SIGNIN_ERROR", code: e.code };
+      if (e.code === "cli_missing") return { ...s, phase: "PREPARE", cliMissing: true, cliUnsupported: false, runId: null };
+      if (e.code === "cli_version_unsupported") return { ...s, phase: "PREPARE", cliMissing: false, cliUnsupported: true, runId: null };
+      return { ...s, phase: "SIGNIN_ERROR", code: e.code };
     case "confirm":
       return { ...s, confirmed: e.on };
     case "choose":
       return { ...s, choice: e.choice };
     case "installStarted":
-      return { ...s, phase: "INSTALLING", runId: e.runId };
+      return { ...s, phase: "INSTALLING", runId: e.runId, installFailed: false };
     case "installDone":
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-correlate
       return s.phase === "INSTALLING" && s.runId === e.runId ? { ...s, phase: "PREPARE", runId: null } : s;
     // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-correlate
+    case "installFailed":
+      return s.phase === "INSTALLING" && s.runId === e.runId ? { ...s, phase: "PREPARE", cliMissing: true, installFailed: true, runId: null } : s;
     case "started":
       return { ...s, phase: "BROWSER", hidden: false, provider: e.session.provider, session: e.session, sessionId: e.session.id, identity: null, done: false, code: null };
     case "usedExisting":
@@ -107,7 +116,7 @@ export const sheetOpen = (s: SignIn): boolean => s.phase !== "SIGNED_OUT" && !s.
 
 // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-guard
 /** Continue / Use This Account: a supported installed tool, and the personal-use box where the core asks for it. */
-export const canContinue = (s: SignIn): boolean => s.phase === "PREPARE" && !!s.prepare && !s.cliMissing && s.prepare.cli.installed && s.prepare.cli.supported && (!s.prepare.needs_personal_use_confirmation || s.confirmed);
+export const canContinue = (s: SignIn): boolean => s.phase === "PREPARE" && !!s.prepare && !s.cliMissing && !s.cliUnsupported && s.prepare.cli.installed && s.prepare.cli.supported && (!s.prepare.needs_personal_use_confirmation || s.confirmed);
 // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-guard
 
 /** The stepper's current step: Prepare 0, Sign in 1, Check 2, Use 3 (an error stays where it happened). */

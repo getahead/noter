@@ -102,6 +102,29 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     expect(await sent(page, "cli_install")).toHaveLength(1);
   });
 
+  test("error path — a failed install shows the install error and offers Install again", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await steer.invoke("harness.account_cli", { tool: "codex", installed: false, install: { fail: "offline" } });
+    await openModels(page);
+    await button(row(page, "Your ChatGPT account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your ChatGPT account/);
+    await button(dlg, /^Install Codex/).click();
+    await expect(dlg).toContainText(/didn[’']t finish/);
+    await expect(button(dlg, /^Install Codex/)).toBeVisible();
+    await expect(button(dlg, "Continue in Browser")).toBeDisabled();
+  });
+
+  test("error path — an unsupported Codex shows the unsupported copy, not a generic error", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await steer.invoke("harness.account_cli", { tool: "codex", installed: true, supported: false });
+    await openModels(page);
+    await button(row(page, "Your ChatGPT account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your ChatGPT account/);
+    await expect(dlg).toContainText(/This version of Codex isn[’']t supported/);
+    await expect(dlg).not.toContainText("Something went wrong");
+    await expect(button(dlg, "Continue in Browser")).toBeDisabled();
+  });
+
   test("other path: Esc hides the waiting sheet, the row keeps Finishing in your browser…, Cancel ends the session", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await codexCli(steer, { login: { url: "https://chatgpt.com/device", hold: true } });

@@ -115,7 +115,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
   if (s.phase === "PREPARE" || s.phase === "INSTALLING") {
     const cli = s.prepare?.cli;
     const installing = s.phase === "INSTALLING";
-    const unsupported = !!cli && cli.installed && !cli.supported;
+    const unsupported = s.cliUnsupported || (!!cli && cli.installed && !cli.supported);
     const missing = s.cliMissing || (!!cli && !cli.installed);
     // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-if-existing
     const existing = s.prepare?.existing && !missing && !unsupported ? s.prepare.existing : null;
@@ -143,7 +143,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
               <div>
                 <strong>{t(missing ? "signin.cli_missing" : "signin.cli_unsupported", names)}</strong>
               </div>
-              <div className="np-dim">{t(missing ? "signin.cli_missing_note" : "signin.cli_unsupported_note", names)}</div>
+              <div className="np-dim">{t(missing && s.installFailed ? "signin.cli_install_failed" : missing ? "signin.cli_missing_note" : "signin.cli_unsupported_note", names)}</div>
             </div>
             {missing && <PushButton label={t("signin.install", names)} size="small" onAction={() => void m.install(provider)} />}
           </div>

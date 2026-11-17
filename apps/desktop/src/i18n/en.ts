@@ -602,6 +602,7 @@ export const en = {
   "signin.cli_missing_note": "Noter signs in through {tool}. Installing it takes about a minute.",
   "signin.cli_unsupported": "This version of {tool} isn’t supported",
   "signin.cli_unsupported_note": "Update {tool}, then try again.",
+  "signin.cli_install_failed": "Installing {tool} didn’t finish. Check your connection and try again.",
   "signin.cli_installing": "Installing {tool}…",
   "signin.install": "Install {tool}",
   "signin.use_existing": "Use {email}",

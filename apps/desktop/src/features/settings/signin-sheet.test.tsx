@@ -128,6 +128,19 @@ describe("AccountSignInSheet", () => {
     await vi.waitFor(() => expect(m().state.claude.phase).toBe("PREPARE"), { timeout: 8000 });
   }, 15000);
 
+  it("shows the install error with Install again after a failed install job, and the unsupported copy for cli_version_unsupported", async () => {
+    await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepareFailed", code: "cli_missing" });
+    m().dispatch("claude", { type: "installStarted", runId: "run_x" });
+    m().dispatch("claude", { type: "installFailed", runId: "run_x" });
+    expect(html("claude")).toContain("didn’t finish");
+    expect(html("claude")).toContain("Install Claude Code");
+    m().dispatch("claude", { type: "prepareFailed", code: "cli_version_unsupported" });
+    expect(html("claude")).toContain("This version of Claude Code isn’t supported");
+    expect(html("claude")).not.toContain("Something went wrong");
+  });
+
   it("recovers a signing_in row after a reload with Show and no code", async () => {
     await ready((w) => {
       w.app.accounts.accounts.find((a) => a.provider === "claude")!.status = { type: "signing_in", session_id: "sis_77" };

@@ -47,6 +47,7 @@ class Machines {
       if (m.runId) {
         const run = s.jobs[m.runId];
         if (run?.finished_at != null && run.status === "succeeded") void this.afterInstall(p, m.runId);
+        else if (run?.status === "failed" || run?.status === "cancelled") this.dispatch(p, { type: "installFailed", runId: m.runId });
       }
       this.dispatch(p, { type: "accounts", signedIn: this.signedIn(accounts, p) });
     }

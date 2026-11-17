@@ -38,6 +38,20 @@ describe("cpt-noter-algo-ui-accounts-session", () => {
     expect(reduce(installing, { type: "installDone", runId: "run_1" }).phase).toBe("PREPARE");
   });
 
+  it("returns a failed or cancelled install to PREPARE with the install error and a way to try again", () => {
+    const installing = run([{ type: "open" }, { type: "prepareFailed", code: "cli_missing" }, { type: "installStarted", runId: "run_1" }]);
+    expect(reduce(installing, { type: "installFailed", runId: "run_other" }).phase).toBe("INSTALLING");
+    const failed = reduce(installing, { type: "installFailed", runId: "run_1" });
+    expect(failed).toMatchObject({ phase: "PREPARE", cliMissing: true, installFailed: true, runId: null });
+    expect(reduce(failed, { type: "installStarted", runId: "run_2" }).installFailed).toBe(false);
+  });
+
+  it("maps cli_version_unsupported from prepare to the unsupported state, not a generic error", () => {
+    const s = run([{ type: "open" }, { type: "prepareFailed", code: "cli_version_unsupported" }]);
+    expect(s).toMatchObject({ phase: "PREPARE", cliUnsupported: true });
+    expect(canContinue(s)).toBe(false);
+  });
+
   it("starts the browser step from the returned session and maps the progress steps", () => {
     let s = run([{ type: "open" }, { type: "prepared", prepare: prep() }, { type: "started", session: session() }]);
     expect(s).toMatchObject({ phase: "BROWSER", session: session() });
