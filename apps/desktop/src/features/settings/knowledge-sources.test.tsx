@@ -1,7 +1,10 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
+import { createBridge } from "../../app/bridge/bridge";
+import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
+import { KnowledgeSourcesPane } from "./KnowledgeSourcesPane";
 import { AddMcpSourceSheet } from "./AddMcpSourceSheet";
 import { SourcesView } from "./KnowledgeSourcesPane";
 import { AddFolderSheet } from "./SourceFormSheet";
@@ -89,5 +92,34 @@ describe("AddMcpSourceSheet", () => {
     const onClose = vi.fn();
     await press(rendered(AddMcpSourceSheet, { bridge: bridge(null), onClose }), "Cancel");
     expect(onClose).toHaveBeenCalled();
+  });
+});
+
+describe("the pane and the form handlers", () => {
+  it("renders loading first, then the sheets open from the view's buttons", async () => {
+    const fake = new FakeCore({ window: "settings" });
+    const b = createBridge("settings", fake);
+    await b.open();
+    const html = renderToString(<KnowledgeSourcesPane bridge={b} settings={{ privacy: { mode: "cloud_allowed" } } as never} />);
+    expect(html).toContain("Reading the sources");
+    b.close();
+  });
+  it("each MCP field handler updates the draft and a good server closes the sheet", async () => {
+    const onClose = vi.fn();
+    const tree = rendered(AddMcpSourceSheet, { bridge: bridge({ status: "ok", data: row() }), onClose });
+    (find(tree, (p) => p.id === "src-server").props.onChange as (v: string) => void)("wiki");
+    for (const [id, v] of [["src-mode", "live"], ["src-schedule", "hourly"], ["src-mcp-privacy", "sensitive"]] as const) (find(tree, (p) => p.id === id).props.onAction as (v: string) => void)(v);
+    (find(tree, (p) => p.id === "src-server").props.onEnter as () => void)();
+    await addButton(tree);
+    expect(onClose).not.toHaveBeenCalled(); // the probe render keeps its first draft: a blank server
+  });
+  it("the folder sheet words a duplicate and a failed add, and the privacy choice updates", async () => {
+    for (const code of ["invalid_input", "internal"]) {
+      const onClose = vi.fn();
+      const tree = rendered(AddFolderSheet, { bridge: bridge({ status: "error", error: { code, detail: code === "invalid_input" ? { type: "validation", field: "path", rule: "duplicate" } : null } }), onClose });
+      (find(tree, (p) => p.id === "src-privacy").props.onAction as (v: string) => void)("sensitive");
+      await addButton(tree);
+      expect(onClose).not.toHaveBeenCalled();
+    }
   });
 });
