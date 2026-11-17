@@ -46,6 +46,8 @@ export interface PersonPickerProps {
   disabled?: boolean;
   /** Esc with nothing to clear. */
   onClose?: () => void;
+  /** The New form opened or closed: a host that names its dialog after what is shown follows it. */
+  onForm?: (open: boolean) => void;
 }
 
 // @cpt-component:cpt-noter-component-ui-person-picker:p1
@@ -59,6 +61,7 @@ export function PersonPicker(p: PersonPickerProps) {
   const read = usePeople(p.bridge, p.people !== undefined);
   const people = (p.people !== undefined ? p.people : read) ?? null;
   useEffect(() => setQuery(p.value ?? ""), [p.value]);
+  useEffect(() => p.onForm?.(form !== null), [form]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cap = p.variant === "inline" ? CAP_INLINE : CAP_POPOVER;
   const all = useMemo(
