@@ -60,8 +60,9 @@ export function PersonPage({ id }: { id: string }) {
   const [reads, setReads] = useState(0);
   const reread = usePersonReread();
   const notice = usePersonNotice();
-  const status = usePersonStatus();
+  const status = usePersonStatus(id);
   const sheets = usePeopleSheets();
+  useEffect(() => () => setPersonNotice(null), [id]); // a refusal belongs to the person it was shown on
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
@@ -85,7 +86,7 @@ export function PersonPage({ id }: { id: string }) {
     // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
     onSetUpVoice={() => state.page && sheets.open("person-voice", { bridge, person: state.page.person, calls: state.page.calls.length })}
     // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
-    onDeleteVoice={() => state.page && void confirmDeleteProfile(bridge, state.page.person, setPersonNotice)} />;
+    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice))} />;
 }
 
 export interface PersonBodyProps {

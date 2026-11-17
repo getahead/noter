@@ -53,7 +53,7 @@ export async function createProfile(bridge: Bridge, person: PersonRow): Promise<
   const res = await bridge.act("people:voice-create", "voice_profile_create", () => bridge.core.voiceProfileCreate({ person_id: person.id }), { screen: "people" });
   if (res.status === "error" || !res.data.enabled) return false;
   // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
-  setPersonStatus(t("person.voice.created", { name: person.short_name }));
+  setPersonStatus({ id: person.id, text: t("person.voice.created", { name: person.short_name }) });
   bumpPerson();
   // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
   return true;
