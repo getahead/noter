@@ -3,15 +3,15 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { AskAnswer, AskScope, AskThreadRow, ScopePreset } from "../../core/bindings";
+import type { AskAnswer, AskThreadRow, ScopePreset } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
-import { foldTurn, groupThreads, paragraphs, phaseOf, type TurnView } from "./model";
+import { loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { foldTurn, groupThreads, paragraphs, phaseOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
 
 const GROUP = { today: "ask.group.today", yesterday: "ask.group.yesterday", earlier: "ask.group.earlier" } as const;
-const NEW_SCOPE: AskScope = { preset: "all" };
 
 // @cpt-component:cpt-noter-component-screen-ask:p1
 // @cpt-dod:cpt-noter-dod-ui-ask-threads:p1
@@ -28,37 +28,25 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const loadError = useWindow(bridge, (s) => s.commands["ask:list"]?.state === "ERROR");
 
   const refresh = useCallback(async () => {
-    // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-open
-    const res = await bridge.act("ask:list", "ask_threads_list", () => bridge.core.askThreadsList({}));
-    if (res.status === "ok") setRows(res.data.threads);
-    // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-open
+    const r = await loadRows(bridge);
+    if (r) setRows(r);
   }, [bridge]);
 
   useEffect(() => {
     void refresh();
-    void bridge.act("ask:presets", "ask_scope_presets", () => bridge.core.askScopePresets({})).then((r) => r.status === "ok" && setPresets(r.data.presets));
+    void loadPresets(bridge).then((p) => p && setPresets(p));
     // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
     return () => void bridge.unsubscribe("ask_start");
     // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
   }, [bridge, refresh]);
 
-  const open = async (id: string | null) => {
-    setThread(id);
-    setTurns([]);
-    setAsking(null);
-    void bridge.unsubscribe("ask_start");
-    if (!id) return;
-    // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-get-thread
-    const res = await bridge.act("ask:thread", "ask_thread_get", () => bridge.core.askThreadGet({ thread_id: id }));
-    if (res.status === "ok") setTurns(res.data.turns);
-    else setThread(null); // deleted elsewhere: the empty composer
-    // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-get-thread
-  };
+  const open = (id: string | null) => openThread(bridge, id, { setThread, setTurns, setAsking });
 
   const data = stream?.data ?? null;
   // `thread:<id>` opens that thread; the key is the route's, so Back and the core's nav:request land here
   useEffect(() => {
-    if (routeKey.startsWith("thread:")) void open(routeKey.slice("thread:".length));
+    const id = threadOfRoute(routeKey);
+    if (id) void open(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 
@@ -68,37 +56,67 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   // The turn is over for the thread: reload what the core stored.
   useEffect(() => {
-    if (!asking || !data || phase === "streaming") return;
-    const id = data.thread_id;
-    // a failed or stopped turn keeps its partial on screen until the user moves on
-    if (phase === "ready" || phase === "weak" || phase === "not_found") {
-      setThread(id);
-      void bridge.act("ask:thread", "ask_thread_get", () => bridge.core.askThreadGet({ thread_id: id })).then((r) => {
-        if (r.status === "ok") {
-          setTurns(r.data.turns);
-          setAsking(null);
-        }
-      });
-      void refresh();
-    }
+    if (asking && data) void settleTurn(bridge, data.thread_id, phase, { setThread, setTurns, setAsking, refresh });
   }, [asking, data, phase, bridge, refresh]);
 
   const send = () => {
-    const question = draft.trim();
-    if (!question || busy) return;
-    // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-start
+    const question = questionOf(draft, busy);
+    if (!question) return;
     setAsking(question);
     setDraft("");
-    void bridge.subscribe("ask_start", { thread_id: thread, question, scope: presets[scope]?.scope ?? NEW_SCOPE });
-    // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-start
+    startAsk(bridge, thread, question, presets[scope]?.scope);
   };
 
-  const stop = () => {
-    // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-stop
-    if (data) void bridge.act("ask:stop", "ask_stop", () => bridge.core.askStop({ turn_id: data.turn_id }));
-    // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-stop
-  };
+  const stop = () => data && stopAsk(bridge, data.turn_id);
 
+  return (
+    <AskView
+      rows={rows}
+      loadError={loadError}
+      thread={thread}
+      turns={turns}
+      asking={asking}
+      turn={turn}
+      phase={phase}
+      presets={presets}
+      scope={scope}
+      draft={draft}
+      busy={busy}
+      onOpen={(id) => void open(id)}
+      onScope={setScope}
+      onDraft={setDraft}
+      onSend={send}
+      onStop={stop}
+      onRetry={() => {
+        setDraft(asking ?? "");
+        setAsking(null);
+      }}
+    />
+  );
+}
+
+export interface AskViewProps {
+  rows: AskThreadRow[];
+  loadError: boolean;
+  thread: string | null;
+  turns: AskAnswer[];
+  asking: string | null;
+  turn: TurnView | null;
+  phase: TurnPhase | null;
+  presets: ScopePreset[];
+  scope: number;
+  draft: string;
+  busy: boolean;
+  onOpen: (id: string) => void;
+  onScope: (i: number) => void;
+  onDraft: (v: string) => void;
+  onSend: () => void;
+  onStop: () => void;
+  onRetry: () => void;
+}
+
+/** The three regions of the page: recent questions, the thread and the composer. */
+export function AskView({ rows, loadError, thread, turns, asking, turn, phase, presets, scope, draft, busy, onOpen, onScope, onDraft, onSend, onStop, onRetry }: AskViewProps) {
   const empty = turns.length === 0 && !asking;
   const groups = groupThreads(rows, Date.now());
   return (
@@ -110,7 +128,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
           <div key={g.key} role="group" aria-label={t(GROUP[g.key])}>
             <div className="ak-recent__group">{t(GROUP[g.key])}</div>
             {g.rows.map((r) => (
-              <button key={r.id} type="button" className={`ak-recent__item${r.id === thread ? " is-sel" : ""}`} aria-current={r.id === thread} title={r.title} onClick={() => void open(r.id)}>
+              <button key={r.id} type="button" className={`ak-recent__item${r.id === thread ? " is-sel" : ""}`} aria-current={r.id === thread} title={r.title} onClick={() => onOpen(r.id)}>
                 {r.title}
               </button>
             ))}
@@ -129,12 +147,12 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
           <article className="ak-turn">
             <h3 className="ak-q">{asking}</h3>
             <Answer view={turn} />
-            {(phase === "error" || phase === "interrupted") && <PushButton label={t("ask.try_again")} onAction={() => { setDraft(asking); setAsking(null); }} />}
+            {(phase === "error" || phase === "interrupted") && <PushButton label={t("ask.try_again")} onAction={onRetry} />}
           </article>
         )}
         <div className={`ak-composer${empty ? " is-first" : ""}`} data-region="AK-R4">
           {presets.length > 0 && (
-            <select aria-label={t("ask.scope")} value={scope} onChange={(e) => setScope(Number(e.target.value))}>
+            <select aria-label={t("ask.scope")} value={scope} onChange={(e) => onScope(Number(e.target.value))}>
               {presets.map((p, i) => (
                 <option key={p.id} value={i}>
                   {p.label}
@@ -149,9 +167,9 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
             ariaLabel={t("ask.question")}
             placeholder={t(empty ? "ask.composer_first" : "ask.composer_follow_up")}
             value={draft}
-            onChange={setDraft}
+            onChange={onDraft}
           />
-          {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={stop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={send} />}
+          {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={onSend} />}
         </div>
       </section>
     </div>
