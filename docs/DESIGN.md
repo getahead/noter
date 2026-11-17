@@ -2372,7 +2372,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 
 - Shows a native alert for each irreversible action, saying what is lost and that it cannot be undone; the safe button is the default unless the table says otherwise.
 - Shows window-modal sheets, 480 to 640 wide, for forms: voice profile, regeneration, export, the change log, mappings, keys, the sign-in with the user's own Claude account or ChatGPT account (PM-58), sources, the self-test, the screen share test, person details, merges and deleting old audio.
-- Shows popovers anchored to their control, closed by Esc or a click outside, with focus back on the control that opened them, including the New person form, topic rename and tag adding (D90, D92, D94).
+- Shows popovers anchored to their control, closed by Esc or a click outside, with focus back on the control that opened them, including the New person form and tag adding (D90, D92); topic rename is a sheet (D94).
 - Shows the two-step inline confirm for discarding a recording in the call window (D38).
 - Hands file choices to the system open and save panels.
 
@@ -2471,7 +2471,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 | **Run Audio Self-Test…** | sheet, 560 wide, `cpt-noter-component-ui-self-test-panel` | Subtitle **Plays a short clip and listens to your microphone and system audio. Any sound playing in another app also works.**; the self-test with **Play Test Clip**, **Run Test** and the four result lines (D99); **Cancel** · **Done**; from Settings › Audio & Transcription and **Run Audio Self-Test…** on Today |
 | Speaker label, owner chip | popover, `cpt-noter-component-ui-person-picker` | Rename: **Whole call** or **Only this line**, **Also update the voice profile**, **New Person…** (D33) |
 | New person form | popover, `cpt-noter-component-ui-person-picker` | Replaces the picker's list in the same popover: **Name**, **Email**, disabled **Role**; **Back** and **Create and Name**, **Create and Assign** or **Create**; never a sheet, so it works in the call window (D92, D93). Role stays disabled until the command contract can persist it. |
-| **Rename…** for a topic | sheet, `cpt-noter-component-screen-dialogs` | The name field filled in and **Rename** (default); a clash shows **A topic called “Notification service” already exists.** with **Merge Instead** (D94) |
+| **Rename…** for a topic | sheet, 480 wide, `cpt-noter-component-screen-dialogs` | The name field filled in and **Rename** (default); a clash shows **A topic called “Notification service” already exists.** with **Merge Instead** (D94) |
 | **Add Tag…** | popover, 300 wide, `cpt-noter-component-ui-primitives` | Title **Add tag to 3 calls**, the tag field with **Add tag…**, and the line **In use: release · backend · installer · infra**; Return adds and closes with **Tagged 3 calls “release”**; from the Calls list context menu (D90) |
 | **Fix Term…** | popover, `cpt-noter-component-ui-term-fix-popover` | **Correct term**, **Language**, **Add to glossary**, **Fix** |
 | Due date field | popover, 280 wide, `cpt-noter-component-ui-primitives` | Month title (**October 2026**) and a calendar grid starting on Monday, today marked and the current due day selected; a click sets **Due** (such as **Fri 17 Oct**) and closes; from the calendar button of the Item inspector's **Due** field |
@@ -2715,7 +2715,7 @@ Topic thread:
 
 - Calls table: Medium hides **Length** and turns the status cell into an icon whose text is in a help tag and for VoiceOver; Narrow uses two-line rows (title, then when · type · length) and hides **Type** and the tags; column visibility is in the header context menu.
 - Search results: content at most 960 pt; Narrow drops the people line from call group headers and shows one span per call with **+3 More in This Call**.
-- Topic thread: fills the width (the 860 pt cap was dropped, #926); the Item inspector docks in Wide and overlays from the trailing edge in Medium and Narrow (D18).
+- Topic thread: fills the width (no 860 pt cap); the Item inspector docks in Wide and overlays from the trailing edge in Medium and Narrow (D18).
 - German text about 30 % longer: the filter bar wraps to a second line before any label truncates, and buttons never truncate; call and document titles tail-truncate with the full text in a help tag and for VoiceOver.
 - Cyrillic and German matches: quoted spans keep their language attribute, and the highlight lands on the original word even when the match came through stemming or ё/е folding.
 - **Back** from a call returns to the same query, filters and scroll position (D17); window size and display changes follow `cpt-noter-component-shell-main-window`.
@@ -7074,7 +7074,7 @@ Topic threads group decisions and open questions about one subject across calls,
 
 ##### Responsibility boundaries
 
-- Does not merge or rename topics. **Rename…** and **Merge With…** in the thread's ⋯ menu and the row context menu, and **Merge** in the thread's merge banner, open the rename popover and the merge sheet (D94, D95); merges are never automatic (PRD › Search and cross-meeting memory › Topics).
+- Does not merge or rename topics. **Rename…** and **Merge With…** in the thread's ⋯ menu and the row context menu, and **Merge** in the thread's merge banner, open the rename sheet and the merge sheet (D94, D95); merges are never automatic (PRD › Search and cross-meeting memory › Topics).
 - Topic names and counts come from the core.
 
 ##### Related components (by ID)
@@ -11247,7 +11247,7 @@ User:
 1. Types “reconnect” in the search field on **Topics**
 2. Sees **No topics match “reconnect”** with **Clear Search** in place of the table
 3. Clicks **Clear Search** and sees Websocket notifications in the table
-4. Selects **Rename…** in the row's context menu and sees the popover **Rename topic** with the name filled in and **Rename**
+4. Selects **Rename…** in the row's context menu and sees the sheet **Rename topic** with the name filled in and **Rename**
 5. Types “Websocket reconnects” and clicks **Rename**
 6. Gets the topic renamed in the table, its thread and every topic chip, with **Renamed “Websocket notifications” to “Websocket reconnects” · Undo** above the table, so a search for “reconnect” finds it
 
@@ -12425,7 +12425,7 @@ Every UX Designer decision (D1 to D99) and every PM decision (PM-01 to PM-68) is
 | D91 | Filtering by tag: a **Tags ▾** pop-up in the filter bar and **Tag: release** tokens in the search field, where typing # suggests tags; Calls rows show up to two tags. | One filter state with two inputs (D22). | `cpt-noter-component-ui-filter-bar`, `cpt-noter-component-ui-call-row`, `cpt-noter-component-screen-library` | Accepted (owner, 17 Oct) (PM-50) |
 | D92 | **New Person…** opens a three-field form (**Name**, **Email**, disabled **Role**) inside the person picker's own popover in both windows; it checks for duplicates and confirms with **Create and Name**, **Create and Assign** or **Create**. Role stays disabled until the command contract can persist it. | No sheet and no alert in the call window (D2, D38). | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-screen-people` | Accepted; changed by PM-56 |
 | D93 | The New person form keeps its draft when the call window loses key; a click on a field or ⌃⌥⌘N resumes typing; Return never submits during an input-method composition. | Calls interrupt typing, and Cyrillic and German input use compositions. | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-shell-call-window` | Accepted |
-| D94 | Topic rename is a popover with a clash check that offers **Merge Instead**; person rename is the **Edit Details…** sheet, which keeps the old name as an alias by default. | Topic names are short; people have more fields. | `cpt-noter-component-screen-library`, `cpt-noter-component-screen-people`, `cpt-noter-component-screen-dialogs` | Accepted |
+| D94 | Topic rename is a sheet with a clash check that offers **Merge Instead**; person rename is the **Edit Details…** sheet, which keeps the old name as an alias by default. | Topic names are short; people have more fields. | `cpt-noter-component-screen-library`, `cpt-noter-component-screen-people`, `cpt-noter-component-screen-dialogs` | Accepted |
 | D95 | Merging topics or people is a sheet with a target picker and a preview of what moves; the kept entry keeps its name and the merged entry's names become its aliases; a people merge moves voice profiles; the whole merge is one change-log batch with **Undo**, so no alert asks first. | Every change stays undoable (PRD › Feature specification › 11). | `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-change-row`, `cpt-noter-component-ui-history-timeline`, `cpt-noter-component-screen-dialogs` | Accepted; changed by PM-56 |
 | D96 | The **Screen Share Test…** sheet shows what each kind of share would see of each Noter surface, an optional capture test with sample content (Screen Recording asked once, outside calls, nothing stored), a result row per surface and a fixed text on its limits. | The user gets a straight answer before presenting (D50). | `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-dialogs`, `cpt-noter-component-ui-status-row`, `cpt-noter-component-ui-permission-check-row`, `cpt-noter-component-ui-inline-banner` | Accepted (owner, 17 Oct) |
 | D97 | Weak search results are marked: a warning banner when every result is weak, a **Weaker matches** divider when results are mixed, **Weak match** tags, the actions **Clear Filters**, **Search All Languages** and **Ask Instead**, and **Show How Noter Searched** with the normalised search terms. | Trust in Russian and German search. | `cpt-noter-component-screen-library`, `cpt-noter-component-ui-search-result-row`, `cpt-noter-component-ui-inline-banner` | Accepted |
