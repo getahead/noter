@@ -490,7 +490,7 @@ commands! {
     activity_get(ActivityArgs) -> ActivityView [HistoryAndUndo, Frozen, Main];
 
     // ── People ────────────────────────────────────────────────────────────
-    people_list(PeopleListArgs) -> PeopleList [People, Frozen, Main | CallScreen];
+    people_list(PeopleListArgs) -> PeopleList [People, Frozen, Main | CallScreen | Settings];
     person_get(PersonIdArgs) -> PersonPage [People, Frozen, Main];
     person_create(PersonCreateArgs) -> PersonMutation [People, Frozen, Main | CallScreen];
     person_update(PersonUpdateArgs) -> PersonMutation [People, Frozen, Main];

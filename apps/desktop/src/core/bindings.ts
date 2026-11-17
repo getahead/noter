@@ -3638,7 +3638,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.11";
+export const CONTRACT_VERSION = "2.12";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3740,7 +3740,7 @@ export const COMMANDS = {
   proposal_always_for_term: { group: "history_and_undo", stability: "frozen", windows: ["main"], channel: false },
   history_export: { group: "history_and_undo", stability: "frozen", windows: ["main"], channel: false },
   activity_get: { group: "history_and_undo", stability: "frozen", windows: ["main"], channel: false },
-  people_list: { group: "people", stability: "frozen", windows: ["main", "call-screen"], channel: false },
+  people_list: { group: "people", stability: "frozen", windows: ["main", "call-screen", "settings"], channel: false },
   person_get: { group: "people", stability: "frozen", windows: ["main"], channel: false },
   person_create: { group: "people", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   person_update: { group: "people", stability: "frozen", windows: ["main"], channel: false },

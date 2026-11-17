@@ -1182,7 +1182,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `proposal_always_for_term` | History and undo. `AlwaysForTermArgs → GlossaryTerm`. Windows: M. | frozen |
 | Command | `history_export` | History and undo. Export Log… for one call or a period (Markdown or JSON); the core shows the save panel. `HistoryExportArgs → ExportResult`. Windows: M. | frozen |
 | Command | `activity_get` | History and undo. `ActivityArgs → ActivityView`. Windows: M. | frozen |
-| Command | `people_list` | People. `PeopleListArgs → PeopleList`. Windows: MC. | frozen |
+| Command | `people_list` | People. `PeopleListArgs → PeopleList`. Windows: MCS (Settings reads it for a knowledge source's people scope). | frozen |
 | Command | `person_get` | People. `PersonIdArgs → PersonPage`. Windows: M. | frozen |
 | Command | `person_create` | People. `PersonCreateArgs → PersonMutation`. Windows: MC. | frozen |
 | Command | `person_update` | People. `PersonUpdateArgs → PersonMutation`. Windows: M. | frozen |
