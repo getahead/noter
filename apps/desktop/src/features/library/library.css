@@ -237,3 +237,5 @@
 .lb-hit__title { font-weight: 600; }
 .lb-hit mark { background: var(--accent-fill); color: inherit; border-radius: 2px; }
 .lb-thmerge { margin-bottom: 14px; }
+.lb-mergeinto { display: grid; gap: 6px; margin: 12px 0; }
+.lb-mergelist { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; max-height: 200px; overflow-y: auto; }

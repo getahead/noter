@@ -85,6 +85,12 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
     await expect(page.getByText(/Looks like the same subject as/)).toBeVisible();
     await shot(page, "topics-thread-suggestion", "wide");
   });
+  test("thread ⋯ menu open", async ({ page }) => {
+    await thread(page);
+    await page.getByRole("button", { name: "More", exact: true }).click();
+    await expect(page.getByRole("menuitem", { name: "Merge With…" })).toBeVisible();
+    await shot(page, "topics-thread-menu", "wide");
+  });
   test("Rename sheet", async ({ page }) => {
     await thread(page);
     await menu(page, "Rename…");
@@ -115,7 +121,7 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
   test("Merge sheet", async ({ page }) => {
     await thread(page);
     await menu(page, "Merge With…");
-    await expect(page.getByRole("dialog", { name: "Merge topics" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /^Merge “.+” into “.+”\?$/ })).toBeVisible();
     await shot(page, "topics-merge", "wide");
   });
   test("Merge done with its undo strip", async ({ page }) => {

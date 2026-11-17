@@ -31,6 +31,7 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   usePublishHead(data?.topic.name ?? null, data ? threadSubtitle(data.topic, since, prefs) : null);
   const sheets = useSheet();
   const [all, setAll] = useState<TopicRow[]>([]);
+  const [keepFailed, setKeepFailed] = useState(false);
   useEffect(() => {
     void bridge.act("topics_list", "topics_list", () => bridge.core.topicsList({}), { screen: "library-topics" }).then((r) => r.status === "ok" && setAll(r.data.topics));
   }, [bridge, data?.topic.rev]);
@@ -38,22 +39,22 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
     sheets.register("topic-rename", RenameSheet as never);
     sheets.register("topic-merge", MergeSheet as never);
   }, [sheets]);
-  const actions = data && threadActions(sheets, bridge, data.topic, all, retry);
+  const actions = data && threadActions(sheets, bridge, data.topic, all, retry, setKeepFailed);
   const latest = useRef(actions);
   latest.current = actions;
   const menu = useMemo<MenuEntry[]>(() => [{ label: t("topics.rename"), onAction: () => latest.current?.rename() }, { label: t("topics.merge_with"), onAction: () => latest.current?.merge() }], []);
   usePublishThreadMenu(data ? menu : null);
-  return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} />;
+  return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} keepFailed={keepFailed} />;
 }
 
 /** What the thread's buttons do: the sheets over the page, and Keep Separate at once. */
-export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, all: TopicRow[], retry: () => void): ThreadActions {
-  const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()) });
+export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, all: TopicRow[], retry: () => void, onKeepFailed: (failed: boolean) => void = () => {}): ThreadActions {
+  const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()), refresh: retry });
   return {
     rename: () => sheets.open("topic-rename", { bridge, topic, known: all, onRenamed: retry, onMergeInstead: (other: TopicRow) => merge(other.id) }),
     merge: () => merge(topic.merge_suggestion?.id),
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
-    keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => ok && retry()),
+    keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => (onKeepFailed(!ok), ok && retry())),
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
   };
 }
@@ -72,15 +73,22 @@ export interface ThreadViewProps {
   months: ThreadMonth[];
   prefs?: UiPrefs;
   actions?: ThreadActions;
+  /** Keep Separate was refused: the thread says so. */
+  keepFailed?: boolean;
 }
 
-export function ThreadView({ bridge, status, retry, data, months, prefs, actions }: ThreadViewProps) {
+export function ThreadView({ bridge, status, retry, data, months, prefs, actions, keepFailed }: ThreadViewProps) {
   if (status === "ERROR")
     return <InlineBanner banner={{ id: "thread-error", severity: "error", text: t("topics.thread_error"), actions: [{ label: t("action.try_again"), onAction: retry }] }} />;
   if (!data) return <div className="lb-loading" data-state="loading" aria-busy="true" aria-label={t("topics.loading")} />;
   // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-thread
   return (
     <>
+      {keepFailed && (
+        <div className="lb-thmerge">
+          <InlineBanner banner={{ id: "thread-keep-error", severity: "error", text: t("topics.keep_failed") }} />
+        </div>
+      )}
       {actions && data.topic.merge_suggestion && (
         <div data-region="TH-R2" className="lb-thmerge">
           <InlineBanner

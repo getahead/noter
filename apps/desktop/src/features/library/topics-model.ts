@@ -53,5 +53,11 @@ export const lastSeen = (ms: number, prefs?: UiPrefs): string => (ms > 0 ? short
 export const clashOf = (topics: TopicRow[], self: string, name: string): TopicRow | null =>
   topics.find((x) => x.id !== self && x.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? null;
 
+/** What a merge moves, entry by entry in thread order, and from how many calls. */
+export const movesOf = (groups: TopicThreadGroup[]) => ({
+  rows: groups.flatMap((g) => g.items),
+  calls: groups.filter((g) => g.items.length).length,
+});
+
 /** How many items a merge moves: the source thread's entries. */
 export const itemsOf = (groups: TopicThreadGroup[]): number => groups.reduce((n, g) => n + g.items.length, 0);
