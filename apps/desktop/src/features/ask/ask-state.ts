@@ -12,7 +12,18 @@ export interface AskState {
 }
 
 let state: AskState = { presets: [], scopeId: "all", fresh: 0 };
+// Presets the page added itself (a topic the core's short list does not offer): they survive a reload of the list.
+let extra: ScopePreset[] = [];
 const listeners = new Set<() => void>();
+
+/** The core's preset list, plus any transient preset it does not carry. */
+export const setPresets = (list: ScopePreset[]): void => setAskState({ presets: [...list, ...extra.filter((e) => !list.some((p) => p.id === e.id))] });
+/** Offer one more scope in the pop-up (once). */
+export function offerPreset(preset: ScopePreset): void {
+  if (state.presets.some((p) => p.id === preset.id)) return;
+  extra = [...extra, preset];
+  setAskState({ presets: [...state.presets, preset] });
+}
 
 export const askState = (): AskState => state;
 export function setAskState(patch: Partial<AskState>): void {

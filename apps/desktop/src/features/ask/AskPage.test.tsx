@@ -48,6 +48,12 @@ describe("Answer (cpt-noter-state-ui-ask-turn)", () => {
     expect(h).toContain("Search by Keyword");
     expect(h).toContain("could not find");
   });
+  it("offers Widen Scope on a not-found answer when asked, and names the runtime and mode of a started turn", () => {
+    expect(renderToString(<Answer bridge={bridge} onWiden={() => {}} view={view(done({ found: false, stopped: false }))} />)).toContain("Widen Scope");
+    expect(renderToString(<Answer bridge={bridge} view={view(done({ found: false }))} />)).not.toContain("Widen Scope");
+    const h = renderToString(<Answer bridge={bridge} view={view({ type: "started", runtime: "claude_account", mode: "local_only" } as never)} />);
+    expect(h).toContain("Local only");
+  });
   it("names the not-found, stopped, interrupted and error states", () => {
     expect(renderToString(<Answer bridge={bridge} view={view(done({ found: false }))} />)).toContain("could not find");
     expect(renderToString(<Answer bridge={bridge} view={view({ type: "failed", error: { code: "answer_stopped", message: "", retryable: false } as never })} />)).toContain("Stopped by you");
@@ -61,6 +67,17 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
   const noop = () => {};
   const props = { bridge, rows: [], loadError: false, thread: null, turns: [], asking: null, turn: null, phase: null, draft: "", busy: false, onOpen: noop, onCopyQuestion: noop, onDelete: noop, onScope: noop, onDraft: noop, onSend: noop, announce: "", suggestions: [], onSuggest: noop, onStop: noop, onRetry: noop, onPlay: noop, bar: null };
   const row = { id: "a", title: "What did Ann say?", updated_at: Date.now() } as never;
+  it("offers Widen Scope on the last stored turn when it was not found under a narrowed scope", () => {
+    const miss = (id: string, found: boolean) => ({ turn_id: id, question: `Q${id}`, answer_md: "", citations: [], found, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 }) as never;
+    const turns = [miss("1", false), miss("2", false)];
+    const html = (narrowed: boolean) => renderToString(<AskView {...props} thread="a" turns={turns} narrowed={narrowed} onWiden={noop} />);
+    expect(html(true).split("Widen Scope").length - 1).toBe(1); // the last turn only
+    expect(html(false)).not.toContain("Widen Scope");
+  });
+  it("keeps Widen Scope off the previous turn while a follow-up is answering", () => {
+    const miss = { turn_id: "1", question: "Q1", answer_md: "", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 } as never;
+    expect(renderToString(<AskView {...props} thread="a" turns={[miss]} asking="Q2" narrowed onWiden={noop} />)).not.toContain("Widen Scope");
+  });
   it("lists recent questions by day and marks the open one", () => {
     const h = renderToString(<AskView {...props} rows={[row]} thread="a" />);
     expect(h).toContain("Today");

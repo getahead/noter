@@ -13,6 +13,7 @@ import { blocks, type Inline } from "./markdown";
 const COPIED_MS = 2000;
 
 // @cpt-component:cpt-noter-component-ui-cited-answer:p1
+// @cpt-dod:cpt-noter-dod-ui-ask-citations:p1
 export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay }: { bridge: Bridge; text: string; citations: Citation[]; live: boolean; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void }) {
   const [focus, setFocus] = useState<number | null>(null);
   const rows = useRef(new Map<number, HTMLLIElement>());

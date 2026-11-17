@@ -1,6 +1,6 @@
 // Ask's pure view model: one streamed turn folded from its AskMsg events, and the recent list grouped by day.
 import type { PersonRow } from "../../core/bindings";
-import type { AskAnswer, AskMsg, AskThreadRow, Citation, CoreError } from "../../core/bindings";
+import type { AskAnswer, AskMsg, AskThreadRow, Citation, CoreError, EffectiveMode, RuntimeChoice } from "../../core/bindings";
 
 export interface TurnView {
   text: string;
@@ -8,6 +8,9 @@ export interface TurnView {
   answer: AskAnswer | null;
   error: CoreError | null;
   ended: boolean;
+  /** What the core reported in `started`: who answers and under which privacy mode. */
+  runtime: RuntimeChoice | null;
+  mode: EffectiveMode | null;
 }
 
 export type TurnPhase = "streaming" | "ready" | "not_found" | "weak" | "error" | "stopped" | "interrupted";
@@ -15,10 +18,18 @@ export type TurnPhase = "streaming" | "ready" | "not_found" | "weak" | "error" |
 // @cpt-algo:cpt-noter-algo-ui-ask-stream:p1
 /** Fold the events of one subscription in order: deltas grow the text, a citation keeps its stable number, done is authoritative. */
 export function foldTurn(messages: readonly AskMsg[]): TurnView {
-  const v: TurnView = { text: "", citations: [], answer: null, error: null, ended: false };
+  const v: TurnView = { text: "", citations: [], answer: null, error: null, ended: false, runtime: null, mode: null };
   for (const { event: e } of messages) {
     // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-match
     switch (e.type) {
+      case "started":
+        // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-started
+        // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-started
+        v.runtime = e.runtime;
+        v.mode = e.mode;
+        // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-started
+        // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-started
+        break;
       case "delta":
         // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-delta
         v.text += e.text;
@@ -115,5 +126,5 @@ export const errorKeyOf = (v: TurnView): "ask.error_runtime" | "ask.error" => (v
 
 // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-error
 /** The turn view of a question whose start failed: no text, the error, so the page shows the error state. */
-export const failedView = (code: string | null): TurnView => ({ text: "", citations: [], answer: null, error: { code: code ?? "internal", message: "", retryable: true } as CoreError, ended: false });
+export const failedView = (code: string | null): TurnView => ({ text: "", citations: [], answer: null, error: { code: code ?? "internal", message: "", retryable: true } as CoreError, ended: false, runtime: null, mode: null });
 // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-error

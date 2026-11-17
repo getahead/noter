@@ -76,7 +76,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 ### Ask a question and inspect its citations
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-ask-question`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-ask-question`
 
 **Actor**: Primary user
 
@@ -103,8 +103,8 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 10. [x] - `p1` - User opens its title; UI pushes Call page › Transcript at the span with the 3 s highlight; document targets open through `open_external` - `inst-evidence`
 11. [x] - `p1` - **IF** the user chooses **Search by Keyword** - `inst-if-search`
     1. [x] - `p1` - UI: Library search with this turn's exact question - `inst-search`
-12. [ ] - `p1` - **IF** the user chooses **Widen Scope** with a narrowed scope - `inst-if-widen`
-    1. [ ] - `p1` - UI: set **All calls · all sources** and ask the same question again - `inst-widen`
+12. [x] - `p1` - **IF** the user chooses **Widen Scope** with a narrowed scope - `inst-if-widen`
+    1. [x] - `p1` - UI: set **All calls · all sources** and ask the same question again (offered on the last turn of this session, from the scope it was asked with: `AskAnswer` carries no scope, so a turn reloaded in a later session cannot tell it was narrowed; contract gap `AskAnswer.scope`) - `inst-widen`
 13. [x] - `p1` - **RETURN** the thread; local retry actions are constrained by the contract gap below - `inst-return-question`
 
 ### Stop, follow up, copy and manage threads
@@ -141,7 +141,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 ### Consume one answer stream
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-ask-stream`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-ask-stream`
 
 **Input**: active `AskHandle`, ordered `AskMsg` events and the current partial turn
 
@@ -150,7 +150,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 **Steps**:
 1. [x] - `p1` - Use bridge buffering, sequencing and acknowledgements; accept only this subscription and turn; ignore late results after disposal - `inst-scope`
 2. [x] - `p1` - **MATCH** the event - `inst-match`
-   - [ ] - `p1` - **CASE** started: show returned runtime and effective mode; never infer cloud/local from a label - `inst-started`
+   - [x] - `p1` - **CASE** started: show returned runtime and effective mode; never infer cloud/local from a label - `inst-started`
    - [x] - `p1` - **CASE** delta: append escaped text in the bridge's buffered render cadence; do not announce each word - `inst-delta`
    - [x] - `p1` - **CASE** citation: resolve its stable number and quote; never renumber earlier references - `inst-citation`
    - [x] - `p1` - **CASE** done: replace the partial with authoritative `AskAnswer`; update history and render skipped-source, keyword-only and weak-evidence flags - `inst-done`
@@ -158,7 +158,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
    - [x] - `p1` - **CASE** other failed: show the typed runtime error with explicit retry; preserve the question - `inst-failed`
    - [x] - `p1` - **CASE** ended: release the subscription; an end before done or a user stop shows interrupted-answer recovery, not an invented success - `inst-ended`
 3. [x] - `p1` - Render Markdown without raw HTML; citation links use typed targets and never model-provided executable markup - `inst-safe-render`
-4. [ ] - `p1` - On a sequence gap, stop applying deltas, use bridge recovery and reload the stored thread; do not automatically start a second billable answer - `inst-gap`
+4. [x] - `p1` - On a sequence gap, stop applying deltas, use bridge recovery and reload the stored thread; do not automatically start a second billable answer - `inst-gap`
 5. [x] - `p1` - On route disposal detach the listener and unsubscribe; explicit Stop cancels generation; a sheet or component unmount must not attach the stream to another thread - `inst-dispose`
 6. [x] - `p1` - **RETURN** the current turn state - `inst-return`
 
@@ -180,7 +180,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 ### Answer turn
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-ask-turn`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-ask-turn`
 
 **States**: FIRST, STARTING, STREAMING, READY, NOT_FOUND, WEAK, ERROR, STOPPING, STOPPED, SOURCE_DELETED, COPIED
 
@@ -188,7 +188,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 **Transitions**:
 1. [x] - `p1` - **FROM** FIRST **TO** STARTING **WHEN** a nonblank question is submitted - `inst-submit`
-2. [ ] - `p1` - **FROM** STARTING **TO** STREAMING **WHEN** the handle and started event arrive - `inst-started`
+2. [x] - `p1` - **FROM** STARTING **TO** STREAMING **WHEN** the handle and started event arrive - `inst-started`
 3. [x] - `p1` - **FROM** STREAMING **TO** READY **WHEN** done has supported citations - `inst-done`
 4. [x] - `p1` - **FROM** STREAMING **TO** NOT_FOUND **WHEN** done says not found or has no citations - `inst-not-found`
 5. [x] - `p1` - **FROM** STREAMING **TO** WEAK **WHEN** done reports only weak evidence - `inst-weak`
@@ -203,7 +203,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 ### Threads, composer and stream
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-ask-threads`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-ask-threads`
 
 The system **MUST** provide first question, scope presets, history, follow-ups, Stop and explicit recovery using the frozen Ask commands, preserve the runtime and privacy mode sent by the core, and keep late events out of other threads.
 
@@ -221,7 +221,7 @@ The system **MUST** provide first question, scope presets, history, follow-ups, 
 
 ### Cited answer and copy
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-ask-citations`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-ask-citations`
 
 The system **MUST** render the cited-answer variants with original-language quotes, stable superscripts, safe Markdown, weakness and suggested-item qualifiers, evidence navigation, playback and successful clipboard feedback. Contract gaps below remain visible in delivery review. `just gate` passes.
 

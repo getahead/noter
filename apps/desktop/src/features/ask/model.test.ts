@@ -9,6 +9,10 @@ const msgs = (...events: AskMsg["event"][]): AskMsg[] => events.map((event, i) =
 const failed = (code: string): CoreError => ({ code, message: "", retryable: true }) as CoreError;
 
 describe("foldTurn", () => {
+  it("keeps the runtime and mode the core reported in started", () => {
+    const v = foldTurn(msgs({ type: "started", runtime: "claude_account", mode: "cloud" }, { type: "delta", text: "x" }));
+    expect([v.runtime, v.mode]).toEqual(["claude_account", "cloud"]);
+  });
   it("appends deltas and keeps citations by their number", () => {
     const v = foldTurn(msgs({ type: "delta", text: "Hello " }, { type: "citation", citation: cite(1) }, { type: "delta", text: "world" }, { type: "citation", citation: cite(1) }));
     expect(v.text).toBe("Hello world");

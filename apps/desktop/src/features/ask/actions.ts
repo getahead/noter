@@ -2,7 +2,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { setAskState } from "./ask-state";
+import { offerPreset, setAskState } from "./ask-state";
 import { navigate } from "../shell/navigate";
 import { searchRoute } from "../shell/sections";
 import type { Replay } from "../transcript/playback";
@@ -51,6 +51,10 @@ export interface ThreadSetters {
   setThread: (id: string | null) => void;
   setTurns: (t: AskAnswer[]) => void;
   setAsking: (q: string | null) => void;
+  /** Forget the scope the last question was asked with (Widen Scope belongs to the thread it was asked in). */
+  setAskedScope?: (scope: undefined) => void;
+  /** The thread shown now: opening it again (a routed ask settling into its own thread) keeps the asked scope. */
+  current?: string | null;
 }
 
 /** Show thread `id` (or the empty composer for null) with its stored turns. */
@@ -60,6 +64,7 @@ export async function openThread(bridge: Bridge, id: string | null, set: ThreadS
   // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-return-follow-up
   set.setTurns([]);
   set.setAsking(null);
+  if (id !== (set.current ?? null)) set.setAskedScope?.(undefined);
   if (!keepStream) void bridge.unsubscribe("ask_start"); // a turn still answering is kept listened to, so Recent can learn it ended
   if (!id) return;
   const got = await loadThread(bridge, id);
@@ -155,11 +160,11 @@ export function bindStopKey(doc: Pick<Document, "addEventListener" | "removeEven
 export const copyText = (text: string, write: (s: string) => Promise<void>): Promise<void> => write(text).catch(() => {});
 // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage
 
-// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
 /** Open a cited document (at its chunk) in the app that holds it; the core reports an unreachable one. */
 export const openDocument = (bridge: Bridge, document_id: string, chunk_id: string) =>
   bridge.act("ask:open_document", "open_external", () => bridge.core.openExternal({ target: { type: "document", document_id, chunk_id } }));
 
+// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
 /** Search by Keyword: the Library's search for the question's own words. */
 export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
 // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-search
@@ -217,8 +222,10 @@ export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (que
     if (alive()) onError();
     return false;
   }
+  const name = res.data.topic.name;
+  offerPreset({ id: `topic:${id}`, label: t("ask.scope_topic", { name }), scope: topicScope(id) }); // a topic beyond the core's short list still shows in the pop-up
   setAskState({ scopeId: `topic:${id}` }); // the toolbar pop-up shows the topic scope, and follow-ups keep it
-  ask(t("ask.topic_question", { name: res.data.topic.name }), topicScope(id));
+  ask(t("ask.topic_question", { name }), topicScope(id));
   return true;
 }
 
@@ -235,9 +242,32 @@ export function startRoute(bridge: Bridge, key: string, ask: (question: string, 
   };
 }
 
+/** A routed turn failed: forget that its entry was asked, so Back, Forward or a remount asks it again (Try Again already does). */
+export function releaseFailedRoute(key: string, phase: TurnPhase | null): void {
+  if (phase === "error") routed.delete(key);
+}
+
 /** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
 export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
   if (!(key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
   routed.delete(key);
   replace({ section: "ask", key: `thread:${threadId}` });
+}
+
+/** The ask_start stream lost events (the bridge ended it as lagged): the applied deltas cannot be trusted, so drop the live turn and show what the core stored. */
+export async function recoverGap(bridge: Bridge, threadId: string, set: ThreadSetters & { refresh: () => Promise<void> }): Promise<void> {
+  set.setThread(threadId);
+  void set.refresh();
+  const got = await loadThread(bridge, threadId);
+  if (got) set.setTurns(got);
+  set.setAsking(null);
+}
+
+/** Whether a question was asked with a scope narrower than All calls · all sources (no scope means all). */
+export const isNarrowed = (scope: AskScope | undefined): boolean => !!scope && scope.preset !== NEW_SCOPE.preset;
+
+/** Widen Scope: choose All calls · all sources and ask the same question again with it. */
+export function widenScope(question: string, ask: (question: string, scope: AskScope) => void): void {
+  setAskState({ scopeId: "all" });
+  ask(question, NEW_SCOPE);
 }

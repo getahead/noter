@@ -78,3 +78,39 @@ test.describe("cpt-noter-dod-ui-ask-citations Ask states at wide", () => {
     await shot(page, "error-banner", "wide");
   });
 });
+
+test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide", () => {
+  test("the started line: the runtime and mode above the answering turn", async ({ page }) => {
+    await page.clock.install();
+    await page.clock.resume();
+    await ask(page, WIDTHS.wide);
+    // stop the page's clock, then advance it by hand: the fake core's started event and the bridge's buffered render are timers
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500);
+    await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
+    await page.keyboard.press("Enter");
+    const status = page.locator(".ak-turn .ak-status");
+    // started is due at 200 ms and the bridge renders it 100 ms later; the first word is due at 400 ms. Each clock step is a
+    // round trip (about a second on CI), so cover the first 250 ms in one and then go by condition, in small steps
+    await page.clock.runFor(250);
+    await expect(async () => {
+      await page.clock.runFor(20);
+      await expect(status.first()).toContainText("·", { timeout: 200 });
+    }).toPass({ timeout: 20000 });
+    await expect(page.locator(".ak-turn").last().getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
+    await shot(page, "started-line", "wide");
+  });
+
+  test("a topic route: the Topic: <name> option in the scope pop-up", async ({ page }) => {
+    await ask(page, WIDTHS.wide, { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 }), void (w.topics[0].id = "tp_vis")) });
+    await page.evaluate(async () => {
+      const module = "/src/features/shell/navigate.ts"; // served by the dev server: the app's own module instance
+      const { navigate } = (await import(/* @vite-ignore */ module)) as { navigate: (route: { section: string; key: string }) => void };
+      navigate({ section: "ask", key: "new-topic:tp_vis" });
+    });
+    await expect(page.locator(".ak-recent__item")).toHaveCount(2); // asked and stored
+    const scope = page.locator('[data-region="AK-R1"]').getByRole("combobox", { name: /scope/i });
+    await expect(scope.locator("option", { hasText: /^Topic: / })).toHaveCount(1);
+    await expect(scope).toContainText("Topic: "); // the arrival selects it
+    await shot(page, "topic-scope", "wide");
+  });
+});
