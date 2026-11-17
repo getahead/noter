@@ -1,0 +1,19 @@
+/* People (prototype 40-d.css, .pe-*): the table rows and the unnamed speakers; the table itself is the Library's .lb-table. */
+.pe-search { width: 240px; }
+.pe-row { cursor: default; }
+.pe-name { display: inline-flex; align-items: center; gap: 8px; }
+.pe-name__btn { border: 0; background: transparent; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.pe-name__btn:hover { text-decoration: underline; }
+.np-person__ini { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent-fill); font-size: 10px; font-weight: 600; }
+.pe-unnamed { margin-top: 20px; max-width: 900px; }
+.pe-unnamed__list { border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--card-bg); }
+.pe-urow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--sep); }
+.pe-urow:last-child { border-bottom: 0; }
+.pe-table td { vertical-align: middle; }
+/* selected cells repeat the fill and bleed 1px sideways: Chromium anti-aliases hairlines at fractional column edges */
+.np-table.pe-table tbody tr.is-sel td { background: var(--accent-fill); box-shadow: 1px 0 0 var(--accent-fill), -1px 0 0 var(--accent-fill); }
+.pe-hint { margin: 8px 2px 0; font-size: 11px; color: var(--label-3); }
+.pe-loading { min-height: 8px; }
+.pe-skel { display: grid; gap: 1px; border: 1px solid var(--sep); border-radius: var(--r-row); overflow: hidden; }
+.pe-skel__row { display: grid; grid-template-columns: 110px 1fr 120px; gap: 16px; padding: 14px 12px; background: var(--card-bg); }
+.pe-skel__row span { height: 10px; border-radius: var(--r-tag); background: var(--sel-unemph); }
