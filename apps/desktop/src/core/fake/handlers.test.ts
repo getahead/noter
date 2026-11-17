@@ -242,6 +242,12 @@ describe("fake core stream and record parity", () => {
     expect(fake.world.app.accounts.local).toMatchObject({ running: true, cli: { installed: true } });
   });
 
+  it("a rename to a taken name is refused before the revision is looked at, as the real core does", async () => {
+    const fake = core("main");
+    const [a, b] = fake.world.topics;
+    await expect(fake.invoke("topic_rename", { topic_id: a.id, rev: a.rev + 7, name: b.name })).rejects.toMatchObject({ code: "invalid_input", detail: { rule: "duplicate" } });
+  });
+
   it("stopping Ask keeps the partial answer and cancels the remaining response", async () => {
     vi.useFakeTimers();
     const fake = core("main");

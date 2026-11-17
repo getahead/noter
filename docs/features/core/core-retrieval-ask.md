@@ -179,7 +179,7 @@ The empty-topic story offers Delete Topic, but the frozen contract has no such c
 
 **Steps**:
 1. [x] - `p1` - API: `topics_list` and `topic_get { topic_id }` read topic counts, aliases and cached merge suggestions, then items grouped by their call; refresh suggestions when centroids or Keep Separate pairs change; return an empty thread when no calls remain - `inst-topic-read`
-2. [x] - `p1` - API: `topic_rename { topic_id, rev, name }` validates a non-empty name and guards `rev`; write the name and change row in one transaction - `inst-topic-rename`
+2. [x] - `p1` - API: `topic_rename { topic_id, rev, name }` validates a non-empty name that no other topic has (`duplicate`, case and outer spaces ignored; #903) and guards `rev`; write the name and change row in one transaction - `inst-topic-rename`
 3. [x] - `p1` - API: `topics_merge { source, target }` validates both ids; in one change batch move item links, preserve source names and aliases on target, update its centroid and date range, and remove source - `inst-topic-merge`
 4. [x] - `p1` - API: `topics_keep_separate { a, b }` stores the canonical unordered pair as a `topic_merge` suppression through the writer - `inst-topic-separate`
 5. [x] - `p1` - Emit `entity:changed` only after commit; return `TopicMutation` with `change_id` for rename or merge, and `Ack` for Keep Separate - `inst-topic-return`

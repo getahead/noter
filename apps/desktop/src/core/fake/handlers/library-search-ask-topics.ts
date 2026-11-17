@@ -180,10 +180,11 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   topic_rename: (a, { world, emit }) => {
     const t = shared.topic(world, a.topic_id);
-    shared.checkRev(t.rev, a.rev);
     if (!a.name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "name", rule: "required" });
     const same = (name: string) => name.trim().toLowerCase() === a.name.trim().toLowerCase();
     if (world.topics.some((o) => o.id !== t.id && same(o.name))) throw coreError("invalid_input", "name", { type: "validation", field: "name", rule: "duplicate" });
+    // The name is validated before the revision is looked at, as the real core does.
+    shared.checkRev(t.rev, a.rev);
     const before = t.name;
     t.aliases = [...new Set([...t.aliases, before])];
     t.name = a.name;
