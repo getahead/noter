@@ -24,10 +24,11 @@ export function exportCall(bridge: Bridge, callId: string | string[], include: E
 }
 
 /** The sheet's button: what the save panel and the core made of it. A cancelled panel is no error and no status. */
-export async function runExport(bridge: Bridge, callId: string | string[], include: ExportInclude, scope: ShareScope | null): Promise<{ kind: "done"; path: string } | { kind: "cancelled" | "failed" }> {
+export async function runExport(bridge: Bridge, callId: string | string[], include: ExportInclude, scope: ShareScope | null): Promise<{ kind: "done"; path: string } | { kind: "cancelled" | "failed" | "not_ready" }> {
   const r = await exportCall(bridge, callId, include, scope);
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-cancel
-  if (r.status === "error") return { kind: r.error.code === "cancelled" ? "cancelled" : "failed" };
+  // `outputs_not_ready`: a selected call has nothing to export yet; asking again cannot change that
+  if (r.status === "error") return { kind: r.error.code === "cancelled" ? "cancelled" : r.error.code === "outputs_not_ready" ? "not_ready" : "failed" };
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-cancel
   return { kind: "done", path: r.data.path };
 }

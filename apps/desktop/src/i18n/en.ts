@@ -1028,6 +1028,7 @@ export const en = {
   "export.audio": "Audio",
   "export.confirm": "Export…",
   "export.none": "Choose at least one thing to export",
+  "export.not_ready": "Some of the selected calls have nothing to export yet. Choose only calls with finished outputs.",
   "export.failed": "Couldn't export. Try again.",
   "export.done": "Exported to {path}",
   "export.show": "Show in Finder",
