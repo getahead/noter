@@ -258,7 +258,9 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     await codexCli({}, "Free");
     const free = await signIn("chatgpt");
     expect((await ended(free.steps)).error).toBe("plan_not_eligible");
-    expect(await accounts()).toMatchObject({ accounts: before.accounts, keys: before.keys });
+    // The rows' `cli` now follows the scripted tools; what must not move is who is signed in and bound.
+    const bindings = before.accounts.map(({ provider, status, agents }) => ({ provider, status, agents }));
+    expect(await accounts()).toMatchObject({ accounts: bindings, keys: before.keys });
     expect(await rows(s, "SELECT value FROM settings WHERE key = 'accounts'")).toEqual([]);
   });
 
@@ -283,9 +285,14 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-sign-in-account on the real core
     expect(await preference()).toEqual(unbound);
     // CLI install runs as a job.
     const jobs = await s.events("jobs:progress");
-    await cli("claude_code", { version: "2.1.296", install: { version: "2.1.300" } });
+    // A missing CLI shows on the account row, as prepare refuses it; the install makes the row follow.
+    await control("account_cli", { tool: "claude_code", installed: false, install: { version: "2.1.300" } });
+    const cliOf = (view: AccountsView) => view.accounts.find((a) => a.provider === "claude")!.cli;
+    expect(cliOf(ok(await s.core("settings").accountsGet({})))).toMatchObject({ installed: false, path: null, version: null });
+    expect(refused(await s.core("settings").accountSigninPrepare({ provider: "claude" })).code).toBe("cli_missing");
     const job = ok(await s.core("settings").cliInstall({ tool: "claude_code" }));
     await until(() => jobs.all.map((j) => j.run).find((r) => r.id === job.job_run_id && r.status === "succeeded"), "the install job");
+    expect(cliOf(ok(await s.core("settings").accountsGet({})))).toMatchObject({ installed: true, version: "2.1.300", supported: true });
     // Sign out: roles on the account fall back to its API-key runtime; the account is signed out.
     expect(keyStatus(ok(await s.core("settings").apiKeySet({ provider: "codex", key: KEY })), "codex")).toMatchObject({ type: "configured" });
     await useRoles("chatgpt_account");

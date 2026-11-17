@@ -514,6 +514,36 @@ async fn prepare_reports_the_cli_and_an_existing_identity() {
 }
 
 #[tokio::test]
+async fn the_account_row_reports_the_cli_that_prepare_reports() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    w.cli
+        .set(tool(r#"{"tool":"claude_code","installed":false}"#));
+    w.cli.set(tool(
+        r#"{"tool":"codex","installed":true,"path":"/bin/codex","version":"9.9.9","supported":false}"#,
+    ));
+    let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    let cli = |tool| {
+        let row = view.accounts.iter().find(|a| a.cli.tool == tool);
+        row.unwrap().cli.clone()
+    };
+    let claude = cli(CliTool::ClaudeCode);
+    assert!(!claude.installed && claude.path.is_none() && claude.version.is_none());
+    let codex = cli(CliTool::Codex);
+    assert!(codex.installed && !codex.supported);
+    assert_eq!(codex.path.as_deref(), Some("/bin/codex"));
+    assert_eq!(codex.version.as_deref(), Some("9.9.9"));
+    // An install makes the row follow at once, as `accounts:changed` says.
+    w.cli.set(tool(
+        r#"{"tool":"claude_code","installed":true,"path":"/bin/claude","version":"2.1.296"}"#,
+    ));
+    let view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    let claude = &view.accounts[0].cli;
+    assert!(claude.installed && claude.supported);
+    assert_eq!(claude.path.as_deref(), Some("/bin/claude"));
+}
+
+#[tokio::test]
 async fn prepare_names_a_missing_or_unsupported_cli() {
     let dir = tempfile::tempdir().unwrap();
     let w = open(dir.path(), None);

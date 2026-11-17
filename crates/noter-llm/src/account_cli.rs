@@ -67,6 +67,10 @@ pub struct LoginStart {
 
 pub trait AccountCli: Send + Sync {
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus>;
+    /// Whether `status` speaks for `tool`; when not, the account row shows what the runtime found.
+    fn reports(&self, _tool: CliTool) -> bool {
+        true
+    }
     fn login(&self, provider: AccountProvider) -> BoxFuture<'_, Result<LoginStart, CliError>>;
     /// Ends a sign-in that is waiting for the browser.
     fn cancel(&self, provider: AccountProvider);
@@ -86,6 +90,10 @@ pub fn tool_of(provider: AccountProvider) -> CliTool {
 pub struct NoAccountCli;
 
 impl AccountCli for NoAccountCli {
+    fn reports(&self, _: CliTool) -> bool {
+        false
+    }
+
     fn status(&self, _: CliTool) -> BoxFuture<'_, CliStatus> {
         Box::pin(async { CliStatus::missing() })
     }
@@ -247,6 +255,11 @@ impl ScriptedAccountCli {
 }
 
 impl AccountCli for ScriptedAccountCli {
+    /// An unscripted tool leaves the row to the scripted runtime.
+    fn reports(&self, tool: CliTool) -> bool {
+        self.script(tool).is_some()
+    }
+
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus> {
         Box::pin(async move {
             self.script(tool)

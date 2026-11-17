@@ -108,8 +108,7 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-run
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-complete
-        let availability = self.llm.refresh().await;
-        self.accounts.observe(Some(availability));
+        self.refresh_accounts().await;
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-complete
         Ok(())
     }

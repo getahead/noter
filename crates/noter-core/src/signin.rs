@@ -2,12 +2,13 @@
 //! ChatGPT accounts. The CLIs own the sign-in; the core owns the session (a task that outlives
 //! the sheet), the checks, the binding and the sign-out. Only identity, plan and times are kept.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use noter_db::ChangeMeta;
 use noter_jobs::BoxFuture;
-use noter_llm::{tool_of, Failure, LoginOutcome};
+use noter_llm::{tool_of, CliStatus, Failure, LoginOutcome};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
@@ -101,16 +102,34 @@ impl Core {
     /// whether its sign-in is still there.
     pub(crate) async fn refresh_accounts(&self) -> AccountsView {
         let availability = self.llm.refresh().await;
-        self.detect_ended().await;
+        let cli = &self.deps.account_cli;
+        let mut tools = HashMap::new();
+        for provider in ACCOUNTS {
+            let tool = tool_of(provider);
+            if !cli.reports(tool) {
+                continue;
+            }
+            // Read before the probe: a probe that started against one sign-in never ends another.
+            let connection = self.accounts.connection(provider);
+            let status = cli.status(tool).await;
+            let info = CliInfo {
+                tool,
+                installed: status.installed,
+                path: status.path.clone(),
+                version: status.version.clone(),
+                supported: status.supported,
+            };
+            tools.insert(tool, info);
+            if let Some(connection) = connection {
+                self.detect_ended(provider, &connection, &status);
+            }
+        }
+        self.accounts.set_tools(tools);
         self.accounts.observe(Some(availability))
     }
 
-    async fn detect_ended(&self) {
-        for provider in ACCOUNTS {
-            let Some(connection) = self.accounts.connection(provider) else {
-                continue;
-            };
-            let status = self.deps.account_cli.status(tool_of(provider)).await;
+    fn detect_ended(&self, provider: AccountProvider, connection: &Connection, status: &CliStatus) {
+        {
             // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
             // @cpt-begin:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
             if status.installed
