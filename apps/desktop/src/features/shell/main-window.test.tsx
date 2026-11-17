@@ -58,6 +58,21 @@ async function open(mutate: (w: World["app"]) => void = () => {}, label: "main" 
 }
 
 describe("MainWindow (cpt-noter-component-shell-main-window)", () => {
+  it("waits for the window snapshot before reading toolbar tag suggestions", async () => {
+    bridge = createBridge("main", new FakeCore({ window: "main" }));
+    const tags = vi.spyOn(bridge.core, "tagsList");
+    rendered(MainWindow, { bridge });
+    const tagEffect = () => effects.find((run) => run.toString().includes("loadTags"))!();
+    tagEffect();
+    expect(tags).not.toHaveBeenCalled();
+
+    await bridge.open();
+    effects.length = 0;
+    rendered(MainWindow, { bridge });
+    tagEffect();
+    expect(tags).toHaveBeenCalledOnce();
+  });
+
   it("announces a privacy mode transition in the main window live region", async () => {
     const writes: string[] = [];
     const live = { set textContent(value: string) { writes.push(value); }, get textContent() { return ""; } };

@@ -83,9 +83,13 @@ final class WindowSizeTests: NoterTestCase {
         attachSettingsScreenshot("settings-search-titlebar-default")
         verifySearchInput()
 
-        let lowerRight = settings.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 1))
-        lowerRight.press(forDuration: 0.1, thenDragTo: lowerRight.withOffset(CGVector(dx: -120, dy: -140)))
-        XCTAssertTrue(waitUntil(5) { abs(settings.frame.width - 700) <= 8 && abs(settings.frame.height - 480) <= 8 }, "Settings can resize to its 700×480 minimum")
+        // Mouse gestures target straight resize edges, avoiding the rounded corner.
+        let right = settings.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
+        right.click(forDuration: 0.1, thenDragTo: right.withOffset(CGVector(dx: 700 - settings.frame.width, dy: 0)))
+        XCTAssertTrue(waitUntil(5) { abs(settings.frame.width - 700) <= 8 }, "Settings resizes to 700 pt wide; actual frame=\(settings.frame)")
+        let bottom = settings.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
+        bottom.click(forDuration: 0.1, thenDragTo: bottom.withOffset(CGVector(dx: 0, dy: 480 - settings.frame.height)))
+        XCTAssertTrue(waitUntil(5) { abs(settings.frame.width - 700) <= 8 && abs(settings.frame.height - 480) <= 8 }, "Settings can resize to its 700×480 minimum; actual frame=\(settings.frame)")
         XCTAssertLessThanOrEqual(paneList.frame.maxY, pane.frame.minY, "the narrow pane list stacks above, rather than overlaps, the content pane")
         XCTAssertGreaterThanOrEqual(paneList.frame.width, 680, "the narrow ST-R1 pane uses the available Settings width")
         // At the stacked width, ST-R1 has no right border: full pane width minus horizontal paddings and search chrome.

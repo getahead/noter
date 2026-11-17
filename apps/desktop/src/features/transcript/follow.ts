@@ -156,12 +156,17 @@ export class LogScroller {
     const start = this.window(keys, el.scrollTop, el.clientHeight).start;
     const m = measure(ul.children, keys, start, this.heights, this.est, el.scrollTop);
     // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-keep-end
-    if (follow) {
+    // A render may precede the wheel's scroll event: preserve its upward pixel for the handler.
+    const pendingUp = el.scrollTop < this.prevTop && !atEnd(el, 0);
+    if (follow && !pendingUp) {
       el.scrollTo({ top: el.scrollHeight, behavior: m.changed || this.prevTop < 0 ? "instant" : behavior });
       this.prevTop = el.scrollTop;
     }
     // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-keep-end
-    else if (m.shift) el.scrollTo({ top: el.scrollTop + m.shift, behavior: "instant" });
+    else if (m.shift) {
+      el.scrollTo({ top: el.scrollTop + m.shift, behavior: "instant" });
+      if (pendingUp) this.prevTop += m.shift;
+    }
     if (this.focusKey) {
       const row = ul.children[keys.indexOf(this.focusKey) - start];
       row?.focus?.({ preventScroll: true });

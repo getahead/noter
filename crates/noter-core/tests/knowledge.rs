@@ -35,22 +35,29 @@ impl Clock for StepClock {
 #[derive(Default)]
 struct Events {
     recorded: Mutex<Vec<(&'static str, Value)>>,
-    idle_pause: Mutex<Option<IdlePause>>,
+    sync_pause: Mutex<Option<SyncPause>>,
 }
 
-struct IdlePause {
+struct SyncPause {
+    status: &'static str,
     reached: Arc<tokio::sync::Notify>,
     release: std::sync::mpsc::Receiver<()>,
 }
 
 impl EventEmitter for Events {
     fn emit(&self, event: &'static str, payload: Value) {
-        // Hold successful Idle publication before the scheduler closes the run.
-        if event == "entity:changed"
-            && payload["source"]["status"]["type"] == "idle"
-            && payload["source"]["last_sync_at"].is_number()
-        {
-            let pause = self.idle_pause.lock().unwrap().take();
+        // Hold the selected status publication before the sync handler continues.
+        if event == "entity:changed" {
+            let mut slot = self.sync_pause.lock().unwrap();
+            let pause = if slot.as_ref().is_some_and(|p| {
+                payload["source"]["status"]["type"] == p.status
+                    && payload["source"]["last_sync_at"].is_number()
+            }) {
+                slot.take()
+            } else {
+                None
+            };
+            drop(slot);
             if let Some(pause) = pause {
                 pause.reached.notify_one();
                 let _ = pause.release.recv();
@@ -591,11 +598,28 @@ async fn an_unreadable_folder_fails_with_its_code_and_keeps_the_last_sync_until_
         (failed.last_sync_at, failed.documents),
         (Some(TimestampMs(T0)), 6)
     );
-    let error: Option<String> = read(&rig.core, |c| {
-        c.query_row("SELECT error FROM sync_runs ORDER BY rowid DESC", [], |r| {
-            r.get(0)
-        })
+    // A watcher may start another run after Failed was read, before its error is checked.
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let (release, wait) = std::sync::mpsc::channel();
+    *rig.events.sync_pause.lock().unwrap() = Some(SyncPause {
+        status: "indexing",
+        reached: reached.clone(),
+        release: wait,
     });
+    rig.reindex(T0 + 5_000, &row.id).await;
+    tokio::time::timeout(Duration::from_secs(15), reached.notified())
+        .await
+        .expect("the next sync never started");
+    let id = row.id.clone();
+    let error: Option<String> = read(&rig.core, move |c| {
+        c.query_row(
+            "SELECT error FROM sync_runs WHERE source_id = ?1 AND finished_at IS NOT NULL
+             ORDER BY rowid DESC LIMIT 1",
+            [id.as_str()],
+            |r| r.get(0),
+        )
+    });
+    drop(release);
     assert_eq!(error.as_deref(), Some("source_sync_failed"));
 
     // The drive is back: retry goes through indexing to idle.
@@ -1118,7 +1142,8 @@ async fn synced_at_waits_for_the_source_job_after_idle_is_published() {
     let rig = open().await;
     let reached = Arc::new(tokio::sync::Notify::new());
     let (release, wait) = std::sync::mpsc::channel();
-    *rig.events.idle_pause.lock().unwrap() = Some(IdlePause {
+    *rig.events.sync_pause.lock().unwrap() = Some(SyncPause {
+        status: "idle",
         reached: reached.clone(),
         release: wait,
     });

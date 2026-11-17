@@ -1,5 +1,5 @@
 // Ask: recent questions (AK-R2), the thread (AK-R3) and the composer (AK-R4); answers stream from the core.
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -82,8 +82,8 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     return startRoute(bridge, routeKey, ask, () => setRouteError(true));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
-  // ...and once it is stored the entry becomes the thread
-  useEffect(() => {
+  // Commit the thread entry before the ready view can receive Back; a later effect could replace Today.
+  useLayoutEffect(() => {
     settleRoute(routeKey, thread, asking === null && turns.length > 0, (route) => navigate(route, true));
   }, [routeKey, thread, asking, turns]);
 
