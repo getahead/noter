@@ -824,6 +824,7 @@ export const en = {
   "person.voice.delete_message": "Noter stops recognising this voice in new calls. Names already given in past calls stay.",
   "person.voice.delete_confirm": "Delete Profile",
   "person.voice.delete_err": "Couldn’t delete the voice profile. It was not changed.",
+  "person.history_empty": "Changes to {name}'s items, names and voice profile appear here, each with Undo.",
   "person.view": "View",
   "person.tab.overview": "Overview",
   "person.tab.calls": "Calls",
