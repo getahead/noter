@@ -26,6 +26,7 @@ import { MODE_MSG } from "./mode-indicator-view";
 import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
+import { navigateEffect } from "./navigate";
 import { searchRoute } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
@@ -173,6 +174,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // moving focus: the heading is not focused for it, and the core decides whether the window activates.
   const flags = useRef<NavFlags>({ first: true, quiet: null });
   useEffect(() => navEffect(nav, flags.current, dispatch), [nav]);
+  useEffect(() => navigateEffect(dispatch), []);
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-nav
 
