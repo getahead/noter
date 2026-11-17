@@ -293,6 +293,11 @@ impl Core {
         {
             return Err(no_topic());
         }
+        // shortcut: checked before the write, not inside it; one user renames one topic at a time.
+        let name = args.name.clone();
+        if (self.store()).read(move |c| noter_retrieval::name_taken(c, id, &name))? {
+            return Err(noter_retrieval::name_clash());
+        }
         let meta = self.change_meta(ctx, "Renamed a topic".into(), "topic_rename");
         let written = self.store().write(mutation, meta)?;
         // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-rename

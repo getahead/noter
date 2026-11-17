@@ -33,8 +33,9 @@ pub use retrieve::{
 };
 pub use search::{search, search_request, DEFAULT_LIMIT, MAX_LIMIT};
 pub use topics::{
-    attach_topics, keep_separate, merge, refresh_centroids, rename, thread_items, topic_list,
-    topic_name, topic_row, Attached, NewItem, ATTACH_SIMILARITY, SUGGEST_SIMILARITY,
+    attach_topics, keep_separate, merge, name_clash, name_taken, refresh_centroids, rename,
+    thread_items, topic_list, topic_name, topic_row, Attached, NewItem, ATTACH_SIMILARITY,
+    SUGGEST_SIMILARITY,
 };
 
 /// noter-retrieval's own tables; the list runs after noter-core's (its triggers read

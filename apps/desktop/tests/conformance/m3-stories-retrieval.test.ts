@@ -179,6 +179,10 @@ describe("cpt-noter-seq-library-follow-topic", () => {
     const stale = refused(await main.topicRename({ topic_id: "top_drawer", rev: drawer.rev, name: "Again" }));
     expect(stale).toMatchObject({ code: "conflict", detail: { type: "conflict", current_rev: renamed.topic.rev } });
     expect(ok(await main.topicGet({ topic_id: "top_drawer" })).topic.name).toBe("Drawer 8.0");
+    // Another topic's name is refused, whatever its case: the page offers Merge Instead.
+    const taken = refused(await main.topicRename({ topic_id: "top_drawer", rev: renamed.topic.rev, name: " notification SERVICE " }));
+    expect(taken).toMatchObject({ code: "invalid_input", detail: { type: "validation", field: "name", rule: "duplicate" } });
+    expect(ok(await main.topicGet({ topic_id: "top_drawer" })).topic).toMatchObject({ name: "Drawer 8.0", rev: renamed.topic.rev });
   });
 
   it("other — a merge keeps the source's name as an alias, change_undo restores both, and Keep Separate is stored", async () => {

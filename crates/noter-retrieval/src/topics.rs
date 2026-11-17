@@ -362,6 +362,21 @@ pub fn rename(id: &TopicId, rev: Rev, name: &str) -> Result<Mutation, CoreError>
     // @cpt-end:cpt-noter-flow-core-retrieval-ask-topics:p1:inst-topic-rename
 }
 
+/// Whether a topic other than `id` already has `name`, ignoring case and outer spaces.
+pub fn name_taken(conn: &Connection, id: &str, name: &str) -> Db<bool> {
+    let wanted = name.trim().to_lowercase();
+    let names: Vec<String> = conn
+        .prepare("SELECT name FROM topics WHERE id != ?1")?
+        .query_map([id], |r| r.get(0))?
+        .collect::<Db<_>>()?;
+    Ok(names.iter().any(|n| n.trim().to_lowercase() == wanted))
+}
+
+/// `topic_rename` to a name another topic has: the page offers a merge instead.
+pub fn name_clash() -> CoreError {
+    invalid("name", ValidationRule::Duplicate)
+}
+
 struct Stored {
     rev: i64,
     name: String,
