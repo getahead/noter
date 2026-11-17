@@ -1,6 +1,8 @@
+import type { KeyboardEvent } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { SearchHit } from "../../core/bindings";
 import { shortDay, t } from "../../i18n/format";
+import { IconButton } from "../../ui/primitives/icon-button";
 import { Link } from "../../ui/primitives/link";
 import { openSpan } from "../items/evidence";
 import { segments } from "./search-model";
@@ -15,14 +17,28 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
     else if (x.type === "document") void bridge.act("open_external", "open_external", () => bridge.core.openExternal({ target: { type: "document", document_id: x.document_id, chunk_id: x.chunk_id } }), { screen: "library-search" });
     else if (hit.call) void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: hit.call!.id, tab: "summary" } }), { screen: "library-search" });
   };
+  const span = hit.target.type === "segment" ? hit.target.span : null;
+  const play = () => span && void bridge.act("audio_play", "audio_play", () => bridge.core.audioPlay({ call_id: span.call_id, from_ms: span.t0_ms, to_ms: span.t1_ms, channel: span.channel }), { screen: "library-search" });
+  // Space plays the span and Return opens it; ↑ and ↓ walk the hits.
+  const key = (e: KeyboardEvent<HTMLLIElement>) => {
+    if (e.target !== e.currentTarget) return;
+    if (e.key === "Enter") go();
+    else if (e.key === " " && span) (e.preventDefault(), play());
+    else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      const rows = Array.from(document.querySelectorAll<HTMLElement>(".lb-hit"));
+      rows[rows.indexOf(e.currentTarget) + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
+      e.preventDefault();
+    }
+  };
   return (
-    <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={(e) => e.key === "Enter" && go()}>
+    <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
       {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}
       <span className="lb-hit__snippet" lang={lang}>
         {segments(hit.snippet, hit.highlights).map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : s.text))}
       </span>
       {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
+      {span && <IconButton icon="play" label={t("transcript.play")} size="inline" onAction={play} />}
       <Link label={t("search.open")} onAction={go} />
     </li>
   );

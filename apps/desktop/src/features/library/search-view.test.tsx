@@ -22,6 +22,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     const none = props(results(), { filter: {} });
     expect(html(none)).toContain("No matches for “websocket”");
     expect(html(none)).toContain("Ask Instead");
+    expect(html(none)).toContain("Try fewer words");
     expect(html(none)).not.toContain("Clear Filters");
     const filtered = props(results(), { filter: { tags: ["release"] } });
     expect(html(filtered)).toContain("Clear Filters");

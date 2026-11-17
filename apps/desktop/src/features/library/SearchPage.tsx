@@ -46,7 +46,6 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
       <div className="lb-actions">
         {filtered && (
           <>
-            <span className="np-dim">{t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}</span>
             <PushButton label={clear.label} size="small" onAction={clear.onAction} />
           </>
         )}
@@ -57,7 +56,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     if (status === "NO_MATCHES")
       return (
         <>
-          <EmptyState variant="filtered" title={t("search.none", { query })} />
+          <EmptyState variant="filtered" title={t("search.none", { query })} body={filtered ? t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length }) : t("search.try_fewer")} />
           {widen}
         </>
       );
