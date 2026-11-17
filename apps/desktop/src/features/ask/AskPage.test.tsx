@@ -67,6 +67,13 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
   const noop = () => {};
   const props = { bridge, rows: [], loadError: false, thread: null, turns: [], asking: null, turn: null, phase: null, draft: "", busy: false, onOpen: noop, onCopyQuestion: noop, onDelete: noop, onScope: noop, onDraft: noop, onSend: noop, announce: "", suggestions: [], onSuggest: noop, onStop: noop, onRetry: noop, onPlay: noop, bar: null };
   const row = { id: "a", title: "What did Ann say?", updated_at: Date.now() } as never;
+  it("offers Widen Scope on the last stored turn when it was not found under a narrowed scope", () => {
+    const miss = (id: string, found: boolean) => ({ turn_id: id, question: `Q${id}`, answer_md: "", citations: [], found, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 }) as never;
+    const turns = [miss("1", false), miss("2", false)];
+    const html = (narrowed: boolean) => renderToString(<AskView {...props} thread="a" turns={turns} narrowed={narrowed} onWiden={noop} />);
+    expect(html(true).split("Widen Scope").length - 1).toBe(1); // the last turn only
+    expect(html(false)).not.toContain("Widen Scope");
+  });
   it("lists recent questions by day and marks the open one", () => {
     const h = renderToString(<AskView {...props} rows={[row]} thread="a" />);
     expect(h).toContain("Today");

@@ -104,7 +104,7 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 11. [x] - `p1` - **IF** the user chooses **Search by Keyword** - `inst-if-search`
     1. [x] - `p1` - UI: Library search with this turn's exact question - `inst-search`
 12. [x] - `p1` - **IF** the user chooses **Widen Scope** with a narrowed scope - `inst-if-widen`
-    1. [x] - `p1` - UI: set **All calls · all sources** and ask the same question again (live turn only: `AskAnswer` carries no scope, so a reloaded stored turn cannot tell it was narrowed; contract gap `AskAnswer.scope`) - `inst-widen`
+    1. [x] - `p1` - UI: set **All calls · all sources** and ask the same question again (offered on the last turn of this session, from the scope it was asked with: `AskAnswer` carries no scope, so a turn reloaded in a later session cannot tell it was narrowed; contract gap `AskAnswer.scope`) - `inst-widen`
 13. [x] - `p1` - **RETURN** the thread; local retry actions are constrained by the contract gap below - `inst-return-question`
 
 ### Stop, follow up, copy and manage threads
