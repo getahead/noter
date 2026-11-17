@@ -24,7 +24,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
   const mode = modeIndicator({ mode: privacy?.mode ?? "cloud_redacted", degraded: degraded?.states ?? [], sensitiveCall: false });
   const openPrivacy = () => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "settings", pane: "privacy" } }));
   // Medium and Narrow: the Recent pane's place (the pane and this pop-up swap by the window's width class, in ask.css)
-  const recentPop = <PopupButton variant="toolbar" cls="ak-recent-pop" label={t("ask.recent")} options={recentChoices(recent, t("ask.recent"))} value="" onAction={(id) => id && requestOpen(id)} />;
+  const recentPop = <PopupButton variant="toolbar" cls="ak-recent-pop" label={t("ask.recent")} options={recentChoices(recent, t("ask.recent_short"))} value="" onAction={(id) => id && requestOpen(id)} />;
   // Narrow: the scope moves into the » menu first (the mode indicator stays)
   const scopeActions = base.narrow ? presets.map((p) => ({ label: `${t("ask.scope")}: ${p.id === "all" ? t("ask.scope_all") : p.label}`, onAction: () => setAskState({ scopeId: p.id }) })) : [];
   const scope =

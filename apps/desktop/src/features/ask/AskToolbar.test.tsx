@@ -50,6 +50,7 @@ describe("AskToolbar (cpt-noter-component-screen-ask)", () => {
     const wide = html();
     expect(wide).toContain("ak-recent-pop");
     expect(wide).toContain("First question");
+    expect(wide).toContain(">Recent</option>"); // a compact title: the pop-up must fit beside the scope and the search field at Medium
     expect(wide).toContain('aria-label="Scope"');
     const narrow = renderToString(<AskToolbar route={{ section: "ask", key: "root" }} bridge={{ store: { getState: () => ({ streams: {}, whole: {} }), subscribe: () => () => {} } } as never} base={{ ...base, narrow: true }} inspectorOpen={false} onToggleInspector={() => {}} />);
     expect(narrow).toContain("ak-recent-pop");

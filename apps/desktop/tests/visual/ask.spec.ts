@@ -113,4 +113,11 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
     await expect(scope).toContainText("Topic: "); // the arrival selects it
     await shot(page, "topic-scope", "wide");
   });
+
+  test("Narrow: the » menu holds New Question and the scope choices", async ({ page }) => {
+    await ask(page, WIDTHS.narrow);
+    await page.locator("#mw-overflow").click();
+    await expect(page.getByRole("menuitem", { name: /^Scope: / }).first()).toBeVisible();
+    await shot(page, "overflow-menu", "narrow");
+  });
 });

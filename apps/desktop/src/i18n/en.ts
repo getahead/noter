@@ -1724,6 +1724,7 @@ export const en = {
   "ask.answering": "Answering…",
   "ask.new_question": "New Question",
   "ask.open_person": "Open {name}",
+  "ask.recent_short": "Recent",
   "ask.recent": "Recent questions",
   "ask.recent_empty": "Your questions appear here",
   "ask.topic_error": "Couldn’t open this topic",
