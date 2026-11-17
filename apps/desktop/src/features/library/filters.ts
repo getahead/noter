@@ -105,6 +105,16 @@ export const holdFilter = (s: FilterState): void => {
 export const watchFilter = (w: () => void): (() => void) => (watchers.add(w), () => void watchers.delete(w));
 
 
+/** Reads the list again once per filter change: the page's own change and the watcher both land here, so the same filter never reads twice (words alone never read). */
+export function syncFilter(read: (f: CallFilter) => void, start: CallFilter): (s: FilterState) => void {
+  let last = start;
+  return (s) => {
+    if (s.filter === last) return;
+    last = s.filter;
+    read(s.filter);
+  };
+}
+
 /** Whether any filter group narrows the list. */
 export const isFiltered = (f: CallFilter): boolean => Object.values(f).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));
 

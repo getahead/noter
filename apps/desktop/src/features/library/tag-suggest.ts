@@ -10,18 +10,22 @@ export function tagChoice(text: string, tags: string[]): string | null {
   return (m && tags.find((x) => x.toLowerCase() === m[1]!.toLowerCase())) || null;
 }
 
-/** A tag choice adds the tag filter once and the caller clears the draft; returns whether it was a choice. */
-export function takeTag(text: string, tags: string[]): boolean {
-  const tag = tagChoice(text, tags);
-  if (tag) holdFilter(apply(heldFilter(), { type: "add", group: "tags", value: tag }));
-  return tag !== null;
+/** A chosen tag (picked from the list, or an exact `#tag` on Return) adds the tag filter once; the caller clears the draft. */
+export const holdTag = (tag: string): void => holdFilter(apply(heldFilter(), { type: "add", group: "tags", value: tag }));
+
+/** ↑ ↓ move the active row of the list (wrapping), Return picks the active one; null leaves the key to the field. */
+export function listKey(key: string, active: number, count: number): { active: number; pick?: number } | null {
+  if (count === 0) return null;
+  if (key === "ArrowDown") return { active: (active + 1) % count };
+  if (key === "ArrowUp") return { active: active <= 0 ? count - 1 : active - 1 };
+  return key === "Enter" && active >= 0 ? { active, pick: active } : null;
 }
 
-/** The tags the list under the field offers for what is typed: while it starts with `#`, those containing the rest (an exact tag is taken as the filter instead). */
+/** The tags the list under the field offers for what is typed: while it starts with `#`, those containing the rest. */
 export function tagMatches(text: string, tags: string[], limit = 8): string[] {
   if (!text.startsWith("#")) return [];
   const q = text.slice(1).toLowerCase();
-  return tags.filter((x) => x.toLowerCase().includes(q) && x.toLowerCase() !== q).slice(0, limit);
+  return tags.filter((x) => x.toLowerCase().includes(q)).slice(0, limit);
 }
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-suggest
 

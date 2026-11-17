@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { apply, BLANK, datePreset, isFiltered, reconcile, shiftDay, tokens, type Lookups } from "./filters";
+import { describe, expect, it, vi } from "vitest";
+import { apply, BLANK, datePreset, isFiltered, reconcile, shiftDay, syncFilter, tokens, type Lookups } from "./filters";
 
 const look: Lookups = { person: (id) => ({ per_anna: "Anna", per_bo: "Boris" })[id] ?? id, type: (id) => ({ planning: "Planning" })[id] ?? id };
 
@@ -77,5 +77,20 @@ describe("custom date range", () => {
   it("turns a backwards range round instead of sending from > to", () => {
     const s = apply(BLANK, { type: "date", preset: "custom", from: "2026-11-10", to: "2026-11-01" });
     expect(s.filter).toMatchObject({ from: "2026-11-01", to: "2026-11-10" });
+  });
+});
+
+describe("syncFilter (one calls_list read per filter change)", () => {
+  it("reads once when the filter changes, never for words alone, and again only for the next change", () => {
+    const read = vi.fn();
+    const sync = syncFilter(read, BLANK.filter);
+    const tagged = apply(BLANK, { type: "add", group: "tags", value: "release" });
+    sync(tagged); // the page's own change reaches the watcher once
+    sync(tagged);
+    expect(read).toHaveBeenCalledTimes(1);
+    sync(apply(tagged, { type: "words", words: "zoom" }));
+    expect(read).toHaveBeenCalledTimes(1);
+    sync(apply(tagged, { type: "clear" }));
+    expect(read).toHaveBeenCalledTimes(2);
   });
 });

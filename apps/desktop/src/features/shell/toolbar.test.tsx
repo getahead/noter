@@ -42,7 +42,7 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(html).not.toContain("Show Sidebar");
   });
 
-  it("lists the matching tags under the field while a # is typed, and picking one fills the field", () => {
+  it("lists the matching tags under the field while a # is typed, and picking one chooses that tag", () => {
     const tags = ["release", "vhi-8.0"];
     const none = renderToString(<MainToolbar {...props({ tagChoices: tags, search: "zoom" })} />);
     expect(none).not.toContain('role="listbox"');
@@ -51,10 +51,10 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(html).toContain('role="listbox"');
     expect(html).toContain("#release");
     expect(html).not.toContain("#vhi-8.0");
-    const onSearch = vi.fn();
-    const tree = rendered(MainToolbar, props({ tagChoices: tags, search: "#", onSearch }));
+    const onPickTag = vi.fn();
+    const tree = rendered(MainToolbar, props({ tagChoices: tags, search: "#", onPickTag }));
     (find(tree, (p) => p.role === "option" && String(p.children).includes("vhi")).props.onMouseDown as (e: { preventDefault(): void }) => void)({ preventDefault: vi.fn() });
-    expect(onSearch).toHaveBeenCalledWith("#vhi-8.0");
+    expect(onPickTag).toHaveBeenCalledWith("vhi-8.0");
   });
 
   it("disables Back at the start, and shows the sidebar toggle while the sidebar is hidden", () => {
