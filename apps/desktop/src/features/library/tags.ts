@@ -24,3 +24,6 @@ export async function tagCalls(bridge: Bridge, ids: string[], add: string[], rem
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-result
   return r;
 }
+
+/** Changes whenever a held call's tags do, so the tag choices are read again after a write, an Undo or a Redo. */
+export const tagsKey = (rows: { tags: string[] }[]): string => rows.map((r) => r.tags.join("\u0000")).join("\u0001");

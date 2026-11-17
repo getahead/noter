@@ -20,7 +20,7 @@ import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
 import { AddTagPopover } from "./add-tag";
-import { tagCalls } from "./tags";
+import { tagCalls, tagsKey } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
 import { apply, heldFilter, holdFilter, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
@@ -62,7 +62,7 @@ export function CallsPage() {
   const [fstate, setFstate] = useState<FilterState>(heldFilter);
   const [tagging, setTagging] = useState<HTMLElement | null>(null);
   const [fresh, setFresh] = useState(0);
-  const lists = useLists(bridge, fresh);
+  const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
     const next = apply(fstate, a);

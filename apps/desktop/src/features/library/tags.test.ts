@@ -27,3 +27,12 @@ describe("tags", () => {
     expect(holdUndo).not.toHaveBeenCalled();
   });
 });
+
+import { tagsKey } from "./tags";
+describe("tagsKey", () => {
+  it("changes when any held call gains or loses a tag (an Undo included), not otherwise", () => {
+    const a = [{ tags: ["x"] }, { tags: [] }] as never;
+    expect(tagsKey(a)).toBe(tagsKey([{ tags: ["x"] }, { tags: [] }] as never));
+    expect(tagsKey(a)).not.toBe(tagsKey([{ tags: [] }, { tags: [] }] as never));
+  });
+});
