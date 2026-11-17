@@ -5,8 +5,8 @@ import * as shared from "./shared";
 
 export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
-  /** What the user owes a person: the page's list, and the row's count. */
-  const owed = (world: Core.FakeCore["world"], p: Bindings.PersonRow) => (p.is_you ? [] : world.items.filter((i) => i.owner?.is_you && i.status === "open" && i.call.id && i.owed === "by_you"));
+  /** What the user owes a person: their own open actions from calls the person was on (the page's list, the row's count). */
+  const owed = (world: Core.FakeCore["world"], p: Bindings.PersonRow) => (p.is_you ? [] : world.items.filter((i) => i.owner?.is_you && i.status === "open" && i.owed === "by_you" && world.calls.some((c) => c.id === i.call.id && c.participants.some((x) => x.id === p.id))));
   return {
   // ── People ───────────────────────────────────────────────────────────
   people_list: (a, { world }) => {

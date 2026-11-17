@@ -410,7 +410,7 @@ fn every_menu_item_runs_its_command_with_the_live_call() {
             TrayAction::OpenSettings,
             false,
             "window_navigate",
-            json!({ "target": { "type": "settings", "pane": "general" } }),
+            json!({ "target": { "type": "settings", "pane": "general", "call_id": null } }),
         ),
     ] {
         assert_eq!(

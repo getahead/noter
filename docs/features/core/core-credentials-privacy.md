@@ -96,7 +96,7 @@ Agent editing belongs to M4; binding existing agents is in scope now. Audit writ
 
 The decomposition assigns no new table here: account metadata uses existing settings, binding uses existing agents and changes, and audit reads the gate's existing table. CLI installation uses the M2 scheduler. These are integration seams, not new command ownership.
 
-Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no call id, so server-filtered call-specific audit/export in the story cannot be expressed. `account_use_existing` accepts only provider, while the Claude reuse story also requires personal-use confirmation; the browser-start command carries it, reuse does not. The existing-account route must not bypass that requirement. Q8 settles Claude plan detection, with the test request as fallback. Q4 settles whether storage moves ship. No new arguments, plan-detection mechanism or storage entitlement decision is defined here.
+`AuditListArgs` and `AuditExportArgs` accept dates and, since contract 2.11 (#911), a `call_id`; `audit_list` answers the range's `total`. Known contract limits: `account_use_existing` accepts only provider, while the Claude reuse story also requires personal-use confirmation; the browser-start command carries it, reuse does not. The existing-account route must not bypass that requirement. Q8 settles Claude plan detection, with the test request as fallback. Q4 settles whether storage moves ship. No new arguments, plan-detection mechanism or storage entitlement decision is defined here.
 
 ## 2. Actor Flows (CDSL)
 
@@ -200,7 +200,7 @@ Known contract limits: `AuditListArgs` and `AuditExportArgs` accept dates but no
 - Invalid date range or page cursor: `invalid_input`; cancelled save panel: `cancelled`; file failure: typed error without a success result.
 
 **Steps**:
-1. [x] - `p1` - API: `audit_list { from, to, page }` from Settings validates dates and cursor and reads append-only rows from the pool in stable time/id order - `inst-audit-read`
+1. [x] - `p1` - API: `audit_list { from, to, call_id, page }` from Settings validates dates and cursor, counts the range for `total` and reads append-only rows from the pool in stable time/id order - `inst-audit-read`
 2. [x] - `p1` - Assemble `AuditEntry` with kind, run linkage, optional call/runtime, destination, what, bytes and redaction flag; **RETURN** a cursor page - `inst-audit-return`
 3. [x] - `p1` - API: `audit_export { from, to, format }` from Settings uses the same date predicate; the core opens the native save panel - `inst-audit-export`
 4. [x] - `p1` - Stream matching metadata rows to Markdown or JSON in bounded batches; export no packet body, original redaction mapping, key or audio - `inst-audit-write`
