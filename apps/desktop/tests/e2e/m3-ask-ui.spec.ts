@@ -86,7 +86,9 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     await expect(toolbar(page)).toContainText("Answering…");
     await expect(button(composer(page), "Stop")).toBeVisible();
     await expect(button(composer(page), "Ask")).toHaveCount(0);
-    await expect(thread(page).locator(".ak-status", { hasText: " · " })).toBeVisible(); // started: the runtime and mode the core reported
+    // started: the runtime and mode the core reported. The fake streams for ~1.6 s; the real core's scripted runtime answers at once,
+    // so started, the answer and done reach the page in one buffered flush and the stored turn replaces the live one before any check
+    if (!REAL) await expect(thread(page).locator(".ak-status", { hasText: " · " })).toBeVisible();
 
     await expect(toolbar(page)).not.toContainText("Answering…");
     const answer = answers(page).last();
