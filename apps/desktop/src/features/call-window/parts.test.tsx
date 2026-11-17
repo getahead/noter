@@ -42,11 +42,10 @@ describe("PersonChip (cpt-noter-component-ui-person-chip)", () => {
   it("makes a renameable participant chip an accessible button", () => {
     const onRename = vi.fn();
     const tree = rendered(PersonChip, { speaker: speaker({ type: "unnamed", n: 3 }), onRename });
-    const chip = find(tree, (p) => p["aria-label"] === "Rename Speaker 3").props as {
-      onClick: (event: { currentTarget: HTMLElement }) => void;
-    };
+    // the chip is the shared primitive: the rename action and its VoiceOver name are its props
+    const chip = find(tree, (p) => p.label === "Rename Speaker 3").props as { onAction: (anchor: HTMLElement) => void };
     const anchor = {} as HTMLElement;
-    chip.onClick({ currentTarget: anchor });
+    chip.onAction(anchor);
     expect(onRename).toHaveBeenCalledWith(anchor);
   });
 });

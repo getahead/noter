@@ -21,6 +21,7 @@ export interface Entry {
   /** Role or source line under the name. */
   caption: string;
   aliases?: string[];
+  is_you?: boolean;
 }
 export interface Group {
   key: "call" | "recent";
@@ -86,6 +87,7 @@ const fromChip = (c: PersonChip, caption = ""): Entry => ({
   short_name: c.short_name,
   initials: c.initials,
   caption,
+  is_you: c.is_you,
 });
 
 /**
@@ -96,16 +98,18 @@ export function candidates(
   participants: readonly PersonChip[],
   speakers: readonly Pick<SpeakerView, "label" | "suggestion">[],
   people: readonly PersonRow[] | null,
+  /** A multi-select offers You like anyone else (a filter by person can be about the user). */
+  includeYou = false,
 ): Group[] {
   const seen = new Map<string, Entry>();
   const add = (c: PersonChip, caption: string) =>
-    void (!c.is_you && !seen.has(c.id) && seen.set(c.id, fromChip(c, caption)));
+    void ((includeYou || !c.is_you) && !seen.has(c.id) && seen.set(c.id, fromChip(c, caption)));
   participants.forEach((c) => add(c, ""));
   speakers.forEach((s) => s.label.type === "person" && add(s.label.person, ""));
   speakers.forEach((s) => s.suggestion && add(s.suggestion, ""));
   const call = [...seen.values()];
   const recent = (people ?? [])
-    .filter((p) => !p.is_you && !seen.has(p.id))
+    .filter((p) => (includeYou || !p.is_you) && !seen.has(p.id))
     .map((p) => ({
       ...fromChip(p),
       caption: p.role ?? "",
@@ -130,3 +134,9 @@ export const created = ({ name, email }: NewPerson): PersonRef => ({
 
 /** The command key of a speaker's rename (bridge.act). */
 export const renameKey = (speakerId: string) => `speaker:rename:${speakerId}`;
+
+/** The option ↑/↓ moves to: `current` (-1: none) plus `step`, kept within 0..`last` (`last` -1: nothing to highlight). */
+export function stepActive(current: number, step: 1 | -1, last: number): number {
+  if (last < 0) return -1;
+  return Math.min(last, Math.max(0, (current < 0 ? (step > 0 ? -1 : last + 1) : current) + step));
+}

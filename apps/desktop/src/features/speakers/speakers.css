@@ -259,3 +259,6 @@
   justify-content: space-between;
   padding: 4px 0;
 }
+.cw-pp__chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+.cw-pp__chip { display: inline-flex; align-items: center; gap: 2px; }
+.cw-pp__x { border: 0; background: transparent; padding: 2px; color: var(--label-2); cursor: pointer; border-radius: 50%; }
