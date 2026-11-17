@@ -34,7 +34,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
 
     test("answered thread", async ({ page }) => {
       await ask(page, px);
-      await page.getByRole("textbox", { name: "Question" }).fill("What did we decide about the backend?");
+      await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
       await page.keyboard.press("Enter");
       // done = the core stored the turn: the recent list gains its row beside the seeded thread, and Stop is gone
       await expect(page.locator(".ak-recent__item")).toHaveCount(2);

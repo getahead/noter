@@ -29,7 +29,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
   useEffect(() => bindNewKey(document), []);
   return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion, primary: true }]} trailing={
       <>
-        <ModeIndicator view={mode} variant="ask" runtime={privacy?.mode === "local_only" ? "Local model" : "Claude Code"} onOpenPrivacy={openPrivacy} />
+        <ModeIndicator view={mode} variant={base.narrow ? "glyph" : "ask"} runtime={privacy?.mode === "local_only" ? "Local model" : "Claude Code"} onOpenPrivacy={openPrivacy} />
         {scope}
       </>
     } />;

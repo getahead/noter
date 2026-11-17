@@ -22,6 +22,11 @@ describe("AskToolbar (cpt-noter-component-screen-ask)", () => {
     expect(h).toContain('data-component="cpt-noter-component-ui-mode-indicator"');
     expect(h).toContain('data-variant="ask"');
   });
+  it("shrinks the mode indicator to its glyph at Narrow so the title keeps its room", () => {
+    const h = renderToString(<AskToolbar route={{ section: "ask", key: "root" }} bridge={{ store: { getState: () => ({ streams: {}, whole: {} }), subscribe: () => () => {} } } as never} base={{ ...base, narrow: true }} inspectorOpen={false} onToggleInspector={() => {}} />);
+    expect(h).toContain('data-variant="glyph"');
+    expect(h).not.toContain('data-variant="ask"');
+  });
   it("offers New Question as the primary action, bound to ⌘N", () => {
     expect(html()).toContain("New Question");
     expect(isNewKey({ key: "n", metaKey: true, shiftKey: false })).toBe(true);
