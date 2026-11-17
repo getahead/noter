@@ -1,9 +1,6 @@
-// M3 — Library: search, filters and topics (docs/features/ui/library-search-topics.md; DESIGN.md stories
-// cpt-noter-seq-library-search-calls, -filter-calls, -follow-topic). Real-core flows written before the screens exist
-// (tests first); copy is DESIGN's. The world fixture is smaller than DESIGN's (2 calls, one person per call): counts are
-// read from the core's own rows, never DESIGN's 8 / 31. Not covered here (the real core has no way to put the index in
-// rebuild or return only weak hits, and the Call page Tags editor is not part of this feature): Error — Index rebuilding,
-// Error — Only weak matches, Empty — No tags yet steps 2-4, Delete Topic (a contract gap).
+// M3 — Library: filter and tag calls (docs/features/ui/library-search-topics.md; DESIGN.md story cpt-noter-seq-library-filter-calls).
+// Real-core flows; copy is DESIGN's. The world fixture is smaller than DESIGN's (2 calls, one person per call): counts are read from
+// the core's own rows, never DESIGN's 8 / 31. The search and topic stories are in m3-library-search-ui.spec.ts.
 import type { Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
@@ -15,20 +12,6 @@ import { expect, test } from "./support/fixtures";
 const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 
-/** Topics the way DESIGN's thread has them: the decision and the open question under Websocket notifications, a replay item under the kept topic. */
-function topicWorld(w: World): void {
-  W.idle(w);
-  const topic = (id: string) => {
-    const t = w.topics.find((x) => x.id === id)!;
-    return { id: t.id, name: t.name };
-  };
-  for (const [item, id] of [["itm_notif", "top_ws"], ["itm_reconnect_q", "top_ws"], ["itm_replay", "top_notif"]] as const) {
-    w.items.find((i) => i.id === item)!.topic = topic(id);
-  }
-  // The core owns topics and their merge suggestions: harness.world_set refuses a changed `topics` slice. The Merge-suggested
-  // and No-topics tests wait for the fixture seed (techlead ask #7, Row 7) and fail on that state until it lands.
-}
-
 async function openMain(page: Page, key: string, heading: string, world: (w: World) => void = W.idle) {
   const steer = await openWindow(page, "main", { world });
   await expect(async () => {
@@ -38,13 +21,6 @@ async function openMain(page: Page, key: string, heading: string, world: (w: Wor
   return steer;
 }
 const openCalls = (page: Page, world?: (w: World) => void) => openMain(page, "Meta+Digit3", "Calls", world);
-const openTopics = (page: Page, world: (w: World) => void = topicWorld) => openMain(page, "Meta+Digit5", "Topics", world);
-const searchField = (page: Page) => page.getByRole("searchbox", { name: /Search/ });
-async function search(page: Page, words: string) {
-  await searchField(page).click();
-  await searchField(page).fill(words);
-  await page.keyboard.press("Enter");
-}
 
 test.describe("cpt-noter-seq-library-filter-calls", () => {
   test("UI — happy path: People Anna K. plus Has Open Items reads calls_list with that filter and counts the matches; two selected rows count as selected", async ({ page }) => {
