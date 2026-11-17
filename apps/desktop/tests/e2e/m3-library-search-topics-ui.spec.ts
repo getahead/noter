@@ -117,7 +117,7 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await page.setViewportSize({ width: 1400, height: 800 });
     await openCalls(page);
     await button(page, /^People/).click();
-    await page.getByRole("menuitemcheckbox", { name: "Anna K." }).click();
+    await page.getByRole("option", { name: /Anna K\./ }).click(); // the People filter is the multi-select person picker
     await button(page, "Has Open Items").click();
     await expect.poll(async () => (await sent(page, "calls_list")).at(-1)).toMatchObject({ filter: { people: ["per_anna"], has_open_items: true } });
     await expect(page.getByText(/\d+ calls? match/)).toBeVisible();
@@ -132,7 +132,7 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
   test("UI — empty path: filters that match nothing show No calls match these filters, Clear Filters brings every call back", async ({ page }) => {
     await openCalls(page);
     await button(page, /^People/).click();
-    await page.getByRole("menuitemcheckbox", { name: "Lena K." }).click(); // Lena is on no call
+    await page.getByRole("option", { name: /Lena K\./ }).click(); // Lena is on no call
     await expect(page.getByText("No calls match these filters")).toBeVisible();
     await button(page, "Clear Filters").click();
     await expect(page.locator(ROW)).toHaveCount(2);
