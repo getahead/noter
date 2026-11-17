@@ -35,16 +35,22 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   useEffect(() => {
     void bridge.act("topics_list", "topics_list", () => bridge.core.topicsList({}), { screen: "library-topics" }).then((r) => r.status === "ok" && setAll(r.data.topics));
   }, [bridge, data?.topic.rev]);
-  useEffect(() => {
-    sheets.register("topic-rename", RenameSheet as never);
-    sheets.register("topic-merge", MergeSheet as never);
-  }, [sheets]);
+  useRegisterTopicSheets(sheets);
   const actions = data && threadActions(sheets, bridge, data.topic, all, retry, setKeepFailed);
   const latest = useRef(actions);
   latest.current = actions;
   const menu = useMemo<MenuEntry[]>(() => [{ label: t("topics.rename"), onAction: () => latest.current?.rename() }, { label: t("topics.merge_with"), onAction: () => latest.current?.merge() }], []);
   usePublishThreadMenu(data ? menu : null);
   return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} keepFailed={keepFailed} />;
+}
+
+/** The Rename and Merge sheets, on the host before a page opens them. */
+export function useRegisterTopicSheets(sheets: Sheets | null) {
+  useEffect(() => {
+    if (!sheets) return;
+    sheets.register("topic-rename", RenameSheet as never);
+    sheets.register("topic-merge", MergeSheet as never);
+  }, [sheets]);
 }
 
 /** What the thread's buttons do: the sheets over the page, and Keep Separate at once. */

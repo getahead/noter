@@ -8,7 +8,7 @@ import { MergeSheet } from "./MergeSheet";
 import { RenameSheet } from "./RenameSheet";
 import { ThreadView, threadActions } from "./ThreadPage";
 import { createSheets } from "../../ui/dialogs/sheets";
-import { keepSeparate, mergeTopic, renameTopic } from "./topics-actions";
+import { confirmMerge, keepSeparate, mergeTopic, renameTopic } from "./topics-actions";
 import { clashOf, movesOf } from "./topics-model";
 
 let bridge: Bridge;
@@ -142,6 +142,16 @@ describe("sheet flows and thread actions", () => {
     expect(still.close).not.toHaveBeenCalled(); // a conflict that persists keeps the draft and re-reads the page
     expect(still.onRenamed).toHaveBeenCalled();
     expect((await run({ ...a!, name: " " })).close).not.toHaveBeenCalled();
+  });
+  it("confirmMerge waits for the read, refuses the same topic, then merges and counts what moved", async () => {
+    const [a, b] = await ready();
+    const groups = [{ call: {} as never, items: [{}, {}] as never }];
+    expect(await confirmMerge(bridge, a!.id, b!.id, undefined, () => {})).toBeUndefined();
+    expect(await confirmMerge(bridge, a!.id, b!.id, null, () => {})).toBeUndefined();
+    expect(await confirmMerge(bridge, a!.id, a!.id, groups, () => {})).toBeUndefined();
+    expect(await confirmMerge(bridge, a!.id, "", groups, () => {})).toBeUndefined();
+    expect(await confirmMerge(bridge, a!.id, b!.id, groups, () => {})).toMatchObject({ id: b!.id });
+    expect(await confirmMerge(bridge, "top_missing", b!.id, groups, () => {})).toBeNull();
   });
   it("Merge hands the Undo its refresh and reports the kept topic", async () => {
     const [a, b] = await ready();

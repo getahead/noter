@@ -30,6 +30,18 @@ const actions = [
 ];
 
 describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
+  it("↓ in the search field focuses the first Search result when there is one", () => {
+    const host = find(rendered(MainToolbar, props()), (p) => p.className === "np-toolbar__searchhost");
+    const focus = vi.fn();
+    const q = vi.fn(() => ({ focus }));
+    vi.stubGlobal("document", { querySelector: q });
+    const e = { key: "ArrowDown", preventDefault: vi.fn() };
+    (host.props.onKeyDownCapture as (e: unknown) => void)(e);
+    expect(q).toHaveBeenCalledWith(".lb-hit");
+    expect(focus).toHaveBeenCalled();
+    expect(e.preventDefault).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
   it("draws MW-R1: Back and Forward in one capsule, the title and subtitle, the search field", () => {
     const html = renderToString(<MainToolbar {...props()} />);
     expect(html).toContain('data-region="MW-R1"');

@@ -115,7 +115,7 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
     await menu(page, "Rename…");
     await page.getByRole("textbox", { name: "Topic name" }).fill("Drawer redesign, renamed");
     await page.getByRole("button", { name: "Rename", exact: true }).click();
-    await expect(page.getByText(/Renamed topic to/)).toBeVisible();
+    await expect(page.getByText(/Renamed “.+” to “.+”/)).toBeVisible();
     await shot(page, "topics-renamed-undo", "wide");
   });
   test("Merge sheet", async ({ page }) => {

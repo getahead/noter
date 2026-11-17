@@ -17,10 +17,13 @@ export function useRead<T>(load: () => Promise<Result<T>>, key: string): [Read<T
       setState(res.status === "ok" ? { status: "READY", data: res.data } : { status: "ERROR", error: res.error });
     });
   }, []);
+  // React's dev double-mount runs this effect twice for one key: the read goes out once (a newer key still supersedes it in `run`).
+  const started = useRef<string | null>(null);
   useEffect(() => {
+    if (started.current === key) return;
+    started.current = key;
     setState({ status: "LOADING" });
     run();
-    return () => void latest.current++;
   }, [key, run]);
   return [state, run];
 }

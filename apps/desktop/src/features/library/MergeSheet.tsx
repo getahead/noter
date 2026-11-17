@@ -8,7 +8,7 @@ import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { KIND_KEY } from "../items/kind";
-import { mergeTopic } from "./topics-actions";
+import { confirmMerge } from "./topics-actions";
 import { movesOf } from "./topics-model";
 
 type Props = SheetProps & {
@@ -37,10 +37,10 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
     return () => void (live = false);
   }, [bridge, source.id]);
   async function run() {
-    if (!keep || keep === source.id || !groups) return;
     setBusy(true);
-    const kept = await mergeTopic(bridge, source.id, keep, moves.rows.length, refresh ?? (() => {}));
+    const kept = await confirmMerge(bridge, source.id, keep, groups, refresh ?? (() => {}));
     setBusy(false);
+    if (kept === undefined) return;
     if (!kept) return setFailed(true);
     onMerged(kept);
     close();

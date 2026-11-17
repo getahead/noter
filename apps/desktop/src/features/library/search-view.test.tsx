@@ -68,6 +68,20 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     (find(rendered(SearchView, p), (x) => typeof x.onOpen === "function").props.onOpen as () => void)();
     expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
   });
+  it("↓ on the results title enters the first hit", () => {
+    const focus = vi.fn();
+    const title = {};
+    const root = { querySelector: (q: string) => (q === "h2" ? title : { focus }) };
+    const tree = rendered(SearchView, props(results({ items: [hit("strong")] })));
+    const region = find(tree, (p) => p.className === "lb-search");
+    const press = (key: string, target: unknown) => (region.props.onKeyDown as (e: unknown) => void)({ key, target, currentTarget: root, preventDefault: vi.fn() });
+    press("ArrowDown", {});
+    expect(focus).not.toHaveBeenCalled();
+    press("ArrowUp", title);
+    expect(focus).not.toHaveBeenCalled();
+    press("ArrowDown", title);
+    expect(focus).toHaveBeenCalled();
+  });
   it("shows the keyword-only line while the index rebuilds", () => {
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");
