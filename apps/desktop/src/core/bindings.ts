@@ -296,7 +296,10 @@ export type AskAnswer = {
 	sensitive_sources_skipped: number,
 	keyword_only: boolean,
 	only_weak_evidence: boolean,
-	/**  The user stopped this turn (`ask_stop`): `answer_md` is what had arrived, `found` is `false`. */
+	/**
+	 *  The user stopped this turn (`ask_stop`): `answer_md` and `citations` are what had arrived
+	 *  (empty when the stop came before the first of them), and `found` is `false`.
+	 */
 	stopped: boolean,
 	asked_at: TimestampMs,
 };

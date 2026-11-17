@@ -4,6 +4,7 @@
 //! storage and the citation check are `noter-retrieval`'s.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -88,11 +89,13 @@ struct Active {
     cancel: Cancel,
     /// The answer text streamed so far, kept when the turn is stopped.
     partial: String,
+    /// The citations streamed so far, kept with it.
+    citations: Vec<Citation>,
 }
 
 /// The running turns, by turn id.
 #[derive(Default)]
-pub(crate) struct Turns(Mutex<HashMap<String, Active>>);
+pub(crate) struct Turns(Mutex<HashMap<String, Active>>, AtomicU64);
 
 /// Why a worker ended without an answer.
 enum Ended {
@@ -188,6 +191,7 @@ impl Core {
             state: TurnState::Accepted,
             cancel: cancel.clone(),
             partial: String::new(),
+            citations: Vec::new(),
         };
         lock(&self.ask.0).insert(turn.as_str().to_owned(), active);
         let hub = self.ask_hub();
@@ -335,16 +339,19 @@ impl Core {
         // @cpt-end:cpt-noter-algo-core-retrieval-ask-citations:p1:inst-cite-flags
         // @cpt-end:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-validate-answer
         // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-finish
-        let Some(()) = self.claim(&job.turn, TurnState::Done) else {
-            return Err(Ended::Cancelled);
-        };
+        // Until everything is delivered Stop wins and keeps what arrived; then the answer does.
         for line in answer.answer_md.split_inclusive('\n') {
             self.emit(&job.turn, AskEvent::Delta { text: line.into() })?;
+            self.ask_pace().await;
         }
         for citation in &answer.citations {
             let citation = citation.clone();
             self.emit(&job.turn, AskEvent::Citation { citation })?;
+            self.ask_pace().await;
         }
+        let Some(()) = self.claim(&job.turn, TurnState::Done) else {
+            return Err(Ended::Cancelled);
+        };
         let meta = run
             .as_ref()
             .map_or_else(ask_meta, |p| model_meta(&p.llm_run_id, p.runtime, &p.model));
@@ -466,6 +473,19 @@ impl Core {
         ))
     }
 
+    /// The pause after each streamed message: none, unless a test set one (`testing::ask_pace`).
+    async fn ask_pace(&self) {
+        let ms = self.ask.1.load(Ordering::Relaxed);
+        if ms > 0 {
+            tokio::time::sleep(Duration::from_millis(ms)).await;
+        }
+    }
+
+    /// `testing::ask_pace`.
+    pub(crate) fn set_ask_pace(&self, ms: u64) {
+        self.ask.1.store(ms, Ordering::Relaxed);
+    }
+
     /// Moves a running turn on; `Cancelled` when it ended meanwhile.
     fn enter(&self, turn: &AskTurnId, next: TurnState) -> Result<(), Ended> {
         let mut turns = lock(&self.ask.0);
@@ -484,8 +504,10 @@ impl Core {
     fn emit(&self, turn: &AskTurnId, event: AskEvent) -> Result<(), Ended> {
         let mut turns = lock(&self.ask.0);
         let active = turns.get_mut(turn.as_str()).ok_or(Ended::Cancelled)?;
-        if let AskEvent::Delta { text } = &event {
-            active.partial.push_str(text);
+        match &event {
+            AskEvent::Delta { text } => active.partial.push_str(text),
+            AskEvent::Citation { citation } => active.citations.push(citation.clone()),
+            _ => {}
         }
         let msg = AskMsg { seq: Seq(0), event };
         self.ask_hub().publish(turn.as_str(), msg);
@@ -598,7 +620,7 @@ impl Core {
             turn_id: args.turn_id,
             question: String::new(),
             answer_md: active.partial,
-            citations: vec![],
+            citations: active.citations,
             found: false,
             runtime: route.runtime,
             answered_locally: route.local,

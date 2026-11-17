@@ -1261,6 +1261,15 @@ impl Controls for Harness {
                     noter_core::testing::hold_rebuild(&self.core, on);
                     Ok(json!({}))
                 }
+                // `{ ms }`: an Ask answer pauses `ms` after each delta and citation (0 = none), so
+                // a story can stop it while it arrives.
+                "ask_pace" => {
+                    let ms = args["ms"].as_u64().ok_or_else(|| {
+                        CoreError::new(ErrorCode::InvalidInput, "harness.ask_pace needs { ms }")
+                    })?;
+                    noter_core::testing::ask_pace(&self.core, ms);
+                    Ok(json!({}))
+                }
                 // `{ tool, installed?, path?, version?, supported?, identity?, login_identity?,
                 // install?: { fail?, delay_ms?, version? }, login?: { url?, code?, outcome?,
                 // delay_ms?, hold? } }`: replaces what the scripted CLI of `tool` (`claude_code`,
