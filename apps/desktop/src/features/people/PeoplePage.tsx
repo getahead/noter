@@ -2,17 +2,19 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type Keyboa
 
 import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
-import type { PersonRow, UiPrefs } from "../../core/bindings";
+import type { PersonRow, UiPrefs, UnnamedSpeaker } from "../../core/bindings";
 import { shortDay, t } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
+import { PushButton } from "../../ui/primitives/push-button";
 import { Table } from "../../ui/primitives/table";
 import { NONE, press, retain, type Selection } from "../library/selection";
 import { holdPeople } from "./count";
 import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
+import { NameSpeakerPopover } from "./NameSpeakerPopover";
 import { confirmDelete, usePeopleSheets } from "./sheets";
 import { createPeopleList, setPeopleQuery, usePeopleQuery, type PeopleState } from "./model";
 import "./people.css";
@@ -42,6 +44,7 @@ export function PeoplePage() {
   const [slow, setSlow] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  const [naming, setNaming] = useState<{ u: UnnamedSpeaker; anchor: HTMLElement | null } | null>(null);
   const sheets = usePeopleSheets();
   const seen = useRef(known);
   useEffect(() => void list.load(), [list]);
@@ -75,7 +78,8 @@ export function PeoplePage() {
   return (
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
-      <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} />
+      <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.map((id) => rows.find((p) => p.id === id)!).filter(Boolean), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
@@ -112,10 +116,12 @@ export interface PeopleBodyProps {
   onSelect: (id: string, mods: { meta?: boolean; shift?: boolean }) => void;
   onRetry: () => void;
   onContext?: (id: string, e: MouseEvent) => void;
+  /** Name… on an unnamed row, with the button the popover opens under. */
+  onName?: (u: UnnamedSpeaker, anchor: HTMLElement | null) => void;
 }
 
 /** What the page draws for a state of the list: the table, its empty states, the skeleton or the error. */
-export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpen: open, onSelect, onRetry, onContext }: PeopleBodyProps) {
+export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpen: open, onSelect, onRetry, onContext, onName }: PeopleBodyProps) {
   const onRow = (id: string) => (e: MouseEvent) => onSelect(id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey });
   const onKey = (id: string) => (e: KeyboardEvent) => {
     if (e.key === "Enter") (e.preventDefault(), open(id));
@@ -193,7 +199,9 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
             {shown.unnamed.map((u) => (
               <div key={`${u.call.id}:${u.speaker_id}`} className="pe-urow">
                 <strong>{t("people.unnamed_label", { n: u.n })}</strong>
-                <span className="np-muted">{t("people.unnamed_meta", { call: u.call.title })}</span>
+                <span className="np-muted">{t("people.unnamed_meta", { call: u.call.title, lines: t("people.unnamed_lines", { count: u.segment_count }) })}</span>
+                <span className="np-tb__spacer" />
+                <PushButton label={t("people.name")} size="small" onAction={() => onName?.(u, (globalThis.document?.activeElement as HTMLElement | null) ?? null)} />
               </div>
             ))}
           </div>
