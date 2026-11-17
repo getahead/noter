@@ -183,18 +183,18 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 
 ### Render plain-word audit rows
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-privacy-sources-audit-rows`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-privacy-sources-audit-rows`
 
 **Input**: paged AuditEntry records, date bounds, optional call id and interface locale
 
 **Output**: Time, What, Size, Destination rows and truthful counts
 
 **Steps**:
-1. [ ] - `p1` - Keep each audit id once across pages; retain order from the core and apply selected-call filtering to every page - `inst-page`
-2. [ ] - `p1` - Map `what` to plain text such as transcript, summary text, document excerpts or live lookup; include known call title, localized time, bytes and destination - `inst-words`
-3. [ ] - `p1` - Preserve run versus tool-result versus lookup identity; do not count three tool results as one outbound request or sum only visible rows as the total range - `inst-counts`
-4. [ ] - `p1` - Show redaction state from the record; the current mode never rewrites historical rows - `inst-redaction`
-5. [ ] - `p1` - **RETURN** rows with no request payload, audio, secret or invented provider; incomplete reads cannot assert nothing left the Mac - `inst-return`
+1. [x] - `p1` - Keep each audit id once across pages; retain order from the core and apply selected-call filtering to every page - `inst-page`
+2. [x] - `p1` - Map `what` to plain text such as transcript, summary text, document excerpts or live lookup; include known call title, localized time, bytes and destination - `inst-words`
+3. [x] - `p1` - Preserve run versus tool-result versus lookup identity; do not count three tool results as one outbound request or sum only visible rows as the total range - `inst-counts`
+4. [x] - `p1` - Show redaction state from the record; the current mode never rewrites historical rows - `inst-redaction`
+5. [x] - `p1` - **RETURN** rows with no request payload, audio, secret or invented provider; incomplete reads cannot assert nothing left the Mac - `inst-return`
 
 ### Derive source status rows
 

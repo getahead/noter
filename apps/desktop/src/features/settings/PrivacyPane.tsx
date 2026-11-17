@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useWindow } from "../../app/use-window";
 import type { PrivacyMode } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { EmptyState } from "../../ui/feedback/empty-state";
 import { Badge } from "../../ui/primitives/badge";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
@@ -15,6 +14,7 @@ import { saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { rowState } from "./permissions";
+import { AuditLog } from "./AuditLog";
 import { ShareTestSheet } from "./ShareTestSheet";
 import { choices, type PaneProps } from "./pane-props";
 
@@ -67,7 +67,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
       <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
 <PushButton label={t("settings.privacy.share_test")} onAction={() => setSheet(true)} />
 {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
-        <EmptyState variant="section" title={t("settings.privacy.left_mac_later")} />
+        <AuditLog bridge={bridge} />
       </Group>
       {sheet && <ShareTestSheet bridge={bridge} onClose={() => setSheet(false)} />}
     </>
