@@ -344,6 +344,14 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-check-privacy on the real core (
     const at = all.rows.map((r) => r.at);
     expect((await auditList({ from: Math.min(...at), to: Math.max(...at) })).rows).toEqual(all.rows);
     expect((await auditList({ from: Math.max(...at) + 1 })).rows).toEqual([]);
+    // The total counts the whole range whatever the page, and one call's rows are its own.
+    expect(first.total).toBe(all.rows.length);
+    const forCall = (await control("llm_run", { skill: "post-call", call_id: "call_backend", items: [{ id: "seg_1", text: PAYLOAD }] })) as { llm_run_id: string };
+    const ofCall = ok(await s.core("settings").auditList({ call_id: "call_backend", page: {} }));
+    expect(ofCall.rows.map((r) => r.llm_run_id)).toEqual([forCall.llm_run_id]);
+    expect(ofCall.rows[0].call?.id).toBe("call_backend");
+    expect(ofCall.total).toBe(1);
+    expect(ok(await s.core("settings").auditList({ call_id: "call_live", page: {} }))).toMatchObject({ rows: [], total: 0 });
   });
 
   it("export (Markdown and JSON) holds the metadata and no payload, key or audio; a cancelled panel writes nothing; moving storage does not ship", async () => {

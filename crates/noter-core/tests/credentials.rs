@@ -258,8 +258,76 @@ async fn run_at(w: &World, ts: i64) {
         .unwrap();
 }
 
+async fn run_for(w: &World, ts: i64, call: &str) {
+    w.clock.0.store(ts, Ordering::SeqCst);
+    let items = vec![("seg_1".to_owned(), SECRET_TEXT.to_owned())];
+    let call = Some(CallId::new(call));
+    noter_core::testing::llm_run_for(&w.core, Skill::PostCall.id(), items, call)
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn the_audit_counts_its_range_and_filters_by_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    run_at(&w, 1_000).await;
+    run_for(&w, 2_000, "call_a").await;
+    run_for(&w, 3_000, "call_a").await;
+    run_for(&w, 4_000, "call_b").await;
+    // The total is the whole range, whatever the page.
+    let page = (w
+        .core
+        .audit_list(&settings(), list(None, None, None, 1))
+        .await)
+        .unwrap();
+    assert_eq!((page.rows.len(), page.total), (1, Some(4)));
+    let ranged = (w
+        .core
+        .audit_list(&settings(), list(Some(2_000), Some(3_000), None, 10))
+        .await)
+        .unwrap();
+    assert_eq!(ranged.total, Some(2));
+    // One call: its rows only, counted, paged with the same cursor.
+    let of = |call: &str, limit| AuditListArgs {
+        call_id: Some(CallId::new(call)),
+        ..list(None, None, None, limit)
+    };
+    let a = w
+        .core
+        .audit_list(&settings(), of("call_a", 1))
+        .await
+        .unwrap();
+    assert_eq!((a.rows[0].at.0, a.total), (2_000, Some(2)));
+    let mut next = of("call_a", 1);
+    next.page.cursor = a.next_cursor.clone();
+    let rest = w.core.audit_list(&settings(), next).await.unwrap();
+    assert_eq!((rest.rows[0].at.0, rest.next_cursor), (3_000, None));
+    let none = w
+        .core
+        .audit_list(&settings(), of("call_none", 10))
+        .await
+        .unwrap();
+    assert_eq!((none.rows.len(), none.total), (0, Some(0)));
+    // The export of one call holds that call's rows only.
+    let file = dir.path().join("one-call.json");
+    *w.panel.0.lock().unwrap() = Some(file.clone());
+    let args = AuditExportArgs {
+        from: None,
+        to: None,
+        call_id: Some(CallId::new("call_b")),
+        format: LogFormat::Json,
+    };
+    w.core.audit_export(&settings(), args).await.unwrap();
+    let rows: Vec<serde_json::Value> =
+        serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0]["at"], 4_000);
+}
+
 fn list(from: Option<i64>, to: Option<i64>, cursor: Option<&str>, limit: u32) -> AuditListArgs {
     AuditListArgs {
+        call_id: None,
         from: from.map(TimestampMs),
         to: to.map(TimestampMs),
         page: PageRequest {
@@ -366,6 +434,7 @@ fn export(format: LogFormat) -> AuditExportArgs {
     AuditExportArgs {
         from: None,
         to: None,
+        call_id: None,
         format,
     }
 }
@@ -437,6 +506,7 @@ async fn a_cancelled_save_panel_writes_nothing_and_a_bad_range_is_refused() {
             AuditExportArgs {
                 from: Some(TimestampMs(9)),
                 to: Some(TimestampMs(1)),
+                call_id: None,
                 format: LogFormat::Json,
             },
         )

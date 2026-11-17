@@ -144,6 +144,9 @@ pub enum NavTarget {
     },
     Settings {
         pane: SettingsPane,
+        /// Privacy opened from a call's **What left this Mac** link: the audit starts on this call.
+        #[serde(default)]
+        call_id: Option<CallId>,
     },
     FirstRun {
         #[serde(default)]

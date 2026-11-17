@@ -101,7 +101,7 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     return world.glossary;
   },
   audit_list: (a, { world }) => {
-    const rows = world.audit.filter((r) => (a.from == null || r.at >= a.from) && (a.to == null || r.at <= a.to));
+    const rows = world.audit.filter((r) => (a.from == null || r.at >= a.from) && (a.to == null || r.at <= a.to) && (a.call_id == null || r.call?.id === a.call_id));
     return shared.pageRows(a.page, rows);
   },
   audit_export: (a) => ({ path: `~/Downloads/Noter privacy log.${a.format === "json" ? "json" : "md"}`, files: 1 }),

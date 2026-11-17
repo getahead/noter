@@ -430,6 +430,8 @@ export type AuditEntry = {
 export type AuditExportArgs = {
 	from?: TimestampMs | null,
 	to?: TimestampMs | null,
+	/**  Only this call's rows, as `audit_list` filters them. */
+	call_id?: CallId | null,
 	format: LogFormat,
 };
 
@@ -451,6 +453,8 @@ export type AuditKind =
 export type AuditListArgs = {
 	from?: TimestampMs | null,
 	to?: TimestampMs | null,
+	/**  Only what left this Mac for this call (the Call info link); `null` = every row. */
+	call_id?: CallId | null,
 	page: PageRequest,
 };
 
@@ -2235,7 +2239,9 @@ export type NavTarget = { type: "today" } |
  *  The Summary of the latest call whose outputs are ready (the menu bar's Open Last Summary);
  *  the core answers with the call's `call_page` target.
  */
-{ type: "last_summary" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane } | { type: "first_run"; step?: SetupStep | null } | 
+{ type: "last_summary" } | { type: "call_page"; call_id: CallId; tab: CallPageTab; span?: TimeSpan | null } | { type: "item"; item_id: ItemId } | { type: "person"; person_id: PersonId } | { type: "topic"; topic_id: TopicId } | { type: "ask"; thread_id?: AskThreadId | null } | { type: "activity" } | { type: "agents"; agent_id?: AgentId | null } | { type: "performance"; call_id?: CallId | null } | { type: "settings"; pane: SettingsPane; 
+/**  Privacy opened from a call's **What left this Mac** link: the audit starts on this call. */
+call_id?: CallId | null } | { type: "first_run"; step?: SetupStep | null } | 
 /**  The **Delete Old Audio…** sheet over the main window's current page (D-17). */
 { type: "delete_old_audio" };
 
@@ -3632,7 +3638,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.10";
+export const CONTRACT_VERSION = "2.11";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
