@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
+import { focusFirstAvailable, focusIfLost, startedFrom } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { HandoffTarget, RepoMapping } from "../../core/bindings";
@@ -24,6 +24,10 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
   const [error, setError] = useState<string | null>(null);
   const active = useRef(false);
   const focusAfterRemove = useRef<number | null>(null);
+  const stayOnRemove = useRef(false);
+  useEffect(() => {
+    if (!busy && stayOnRemove.current) { stayOnRemove.current = false; focusFirstAvailable(document, ["repo-remove"]); }
+  }, [busy]);
   useEffect(() => {
     const index = focusAfterRemove.current;
     if (index === null || !list || busy) return;
@@ -31,6 +35,13 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
     const next = Math.min(index, list.mappings.length - 1);
     focusFirstAvailable(document, [...(next >= 0 ? [`r${next}`] : []), "repo-add"]);
   }, [busy, list]);
+  // the first mapping replaces the empty state, and its Add Mapping… with it: the new one takes the focus the sheet gave back
+  const count = list?.mappings.length ?? 0;
+  const had = useRef(count);
+  useEffect(() => {
+    if (had.current === 0 && count > 0) focusIfLost(document, ["repo-add"]);
+    had.current = count;
+  }, [count]);
   const mapping = list?.mappings.find((repo) => repo.id === selected);
   const edit = (repo?: RepoMapping) => sheets.open("add-mapping", { bridge, mapping: repo });
   const changeTool = async (repo: RepoMapping, target: HandoffTarget) => {
@@ -52,7 +63,7 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
     setError(null);
     try {
       const confirmed = await ask({ title: t("mapping.remove_title", { key: mapping.key }), message: t("mapping.remove_note"), cancel: t("dialogs.cancel"), confirm: t("mapping.remove"), destructive: true });
-      if (!confirmed) return;
+      if (!confirmed) { stayOnRemove.current = restore; return; } // Remove is disabled until busy ends: the effect below focuses it
       const result = await removeRepo(bridge, mapping.id);
       if (result.status === "error") { setError(mappingError(result.error.code)?.message ?? null); focusAfterRemove.current = null; }
       else { if (restore && index >= 0) focusAfterRemove.current = index; select(null); }

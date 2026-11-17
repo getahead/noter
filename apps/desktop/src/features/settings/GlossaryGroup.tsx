@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
+import { focusFirstAvailable, focusIfLost, startedFrom } from "../../app/a11y/focus";
 import type { GlossaryTerm } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -36,6 +36,13 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
     focusFirstAvailable(document, [...(next >= 0 ? ["g" + next] : []), "glossary-add"]);
   }, [terms]);
 
+  // the form closed (Add, Save, Cancel, Esc): focus goes back to the button that opened it
+  const formOpen = useRef(false);
+  const openedFor = useRef("glossary-add");
+  useEffect(() => {
+    if (form) { formOpen.current = true; openedFor.current = editing ? "glossary-edit" : "glossary-add"; }
+    else if (formOpen.current) { formOpen.current = false; focusIfLost(document, [openedFor.current, "glossary-add"]); }
+  }, [form, editing]);
   const { add, remove } = createGlossaryActions(bridge, { form, selected, editing, setTerms, setForm, setSelected, setEditing });
   const edit = () => { const term = terms.find((item) => item.id === selected); if (!term) return; setEditing(term); setForm({ term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") }); };
   const removeSelected = async () => {
@@ -50,7 +57,7 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
       foot={
         <>
           <IconButton id="glossary-add" icon="plus" label={t("settings.glossary.add")} size="inline" onAction={() => setForm(EMPTY_FORM)} />
-          <PushButton label={t("settings.glossary.edit")} size="small" disabled={!selected} onAction={edit} />
+          <PushButton id="glossary-edit" label={t("settings.glossary.edit")} size="small" disabled={!selected} onAction={edit} />
           <IconButton id="glossary-remove" icon="minus" label={t("settings.glossary.remove")} size="inline" disabled={!selected} onAction={() => void removeSelected()} />
           <span className="np-dim">{t("settings.glossary.note")}</span>
         </>
@@ -81,7 +88,7 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
 export function GlossaryForm({ form, editing, mutationFailed, onChange, onSave, onCancel }: { form: TermForm; editing: GlossaryTerm | null; mutationFailed: boolean; onChange: (key: keyof TermForm, value: string) => void; onSave: () => void; onCancel: () => void }) {
   const field = (key: keyof TermForm, label: string) => <TextField ariaLabel={label} placeholder={label} value={form[key]} onChange={(value) => onChange(key, value)} onEnter={onSave} />;
   return (
-    <div className="st-inline st-glossary-form" role="group" aria-label={t(editing ? "settings.glossary.edit" : "settings.glossary.add")}>
+    <div className="st-inline st-glossary-form" role="group" aria-label={t(editing ? "settings.glossary.edit" : "settings.glossary.add")} onKeyDown={(e) => { if (e.key === "Escape" && !e.nativeEvent.isComposing) { e.stopPropagation(); onCancel(); } }}>
       {field("term", t("settings.glossary.term"))}
       {field("latin", t("settings.glossary.latin"))}
       {field("cyrillic", t("settings.glossary.cyrillic"))}

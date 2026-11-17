@@ -2,7 +2,7 @@
 // account as its frame (the sign-in arrives in M3). The key itself is never shown or held.
 import { useEffect, useRef, useState } from "react";
 
-import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
+import { focusFirstAvailable, focusIfLost, startedFrom } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { AccountProvider, AccountView, KeyView } from "../../core/bindings";
@@ -50,6 +50,7 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
   const state = keyRowState(view);
   const removeId = view.provider === "anthropic" ? "credential-remove-anthropic" : "credential-remove-codex";
   const addId = view.provider === "anthropic" ? "credential-add-anthropic" : "credential-add-codex";
+  const replaceId = view.provider === "anthropic" ? "credential-replace-anthropic" : "credential-replace-codex";
   const returnFocus = useRef(false);
   const previousState = useRef(state);
   useEffect(() => {
@@ -74,10 +75,10 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
       <div className="st-cred__actions">
         {saved && <InlineStatus text={t("settings.keys.saved")} onExpire={onSavedExpire ?? (() => {})} />}
         {state === "not_set" ? (
-          <PushButton id={addId} label={t("settings.keys.add")} size="small" disabled={locked} onAction={onAdd} />
+          <PushButton id={addId} label={t("settings.keys.add")} size="small" disabled={locked} attrs={{ "data-focus-successor": replaceId }} onAction={onAdd} />
         ) : (
           <>
-            <PushButton label={t("settings.keys.replace")} size="small" disabled={busy} onAction={onReplace} />
+            <PushButton id={replaceId} label={t("settings.keys.replace")} size="small" disabled={busy} onAction={onReplace} />
             <PushButton id={removeId} label={t("settings.keys.remove")} size="small" disabled={busy} onAction={() => { returnFocus.current = startedFrom(document, removeId); onRemove(); }} />
           </>
         )}
@@ -134,6 +135,7 @@ const ACCOUNT_TAG: Record<AccountRowState, { tone: BadgeProps["tone"]; icon?: Ic
 export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: Bridge; view: AccountView; keyConfigured: boolean; onUseKey?: () => void }) {
   const a = ACCOUNT[view.provider];
   const state = accountRowState(view);
+  const testId = view.provider === "claude" ? "account-test-claude" : "account-test-chatgpt";
   const [testLine, setTestLine] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
   const signOutError = useWindow(bridge, (s) => s.commands[signOutKey(view.provider)]?.state) === "ERROR";
@@ -153,6 +155,7 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
     setTestLine(null);
     const res = await testAccount(bridge, view.provider);
     setTestLine(res.status === "ok" ? testResultText(res.data) : t("settings.accounts.test_failed"));
+    focusIfLost(document, [testId]); // a mouse click does not focus the button
   };
   // the row changes only with the core's answer; a refusal leaves it as it was and says so
   const confirmSignOut = async (also: boolean) => {
@@ -186,7 +189,7 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
       <div className="st-cred__actions">
         {state === "signed_in" ? (
           <>
-            <PushButton label={t("settings.accounts.test")} size="small" loading={testing} onAction={() => void runTest()} />
+            <PushButton id={testId} label={t("settings.accounts.test")} size="small" loading={testing} onAction={() => void runTest()} />
             <PushButton label={t("settings.accounts.sign_out")} size="small" onAction={() => setAsking(true)} />
           </>
         ) : state === "signing_in" ? (
