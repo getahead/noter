@@ -5,7 +5,8 @@ import type { PersonPage as Page, PersonRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { PeopleToolbar, personIdOf } from "./PeopleToolbar";
 import { DialogsProvider } from "../../ui/dialogs/host";
-import { Overview, PersonBody, type PersonBodyProps } from "./PersonPage";
+import { BridgeProvider } from "../../app/bridge/context";
+import { Overview, PersonBody, PersonPage, readPerson, type PersonBodyProps } from "./PersonPage";
 import { holdPerson, setPersonTab } from "./person-store";
 
 const person = (o: Partial<PersonRow> = {}): PersonRow => ({
@@ -70,5 +71,19 @@ describe("Person toolbar", () => {
     for (const s of ["Overview", "Calls", "History"]) expect(h).toContain(s);
     expect(h).not.toContain("pl-search");
     holdPerson(null);
+  });
+});
+
+describe("PersonPage", () => {
+  it("reads one person: OK with the page, ERROR with the core's error", async () => {
+    const ok = { status: "ok", data: page() };
+    expect(await readPerson({ act: async () => ok, core: { personGet: vi.fn() } } as never, "per_a")).toEqual({ status: "OK", page: page(), error: null });
+    const err = { status: "error", error: { code: "not_found" } };
+    expect(await readPerson({ act: async () => err, core: {} } as never, "per_a")).toEqual({ status: "ERROR", page: null, error: { code: "not_found" } });
+  });
+  it("starts LOADING under the bridge and dialogs providers", () => {
+    const b = { label: "main", store: { getState: () => ({ entities: { person: {} }, app: null, commands: {} }), subscribe: () => () => {} }, act: () => new Promise(() => {}), core: {} } as never;
+    const h = renderToString(<BridgeProvider value={b}><DialogsProvider><PersonPage id="per_a" /></DialogsProvider></BridgeProvider>);
+    expect(h).toContain('data-state="loading"');
   });
 });

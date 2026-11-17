@@ -23,6 +23,12 @@ export interface PersonState {
   error: CoreError | null;
 }
 
+/** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People. */
+export async function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
+  const res = await bridge.act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" });
+  return res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error };
+}
+
 const navigate = (bridge: Bridge, target: Parameters<Bridge["core"]["windowNavigate"]>[0]["target"]) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target }), { screen: "person" });
 
@@ -38,12 +44,8 @@ export function PersonPage({ id }: { id: string }) {
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
-    void bridge.act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" }).then((res) => {
-      if (!current) return;
-      if (res.status === "ok") return setState({ status: "OK", page: res.data, error: null });
-      // shortcut: a person who no longer exists shows the read error; returning to People after a delete comes with Delete Person (S2)
-      setState((s) => ({ status: "ERROR", page: s.page, error: res.error }));
-    });
+    // a failed re-read keeps the page that is on screen
+    void readPerson(bridge, id).then((next) => current && setState((s) => (next.status === "ERROR" ? { ...next, page: s.page } : next)));
     return () => void (current = false);
   }, [bridge, id, known?.rev, reads]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-get
