@@ -258,6 +258,9 @@ export async function recoverGap(bridge: Bridge, threadId: string, set: ThreadSe
   set.setAsking(null);
 }
 
+/** Whether a question was asked with a scope narrower than All calls · all sources (no scope means all). */
+export const isNarrowed = (scope: AskScope | undefined): boolean => !!scope && scope.preset !== NEW_SCOPE.preset;
+
 /** Widen Scope: choose All calls · all sources and ask the same question again with it. */
 export function widenScope(question: string, ask: (question: string, scope: AskScope) => void): void {
   setAskState({ scopeId: "all" });

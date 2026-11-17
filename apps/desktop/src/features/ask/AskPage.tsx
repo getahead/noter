@@ -13,7 +13,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute, NEW_SCOPE } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, isNarrowed, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute, NEW_SCOPE } from "./actions";
 import { setAskState, setPresets, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { runtimeLabel } from "../call-page/outputs-logic";
@@ -57,6 +57,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     return openThread(bridge, id, { setThread, setTurns, setAsking }, busy);
   };
 
+  const [askedScope, setAskedScope] = useState<AskScope | undefined>(undefined);
   const previousTurn = useRef<string | null>(null);
   const data = currentStream(stream?.data ?? null, previousTurn.current);
 
@@ -126,7 +127,9 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     setAnnounce("");
     setAsking(question);
     setDraft("");
-    startAsk(bridge, thread, question, scope ?? scopeOf(presets, scopeId));
+    const sent = scope ?? scopeOf(presets, scopeId);
+    setAskedScope(sent); // Widen Scope follows the scope this turn was asked with, not the pop-up's later choice
+    startAsk(bridge, thread, question, sent);
   };
   // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-submit
   const widen = (question: string) => widenScope(question, ask);
@@ -170,7 +173,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       announce={announce}
       suggestions={suggestionsOf(people, (name) => t("ask.suggest_person", { name }))}
       onSuggest={ask}
-      narrowed={scopeId !== "all"}
+      narrowed={isNarrowed(askedScope)}
       onWiden={widen}
       onStop={stop}
       // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-retry

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { askState, setAskState } from "./ask-state";
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, startFromTopicRoute, startRoute, topicOfRoute, scopeOf, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, releaseFailedRoute, recoverGap, widenScope, startFromRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, startFromTopicRoute, startRoute, topicOfRoute, scopeOf, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, releaseFailedRoute, recoverGap, widenScope, startFromRoute, isNarrowed } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -310,5 +310,10 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(startFromRoute("new:Flaky", ask)).toBe(false);
     releaseFailedRoute("new:Flaky", "error");
     expect(startFromRoute("new:Flaky", ask)).toBe(true);
+  });
+  it("tells a narrowed turn from its own scope, not from the pop-up", () => {
+    expect(isNarrowed(undefined)).toBe(false);
+    expect(isNarrowed(NEW_SCOPE)).toBe(false);
+    expect(isNarrowed({ preset: "topic:tp_1", topic_id: "tp_1" })).toBe(true);
   });
 });
