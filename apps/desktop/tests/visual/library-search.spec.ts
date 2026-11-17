@@ -133,7 +133,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     });
     test("no matches", async ({ page }) => {
       await search(page, px, { none: true }, "zzyzx");
-      await expect(page.getByText(/No matches for/)).toBeVisible();
+      await expect(page.locator('[data-component="cpt-noter-component-ui-empty-state"]')).toContainText(/No matches for/); // not the hidden live-region line, which repeats it
       await shot(page, "search-none", width);
     });
     test("keyword only while the index is rebuilt", async ({ page }) => {
