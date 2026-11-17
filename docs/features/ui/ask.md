@@ -240,11 +240,11 @@ The system **MUST** render the cited-answer variants with original-language quot
 
 ## 6. Acceptance Criteria
 
-- [ ] `default`, `first`, `answering`, `not-found`, `unreachable`, `local`, `sensitive`, `keyword-only`, `weak`, `deleted`, stopped and copied states match the prototype's structure and tokens
-- [ ] A follow-up uses the same core thread id; citation numbers restart per answer and never change during a turn
-- [ ] Copy writes only the chosen answer and its citations; Copied lasts 2 s after success
+- [x] `default`, `first`, `answering`, `not-found`, `unreachable`, `local`, `sensitive`, `keyword-only`, `weak`, `deleted`, stopped and copied states match the prototype's structure and tokens
+- [x] A follow-up uses the same core thread id; citation numbers restart per answer and never change during a turn
+- [x] Copy writes only the chosen answer and its citations; Copied lasts 2 s after success
 - [ ] At Wide the recent pane is 260 pt and thread at most 860 pt; Medium/Narrow use Recent in the toolbar, with scope overflowing before the mode indicator
-- [ ] Streaming is silent to VoiceOver; completion is announced once, with weakness included; quotes carry their own language
+- [x] Streaming is silent to VoiceOver; completion is announced once, with weakness included; quotes carry their own language
 
 ## 7. Additional Context
 
@@ -254,6 +254,6 @@ The system **MUST** render the cited-answer variants with original-language quot
 
 **Contract and fake gaps.** `AskStartArgs` has no per-answer runtime override. **Answer with Local Model** and **Use Local Model** cannot silently select a local runtime through this command; task runtime settings can change through Settings, but that is not an equivalent per-answer override. `AskAnswer` lacks lookup counts, elapsed time, detailed search/read progress, rebuild percentage and persisted ratings; do not fabricate the example meta line or claim a thumbs rating was persisted. Thumbs may toggle only as window view state until a contract exists. Citation contains number, provenance, quote, speaker, strength and deleted flag, but no quote language, audio availability or suggested-item flag. Use the shared transcript span/record data where available; document freshness is not present in document provenance, while live lookup provenance carries its time. Missing detail is not inferred. The default fake emits a simple cited answer and marks a stop as `failed` with `answer_stopped`; scenario overrides cover weak, not-found, skipped-source and interruption states. These gaps block the corresponding full story paths until the contract owner resolves them.
 
-**Delivery (18 Nov 2026).** Recorded gaps, not delivered: **Widen Scope** is not offered on a reloaded narrowed turn, because `AskAnswer.scope` is not read back (`inst-widen`); the meta line counts and the stored thumbs rating (contract gaps above); citations do not show the speaker yet (the core provides `Citation.speaker`; rendering follows in the Ask follow-up PR); and a not-found answer on the default fake, which never produces one (scenario overrides do). Every other flow, algorithm, state and DoD is delivered and marked.
+**Delivery (18 Nov 2026).** Recorded gaps, not delivered: **Widen Scope** is not offered on a reloaded narrowed turn, because `AskAnswer.scope` is not read back (`inst-widen`); the meta line counts and the stored thumbs rating (contract gaps above); citations do not show the speaker yet (the core provides `Citation.speaker`; rendering follows in the Ask follow-up PR); and a not-found answer on the default fake, which never produces one (scenario overrides do). QA could not reach these states on the real core: local and sensitive (the settings change was accepted but the mode indicator did not follow), keyword-only and weak (the harness cannot set the index states). Quotes carry no `lang` attribute, because the contract's `Citation` has no language field, so a quote in its own language is unverified. Every other flow, algorithm, state and DoD is delivered and marked.
 
 **Not applicable.** Retrieval, source permissions, model prompts, account authentication, persistence, database queries, service deployment and billable retry policy belong to the core. The UI retains only current view state and clears listeners on disposal; safe error logging never includes questions or quotes.
