@@ -10,7 +10,7 @@ import { AddMcpSourceSheet } from "./AddMcpSourceSheet";
 import { Group } from "./form";
 import type { PaneProps } from "./pane-props";
 import { AddFolderSheet } from "./SourceFormSheet";
-import { createSources, reindexSource, sourceStatus, type SourcesView as SourcesState } from "./sources";
+import { createSources, reindexSource, sourceStatus, sourceTag, type SourcesView as SourcesState } from "./sources";
 
 type Sheet = "folder" | "mcp" | null;
 
@@ -39,15 +39,15 @@ export function SourcesView({ rows, failed, mode, prefs, onRetry, onAdd, onReind
   if (!rows) return <p className="np-dim" role="status">{t("sources.loading")}</p>;
   if (rows.length === 0) return <EmptyState title={t("sources.empty_title")} body={t("sources.empty_body")} icon="books" actionId="source-add-folder" actionLabel={t("sources.add_folder")} onAction={() => onAdd("folder")} />;
   return (
-    <Group foot={<>
+    <Group foot={<div className="st-sources__foot">
       <PushButton id="source-add-folder" label={t("sources.add_folder")} size="small" onAction={() => onAdd("folder")} />
       <PushButton label={t("sources.add_mcp")} size="small" onAction={() => onAdd("mcp")} />
-    </>}>
+    </div>}>
       {failed && <p className="hd__err" role="alert">{t("sources.read_error")} <PushButton label={t("action.try_again")} size="small" onAction={onRetry} /></p>}
       {rows.map((r) => {
         const v = sourceStatus(r, mode, prefs);
         return (
-          <StatusRow key={r.id} variant="source" tone={v.tone} word={v.word} icon={v.icon} title={r.name} tag={r.kind === "folder" ? t("sources.kind_folder") : t("sources.kind_mcp")} subtitle={v.subtitle} message={v.message} progress={v.progress}
+          <StatusRow key={r.id} variant="source" tone={v.tone} word={v.word} icon={v.icon} title={r.name} tag={sourceTag(r)} subtitle={v.subtitle} message={v.message} progress={v.progress}
             actions={v.canRetry ? <PushButton label={t("sources.try_again")} size="small" onAction={() => onReindex(r.id)} /> : r.status.type === "idle" ? <PushButton label={t("sources.reindex")} size="small" onAction={() => onReindex(r.id)} /> : undefined} />
         );
       })}

@@ -402,7 +402,7 @@ export const en = {
   "sources.mode": "Mode", "sources.mode_indexed": "Indexed", "sources.mode_live": "Live",
   "sources.mode_indexed_note": "Noter copies the documents into a local index and you sign in once in the browser.",
   "sources.mode_live_note": "Nothing is copied. Lookups run after calls and in Ask, only in Cloud allowed, and each one is logged.",
-  "sources.schedule": "Schedule", "sources.schedule_hourly": "Hourly", "sources.schedule_daily": "Daily",
+  "sources.schedule": "Schedule", "sources.schedule_hourly": "Every hour", "sources.schedule_daily": "Every day", "sources.schedule_weekly": "Every week",
   "sources.error_server_required": "Enter the server name.",
   "sources.error_server_duplicate": "This server is already a source.",
   "sources.error_duplicate": "This folder is already a source.",

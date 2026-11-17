@@ -9,12 +9,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { submitMcp } from "./sources";
+import { scheduleChoices, submitMcp } from "./sources";
 
-const SCHEDULES = () => [
-  { value: "hourly", label: t("sources.schedule_hourly") },
-  { value: "daily", label: t("sources.schedule_daily") },
-];
 
 export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
   const [server, setServer] = useState("");
@@ -42,7 +38,7 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
         <p className="np-dim">{mode === "live" ? t("sources.mode_live_note") : t("sources.mode_indexed_note")}</p>
         {mode === "indexed" && (<>
           <label className="st-row__label" htmlFor="src-schedule">{t("sources.schedule")}</label>
-          <PopupButton id="src-schedule" label={t("sources.schedule")} options={SCHEDULES()} value={schedule} onAction={setSchedule} />
+          <PopupButton id="src-schedule" label={t("sources.schedule")} options={scheduleChoices()} value={schedule} onAction={setSchedule} />
         </>)}
         <label className="st-row__label" htmlFor="src-mcp-privacy">{t("sources.privacy")}</label>
         <PopupButton id="src-mcp-privacy" label={t("sources.privacy")} options={PRIVACY_CHOICES()} value={privacy} onAction={(v) => setPrivacy(v as PrivacyClass)} />

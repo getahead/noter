@@ -124,3 +124,13 @@ export function createSources(bridge: Bridge, notify: (v: SourcesView) => void) 
     },
   };
 }
+
+/** The row's tag: how the source is read, and Sensitive when it is. */
+export const sourceTag = (r: SourceRow): string => [r.mode === "live" ? t("sources.mode_live") : t("sources.mode_indexed"), r.privacy === "sensitive" ? t("sources.privacy_sensitive") : null].filter(Boolean).join(" · ");
+
+/** The schedules the core syncs on (hourly, daily, weekly). */
+export const scheduleChoices = () => [
+  { value: "hourly", label: t("sources.schedule_hourly") },
+  { value: "daily", label: t("sources.schedule_daily") },
+  { value: "weekly", label: t("sources.schedule_weekly") },
+];
