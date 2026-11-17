@@ -79,3 +79,14 @@ describe("PeopleToolbar", () => {
     setPeopleQuery("");
   });
 });
+
+describe("PeoplePage", () => {
+  it("starts in LOADING under the bridge: the heading is there, no rows yet", async () => {
+    const { BridgeProvider } = await import("../../app/bridge/context");
+    const { PeoplePage } = await import("./PeoplePage");
+    const bridge = { label: "main", store: { getState: () => ({ entities: { person: {} }, app: null, commands: {} }), subscribe: () => () => {} }, act: () => new Promise(() => {}), core: {} } as never;
+    const h = renderToString(<BridgeProvider value={bridge}><PeoplePage /></BridgeProvider>);
+    expect(h).toContain('data-state="loading"');
+    expect(h).not.toContain("pe-row");
+  });
+});
