@@ -164,17 +164,17 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 
 ### Copy one cited turn
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-ask-copy`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-ask-copy`
 
 **Input**: a completed or stopped turn and its resolved citations
 
 **Output**: Markdown suitable for a status update
 
 **Steps**:
-1. [ ] - `p1` - Keep the answer's paragraphs and reference numbers; exclude UI controls and status spinners - `inst-answer`
-2. [ ] - `p1` - Append citations in first-use order with number, call name, locale date and time, or document title, section, source and freshness - `inst-citations`
-3. [ ] - `p1` - Preserve original quotes, **Weak match**, **suggested, not reviewed**, and **Source deleted** where present; do not invent links to deleted sources - `inst-qualifiers`
-4. [ ] - `p1` - **RETURN** the selected turn only, with no other question history or hidden credentials - `inst-return`
+1. [x] - `p1` - Keep the answer's paragraphs and reference numbers; exclude UI controls and status spinners - `inst-answer`
+2. [x] - `p1` - Append citations in first-use order with number, call name, locale date and time, or document title, section, source and freshness - `inst-citations`
+3. [x] - `p1` - Preserve original quotes, **Weak match**, **suggested, not reviewed**, and **Source deleted** where present; do not invent links to deleted sources - `inst-qualifiers`
+4. [x] - `p1` - **RETURN** the selected turn only, with no other question history or hidden credentials - `inst-return`
 
 ## 4. States (CDSL)
 
