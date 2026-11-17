@@ -106,6 +106,7 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
       )}
       <div data-region="TH-R3" role="region" aria-label={t("topics.timeline")} className="lb-thread" data-state={months.length ? "thread" : "thread-empty"}>
         {months.length ? (
+          // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-timeline
           months.map((m) => (
             <div key={m.label} className="lb-thmonth">
               <h2 className="lb-thmonth__h">{m.label}</h2>
@@ -116,6 +117,7 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
               </ul>
             </div>
           ))
+          // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-timeline
         ) : (
           // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-empty-topic
           <EmptyState variant="large" icon="thread" title={t("topics.nothing_title")} body={t("topics.nothing_body")} />

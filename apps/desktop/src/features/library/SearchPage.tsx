@@ -61,8 +61,8 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
           {widen}
         </>
       );
-    // A search that only found topics still has results to count.
-    const total = r.calls.length + r.items.length + r.documents.length || r.topics.length;
+    // A search that only found topics still has a result to count: the one topic row.
+    const total = r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
     const topic = r.topics[0];
     return (
       <>

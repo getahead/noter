@@ -62,6 +62,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(h).toContain("Websocket notifications");
     expect(h).toContain("6 calls · 3 decisions · 1 open question");
     expect(h).toContain("1 result");
+    expect(html(props(results({ topics: [topic, { ...topic, id: "top_9", name: "Other" }] }), { bridge }))).toContain("1 result"); // one chip renders, so one result
     expect(h).not.toContain("0 results");
     (find(rendered(SearchView, p), (x) => typeof x.onOpen === "function").props.onOpen as () => void)();
     expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());

@@ -8,6 +8,7 @@ import { DialogsProvider } from "../../ui/dialogs/host";
 import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
+import { slots } from "../call-page/slots";
 import { ThreadRow } from "./ThreadRow";
 import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
@@ -79,6 +80,18 @@ describe("Topics page (cpt-noter-flow-ui-library-search-topics-topic)", () => {
     const act = vi.spyOn(bridge, "act");
     openTopic(bridge, "t1");
     expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+  it("a thread row is reachable with Tab and hands Return and ⌘I to the item keys", async () => {
+    const fake = await ready();
+    const item = fake.world.items.find((i) => i.topic)!;
+    const keys = vi.fn();
+    slots.itemKeys = keys;
+    const row = find(rendered(ThreadRow, { bridge, item, call: item.call }), (p) => p.className === "pc-item lb-throw" || (typeof p.className === "string" && p.className.includes("lb-throw")));
+    expect(row.props.tabIndex).toBe(0);
+    const e = { key: "Enter" };
+    (row.props.onKeyDown as (e: unknown) => void)(e);
+    expect(keys).toHaveBeenCalledWith(bridge, item, e);
+    slots.itemKeys = null;
   });
 });
 

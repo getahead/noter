@@ -239,3 +239,5 @@
 .lb-thmerge { margin-bottom: 14px; }
 .lb-mergeinto { display: grid; gap: 6px; margin: 12px 0; }
 .lb-mergelist { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 4px; max-height: 200px; overflow-y: auto; }
+.lb-throw:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; border-radius: 4px; }
+.lb-search [data-region="LS-R3"] { margin: 4px 0 16px; }

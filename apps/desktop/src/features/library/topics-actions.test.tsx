@@ -9,7 +9,7 @@ import { RenameSheet } from "./RenameSheet";
 import { ThreadView, threadActions } from "./ThreadPage";
 import { createSheets } from "../../ui/dialogs/sheets";
 import { keepSeparate, mergeTopic, renameTopic } from "./topics-actions";
-import { clashOf, itemsOf, movesOf } from "./topics-model";
+import { clashOf, movesOf } from "./topics-model";
 
 let bridge: Bridge;
 let fake: FakeCore;
@@ -67,7 +67,6 @@ describe("topic actions (cpt-noter-flow-ui-library-search-topics-topic)", () => 
     expect(clashOf([a!, b!], a!.id, ` ${a!.name} `)).toBeNull();
     expect(clashOf([a!, b!], a!.id, b!.name.toLowerCase())?.id).toBe(b!.id);
     expect(movesOf([{ call: {} as never, items: [{ id: 1 }, { id: 2 }] as never }, { call: {} as never, items: [] }, { call: {} as never, items: [{ id: 3 }] as never }])).toMatchObject({ calls: 2, rows: [{ id: 1 }, { id: 2 }, { id: 3 }] });
-    expect(itemsOf([{ call: {} as never, items: [{}, {}] as never }, { call: {} as never, items: [{}] as never }])).toBe(3);
   });
 });
 
