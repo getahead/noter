@@ -26,7 +26,6 @@ export interface PersonState {
 const navigate = (bridge: Bridge, target: Parameters<Bridge["core"]["windowNavigate"]>[0]["target"]) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target }), { screen: "person" });
 
-// @cpt-dod:cpt-noter-dod-ui-people-pages:p4
 /** A Person page: one `person_get` read, shown as Overview, Calls or History (PE-R2..R6). */
 export function PersonPage({ id }: { id: string }) {
   const bridge = useBridge();
