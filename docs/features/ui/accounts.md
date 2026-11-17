@@ -110,7 +110,7 @@ Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 b
 
 ### Sign in through the user's CLI
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-accounts-sign-in`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-accounts-sign-in`
 
 **Actor**: Primary user
 
@@ -123,25 +123,25 @@ Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 b
 - Errors preserve the other provider's state and never change agent runtimes implicitly
 
 **Steps**:
-1. [ ] - `p1` - User chooses Sign In with Claude or ChatGPT; API: `account_signin_prepare` with provider - `inst-prepare`
-2. [ ] - `p1` - UI: 520-pt sheet at Prepare with CLI/path, facts about password ownership, chosen agents/tasks and privacy; show personal-use confirmation only for Claude - `inst-prepare-ui`
-3. [ ] - `p1` - **IF** the CLI is missing - `inst-if-missing`
-   1. [ ] - `p1` - User chooses Install; API: `cli_install`; consume matching job progress, then prepare again; Continue stays disabled until the tool is installed and supported - `inst-install`
-4. [ ] - `p1` - **IF** prepare reports an existing account - `inst-if-existing`
-   1. [ ] - `p1` - UI: Use this account selected and Sign in with another account; Use This Account calls `account_use_existing` after the local personal-use guard - `inst-use-existing`
-5. [ ] - `p1` - **ELSE** user confirms personal use where required and chooses Continue in Browser - `inst-browser-choice`
-   1. [ ] - `p1` - API: `account_signin_start` with provider and personal-use confirmation; the CLI opens the browser - `inst-start`
-   2. [ ] - `p1` - UI: waiting state from returned session id, expiry and optional code; Copy Code/Link use only returned values, Open the Page Again uses returned URL via `open_external` - `inst-wait`
-6. [ ] - `p1` - User may press Esc to hide the sheet; row keeps **Finishing in your browser…**, Show and Cancel; Show restores the same session - `inst-hide`
-7. [ ] - `p1` - Algorithm: consume matching `signin:progress` and `accounts:changed` through `cpt-noter-algo-ui-accounts-session` - `inst-progress`
-8. [ ] - `p1` - **IF** browser cancellation, timeout, plan rejection or network error arrives - `inst-if-error`
-   1. [ ] - `p1` - UI: prototype's specific error title and explanation; explicit Try Again/Open the Page Again starts a fresh valid session, Use Another Account prepares another sign-in, Use an API Key Instead opens that provider's key sheet - `inst-error`
-9. [ ] - `p1` - **IF** user chooses Cancel in row or sheet - `inst-if-cancel`
-   1. [ ] - `p1` - API: `account_signin_cancel` with session id; ignore later progress for it and clear the waiting view - `inst-cancel`
-10. [ ] - `p1` - UI: Check steps use returned identity and plan; when signed in show Use with candidate agents, current runtime labels, unavailable agents preselected and **Offer your account first when adding an agent** - `inst-use`
-11. [ ] - `p1` - User chooses Use for N Agents; API: `account_bind_agents` with provider, chosen ids and default preference; consume accounts and give its `change_id` to shared Undo - `inst-bind`
-12. [ ] - `p1` - User may choose Not Now or Done without moving agents; retain the connected account; first-run Finish opens Today through its existing flow - `inst-finish`
-13. [ ] - `p1` - **RETURN** separate signed-in rows with returned identity, plan, tool and agents - `inst-return-sign-in`
+1. [x] - `p1` - User chooses Sign In with Claude or ChatGPT; API: `account_signin_prepare` with provider - `inst-prepare`
+2. [x] - `p1` - UI: 520-pt sheet at Prepare with CLI/path, facts about password ownership, chosen agents/tasks and privacy; show personal-use confirmation only for Claude - `inst-prepare-ui`
+3. [x] - `p1` - **IF** the CLI is missing - `inst-if-missing`
+   1. [x] - `p1` - User chooses Install; API: `cli_install`; consume matching job progress, then prepare again; Continue stays disabled until the tool is installed and supported - `inst-install`
+4. [x] - `p1` - **IF** prepare reports an existing account - `inst-if-existing`
+   1. [x] - `p1` - UI: Use this account selected and Sign in with another account; Use This Account calls `account_use_existing` after the local personal-use guard - `inst-use-existing`
+5. [x] - `p1` - **ELSE** user confirms personal use where required and chooses Continue in Browser - `inst-browser-choice`
+   1. [x] - `p1` - API: `account_signin_start` with provider and personal-use confirmation; the CLI opens the browser - `inst-start`
+   2. [x] - `p1` - UI: waiting state from returned session id, expiry and optional code; Copy Code/Link use only returned values, Open the Page Again uses returned URL via `open_external` - `inst-wait`
+6. [x] - `p1` - User may press Esc to hide the sheet; row keeps **Finishing in your browser…**, Show and Cancel; Show restores the same session - `inst-hide`
+7. [x] - `p1` - Algorithm: consume matching `signin:progress` and `accounts:changed` through `cpt-noter-algo-ui-accounts-session` - `inst-progress`
+8. [x] - `p1` - **IF** browser cancellation, timeout, plan rejection or network error arrives - `inst-if-error`
+   1. [x] - `p1` - UI: prototype's specific error title and explanation; explicit Try Again/Open the Page Again starts a fresh valid session, Use Another Account prepares another sign-in, Use an API Key Instead opens that provider's key sheet - `inst-error`
+9. [x] - `p1` - **IF** user chooses Cancel in row or sheet - `inst-if-cancel`
+   1. [x] - `p1` - API: `account_signin_cancel` with session id; ignore later progress for it and clear the waiting view - `inst-cancel`
+10. [x] - `p1` - UI: Check steps use returned identity and plan; when signed in show Use with candidate agents, current runtime labels, unavailable agents preselected and **Offer your account first when adding an agent** - `inst-use`
+11. [x] - `p1` - User chooses Use for N Agents; API: `account_bind_agents` with provider, chosen ids and default preference; consume accounts and give its `change_id` to shared Undo - `inst-bind`
+12. [x] - `p1` - User may choose Not Now or Done without moving agents; retain the connected account; first-run Finish opens Today through its existing flow - `inst-finish`
+13. [x] - `p1` - **RETURN** separate signed-in rows with returned identity, plan, tool and agents - `inst-return-sign-in`
 
 ### Test, select task runtimes and sign out
 
@@ -178,13 +178,13 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 **Output**: one provider's Prepare, Browser, Check, Use or error state
 
 **Steps**:
-1. [ ] - `p1` - Keep provider and session ids separate from the other provider; ignore unrelated or replaced-session progress - `inst-correlate`
-2. [ ] - `p1` - Disable Continue for missing/unsupported CLI and unticked required personal-use confirmation; never infer eligibility from fixture plan names - `inst-guard`
-3. [ ] - `p1` - Derive countdown from `expires_at`; no local countdown authorizes success or binds an agent - `inst-countdown`
-4. [ ] - `p1` - Map waiting_for_browser to Sign in, signed_in/checking_plan/sending_test_request to Check, done plus confirmed signed-in accounts state to Use - `inst-map`
+1. [x] - `p1` - Keep provider and session ids separate from the other provider; ignore unrelated or replaced-session progress - `inst-correlate`
+2. [x] - `p1` - Disable Continue for missing/unsupported CLI and unticked required personal-use confirmation; never infer eligibility from fixture plan names - `inst-guard`
+3. [x] - `p1` - Derive countdown from `expires_at`; no local countdown authorizes success or binds an agent - `inst-countdown`
+4. [x] - `p1` - Map waiting_for_browser to Sign in, signed_in/checking_plan/sending_test_request to Check, done plus confirmed signed-in accounts state to Use - `inst-map`
 5. [ ] - `p1` - Replace whole account state only at the highest version through the bridge; prepare/use-existing results refresh the account row without fabricating Check progress - `inst-version`
-6. [ ] - `p1` - Hide a sheet without stopping the core session; on window reload use accounts_get to recover signing-in status; cancel only on the explicit Cancel action - `inst-lifecycle`
-7. [ ] - `p1` - Clear code, URL and secure drafts when no longer needed; no password, token, key or sign-in code enters logs, storage or analytics - `inst-clear`
+6. [x] - `p1` - Hide a sheet without stopping the core session; on window reload use accounts_get to recover signing-in status; cancel only on the explicit Cancel action - `inst-lifecycle`
+7. [x] - `p1` - Clear code, URL and secure drafts when no longer needed; no password, token, key or sign-in code enters logs, storage or analytics - `inst-clear`
 8. [ ] - `p1` - **RETURN** the active provider's view; retry is always user initiated - `inst-return`
 
 ## 4. States (CDSL)

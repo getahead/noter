@@ -122,7 +122,6 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
   test("happy path: Test shows the latency, Sign Out names the effect and only confirmation signs out", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await claudeCli(steer);
-    await watchAlerts(page);
     await openModels(page);
     const dlg = await claudeToCheck(page);
     await button(dlg, /^Use for \d+ Agents?$/).click();
@@ -130,15 +129,18 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await expect(claude).toContainText("Signed in");
 
     await button(claude, "Test").click();
-    await expect(claude).toContainText(/\d+ ?ms/);
+    await expect(claude).toContainText(/Answered in/);
     expect(await sent(page, "account_test")).toHaveLength(1);
 
-    await button(claude, "Sign Out…").click(); // Cancel is the default answer
-    expect(alertText((await alerts(page))[0]!)).toContain("Also sign out of");
+    await button(claude, "Sign Out…").click(); // a sheet in the alert's place: the native alert has no checkbox
+    const out = sheet(page, /Sign out of your Claude account in Noter\?/);
+    await expect(out).toContainText("Also sign out of Claude Code on this Mac");
+    await button(out, "Cancel").click();
     expect(await sent(page, "account_sign_out")).toHaveLength(0);
-    await answerAlerts(page, "confirm");
     await button(claude, "Sign Out…").click();
+    await button(out, "Sign Out").click();
     await expect.poll(async () => (await sent(page, "account_sign_out")).length).toBe(1);
+    expect((await sent(page, "account_sign_out"))[0]).toEqual({ provider: "claude", also_in_cli: false });
     await expect(claude).toContainText("Not signed in");
   });
 });

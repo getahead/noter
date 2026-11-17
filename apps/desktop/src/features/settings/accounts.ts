@@ -54,3 +54,41 @@ export function signOutAccount(bridge: Bridge, provider: AccountProvider, alsoIn
   return bridge.act(signOutKey(provider), "account_sign_out", () => bridge.core.accountSignOut({ provider, also_in_cli: alsoInCli }), { slice: "accounts" });
   // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
 }
+
+export const signInKey = (provider: AccountProvider) => `signin:${provider}`;
+
+// @cpt-flow:cpt-noter-flow-ui-accounts-sign-in:p1
+/** `account_signin_prepare`: step 1 of the sheet; a missing CLI comes back as the error `cli_missing`. */
+export function prepareSignIn(bridge: Bridge, provider: AccountProvider) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-prepare
+  return bridge.act(`${signInKey(provider)}:prepare`, "account_signin_prepare", () => bridge.core.accountSigninPrepare({ provider }));
+  // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-prepare
+}
+
+/** `account_signin_start`: the CLI opens the browser; the answer carries the session, link and one-time code. */
+export function startSignIn(bridge: Bridge, provider: AccountProvider, personalUseConfirmed: boolean) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-start
+  return bridge.act(`${signInKey(provider)}:start`, "account_signin_start", () => bridge.core.accountSigninStart({ provider, personal_use_confirmed: personalUseConfirmed }), { retainForRetry: false });
+  // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-start
+}
+
+/** `account_signin_cancel`: only the explicit Cancel; an unknown session is already gone. */
+export function cancelSignIn(bridge: Bridge, sessionId: string) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-cancel
+  return bridge.act("signin:cancel", "account_signin_cancel", () => bridge.core.accountSigninCancel({ session_id: sessionId }), { slice: "accounts" });
+  // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-cancel
+}
+
+/** `account_use_existing`: reuse the CLI's own sign-in; the answer is the whole accounts view. */
+export function useExistingAccount(bridge: Bridge, provider: AccountProvider) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-use-existing
+  return bridge.act(`${signInKey(provider)}:existing`, "account_use_existing", () => bridge.core.accountUseExisting({ provider }), { slice: "accounts" });
+  // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-use-existing
+}
+
+/** `account_bind_agents`: the explicit choice of Use; the answer carries the `change_id` for Undo. */
+export function bindAgents(bridge: Bridge, provider: AccountProvider, agentIds: string[], defaultForNew: boolean) {
+  // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-bind
+  return bridge.act(`${signInKey(provider)}:bind`, "account_bind_agents", () => bridge.core.accountBindAgents({ provider, agent_ids: agentIds, default_for_new_agents: defaultForNew }));
+  // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-bind
+}
