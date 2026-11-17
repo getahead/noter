@@ -230,4 +230,13 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     expect(callsList).toHaveBeenLastCalledWith({ filter: { tags: ["release"] }, sort: "newest", page: {} });
     expect(list.get().rows.map((r) => r.id)).toEqual(["new"]);
   });
+
+  it("takes no new call into a filtered list, which the next read decides", async () => {
+    const callsList = vi.fn().mockResolvedValue(page([row("a")]));
+    const act = vi.fn((_k: string, _c: string, run: () => Promise<unknown>) => run());
+    const list = createCallsList({ act, core: { callsList } } as never, undefined, { tags: ["release"] });
+    await list.load();
+    list.merge({ n: { ...row("n"), started_at: 99 } }, new Set());
+    expect(list.get().rows.map((r) => r.id)).toEqual(["a"]);
+  });
 });

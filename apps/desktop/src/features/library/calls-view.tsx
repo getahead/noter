@@ -30,7 +30,7 @@ export interface CallsViewProps {
   /** Filters are set: an empty read is FILTER_EMPTY, not the first-use state. */
   filtered?: boolean;
   onClearFilters?: () => void;
-  /** The Add Tag… and Export… buttons of the selection. */
+  /** The Add Tag popover of the selection. */
   actions?: ReactNode;
   state: CallsState;
   selection: Selection;

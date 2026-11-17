@@ -99,3 +99,12 @@ export const holdFilter = (s: FilterState): void => void (held = s);
 
 /** How many filter groups narrow the list. */
 export const activeCount = (s: FilterState): number => tokens(s, { person: (i) => i, type: (i) => i }).length;
+
+/** Whether any filter group narrows the list. */
+export const isFiltered = (f: CallFilter): boolean => Object.values(f).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));
+
+/** One action on the held state: the next state and whether the list must be read again (words alone never re-read it). */
+export function reconcile(s: FilterState, a: FilterAction): { next: FilterState; reread: boolean } {
+  const next = apply(s, a);
+  return { next, reread: next.filter !== s.filter };
+}

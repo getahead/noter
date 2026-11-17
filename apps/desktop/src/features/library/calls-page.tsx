@@ -22,7 +22,7 @@ import { CallsView, COLUMNS } from "./calls-view";
 import { AddTagPopover } from "./add-tag";
 import { tagCalls, tagsKey } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
-import { apply, heldFilter, holdFilter, type FilterAction, type FilterState } from "./filters";
+import { heldFilter, holdFilter, isFiltered, reconcile, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
   edgeOf,
@@ -65,16 +65,13 @@ export function CallsPage() {
   const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
-    const next = apply(fstate, a);
+    const { next, reread } = reconcile(fstate, a);
     setFstate(next);
     holdFilter(next);
-    if (next.filter !== fstate.filter) void list.setFilter(next.filter);
+    if (reread) void list.setFilter(next.filter);
   };
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
-  const filtered = Object.keys(fstate.filter).some((k) => {
-    const v = fstate.filter[k as keyof typeof fstate.filter];
-    return Array.isArray(v) ? v.length > 0 : !!v;
-  });
+  const filtered = isFiltered(fstate.filter);
   useEffect(() => {
     if (filtered && state.status === "LISTED")
       void announce({ kind: "confirmation", text: t("filters.matches", { count: state.total ?? state.rows.length }), key: `m${state.total}` });
@@ -230,7 +227,7 @@ export function CallsPage() {
 
   return (
     <CallsView
-      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} onRun={() => {}} />}
+      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
       actions={
         <>
           {tagging && chosen.length > 0 && (

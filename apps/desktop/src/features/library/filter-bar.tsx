@@ -15,19 +15,23 @@ export interface Lists {
 }
 const EMPTY: Lists = { people: [], types: [], tags: [] };
 
-/** The choices of the pop-ups: people, call types and the tags in use, each read once from the core. */
+/** The three reads behind the pop-ups; a read that fails leaves its list empty. */
+export async function readLists(bridge: Bridge): Promise<Lists> {
+  const o = { screen: "library-calls" } as const;
+  const [p, ty, tg] = await Promise.all([
+    bridge.act("people_list", "people_list", () => bridge.core.peopleList({}), o),
+    bridge.act("call_types_list", "call_types_list", () => bridge.core.callTypesList({}), o),
+    bridge.act("tags_list", "tags_list", () => bridge.core.tagsList({}), o),
+  ]);
+  return { people: p.status === "ok" ? p.data.people : [], types: ty.status === "ok" ? ty.data.call_types : [], tags: tg.status === "ok" ? tg.data.tags : [] };
+}
+
+/** The choices of the pop-ups: people, call types and the tags in use, read again when `refresh` changes. */
 export function useLists(bridge: Bridge, refresh: unknown = 0): Lists {
   const [lists, setLists] = useState<Lists>(EMPTY);
   useEffect(() => {
     let live = true;
-    const o = { screen: "library-calls" } as const;
-    void Promise.all([
-      bridge.act("people_list", "people_list", () => bridge.core.peopleList({}), o),
-      bridge.act("call_types_list", "call_types_list", () => bridge.core.callTypesList({}), o),
-      bridge.act("tags_list", "tags_list", () => bridge.core.tagsList({}), o),
-    ]).then(([p, ty, tg]) => {
-      if (live) setLists({ people: p.status === "ok" ? p.data.people : [], types: ty.status === "ok" ? ty.data.call_types : [], tags: tg.status === "ok" ? tg.data.tags : [] });
-    });
+    void readLists(bridge).then((l) => live && setLists(l));
     return () => void (live = false);
   }, [bridge, refresh]);
   return lists;
@@ -45,7 +49,7 @@ const LANGS = ["en", "ru", "de"];
 
 // @cpt-component:cpt-noter-component-ui-filter-bar:p1
 /** The filter bar: pop-ups and tokens over one filter state; Clear keeps the typed words. */
-export function FilterBar({ state, lists, onAction, onRun }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void; onRun: (words: string) => void }) {
+export function FilterBar({ state, lists, onAction }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void }) {
   const [open, setOpen] = useState<Menu>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toks = tokens(state, lookups(lists));

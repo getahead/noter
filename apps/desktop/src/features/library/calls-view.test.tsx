@@ -179,3 +179,12 @@ describe("ContextMenu", () => {
     ).toBe(true);
   });
 });
+
+describe("CallsView with filters (cpt-noter-state-ui-library-search-topics-view)", () => {
+  it("an empty read under a filter is FILTER_EMPTY with Clear, and the header counts matches", () => {
+    const empty = renderToString(<CallsView {...props({ state: state({ status: "EMPTY", rows: [], total: 0 }), filtered: true })} />);
+    expect(empty).toContain("No calls match these filters");
+    expect(empty).toContain('data-state="filter-empty"');
+    expect(renderToString(<CallsView {...props({ filtered: true })} />)).toContain("2 calls match");
+  });
+});

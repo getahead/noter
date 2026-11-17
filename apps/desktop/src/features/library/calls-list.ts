@@ -1,5 +1,6 @@
 // The Calls list's state machine (LOADING, EMPTY, LISTED, ERROR) over `calls_list`: one read per page, an answer
 // older than the last request is dropped, and the core's entity events are merged in by identity.
+import { isFiltered } from "./filters";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallFilter, CallRow, CallSort, CoreError } from "../../core/bindings";
 
@@ -155,6 +156,8 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL, init
                 !held.has(r.id) &&
                 !gone.has(r.id) &&
                 state.sort === "newest" &&
+                // a filtered list takes no call it cannot check against the filter; the next read brings the matching ones
+                !isFiltered(filter) &&
                 (!state.rows.length || r.started_at > state.rows[0]!.started_at),
             );
       fresh.sort((a, b) => b.started_at - a.started_at);

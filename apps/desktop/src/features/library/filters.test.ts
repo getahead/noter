@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { apply, BLANK, datePreset, shiftDay, tokens, type Lookups } from "./filters";
+import { apply, BLANK, datePreset, isFiltered, reconcile, shiftDay, tokens, type Lookups } from "./filters";
 
 const look: Lookups = { person: (id) => ({ per_anna: "Anna", per_bo: "Boris" })[id] ?? id, type: (id) => ({ planning: "Planning" })[id] ?? id };
 
@@ -60,5 +60,15 @@ describe("filter state (cpt-noter-algo-ui-library-search-topics-filters)", () =>
   it("a tag choice from the # suggestions adds the tag filter once", () => {
     const s = apply(BLANK, { type: "toggle", group: "tags", value: "release" });
     expect(apply(s, { type: "add", group: "tags", value: "release" }).filter.tags).toEqual(["release"]);
+  });
+});
+
+describe("reconcile and isFiltered", () => {
+  it("re-reads only when the filter changed, never for words", () => {
+    expect(reconcile(BLANK, { type: "words", words: "x" }).reread).toBe(false);
+    const r = reconcile(BLANK, { type: "open_items", on: true });
+    expect(r.reread).toBe(true);
+    expect(isFiltered(r.next.filter)).toBe(true);
+    expect(isFiltered(reconcile(r.next, { type: "clear" }).next.filter)).toBe(false);
   });
 });
