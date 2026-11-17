@@ -27,7 +27,7 @@ describe("AskToolbar (cpt-noter-component-screen-ask)", () => {
     expect(h).toContain('data-variant="glyph"');
     expect(h).not.toContain('data-variant="ask"');
   });
-  it("offers New Question as the primary action, bound to ⌘N", () => {
+  it("offers New Question as an ordinary action (Ask is the only primary), bound to ⌘N", () => {
     expect(html()).toContain("New Question");
     expect(isNewKey({ key: "n", metaKey: true, shiftKey: false })).toBe(true);
     expect(isNewKey({ key: "N", metaKey: true, shiftKey: true })).toBe(false);

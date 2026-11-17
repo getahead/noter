@@ -8,9 +8,9 @@ import { settled } from "./freeze";
 
 const WIDTHS = { wide: 1400, medium: 1000, narrow: 700 } as const;
 
-async function ask(page: Page, width: number) {
+async function ask(page: Page, width: number, plan: Parameters<typeof openWindow>[2] = {}) {
   await page.setViewportSize({ width, height: 800 });
-  await openWindow(page, "main", { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })) });
+  await openWindow(page, "main", { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })), ...plan });
   // a key pressed before the window's shortcuts are bound is lost, so press until the page is Ask
   await expect(async () => {
     await page.keyboard.press("Meta+Digit2");
@@ -44,3 +44,37 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     });
   });
 }
+
+test.describe("cpt-noter-dod-ui-ask-citations Ask states at wide", () => {
+  const QUESTION = "What did we decide about the backend?";
+  const askAndWait = async (page: Page) => {
+    await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill(QUESTION);
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".ak-recent__item")).toHaveCount(2); // the core stored the turn beside the seeded thread
+    await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeVisible();
+  };
+
+  test("a citation playing: the playback bar under the thread", async ({ page }) => {
+    await ask(page, WIDTHS.wide);
+    await askAndWait(page);
+    await page.locator('[data-component="cpt-noter-component-ui-citation-row"]').getByRole("button", { name: /^Play/ }).first().click();
+    await expect(page.locator('[data-component="cpt-noter-component-ui-playback-bar"]')).toBeVisible();
+    await shot(page, "playing", "wide");
+  });
+
+  test("the recent-row menu: Copy Question and Delete", async ({ page }) => {
+    await ask(page, WIDTHS.wide);
+    await page.locator(".ak-recent__item").first().click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: "Delete" })).toBeVisible();
+    await shot(page, "row-menu", "wide");
+  });
+
+  test("the runtime cannot be reached: the error banner with Try Again and Answer with Local Model", async ({ page }) => {
+    await ask(page, WIDTHS.wide, { fail: [{ cmd: "ask_start", code: "runtime_unavailable" }] });
+    await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill(QUESTION);
+    await page.keyboard.press("Enter");
+    const banner = page.locator('[data-component="cpt-noter-component-ui-inline-banner"]');
+    await expect(banner).toContainText("Couldn't reach Claude Code");
+    await shot(page, "error-banner", "wide");
+  });
+});

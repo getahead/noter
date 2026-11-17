@@ -27,7 +27,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
       <PopupButton variant="toolbar" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
     ) : undefined;
   useEffect(() => bindNewKey(document), []);
-  return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion, primary: true }]} trailing={
+  return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion }]} trailing={
       <>
         <ModeIndicator view={mode} variant={base.narrow ? "glyph" : "ask"} runtime={privacy?.mode === "local_only" ? "Local model" : "Claude Code"} onOpenPrivacy={openPrivacy} />
         {scope}

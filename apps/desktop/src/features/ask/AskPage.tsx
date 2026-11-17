@@ -12,10 +12,10 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, copyText, currentStream, removeThread, searchByKeyword, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
-import { announcementOf, errorKeyOf, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
+import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
 
 const GROUP = { today: "ask.group.today", last_week: "ask.group.last_week", earlier: "ask.group.earlier" } as const;
@@ -46,7 +46,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
   }, [bridge, refresh]);
 
-  const open = (id: string | null) => (setAnnounce(""), openThread)(bridge, id, { setThread, setTurns, setAsking });
+  const open = (id: string | null) => {
+    setAnnounce("");
+    if (busy) previousTurn.current = afterTurn(data, previousTurn.current); // the turn goes on without the page showing it
+    return openThread(bridge, id, { setThread, setTurns, setAsking }, busy);
+  };
 
   const previousTurn = useRef<string | null>(null);
   const data = currentStream(stream?.data ?? null, previousTurn.current);
@@ -66,9 +70,19 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 
-  const turn: TurnView | null = data ? foldTurn(data.messages) : null;
+  const turn: TurnView | null = data ? foldTurn(data.messages) : stream?.error && asking ? failedView(stream.error.code) : null;
   const phase = turn ? phaseOf(turn) : null;
   const busy = asking !== null && (phase === null || phase === "streaming") && !stream?.error;
+
+  // A turn the user left while it answered (⌘N, another thread) has ended: Recent now has its thread
+  const away = useRef<string | null>(null);
+  useEffect(() => {
+    const raw = stream?.data ?? null;
+    const ended = endedWhileAway(raw, raw ? phaseOf(foldTurn(raw.messages)) : null, asking, away.current);
+    if (!ended) return;
+    away.current = ended;
+    void refresh();
+  }, [stream, asking, refresh]);
 
   // The turn is over for the thread: reload what the core stored.
   useEffect(() => {

@@ -48,11 +48,11 @@ export interface ThreadSetters {
 }
 
 /** Show thread `id` (or the empty composer for null) with its stored turns. */
-export async function openThread(bridge: Bridge, id: string | null, set: ThreadSetters): Promise<void> {
+export async function openThread(bridge: Bridge, id: string | null, set: ThreadSetters, keepStream = false): Promise<void> {
   set.setThread(id);
   set.setTurns([]);
   set.setAsking(null);
-  void bridge.unsubscribe("ask_start");
+  if (!keepStream) void bridge.unsubscribe("ask_start"); // a turn still answering is kept listened to, so Recent can learn it ended
   if (!id) return;
   const got = await loadThread(bridge, id);
   if (got) set.setTurns(got);
@@ -135,3 +135,9 @@ export const copyText = (text: string, write: (s: string) => Promise<void>): Pro
 
 /** Search by Keyword: the Library's search for the question's own words. */
 export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
+
+/** A turn the user left while it was answering has ended: its id, once, so Recent refreshes to show it; null otherwise. */
+export function endedWhileAway(raw: { turn_id: string } | null, phase: TurnPhase | null, asking: string | null, handled: string | null): string | null {
+  if (!raw || asking !== null || phase === null || phase === "streaming" || raw.turn_id === handled) return null;
+  return raw.turn_id;
+}

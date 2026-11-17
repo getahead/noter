@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -174,5 +174,25 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
   });
   it("searches by keyword without a main window: nothing happens, nothing throws", () => {
     expect(() => searchByKeyword("What did we decide?")).not.toThrow();
+  });
+  it("names a turn that ended while the user was away, once", () => {
+    const raw = { turn_id: "t1" };
+    expect(endedWhileAway(raw, "ready", null, null)).toBe("t1");
+    expect(endedWhileAway(raw, "stopped", null, null)).toBe("t1");
+    expect(endedWhileAway(raw, "ready", null, "t1")).toBeNull(); // already refreshed
+    expect(endedWhileAway(raw, "ready", "asked here", null)).toBeNull(); // the page settles its own turn
+    expect(endedWhileAway(raw, "streaming", null, null)).toBeNull();
+    expect(endedWhileAway(raw, null, null, null)).toBeNull();
+    expect(endedWhileAway(null, "ready", null, null)).toBeNull();
+  });
+  it("keeps listening to a turn still answering when its thread is left", async () => {
+    const m = make(ok({ turns: [] }));
+    const unsubscribe = vi.fn();
+    (m.bridge as unknown as { unsubscribe: unknown }).unsubscribe = unsubscribe;
+    const set = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn() };
+    await openThread(m.bridge, null, set, true);
+    expect(unsubscribe).not.toHaveBeenCalled();
+    await openThread(m.bridge, null, set);
+    expect(unsubscribe).toHaveBeenCalledWith("ask_start");
   });
 });

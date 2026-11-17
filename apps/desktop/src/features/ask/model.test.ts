@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AskAnswer, AskMsg, Citation, CoreError } from "../../core/bindings";
-import { foldTurn, groupThreads, paragraphs, phaseOf, suggestionsOf, announcementOf, errorKeyOf } from "./model";
+import { foldTurn, groupThreads, paragraphs, phaseOf, suggestionsOf, announcementOf, errorKeyOf, failedView } from "./model";
 
 const cite = (n: number): Citation => ({ n, provenance: { type: "model_guess" }, quote: "q", speaker: null, strength: "strong", deleted: false });
 const answer = (o: Partial<AskAnswer> = {}): AskAnswer => ({ turn_id: "t1", question: "Q", answer_md: "A", citations: [cite(1)], found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0, ...o });
@@ -51,6 +51,7 @@ describe("suggestionsOf", () => {
   it("asks about the first three people, and nothing while the directory is empty or unread", () => {
     const people = ["Ann", "Bo", "Cy", "Di"].map((name) => ({ display_name: name })) as never;
     expect(suggestionsOf(people, (n) => `Q ${n}`)).toEqual(["Q Ann", "Q Bo", "Q Cy"]);
+    expect(suggestionsOf([{ display_name: "You", is_you: true }, ...(people as object[])] as never, (n) => `Q ${n}`)).toEqual(["Q Ann", "Q Bo", "Q Cy"]); // never the user's own row
     expect(suggestionsOf(null, (n) => n)).toEqual([]);
     expect(suggestionsOf(undefined, (n) => n)).toEqual([]);
   });
@@ -79,5 +80,13 @@ describe("a stored stopped turn", () => {
     expect(phaseOf(v)).toBe("stopped");
     expect(v.text).toBe("So far [1]");
     expect(v.citations).toHaveLength(1);
+  });
+});
+
+describe("failedView", () => {
+  it("is a turn with no text and the error, which reads as an error (or the unreachable runtime)", () => {
+    expect(phaseOf(failedView("runtime_unavailable"))).toBe("error");
+    expect(errorKeyOf(failedView("runtime_unavailable"))).toBe("ask.error_runtime");
+    expect(errorKeyOf(failedView(null))).toBe("ask.error");
   });
 });

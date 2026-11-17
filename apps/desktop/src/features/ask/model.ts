@@ -90,7 +90,7 @@ export function groupThreads(rows: readonly AskThreadRow[], now: number): { key:
 }
 
 /** Up to three suggested first questions, one per recent person; none until the people directory has rows. */
-export const suggestionsOf = (people: readonly PersonRow[] | null | undefined, ask: (name: string) => string): string[] => (people ?? []).slice(0, 3).map((p) => ask(p.display_name));
+export const suggestionsOf = (people: readonly PersonRow[] | null | undefined, ask: (name: string) => string): string[] => (people ?? []).filter((p) => !p.is_you).slice(0, 3).map((p) => ask(p.display_name));
 
 /** What the page announces once when a turn is ready; nothing for any other phase. */
 export function announcementOf(phase: TurnPhase | null, citations: number): "ask.ready_one" | "ask.ready_other" | "ask.ready_weak" | null {
@@ -100,3 +100,6 @@ export function announcementOf(phase: TurnPhase | null, citations: number): "ask
 
 /** The error line of a failed turn: the runtime named when the core could not reach it, else the generic one. */
 export const errorKeyOf = (v: TurnView): "ask.error_runtime" | "ask.error" => (v.error?.code === "runtime_unavailable" ? "ask.error_runtime" : "ask.error");
+
+/** The turn view of a question whose start failed: no text, the error, so the page shows the error state. */
+export const failedView = (code: string | null): TurnView => ({ text: "", citations: [], answer: null, error: { code: code ?? "internal", message: "", retryable: true } as CoreError, ended: false });
