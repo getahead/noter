@@ -33,6 +33,9 @@ describe("people_list", () => {
     const found = ok(await main.peopleList({ query: "zqalias" })).people;
     expect(found.map((p) => p.id)).toContain(aliased.id);
     expect(ok(await main.peopleList({ query: "no such person xyz" })).people).toEqual([]);
+    // Case, ё/е and ß/ss fold (people.md inst-match).
+    const folded = await make("Алёна Weiß Conf");
+    for (const query of ["алена", "WEISS"]) expect(ok(await main.peopleList({ query })).people.map((p) => p.id)).toContain(folded.id);
   });
 });
 
@@ -44,6 +47,14 @@ describe("person_create and person_get", () => {
     const page = ok(await main.personGet({ person_id: done.person.id }));
     expect(page.person.id).toBe(done.person.id);
     expect([page.calls, page.owns_open, page.you_owe, page.open_questions]).toEqual([[], [], [], []]);
+    expect(page.person).toMatchObject({ notes: null, you_owe: 0 });
+  });
+
+  it("accepts a second person with the same name: Create Anyway is the user's call", async () => {
+    const first = await make("Same Name Conf");
+    const second = ok(await main.personCreate({ display_name: "Same Name Conf", email: null, role: null, org: null })).person;
+    expect(second.id).not.toBe(first.id);
+    expect(second.display_name).toBe("Same Name Conf");
   });
 
   it("refuses a blank name and an unknown person", async () => {
@@ -61,6 +72,14 @@ describe("person_update", () => {
     expect(done.person).toMatchObject({ role: "Tech lead", display_name: p.display_name });
     expect(done.person.aliases).toEqual(["Conf Alias"]);
     expect(done.change_id).toBeTruthy();
+  });
+
+  it("stores notes and reports them on the row, so the Edit sheet starts from what is saved", async () => {
+    const p = await make();
+    const done = ok(await main.personUpdate({ person_id: p.id, rev: p.rev, patch: { notes: "Prefers written updates" } })).person;
+    expect(done.notes).toBe("Prefers written updates");
+    expect(ok(await main.personGet({ person_id: p.id })).person.notes).toBe("Prefers written updates");
+    expect(ok(await main.peopleList({ query: null })).people.find((r) => r.id === p.id)?.notes).toBe("Prefers written updates");
   });
 
   it("a stale rev is a conflict with the current rev; a blank name and an unknown person are refused", async () => {
