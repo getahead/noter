@@ -62,6 +62,11 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await search(page, px, {});
       await shot(page, "search-results", width);
     });
+    test("topic suggestion row", async ({ page }) => {
+      await search(page, px, {}, "websocket");
+      await expect(page.getByRole("button", { name: /Websocket notifications/ })).toBeVisible();
+      await shot(page, "search-topic", width);
+    });
     test("weak matches under the divider", async ({ page }) => {
       await search(page, px, { weak: true });
       await expect(page.getByText("Weaker matches").first()).toBeVisible();

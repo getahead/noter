@@ -54,6 +54,18 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     (find(rendered(SearchView, p), (x) => x.className === "lb-fbtn").props.onClick as () => void)();
     expect(p.onMore).toHaveBeenCalledWith("transcripts:c1");
   });
+  it("a topic hit is one chip row with its counts and opens the thread; topics alone are counted, not 0 results", () => {
+    const bridge = { act: vi.fn() } as never;
+    const topic = { id: "top_1", rev: 1, name: "Websocket notifications", aliases: [], calls: 6, decisions: 3, open_items: 1, last_seen: 1, merge_suggestion: { id: "top_2", name: "Other" } };
+    const p = props(results({ topics: [topic] }), { bridge });
+    const h = html(p);
+    expect(h).toContain("Websocket notifications");
+    expect(h).toContain("6 calls · 3 decisions · 1 open question");
+    expect(h).toContain("1 result");
+    expect(h).not.toContain("0 results");
+    (find(rendered(SearchView, p), (x) => typeof x.onOpen === "function").props.onOpen as () => void)();
+    expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
   it("shows the keyword-only line while the index rebuilds", () => {
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");

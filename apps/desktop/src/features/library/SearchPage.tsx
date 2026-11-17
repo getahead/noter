@@ -6,9 +6,12 @@ import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { navigate } from "../shell/navigate";
+import { TopicChip } from "../../ui/primitives/topic-chip";
 import { PushButton } from "../../ui/primitives/push-button";
 import { apply, heldFilter, holdFilter, isFiltered } from "./filters";
 import { SearchResultRow } from "./SearchResultRow";
+import { openTopic } from "./topic-nav";
+import { topicCounts } from "./topics-model";
 import { askRoute, groupByCall, once, sections, statusOf } from "./search-model";
 import "./library.css";
 
@@ -58,13 +61,20 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
           {widen}
         </>
       );
-    const total = r.calls.length + r.items.length + r.documents.length;
+    // A search that only found topics still has results to count.
+    const total = r.calls.length + r.items.length + r.documents.length || r.topics.length;
+    const topic = r.topics[0];
     return (
       <>
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
         </p>
         {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: filtered ? [clear, ask] : [ask] }} />}
+        {topic && (
+          <section data-region="LS-R3" aria-label={t("search.section.topic")}>
+            <TopicChip size="suggestion" name={topic.name} counts={topicCounts(topic)} merge={topic.merge_suggestion ? t("topics.merge_glyph") : undefined} onOpen={() => openTopic(bridge, topic.id)} />
+          </section>
+        )}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>
