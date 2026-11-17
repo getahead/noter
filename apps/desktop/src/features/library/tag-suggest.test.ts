@@ -38,6 +38,9 @@ describe("listKey (↑ ↓ Return in the list)", () => {
     expect(listKey("ArrowUp", 1, 3)).toEqual({ active: 0 });
     expect(listKey("Enter", 1, 3)).toEqual({ active: 1, pick: 1 });
     expect(listKey("Enter", -1, 3)).toBeNull(); // nothing active: Return runs the search (or takes an exact #tag)
+    expect(listKey("Enter", 2, 1)).toBeNull(); // the list shrank under the active row: nothing to pick
+    expect(listKey("ArrowDown", 5, 2)).toEqual({ active: 0 });
+    expect(listKey("ArrowUp", 5, 2)).toEqual({ active: 1 });
     expect(listKey("a", 0, 3)).toBeNull();
     expect(listKey("ArrowDown", -1, 0)).toBeNull();
   });

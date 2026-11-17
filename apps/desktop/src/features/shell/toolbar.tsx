@@ -120,11 +120,13 @@ export function MainToolbar(p: ToolbarProps) {
               if (!k) return;
               e.preventDefault();
               e.stopPropagation();
-              if (k.pick !== undefined) return void (setActive(-1), p.onPickTag?.(matches[k.pick]!));
+              const tag = k.pick === undefined ? undefined : matches[k.pick];
+              if (tag !== undefined) return void (setActive(-1), p.onPickTag?.(tag));
+              if (k.pick !== undefined) return;
               setActive(k.active);
             }}
           >
-            <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+            <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={(v) => (setActive(-1), p.onSearch(v))} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
             {matches.length > 0 && (
               <ul className="np-tagpop" role="listbox" aria-label={t("search.tags_list")}>
                 {matches.map((x, i) => (

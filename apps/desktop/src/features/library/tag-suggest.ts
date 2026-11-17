@@ -17,8 +17,8 @@ export const holdTag = (tag: string): void => holdFilter(apply(heldFilter(), { t
 export function listKey(key: string, active: number, count: number): { active: number; pick?: number } | null {
   if (count === 0) return null;
   if (key === "ArrowDown") return { active: (active + 1) % count };
-  if (key === "ArrowUp") return { active: active <= 0 ? count - 1 : active - 1 };
-  return key === "Enter" && active >= 0 ? { active, pick: active } : null;
+  if (key === "ArrowUp") return { active: active <= 0 || active >= count ? count - 1 : active - 1 };
+  return key === "Enter" && active >= 0 && active < count ? { active, pick: active } : null;
 }
 
 /** The tags the list under the field offers for what is typed: while it starts with `#`, those containing the rest. */
