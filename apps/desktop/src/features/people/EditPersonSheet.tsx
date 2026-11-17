@@ -31,13 +31,25 @@ export function patchOf(p: PersonRow, d: { name: string; aka: string; email: str
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-alias
 
+type Draft = { name: string; aka: string; email: string; role: string; org: string; notes: string; keep: boolean };
+type Field = keyof Draft;
+
+/** The draft over a fresher record: fields the user edited stay theirs, every other field shows the current value. */
+export function rebaseDraft(d: Draft, fresh: PersonRow, touched: ReadonlySet<Field>, name: string): Draft {
+  const current: Draft = { name: fresh.display_name, aka: fresh.aliases.join(", "), email: fresh.email ?? "", role: fresh.role ?? "", org: fresh.org ?? "", notes: fresh.notes ?? "", keep: d.keep };
+  const out = { ...current } as Record<Field, string | boolean>;
+  (Object.keys(d) as Field[]).forEach((k) => touched.has(k) && (out[k] = k === "name" ? name : d[k]));
+  return out as Draft;
+}
+
 export function EditPersonSheet({ close, bridge, person: opened }: { close: () => void; bridge: Bridge; person: PersonRow }) {
   // the record the sheet saves against: a refused stale save replaces it with the current one, the draft stays
   const [person, setPerson] = useState(opened);
   const [d, setD] = useState({ name: person.display_name, aka: person.aliases.join(", "), email: person.email ?? "", role: person.role ?? "", org: person.org ?? "", notes: person.notes ?? "", keep: true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"conflict" | "failed" | null>(null);
-  const set = (k: keyof typeof d) => (v: string) => setD({ ...d, [k]: v });
+  const [touched, setTouched] = useState<ReadonlySet<Field>>(new Set());
+  const set = (k: keyof typeof d) => (v: string) => (setTouched(new Set(touched).add(k)), setD({ ...d, [k]: v }));
   const renamed = d.name.trim() !== "" && d.name.trim() !== person.display_name;
   async function save() {
     setBusy(true);
@@ -48,7 +60,7 @@ export function EditPersonSheet({ close, bridge, person: opened }: { close: () =
     setError(outcome); // the draft stays
     if (outcome === "conflict") {
       const fresh = await readPerson(bridge, person.id);
-      if (fresh.page) setPerson(fresh.page.person);
+      if (fresh.page) (setPerson(fresh.page.person), setD(rebaseDraft(d, fresh.page.person, touched, d.name)));
     }
     // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-if-error
   }

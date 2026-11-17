@@ -5,7 +5,7 @@ import type { PersonRow } from "../../core/bindings";
 import { undoMode } from "../history/undo";
 import { find, rendered } from "../../ui/testing";
 import { deletePerson, mergePeople, updatePerson } from "./actions";
-import { EditPersonSheet, patchOf } from "./EditPersonSheet";
+import { EditPersonSheet, patchOf, rebaseDraft } from "./EditPersonSheet";
 import { possibleDuplicate } from "./identity";
 import { MergePeopleSheet, mergeTargets, readPreview } from "./MergePeopleSheet";
 import { rowMenu } from "./PeoplePage";
@@ -124,6 +124,17 @@ describe("cpt-noter-flow-ui-people-edit-merge", () => {
     await save();
     await flush();
     expect(b.core.personGet).toHaveBeenCalledWith({ person_id: "per_p" });
+  });
+  it("after a stale save the untouched fields take the current values and only the user's edits are kept (QA)", () => {
+    const old = draft({ role: "Product manager", email: "" });
+    const fresh = person({ rev: 4, role: "Outside role", email: "p@x.io" });
+    // the user only edited the name
+    const next = rebaseDraft(old, fresh, new Set(["name"] as const), "Pavel R.");
+    expect(next).toMatchObject({ name: "Pavel R.", role: "Outside role", email: "p@x.io" });
+    // the retry sends the user's rename and nothing that reverts the outside change
+    expect(patchOf(fresh, { ...next, keep: true })).toEqual({ display_name: "Pavel R.", aliases: ["Pasha", "Pavel Romanov"] });
+    // an edited field stays the user's
+    expect(rebaseDraft(old, fresh, new Set(["role"] as const), old.name).role).toBe("Product manager");
   });
   it("finds a possible duplicate by full name, short name or a lone first name (QA 2)", () => {
     const people = [person({ display_name: "Lena Krüger", short_name: "Lena K." })];
