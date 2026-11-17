@@ -32,9 +32,19 @@ describe("topic actions (cpt-noter-flow-ui-library-search-topics-topic)", () => 
     const out = await renameTopic(bridge, a!, "Brand new name", [a!, b!], () => {});
     expect(out).toMatchObject({ type: "renamed", topic: { name: "Brand new name" } });
   });
-  it("a stale revision and a failed write keep the draft", async () => {
+  it("a stale revision re-reads the topic and retries once with the fresh revision, keeping only the typed name", async () => {
     const [a, b] = await ready();
-    expect(await renameTopic(bridge, { ...a!, rev: a!.rev + 5 }, "Other", [a!, b!], () => {})).toEqual({ type: "stale" });
+    const rename = vi.spyOn(bridge.core, "topicRename");
+    const rev = a!.rev;
+    const out = await renameTopic(bridge, { ...a!, rev: rev + 5 }, "Other", [a!, b!], () => {});
+    expect(out).toMatchObject({ type: "renamed", topic: { id: a!.id, name: "Other" } });
+    expect(rename.mock.calls.map((c) => [c[0].rev, c[0].name])).toEqual([[rev + 5, "Other"], [rev, "Other"]]);
+  });
+  it("a conflict that persists after the re-read stays stale, and a failed write keeps the draft", async () => {
+    const [a, b] = await ready();
+    fake.failNext("topic_rename", "conflict", null);
+    fake.failNext("topic_rename", "conflict", null);
+    expect(await renameTopic(bridge, a!, "Other", [a!, b!], () => {})).toEqual({ type: "stale" });
     expect(await renameTopic(bridge, { ...a!, id: "top_missing" }, "Other", [a!, b!], () => {})).toEqual({ type: "failed" });
   });
   it("merges only the chosen pair and keeps topics separate", async () => {
@@ -103,7 +113,12 @@ describe("sheet flows and thread actions", () => {
     };
     expect((await run(a)).close).toHaveBeenCalled();
     expect((await run({ ...a!, name: b!.name })).close).not.toHaveBeenCalled();
-    expect((await run({ ...a!, rev: a!.rev + 9 })).onRenamed).toHaveBeenCalled();
+    expect((await run({ ...a!, rev: a!.rev + 9 })).close).toHaveBeenCalled(); // a stale revision saves after the re-read
+    fake.failNext("topic_rename", "conflict", null);
+    fake.failNext("topic_rename", "conflict", null);
+    const still = await run({ ...a! });
+    expect(still.close).not.toHaveBeenCalled(); // a conflict that persists keeps the draft and re-reads the page
+    expect(still.onRenamed).toHaveBeenCalled();
     expect((await run({ ...a!, name: " " })).close).not.toHaveBeenCalled();
   });
   it("Merge closes and reports the kept topic", async () => {

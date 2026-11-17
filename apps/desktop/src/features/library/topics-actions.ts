@@ -12,8 +12,8 @@ export type RenameOutcome =
   | { type: "failed" };
 
 // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-rename
-/** Renames `topic`; a taken name is refused here (the pre-check that offers Merge Instead) and by the core alike, a stale revision keeps the draft. Undo is offered with the returned change. */
-export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string, known: TopicRow[], refresh: () => void): Promise<RenameOutcome> {
+/** Renames `topic`; a taken name is refused here (the pre-check that offers Merge Instead) and by the core alike. A stale revision re-reads the topic and retries once with its fresh revision (the draft is the user's name only); a second conflict is stale. Undo is offered with the returned change. */
+export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string, known: TopicRow[], refresh: () => void, retried = false): Promise<RenameOutcome> {
   const clean = name.trim();
   if (!clean) return { type: "blank" };
   const other = clashOf(known, topic.id, clean);
@@ -24,7 +24,11 @@ export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string,
     return { type: "renamed", topic: res.data.topic };
   }
   const d = res.error.detail;
-  if (res.error.code === "conflict") return { type: "stale" };
+  if (res.error.code === "conflict") {
+    if (retried) return { type: "stale" };
+    const fresh = await bridge.act("topic_get", "topic_get", () => bridge.core.topicGet({ topic_id: topic.id }), { screen: "library-topics" });
+    return fresh.status === "ok" ? renameTopic(bridge, fresh.data.topic, name, known, refresh, true) : { type: "stale" };
+  }
   if (res.error.code === "invalid_input" && d?.type === "validation" && d.field === "name")
     return d.rule === "duplicate" ? { type: "clash", other: known.find((x) => x.id !== topic.id && x.name.toLowerCase() === clean.toLowerCase()) ?? topic } : { type: "blank" };
   return { type: "failed" };
