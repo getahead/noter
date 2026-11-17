@@ -1484,7 +1484,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [ ] `p4` - `cpt-noter-constraint-behaviour-metrics-off`
+  - `cpt-noter-constraint-behaviour-metrics-off` (plain reference: its status lives in DESIGN.md and closes with the last feature that references it, M5)
 
 - **Domain Model Entities**:
   - Person, voice profile
