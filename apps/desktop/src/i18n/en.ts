@@ -1693,6 +1693,7 @@ export const en = {
   "ask.new_question": "New Question",
   "ask.recent": "Recent questions",
   "ask.recent_empty": "Your questions appear here",
+  "ask.topic_error": "Couldn’t open this topic",
   "ask.topic_question": "What was decided and what is still open about {name}?",
   "ask.group.today": "Today",
   "ask.group.last_week": "Last week",

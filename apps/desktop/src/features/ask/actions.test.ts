@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { askState } from "./ask-state";
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, startRoute, topicOfRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, startRoute, topicOfRoute, scopeOf } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -240,7 +241,7 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(topicOfRoute("new-topic:")).toBeNull();
     expect(topicOfRoute("new:tp_1")).toBeNull();
     expect(await startFromTopicRoute(bridge, "new-topic:tp_1", ask)).toBe(true);
-    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about Websocket notifications?", { preset: "all", topic_id: "tp_1" });
+    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about Websocket notifications?", { preset: "topic:tp_1", topic_id: "tp_1" });
     expect(await startFromTopicRoute(bridge, "new-topic:tp_1", ask)).toBe(false); // remount on the same entry
     expect(await startFromTopicRoute(bridge, "root", ask)).toBe(false);
     expect(ask).toHaveBeenCalledOnce();
@@ -250,7 +251,9 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
   });
   it("keeps a topic route askable when the topic cannot be read or the page was left", async () => {
     const ask = vi.fn();
-    expect(await startFromTopicRoute(make(err).bridge, "new-topic:tp_2", ask)).toBe(false);
+    const onError = vi.fn();
+    expect(await startFromTopicRoute(make(err).bridge, "new-topic:tp_2", ask, () => true, onError)).toBe(false);
+    expect(onError).toHaveBeenCalledOnce();
     const good = make(ok({ topic: { name: "X" } })).bridge;
     expect(await startFromTopicRoute(good, "new-topic:tp_2", ask, () => false)).toBe(false);
     expect(await startFromTopicRoute(good, "new-topic:tp_2", ask)).toBe(true);
@@ -266,7 +269,16 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     startRoute(bridge, "new-topic:tp_7", ask);
     await vi.runAllTimersAsync();
     expect(ask).toHaveBeenCalledWith("Hello");
-    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about T?", { preset: "all", topic_id: "tp_7" });
+    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about T?", { preset: "topic:tp_7", topic_id: "tp_7" });
     vi.useRealTimers();
+  });
+  it("selects the topic scope on arrival and keeps it for follow-ups", async () => {
+    const good = make(ok({ topic: { name: "T" } })).bridge;
+    await startFromTopicRoute(good, "new-topic:tp_9", vi.fn());
+    expect(askState().scopeId).toBe("topic:tp_9");
+    const listed = { id: "topic:tp_9", scope: { preset: "topic:tp_9", topic_id: "tp_9", people: [] } } as never;
+    expect(scopeOf([listed], "topic:tp_9")).toEqual((listed as { scope: unknown }).scope);
+    expect(scopeOf([], "topic:tp_9")).toEqual({ preset: "topic:tp_9", topic_id: "tp_9" }); // the follow-up's scope, not All calls
+    expect(scopeOf([], "all")).toBeUndefined();
   });
 });

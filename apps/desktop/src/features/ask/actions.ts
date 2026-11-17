@@ -2,6 +2,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { setAskState } from "./ask-state";
 import { navigate } from "../shell/navigate";
 import { searchRoute } from "../shell/sections";
 import type { Replay } from "../transcript/playback";
@@ -195,29 +196,38 @@ export function startFromRoute(key: string, ask: (question: string) => void): bo
   return true;
 }
 
+/** The scope of the core's `topic:<id>` preset. */
+export const topicScope = (id: string): AskScope => ({ preset: `topic:${id}`, topic_id: id });
+
+/** The scope a question is sent with: the chosen preset's, or for a `topic:<id>` choice the preset list does not carry (yet), the topic's own. */
+export const scopeOf = (presets: readonly ScopePreset[], scopeId: string): AskScope | undefined =>
+  presets.find((p) => p.id === scopeId)?.scope ?? (scopeId.startsWith("topic:") ? topicScope(scopeId.slice("topic:".length)) : undefined);
+
 /** The topic id a `new-topic:<id>` route names (Library's Ask About This Thread), or null for any other route. */
 export const topicOfRoute = (key: string): string | null => (key.startsWith("new-topic:") ? key.slice("new-topic:".length) || null : null);
 
 /** Ask about the routed topic once per history entry: its name makes the question, its id the scope. False when the key names no topic, was asked already, or the topic cannot be read (the key stays askable). */
-export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (question: string, scope: AskScope) => void, alive: () => boolean = () => true): Promise<boolean> {
+export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (question: string, scope: AskScope) => void, alive: () => boolean = () => true, onError: () => void = () => {}): Promise<boolean> {
   const id = topicOfRoute(key);
   if (!id || routed.has(key)) return false;
   routed.add(key);
   const res = await bridge.act("ask:topic", "topic_get", () => bridge.core.topicGet({ topic_id: id }));
   if (res.status !== "ok" || !alive()) {
     routed.delete(key);
+    if (alive()) onError();
     return false;
   }
-  ask(t("ask.topic_question", { name: res.data.topic.name }), { ...NEW_SCOPE, topic_id: id });
+  setAskState({ scopeId: `topic:${id}` }); // the toolbar pop-up shows the topic scope, and follow-ups keep it
+  ask(t("ask.topic_question", { name: res.data.topic.name }), topicScope(id));
   return true;
 }
 
 /** Start what a `new:` or `new-topic:` route asks, from a timer the returned cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing. */
-export function startRoute(bridge: Bridge, key: string, ask: (question: string, scope?: AskScope) => void): () => void {
+export function startRoute(bridge: Bridge, key: string, ask: (question: string, scope?: AskScope) => void, onError?: () => void): () => void {
   let alive = true;
   const h = setTimeout(() => {
     startFromRoute(key, ask);
-    void startFromTopicRoute(bridge, key, ask, () => alive);
+    void startFromTopicRoute(bridge, key, ask, () => alive, onError);
   }, 0);
   return () => {
     alive = false;
