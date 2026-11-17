@@ -1,5 +1,5 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { AuditEntry, AuditWhat, ExportResult, LogFormat, Page } from "../../core/bindings";
+import type { AuditEntry, AuditWhat, ExportResult, LogFormat, NavTarget, Page } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { clock, locale, shortDay, t } from "../../i18n/format";
 import type { UiPrefs } from "../../core/bindings";
@@ -119,3 +119,6 @@ export function createAudit(bridge: Bridge, callId: string | null, notify: (v: A
     },
   };
 }
+
+/** The call Privacy is opened on. "All calls" dismisses that one request, not the call: the next request for it (a new object) opens on it again. */
+export const auditCall = (nav: NavTarget | null, dismissed: NavTarget | null): string | null => (nav?.type === "settings" && nav !== dismissed ? (nav.call_id ?? null) : null);

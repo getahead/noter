@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { useWindow } from "../../app/use-window";
-import type { PrivacyMode } from "../../core/bindings";
+import type { NavTarget, PrivacyMode } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { PopupButton } from "../../ui/primitives/popup-button";
@@ -14,6 +14,7 @@ import { saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { rowState } from "./permissions";
+import { auditCall } from "./audit";
 import { AuditLog } from "./AuditLog";
 import { ShareTestSheet } from "./ShareTestSheet";
 import { choices, type PaneProps } from "./pane-props";
@@ -33,9 +34,9 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
   const due = audio.retention_next_run_deletes;
   const [sheet, setSheet] = useState(false);
   // the Call info link opens Privacy on its call
-  const navCall = useWindow(bridge, (s) => (s.nav?.type === "settings" ? (s.nav.call_id ?? null) : null));
-  const [dismissed, setDismissed] = useState<string | null>(null);
-  const callId = navCall && navCall !== dismissed ? navCall : null;
+  const nav = useWindow(bridge, (s) => s.nav);
+  const [dismissed, setDismissed] = useState<NavTarget | null>(null);
+  const callId = auditCall(nav, dismissed);
   const rowError = useRowErrors(bridge);
   const calendar = rowState("calendar", useWindow(bridge, (s) => s.whole.setup?.permissions));
   return (
@@ -71,7 +72,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
       <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
 <PushButton label={t("settings.privacy.share_test")} onAction={() => setSheet(true)} />
 {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
-        <AuditLog bridge={bridge} callId={callId} onAllCalls={() => setDismissed(navCall)} />
+        <AuditLog bridge={bridge} callId={callId} onAllCalls={() => setDismissed(nav)} />
       </Group>
       {sheet && <ShareTestSheet bridge={bridge} onClose={() => setSheet(false)} />}
     </>

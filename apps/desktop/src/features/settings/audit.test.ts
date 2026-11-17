@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuditEntry } from "../../core/bindings";
-import { auditRows, exportAudit, formatBytes, mergePage, readAudit, requestCount, totalBytes } from "./audit";
+import { auditCall, auditRows, exportAudit, formatBytes, mergePage, readAudit, requestCount, totalBytes } from "./audit";
 
 const row = (id: string, o: Partial<AuditEntry> = {}): AuditEntry => ({ id, kind: "run", llm_run_id: null, at: 1_700_000_000_000, call: null, runtime: null, destination: "Claude", what: "full_transcript", bytes_out: 1800, redacted: false, ...o });
 const call = (id: string) => ({ id, title: `Call ${id}`, started_at: 0, call_type: "t" });
@@ -112,5 +112,20 @@ describe("audit with a call", () => {
     expect(auditList).toHaveBeenCalledWith(expect.objectContaining({ call_id: "c1" }));
     expect(auditExport).toHaveBeenCalledWith({ call_id: "c1", format: "markdown" });
     expect(s.view().total).toBe(41);
+  });
+});
+
+describe("auditCall", () => {
+  const open = (call?: string) => ({ type: "settings", pane: "privacy", call_id: call }) as never;
+  it("opens on the call of a settings request, and on none for other requests", () => {
+    expect(auditCall(open("c1"), null)).toBe("c1");
+    expect(auditCall(open(), null)).toBeNull();
+    expect(auditCall(null, null)).toBeNull();
+    expect(auditCall({ type: "ask" } as never, null)).toBeNull();
+  });
+  it("All calls drops that request only: a new request for the same call opens on it again", () => {
+    const first = open("c1");
+    expect(auditCall(first, first)).toBeNull();
+    expect(auditCall(open("c1"), first)).toBe("c1");
   });
 });
