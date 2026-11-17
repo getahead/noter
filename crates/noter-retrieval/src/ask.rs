@@ -314,12 +314,16 @@ fn turns(c: &Connection, thread: &str) -> Db<Vec<AskAnswer>> {
                 .and_then(|r| serde_json::from_value(serde_json::Value::String(r)).ok())
                 .unwrap_or(RuntimeChoice::Local);
             let citations: String = r.get(3)?;
+            let answer_md: Option<String> = r.get(2)?;
+            let found: Option<bool> = r.get(4)?;
             Ok(AskAnswer {
                 turn_id: AskTurnId::new(r.get::<_, String>(0)?),
                 question: r.get(1)?,
-                answer_md: r.get::<_, Option<String>>(2)?.unwrap_or_default(),
+                // A stopped turn keeps its text and has no `found`; a running one has neither yet.
+                stopped: found.is_none() && answer_md.is_some(),
+                answer_md: answer_md.unwrap_or_default(),
                 citations: serde_json::from_str(&citations).unwrap_or_default(),
-                found: r.get::<_, Option<bool>>(4)?.unwrap_or(false),
+                found: found.unwrap_or(false),
                 answered_locally: runtime == RuntimeChoice::Local,
                 runtime,
                 sensitive_sources_skipped: r.get(6)?,

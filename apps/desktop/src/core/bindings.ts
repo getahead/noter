@@ -296,6 +296,8 @@ export type AskAnswer = {
 	sensitive_sources_skipped: number,
 	keyword_only: boolean,
 	only_weak_evidence: boolean,
+	/**  The user stopped this turn (`ask_stop`): `answer_md` is what had arrived, `found` is `false`. */
+	stopped: boolean,
 	asked_at: TimestampMs,
 };
 
@@ -3623,7 +3625,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.8";
+export const CONTRACT_VERSION = "2.9";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

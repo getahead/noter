@@ -570,6 +570,10 @@ async fn stop_ends_the_turn_with_answer_stopped_and_nothing_after() {
     let thread = w.thread(&handle.thread_id).await.unwrap();
     assert_eq!(thread.turns.len(), 1);
     assert!(!thread.turns[0].found);
+    assert!(
+        thread.turns[0].stopped,
+        "a reopened thread tells stopped from not found"
+    );
     let stored: (Option<String>, Option<bool>) = w
         .core
         .store()

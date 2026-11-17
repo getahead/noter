@@ -133,7 +133,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       fake.push(sub, { event: { type: "citation", citation: cite } });
     });
     later(400 + words.length * 60 + 100, () => {
-      const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: shared.now() };
+      const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
       save(answer);
       fake.push(sub, { event: { type: "done", answer } });
       fake.push(sub, { event: { type: "ended", reason: "call_stopped" } });
@@ -147,13 +147,11 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     const run = runs?.get(a.turn_id);
     if (run) {
       run.timers.forEach((timer) => fake.cancelLater(timer));
-      if (run.text) {
-        const answer: Bindings.AskAnswer = { turn_id: a.turn_id, question: run.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, asked_at: shared.now() };
-        const world = fake.world;
-        const existing = world.ask_threads.find((t) => t.id === run.thread);
-        if (existing) existing.turns.push(answer);
-        else world.ask_threads.unshift({ id: run.thread, title: run.question, scope: run.scope, turns: [answer] });
-      }
+      const answer: Bindings.AskAnswer = { turn_id: a.turn_id, question: run.question, answer_md: run.text, citations: run.citations, found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: true, asked_at: shared.now() };
+      const world = fake.world;
+      const existing = world.ask_threads.find((t) => t.id === run.thread);
+      if (existing) existing.turns.push(answer);
+      else world.ask_threads.unshift({ id: run.thread, title: run.question, scope: run.scope, turns: [answer] });
       fake.push(run.subscription, { event: { type: "failed", error: coreError("answer_stopped", `turn ${a.turn_id} stopped`) } });
       fake.push(run.subscription, { event: { type: "ended", reason: "unsubscribed" } });
       fake.closeChannel(run.subscription);

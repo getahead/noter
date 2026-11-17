@@ -329,6 +329,7 @@ impl Core {
             sensitive_sources_skipped: found.sensitive_skipped,
             keyword_only: !matches!(mode, SearchMode::Hybrid),
             only_weak_evidence: noter_retrieval::only_weak(strengths),
+            stopped: false,
             asked_at: job.asked_at,
         };
         // @cpt-end:cpt-noter-algo-core-retrieval-ask-citations:p1:inst-cite-flags
@@ -604,6 +605,7 @@ impl Core {
             sensitive_sources_skipped: 0,
             keyword_only: false,
             only_weak_evidence: false,
+            stopped: true,
             asked_at: self.deps.clock.now(),
         };
         let now = self.deps.clock.now();

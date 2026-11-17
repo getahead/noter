@@ -274,7 +274,7 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
     await pause(1800); // past the held answer (1500 ms)
     expect(types(got)).toEqual(["started", "failed"]);
     const turn = ok(await main.askThreadGet({ thread_id: handle.thread_id })).turns[0];
-    expect(turn.found).toBe(false);
+    expect(turn).toMatchObject({ found: false, stopped: true });
   });
 
   it("other — deleting the thread mid-turn ends it once and its late answer recreates nothing", async () => {
