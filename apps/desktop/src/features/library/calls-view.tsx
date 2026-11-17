@@ -54,6 +54,7 @@ export interface CallsViewProps {
   onDismissFailed: () => void;
   onCloseMenu: () => void;
   onDelete: () => void;
+  onAddTag?: () => void;
 }
 
 const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
@@ -108,6 +109,7 @@ export function CallsView(p: CallsViewProps) {
             single={chosen.length === 1 ? chosen[0]! : null}
             onOpen={p.onOpen}
             onDelete={p.onDelete}
+            onAddTag={p.onAddTag}
           />
         </div>
       )}
@@ -269,11 +271,13 @@ export function ContextMenu({
   single,
   onOpen,
   onDelete,
+  onAddTag,
 }: {
   onClose: () => void;
   single: CallRow | null;
   onOpen: (id: string) => void;
   onDelete: () => void;
+  onAddTag?: () => void;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -291,6 +295,7 @@ export function ContextMenu({
             disabled: !single,
             onSelect: run(() => single && onOpen(single.id)),
           },
+          ...(onAddTag ? [{ label: t("library.add_tag"), onSelect: run(onAddTag) }] : []),
           { divider: true },
           {
             label: t("library.menu.delete"),

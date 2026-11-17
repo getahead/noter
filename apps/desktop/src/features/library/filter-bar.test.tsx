@@ -9,7 +9,7 @@ const bar = (s = BLANK) => renderToString(<FilterBar state={s} lists={lists} onA
 describe("FilterBar (cpt-noter-component-ui-filter-bar)", () => {
   it("offers the pop-ups and no Clear without filters", () => {
     const html = bar();
-    for (const w of ["People", "Type", "Tags", "Language", "Date", "Has open items"]) expect(html).toContain(w);
+    for (const w of ["People", "Type", "Tags", "Language", "Date", "Has Open Items"]) expect(html).toContain(w);
     expect(html).not.toContain("Clear Filters");
   });
   it("shows a token with the person's short name and Clear once a filter is set", () => {

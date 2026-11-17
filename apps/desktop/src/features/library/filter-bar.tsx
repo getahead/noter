@@ -5,7 +5,7 @@ import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
-import { SearchField } from "../../ui/primitives/search-field";
+import { Icon } from "../../ui/icons";
 import { datePreset, tokens, type FilterAction, type FilterState, type Group, type Lookups } from "./filters";
 
 export interface Lists {
@@ -39,6 +39,7 @@ export const lookups = (l: Lists): Lookups => ({
 });
 
 const MENU_LABEL = { people: "filters.people", type: "filters.type", tags: "filters.tags", language: "filters.language", date: "filters.date" } as const;
+const LANG_NAME: Record<string, string> = { en: t("settings.general.lang_en"), ru: t("settings.general.lang_ru"), de: t("settings.general.lang_de") };
 type Menu = "people" | "type" | "tags" | "language" | "date" | null;
 const LANGS = ["en", "ru", "de"];
 
@@ -49,28 +50,34 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toks = tokens(state, lookups(lists));
   const f = state.filter;
-  const pick = (m: Exclude<Menu, null>) => (
-    <button key={m} type="button" className="lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
-      {t(MENU_LABEL[m])}
-    </button>
-  );
+  const GROUP = { people: "people", type: "call_types", tags: "tags", language: "languages" } as const;
+  const pick = (m: Exclude<Menu, null>) => {
+    const held = m === "date" ? [] : ((f[GROUP[m]] ?? []) as string[]);
+    const first = m === "people" ? lookups(lists).person(held[0] ?? "") : m === "type" ? lookups(lists).type(held[0] ?? "") : m === "language" ? LANG_NAME[held[0] ?? ""] ?? "" : held[0] ?? "";
+    const value = m === "date" ? (preset === "any" ? "" : toks.find((k) => k.kind === "date")?.label ?? "") : held.length ? (held.length > 1 ? `${first} +${held.length - 1}` : first) : "";
+    return (
+      <button key={m} type="button" className="lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
+        {t(MENU_LABEL[m])}{value && <span className="np-dim"> {value}</span>}
+        <Icon name="updown" size={11} cls="np-popup__chev" />
+      </button>
+    );
+  };
   const group = (g: Group, items: { value: string; label: string }[]) =>
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
   const today = new Date().toISOString().slice(0, 10);
   const preset = datePreset(f);
   return (
     <div data-region="LC-R2" className="lb-filterbar" role="search" aria-label={t("filters.label")}>
-      <SearchField
-        variant="tokens"
-        placeholder={t("filters.search")}
-        value={state.words}
-        tokens={toks.map((k) => ({ label: k.label, kind: k.kind }))}
-        onChange={(words) => onAction({ type: "words", words })}
-        onEnter={onRun}
-        onRemoveToken={(i) => toks[i] && onAction({ type: "remove", token: toks[i]! })}
-      />
+      {toks.map((k, i) => (
+        <span key={`${k.kind}:${k.value}`} className="np-token" data-token-kind={k.kind}>
+          {k.label}
+          <button type="button" className="np-token__x" aria-label={t("search.remove_token", { label: k.label })} onClick={() => onAction({ type: "remove", token: toks[i]! })}>
+            <Icon name="x" size={9} />
+          </button>
+        </span>
+      ))}
       {(["people", "type", "tags", "language", "date"] as const).map(pick)}
-      <Checkbox label={t("filters.open_items")} checked={!!f.has_open_items} onAction={(on) => onAction({ type: "open_items", on })} />
+      <button type="button" className="lb-fbtn" aria-pressed={!!f.has_open_items} onClick={() => onAction({ type: "open_items", on: !f.has_open_items })}>{t("filters.open_items_toggle")}</button>
       {toks.length > 0 && <PushButton label={t("filters.clear")} variant="quiet" size="small" onAction={() => onAction({ type: "clear" })} />}
       {open && (
         <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
@@ -78,7 +85,7 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
             {open === "people" && group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })))}
             {open === "type" && group("call_types", lists.types.map((c) => ({ value: c.id, label: c.label })))}
             {open === "tags" && (lists.tags.length ? group("tags", lists.tags.map((g) => ({ value: g.tag, label: g.tag }))) : <p>{t("filters.no_tags")}</p>)}
-            {open === "language" && group("languages", LANGS.map((l) => ({ value: l, label: l.toUpperCase() })))}
+            {open === "language" && group("languages", LANGS.map((l) => ({ value: l, label: LANG_NAME[l]! })))}
             {open === "date" && (
               <>
                 {(["any", "7d", "30d"] as const).map((p) => (

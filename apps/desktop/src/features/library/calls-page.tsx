@@ -233,7 +233,6 @@ export function CallsPage() {
       bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} onRun={() => {}} />}
       actions={
         <div className="lb-actions">
-          <button type="button" className="lb-fbtn" disabled={!chosen.length} onClick={(e) => setTagging(e.currentTarget)}>{t("library.add_tag")}</button>
           <button type="button" className="lb-fbtn" disabled title={t("library.export_hint")}>{t("library.export")}</button>
           {tagging && chosen.length > 0 && (
             <AddTagPopover
@@ -274,6 +273,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
+      onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-actions"))}
     />
   );
 }

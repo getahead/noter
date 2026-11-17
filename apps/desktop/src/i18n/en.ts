@@ -796,6 +796,7 @@ export const en = {
   "filters.last_30": "Last 30 Days",
   "filters.range": "{from} – {to}",
   "filters.open_items": "Has open items",
+  "filters.open_items_toggle": "Has Open Items",
   "filters.label": "Filter calls",
   "filters.people": "People",
   "filters.type": "Type",
