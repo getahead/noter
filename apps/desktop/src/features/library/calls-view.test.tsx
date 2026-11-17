@@ -162,6 +162,17 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it("Remove Tag lists the selection's tags and removes the chosen one; with none it is disabled", () => {
+    const [onClose, onRemoveTag] = [vi.fn(), vi.fn()];
+    const items = (tags: string[]) => find(rendered(ContextMenu, { onClose, single: null, onOpen: vi.fn(), onDelete: vi.fn(), tags, onRemoveTag }), (p) => Array.isArray(p.items)).props.items as { label?: string; header?: string; onSelect?: () => void; disabled?: boolean }[];
+    const some = items(["release", "hotfix"]);
+    expect(some.filter((i) => i.header).map((i) => i.header)).toEqual(["Remove Tag"]);
+    some.find((i) => i.label === "hotfix")!.onSelect!();
+    expect(onRemoveTag).toHaveBeenCalledWith("hotfix");
+    expect(onClose).toHaveBeenCalled();
+    expect(items([]).find((i) => i.label === "Remove Tag")!.disabled).toBe(true);
+  });
+
   it("disables Open when several calls are selected", () => {
     const tree = rendered(ContextMenu, {
       onClose: vi.fn(),
@@ -177,6 +188,17 @@ describe("ContextMenu", () => {
         }[]
       )[0]!.disabled,
     ).toBe(true);
+  });
+});
+
+describe("CallsView context menu", () => {
+  it("opens the context menu with the selection's tags and Remove Tag", () => {
+    const rows = [{ ...call("a"), tags: ["release"] }, { ...call("b"), tags: ["release", "hotfix"] }];
+    const onRemoveTag = vi.fn();
+    const tree = rendered(CallsView, props({ state: state({ status: "LISTED", rows, total: 2 }), selected: new Set(["a", "b"]), menu: { x: 1, y: 2 }, onRemoveTag }));
+    const menu = find(tree, (_p, type) => type === ContextMenu);
+    expect(menu.props.tags).toEqual(["release", "hotfix"]);
+    expect(menu.props.onRemoveTag).toBe(onRemoveTag);
   });
 });
 

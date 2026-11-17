@@ -6,6 +6,7 @@ import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Icon } from "../../ui/icons";
+import { SearchField } from "../../ui/primitives/search-field";
 import { datePreset, tokens, type FilterAction, type FilterState, type Group, type Lookups } from "./filters";
 
 export interface Lists {
@@ -68,6 +69,7 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
   };
   const group = (g: Group, items: { value: string; label: string }[]) =>
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
+  const people = <PeopleList lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} />;
   const today = new Date().toISOString().slice(0, 10);
   const preset = datePreset(f);
   return (
@@ -86,7 +88,7 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
       {open && (
         <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
           <div className="lb-pop">
-            {open === "people" && group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })))}
+            {open === "people" && people}
             {open === "type" && group("call_types", lists.types.map((c) => ({ value: c.id, label: c.label })))}
             {open === "tags" && (lists.tags.length ? group("tags", lists.tags.map((g) => ({ value: g.tag, label: g.tag }))) : <p>{t("filters.no_tags")}</p>)}
             {open === "language" && group("languages", LANGS.map((l) => ({ value: l, label: LANG_NAME[l]! })))}
@@ -103,5 +105,21 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
         </Popover>
       )}
     </div>
+  );
+}
+
+/** The People filter (DESIGN: a menu headed People, a search field, one checkbox per person sorted by locale; you are not listed). */
+export function PeopleList({ lists, held, onAction }: { lists: Lists; held: string[]; onAction: (a: FilterAction) => void }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const people = lists.people.filter((p) => !p.is_you && (!q || [p.display_name, ...p.aliases].some((n) => n.toLowerCase().includes(q)))).sort((a, b) => a.display_name.localeCompare(b.display_name));
+  return (
+    <>
+      <strong>{t("filters.people")}</strong>
+      <SearchField placeholder={t("filters.people_search")} value={query} onChange={setQuery} />
+      {people.map((p) => (
+        <Checkbox key={p.id} label={p.display_name} checked={held.includes(p.id)} onAction={() => onAction({ type: "toggle", group: "people", value: p.id })} />
+      ))}
+    </>
   );
 }

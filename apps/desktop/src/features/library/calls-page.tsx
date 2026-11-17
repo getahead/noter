@@ -298,6 +298,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
+      onRemoveTag={(tag) => void tagCalls(bridge, chosen.map((c) => c.id), [], [tag]).then((r) => r.status === "ok" && setFresh((n) => n + 1))}
       onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );
