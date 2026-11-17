@@ -34,18 +34,18 @@ async function open(page: Page, width: number) {
   await openWindow(page, "main", { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 })) });
   await page.waitForFunction(() => typeof (globalThis as unknown as { __noterFake?: Fake }).__noterFake?.invoke === "function");
 }
-/** ⌘F opens the search field; the shell takes the key only once it has rendered, so press until it shows. */
+/** At Wide the field is always there; below that a Search button opens it. */
 async function focusSearch(page: Page) {
-  await expect(async () => {
-    await page.keyboard.press("Meta+KeyF");
-    await expect(page.getByRole("searchbox")).toBeFocused({ timeout: 1000 });
-  }).toPass();
+  const field = page.getByRole("searchbox", { name: /Search/ });
+  await expect(field.or(page.getByRole("button", { name: "Search", exact: true })).first()).toBeVisible();
+  if (!(await field.isVisible())) await page.getByRole("button", { name: "Search", exact: true }).click();
+  await expect(field).toBeVisible();
 }
 async function search(page: Page, width: number, shape: Shape, words = "drawer") {
   await open(page, width);
   await shapeSearch(page, shape);
   await focusSearch(page);
-  const field = page.getByRole("searchbox");
+  const field = page.getByRole("searchbox", { name: /Search/ });
   await field.fill(words);
   await field.press("Enter");
   await expect(page.getByRole("heading", { name: "Search results", level: 1 })).toBeVisible();
@@ -91,7 +91,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await open(page, px);
       await shapeSearch(page, { fail: true });
       await focusSearch(page);
-      const field = page.getByRole("searchbox");
+      const field = page.getByRole("searchbox", { name: /Search/ });
       await field.fill("drawer");
       await field.press("Enter");
       await expect(page.getByText("Couldn’t search your calls")).toBeVisible();
@@ -103,6 +103,6 @@ for (const [width, px] of Object.entries(WIDTHS)) {
 test("cpt-noter-dod-ui-library-search-topics-search # in the search field lists the tags", async ({ page }) => {
   await open(page, WIDTHS.wide);
   await focusSearch(page);
-  await page.getByRole("searchbox").fill("#");
+  await page.getByRole("searchbox", { name: /Search/ }).fill("#");
   await shot(page, "search-tag-suggest", "wide");
 });
