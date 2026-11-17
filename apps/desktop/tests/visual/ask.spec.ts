@@ -36,7 +36,10 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await ask(page, px);
       await page.getByRole("textbox", { name: "Question" }).fill("What did we decide about the backend?");
       await page.keyboard.press("Enter");
-      await expect(page.locator(".ak-recent__item")).toHaveCount(1);
+      // done = the core stored the turn: the recent list gains its row beside the seeded thread, and Stop is gone
+      await expect(page.locator(".ak-recent__item")).toHaveCount(2);
+      await expect(page.getByRole("button", { name: "Ask", exact: true })).toBeVisible();
+      await expect(page.getByText("Answering…")).toHaveCount(0);
       await shot(page, "answered", width);
     });
   });
