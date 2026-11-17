@@ -60,7 +60,7 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
 
 describe("Person toolbar", () => {
   const base = { title: "", actions: [], hasSearch: true, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
-  const draw = (key: string) => renderToString(<PeopleToolbar route={{ section: "people", key }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
+  const draw = (key: string) => renderToString(<DialogsProvider><PeopleToolbar route={{ section: "people", key }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} /></DialogsProvider>);
   it("reads the person id from the route and shows the name with the Overview, Calls and History control", () => {
     expect(personIdOf("person:per_a")).toBe("per_a");
     expect(personIdOf("root")).toBeNull();

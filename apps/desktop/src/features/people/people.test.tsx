@@ -2,6 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { PersonRow } from "../../core/bindings";
+import { DialogsProvider } from "../../ui/dialogs/host";
 import { find, rendered } from "../../ui/testing";
 import { view } from "./identity";
 import { PeopleBody, type PeopleBodyProps } from "./PeoplePage";
@@ -39,8 +40,10 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
     expect(h).toContain("Couldn’t read your people");
     expect(h).toContain("Try Again");
   });
-  it("has no You owe column until the core counts it", () => {
-    expect(renderToString(<PeopleBody {...props({})} />)).not.toContain("You owe");
+  it("shows You owe from the row, blank at zero", () => {
+    const h = renderToString(<PeopleBody {...props({ shown: listed([person({ you_owe: 3 }), person({ id: "per_b", display_name: "Boris", short_name: "Boris", you_owe: 0 })]) })} />);
+    expect(h).toContain("You owe");
+    expect(h).toContain('<td class="np-tnum">3</td>');
   });
   it("LOADING shows skeleton rows only after the delay; ERROR offers Try Again", () => {
     expect(renderToString(<PeopleBody {...props({ shown: null, status: "LOADING" })} />)).not.toContain("pe-skel");
@@ -74,7 +77,7 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
 
 describe("PeopleToolbar", () => {
   const base = { title: "", actions: [], hasSearch: true, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
-  const draw = () => renderToString(<PeopleToolbar route={{ section: "people", key: "root" }} bridge={{} as never} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
+  const draw = () => renderToString(<DialogsProvider><PeopleToolbar route={{ section: "people", key: "root" }} bridge={{} as never} base={base} inspectorOpen={false} onToggleInspector={() => {}} /></DialogsProvider>);
   it("shows the count and its own search field, not the global one", () => {
     holdPeople([person({}), person({ id: "b" }), person({ id: "c" })]);
     setPeopleQuery("ann");
@@ -94,7 +97,7 @@ describe("PeoplePage", () => {
     const { BridgeProvider } = await import("../../app/bridge/context");
     const { PeoplePage } = await import("./PeoplePage");
     const bridge = { label: "main", store: { getState: () => ({ entities: { person: {} }, app: null, commands: {} }), subscribe: () => () => {} }, act: () => new Promise(() => {}), core: {} } as never;
-    const h = renderToString(<BridgeProvider value={bridge}><PeoplePage /></BridgeProvider>);
+    const h = renderToString(<BridgeProvider value={bridge}><DialogsProvider><PeoplePage /></DialogsProvider></BridgeProvider>);
     expect(h).toContain('data-state="loading"');
     expect(h).not.toContain("pe-row");
   });
