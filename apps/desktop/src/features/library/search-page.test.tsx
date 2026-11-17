@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { BridgeProvider } from "../../app/bridge/context";
 import { find, rendered } from "../../ui/testing";
 import { BLANK, heldFilter, holdFilter } from "./filters";
-import { linkIn, SearchPage } from "./SearchPage";
+import { keepLink, linkIn, SearchPage } from "./SearchPage";
 import { SearchResultRow } from "./SearchResultRow";
 
 vi.mock("../shell/navigate", () => ({ navigate: vi.fn() }));
@@ -55,5 +55,16 @@ describe("linkIn", () => {
     expect(linkIn({ querySelector: (s) => (s === "a" ? link : null) })).toBe(link);
     expect(linkIn({ querySelector: () => null })).toBeNull();
     expect(linkIn(null)).toBeNull();
+  });
+});
+
+describe("keepLink", () => {
+  it("stores the wrapper's link in the ref, and clears it when the wrapper goes", () => {
+    const link = {} as HTMLElement;
+    const to: { current: HTMLElement | null } = { current: null };
+    keepLink(to)({ querySelector: () => link } as unknown as HTMLElement);
+    expect(to.current).toBe(link);
+    keepLink(to)(null);
+    expect(to.current).toBeNull();
   });
 });

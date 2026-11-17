@@ -27,6 +27,11 @@ export type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: 
 /** The link inside a wrapper: the popover is anchored on it, not on the span, so closing it can hand focus back (a span takes none). */
 export const linkIn = (wrap: { querySelector(selector: string): HTMLElement | null } | null): HTMLElement | null => wrap?.querySelector("a") ?? null;
 
+/** A ref callback that keeps the wrapper's link in `to`. */
+export const keepLink = (to: { current: HTMLElement | null }) => (wrap: HTMLElement | null) => {
+  to.current = linkIn(wrap);
+};
+
 export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
 
 export interface SearchViewProps {
@@ -94,7 +99,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
           {" · "}
-          <span ref={(el) => { howAt.current = linkIn(el); }}>
+          <span ref={keepLink(howAt)}>
             <Link label={t("search.how")} onAction={() => setHow(!how)} />
           </span>
         </p>
