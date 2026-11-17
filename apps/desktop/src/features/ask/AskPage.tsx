@@ -84,9 +84,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     settleRoute(routeKey, thread, asking === null && turns.length > 0, (route) => navigate(route, true));
   }, [routeKey, thread, asking, turns]);
 
+  // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-stream
   const turn: TurnView | null = data ? foldTurn(data.messages) : stream?.error && asking ? failedView(stream.error.code) : null;
   const phase = turn ? phaseOf(turn) : null;
   const busy = asking !== null && (phase === null || phase === "streaming") && !stream?.error;
+  // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-stream
 
   // A turn the user left while it answered (⌘N, another thread) has ended: Recent now has its thread
   const away = useRef<string | null>(null);
@@ -106,6 +108,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asking, data, phase, bridge, refresh]);
 
+  // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-submit
   const ask = (question: string) => {
     previousTurn.current = afterTurn(data, previousTurn.current); // the answered turn's data must not settle or show as the follow-up
     setAnnounce("");
@@ -113,10 +116,13 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     setDraft("");
     startAsk(bridge, thread, question, presets.find((p) => p.id === scopeId)?.scope);
   };
+  // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-submit
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-follow-up
   const send = () => {
     const question = questionOf(draft, busy);
     if (question) ask(question);
   };
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-follow-up
   const people = usePeople(bridge);
   const replay = useAskReplay(bridge);
 
@@ -151,7 +157,9 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       suggestions={suggestionsOf(people, (name) => t("ask.suggest_person", { name }))}
       onSuggest={ask}
       onStop={stop}
+      // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-retry
       onRetry={() => asking && ask(asking)}
+      // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-retry
     />
   );
 }
@@ -188,6 +196,7 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
   const groups = groupThreads(rows, Date.now());
   return (
     <div className="ak-split">
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-first */}
       <nav className="ak-recent" data-region="AK-R2" aria-label={t("ask.recent")}>
         {loadError && <div className="ak-recent__empty">{t("ask.load_error")}</div>}
         {!loadError && rows.length === 0 && <div className="ak-recent__empty">{t("ask.recent_empty")}</div>}
@@ -202,15 +211,20 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
           </div>
         ))}
       </nav>
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-first */}
       <section className="ak-thread" data-region="AK-R3" aria-label={t("ask.thread")}>
         <div role="status" className="ak-live">{announce}</div>
         {empty && <h2 className="ak-first__h">{t("ask.first_heading")}</h2>}
+        {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
+        {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
         {turns.map((a) => (
           <article key={a.turn_id} className="ak-turn">
             <h3 className="ak-q">{a.question}</h3>
             <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question)} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
           </article>
         ))}
+        {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
+        {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
         {asking && turn && (
           <article className="ak-turn">
             <h3 className="ak-q">{asking}</h3>
@@ -220,6 +234,7 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
         )}
         {bar}
         <div className={`ak-composer${empty ? " is-first" : ""}`} data-region="AK-R4">
+          {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
           <TextField
             variant="multi"
             cls="ak-composer__field"
@@ -230,6 +245,7 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
             onChange={onDraft}
             onEnter={onSend}
           />
+          {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
           {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={onSend} />}
         </div>
         {empty && suggestions.length > 0 && (
@@ -247,17 +263,23 @@ export function AskView({ bridge, rows, loadError, thread, turns, asking, turn, 
 /** One turn's answer: its text as escaped paragraphs; citations and richer states arrive with the cited-answer slice. */
 export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch }: { view: TurnView; bridge: Bridge; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void; onRetry?: () => void; onSearch?: () => void }) {
   const phase = phaseOf(view);
+  // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   if (phase === "not_found")
     return (
       <div className="ak-ans" data-component="cpt-noter-component-ui-cited-answer">
         <p className="ak-ans__p">{t("ask.not_found")}</p>
+        {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-search */}
         {onSearch && <PushButton label={t("ask.search_keyword")} onAction={onSearch} />}
+        {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-if-search */}
       </div>
     );
+  // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   return (
     <div className="ak-ans" data-component="cpt-noter-component-ui-cited-answer">
       {phase === "streaming" && !view.text && <div className="ak-status">{t("ask.answering")}</div>}
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
       {view.text && <CitedAnswer bridge={bridge} text={view.text} citations={view.citations} live={phase === "streaming"} onAskAgain={onAskAgain} onPlay={onPlay} />}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
       {phase === "stopped" && <div className="ak-status">{t("ask.stopped")}</div>}
       {phase === "interrupted" && <div className="ak-status">{t("ask.interrupted")}</div>}
       {phase === "error" && <ErrorBanner view={view} onRetry={onRetry} onLocal={() => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } }))} />}

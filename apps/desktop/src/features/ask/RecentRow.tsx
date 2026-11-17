@@ -22,8 +22,10 @@ export function RecentRow({ row, selected, onOpen, onCopy, onDelete }: { row: As
       >
         {row.title}
       </button>
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage */}
       {anchor && (
         <Popover variant="ask-row-menu" anchor={anchor} align="start" label={t("ask.row_menu")} onClose={close}>
+      {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage */}
           <Menu
             variant="context-menu"
             label={t("ask.row_menu")}

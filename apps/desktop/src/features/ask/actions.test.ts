@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -12,6 +12,7 @@ const make = (result: unknown) => {
     askStop: vi.fn(async () => result),
     askThreadDelete: vi.fn(async () => result),
     audioPlay: vi.fn(async () => result),
+    openExternal: vi.fn(async () => result),
   };
   const bridge = { core, act: (_k: string, _c: string, f: () => unknown) => f(), subscribe: vi.fn() } as unknown as Bridge;
   return { bridge, core, subscribe: bridge.subscribe as ReturnType<typeof vi.fn> };
@@ -225,5 +226,10 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(replace).toHaveBeenCalledWith({ section: "ask", key: "thread:ask_1" });
     expect(startFromRoute("new:Again", ask)).toBe(true);
     expect(ask).toHaveBeenCalledTimes(2);
+  });
+  it("opens a cited document at its chunk through open_external", async () => {
+    const { bridge, core } = make(ok({}));
+    await openDocument(bridge, "doc_1", "ch_2");
+    expect(core.openExternal).toHaveBeenCalledWith({ target: { type: "document", document_id: "doc_1", chunk_id: "ch_2" } });
   });
 });

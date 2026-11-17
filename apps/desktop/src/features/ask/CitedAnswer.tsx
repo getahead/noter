@@ -7,7 +7,7 @@ import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { ProvenanceChip } from "../items/ProvenanceChip";
 import { openSpan, spanTime } from "../items/evidence";
-import { copyTurn } from "./actions";
+import { copyTurn, openDocument } from "./actions";
 import { blocks, type Inline } from "./markdown";
 
 const COPIED_MS = 2000;
@@ -18,12 +18,15 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
   const rows = useRef(new Map<number, HTMLLIElement>());
   const origin = useRef<HTMLElement | null>(null); // the superscript that sent focus to a row: ⇧Tab goes back to it
   const [copy, setCopy] = useState<"idle" | "copied" | "failed">("idle");
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-clipboard
   useEffect(() => {
     if (copy === "idle") return;
     const h = setTimeout(() => setCopy("idle"), COPIED_MS);
     return () => clearTimeout(h);
   }, [copy]);
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-clipboard
   const known = new Set(citations.map((c) => c.n));
+  // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-citation-focus
   const span = (s: Inline, i: number) =>
     s.t === "ref" ? (
       known.has(s.n) ? (
@@ -40,6 +43,7 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
     ) : (
       s.text
     );
+  // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-citation-focus
   return (
     <div className="ak-ans" aria-busy={live}>
       {blocks(text).map((b, i) =>
@@ -60,12 +64,20 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
       )}
       {!live && text && (
         <div className="ak-actions">
+          {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-if-deleted */}
+          {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
+          {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
           {onAskAgain && citations.some((c) => c.deleted) && <PushButton label={t("ask.ask_again")} onAction={onAskAgain} />}
+          {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
+          {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
+          {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-if-deleted */}
+          {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-copy */}
           <PushButton
             ariaLabel={t("ask.copy")} /* the name stays; the label shows Copied and the status region announces it */
             label={copy === "copied" ? t("ask.copied") : copy === "failed" ? t("ask.copy_failed") : t("ask.copy")}
             onAction={() => void copyTurn({ answer_md: text, citations }, (s) => navigator.clipboard.writeText(s)).then(setCopy)}
           />
+          {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-copy */}
           <span role="status" className="ak-live">{copy === "copied" ? t("ask.copied_status") : ""}</span>
         </div>
       )}
@@ -73,13 +85,18 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
   );
 }
 
-function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: Bridge; c: Citation; focused: boolean; onPlay?: (span: TimeSpan) => void; register: (el: HTMLLIElement | null) => void; back: () => void }) {
+export function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: Bridge; c: Citation; focused: boolean; onPlay?: (span: TimeSpan) => void; register: (el: HTMLLIElement | null) => void; back: () => void }) {
   const p = c.provenance;
   const span = p.type === "past_call" || p.type === "this_call" ? p.span : null;
   return (
     <li ref={register} tabIndex={-1} onKeyDown={(e) => e.target === e.currentTarget && e.key === "Tab" && e.shiftKey && (e.preventDefault(), back())} data-component="cpt-noter-component-ui-citation-row" className={`ak-cite${focused ? " is-focus" : ""}`} value={c.n}>
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-deleted */}
+      {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-deleted */}
       {c.deleted && <span className="np-dim">{t("items.source_deleted")}</span>}
+      {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-deleted */}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-deleted */}
       {!c.deleted && span && <ProvenanceChip bridge={bridge} span={span} />}
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-evidence */}
       {p.type === "past_call" &&
         (c.deleted ? (
           <span className="ak-cite__src">{p.call.title}</span>
@@ -88,12 +105,22 @@ function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: B
             {p.call.title}
           </a>
         ))}
+      {p.type === "document" &&
+        (c.deleted ? (
+          <span className="ak-cite__src">{[p.title, p.source_name].join(" · ")}</span>
+        ) : (
+          <a href="#open" className="np-link ak-cite__src" onClick={(e) => (e.preventDefault(), void openDocument(bridge, p.document_id, p.chunk_id))}>
+            {[p.title, p.source_name].join(" · ")}
+          </a>
+        ))}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-evidence */}
+      {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-play */}
       {span && (
         <button type="button" className="np-link" disabled={c.deleted} aria-label={t("ask.play", { at: spanTime(span) })} onClick={() => onPlay?.(span)}>
           ▶
         </button>
       )}
-      {p.type === "document" && <span className="ak-cite__src">{[p.title, p.source_name].join(" · ")}</span>}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-play */}
       {c.strength === "weak" && <span className="np-dim">{t("ask.weak")}</span>}
       {c.quote && <blockquote className="ak-cite__quote">{c.quote}</blockquote>}
     </li>

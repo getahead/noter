@@ -90,26 +90,26 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 - Sensitive sources skipped, index rebuilding and weak evidence remain visible with their explanation and applicable actions
 
 **Steps**:
-1. [ ] - `p1` - User opens Ask with ⌘2 or **New Question** with ⌘N; API: `ask_threads_list` and `ask_scope_presets` - `inst-open`
-2. [ ] - `p1` - UI: recent questions grouped by date; before the first question show **Your questions appear here**, the first composer and three recent-person/topic suggestions when available - `inst-first`
-3. [ ] - `p1` - User chooses a readable scope and enters a nonblank question; Return sends, ⇧Return inserts a line; IME composition does not submit - `inst-compose`
-4. [ ] - `p1` - API: `ask_start` with no thread id, question and chosen scope; keep the returned thread, turn and subscription ids - `inst-start`
-5. [ ] - `p1` - Algorithm: consume `AskMsg` through `cpt-noter-algo-ui-ask-stream`; title reads **Answering…** and **Stop** replaces Ask - `inst-stream`
-6. [ ] - `p1` - **IF** the completed answer was not found or has no citations - `inst-if-not-found`
-   1. [ ] - `p1` - UI: the not-found sentence and search/widen actions; no speculative answer, citation list or thumbs - `inst-not-found`
-7. [ ] - `p1` - **ELSE** render the answer, numbered citations and available meta information, then announce **Answer ready, 6 citations** once - `inst-ready`
-8. [ ] - `p1` - User hovers or focuses a superscript; UI highlights it and its row; Return moves focus to the row and ⇧Tab returns to the originating superscript - `inst-citation-focus`
-9. [ ] - `p1` - User presses Space or ▶ on a call citation; shared playback plays its span in AK-R5, or explains unavailable audio - `inst-play`
-10. [ ] - `p1` - User opens its title; UI pushes Call page › Transcript at the span with the 3 s highlight; document targets open through `open_external` - `inst-evidence`
-11. [ ] - `p1` - **IF** the user chooses **Search by Keyword** - `inst-if-search`
-    1. [ ] - `p1` - UI: Library search with this turn's exact question - `inst-search`
+1. [x] - `p1` - User opens Ask with ⌘2 or **New Question** with ⌘N; API: `ask_threads_list` and `ask_scope_presets` - `inst-open`
+2. [x] - `p1` - UI: recent questions grouped by date; before the first question show **Your questions appear here**, the first composer and three recent-person/topic suggestions when available - `inst-first`
+3. [x] - `p1` - User chooses a readable scope and enters a nonblank question; Return sends, ⇧Return inserts a line; IME composition does not submit - `inst-compose`
+4. [x] - `p1` - API: `ask_start` with no thread id, question and chosen scope; keep the returned thread, turn and subscription ids - `inst-start`
+5. [x] - `p1` - Algorithm: consume `AskMsg` through `cpt-noter-algo-ui-ask-stream`; title reads **Answering…** and **Stop** replaces Ask - `inst-stream`
+6. [x] - `p1` - **IF** the completed answer was not found or has no citations - `inst-if-not-found`
+   1. [x] - `p1` - UI: the not-found sentence and search/widen actions; no speculative answer, citation list or thumbs - `inst-not-found`
+7. [x] - `p1` - **ELSE** render the answer, numbered citations and available meta information, then announce **Answer ready, 6 citations** once - `inst-ready`
+8. [x] - `p1` - User hovers or focuses a superscript; UI highlights it and its row; Return moves focus to the row and ⇧Tab returns to the originating superscript - `inst-citation-focus`
+9. [x] - `p1` - User presses Space or ▶ on a call citation; shared playback plays its span in AK-R5, or explains unavailable audio - `inst-play`
+10. [x] - `p1` - User opens its title; UI pushes Call page › Transcript at the span with the 3 s highlight; document targets open through `open_external` - `inst-evidence`
+11. [x] - `p1` - **IF** the user chooses **Search by Keyword** - `inst-if-search`
+    1. [x] - `p1` - UI: Library search with this turn's exact question - `inst-search`
 12. [ ] - `p1` - **IF** the user chooses **Widen Scope** with a narrowed scope - `inst-if-widen`
     1. [ ] - `p1` - UI: set **All calls · all sources** and ask the same question again - `inst-widen`
-13. [ ] - `p1` - **RETURN** the thread; local retry actions are constrained by the contract gap below - `inst-return-question`
+13. [x] - `p1` - **RETURN** the thread; local retry actions are constrained by the contract gap below - `inst-return-question`
 
 ### Stop, follow up, copy and manage threads
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-ask-follow-up-copy`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-ask-follow-up-copy`
 
 **Actor**: Primary user
 
@@ -123,19 +123,19 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 - Thread deleted elsewhere: return to the empty composer and refresh recent questions
 
 **Steps**:
-1. [ ] - `p1` - User selects a recent question; API: `ask_thread_get` with thread id; UI renders its turns in order - `inst-get-thread`
-2. [ ] - `p1` - User sends **Who owns the acceptance criteria for the reconnect?** in **Ask a follow-up…** - `inst-follow-up`
-3. [ ] - `p1` - API: `ask_start` with this thread id, question and next-question scope; append the turn with its own citation numbering - `inst-start-follow-up`
-4. [ ] - `p1` - **IF** the user presses Stop or ⌘. while answering - `inst-if-stop`
-   1. [ ] - `p1` - API: `ask_stop` with the active turn id; keep text so far and resolved citations, remove unresolved superscripts and label the result **Stopped by you ·** - `inst-stop`
-5. [ ] - `p1` - User chooses **Copy with Citations** on a completed or stopped cited answer - `inst-copy`
-6. [ ] - `p1` - Algorithm: serialize that turn with `cpt-noter-algo-ui-ask-copy`; write to the clipboard; after success show and politely announce **Copied** for 2 s - `inst-clipboard`
-7. [ ] - `p1` - **IF** a cited source has been deleted - `inst-if-deleted`
-   1. [ ] - `p1` - UI: keep its number and focus destination, mark **Source deleted**, disable opening/play and offer **Ask Again** - `inst-deleted`
-   2. [ ] - `p1` - User chooses **Ask Again**; API: `ask_start` with the same question and scope, letting the core retrieve only surviving sources - `inst-again`
-8. [ ] - `p1` - User chooses **Copy Question** or **Delete** in a recent row's menu; copy its title or call `ask_thread_delete` with its id - `inst-manage`
-9. [ ] - `p1` - UI: remove a thread only after success, refresh `ask_threads_list`, and clear the active route if it was deleted; failure keeps the row with an explicit retry - `inst-deleted-thread`
-10. [ ] - `p1` - **RETURN** the selected thread or an empty new question - `inst-return-follow-up`
+1. [x] - `p1` - User selects a recent question; API: `ask_thread_get` with thread id; UI renders its turns in order - `inst-get-thread`
+2. [x] - `p1` - User sends **Who owns the acceptance criteria for the reconnect?** in **Ask a follow-up…** - `inst-follow-up`
+3. [x] - `p1` - API: `ask_start` with this thread id, question and next-question scope; append the turn with its own citation numbering - `inst-start-follow-up`
+4. [x] - `p1` - **IF** the user presses Stop or ⌘. while answering - `inst-if-stop`
+   1. [x] - `p1` - API: `ask_stop` with the active turn id; keep text so far and resolved citations, remove unresolved superscripts and label the result **Stopped by you ·** - `inst-stop`
+5. [x] - `p1` - User chooses **Copy with Citations** on a completed or stopped cited answer - `inst-copy`
+6. [x] - `p1` - Algorithm: serialize that turn with `cpt-noter-algo-ui-ask-copy`; write to the clipboard; after success show and politely announce **Copied** for 2 s - `inst-clipboard`
+7. [x] - `p1` - **IF** a cited source has been deleted - `inst-if-deleted`
+   1. [x] - `p1` - UI: keep its number and focus destination, mark **Source deleted**, disable opening/play and offer **Ask Again** - `inst-deleted`
+   2. [x] - `p1` - User chooses **Ask Again**; API: `ask_start` with the same question and scope, letting the core retrieve only surviving sources - `inst-again`
+8. [x] - `p1` - User chooses **Copy Question** or **Delete** in a recent row's menu; copy its title or call `ask_thread_delete` with its id - `inst-manage`
+9. [x] - `p1` - UI: remove a thread only after success, refresh `ask_threads_list`, and clear the active route if it was deleted; failure keeps the row with an explicit retry - `inst-deleted-thread`
+10. [x] - `p1` - **RETURN** the selected thread or an empty new question - `inst-return-follow-up`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -148,19 +148,19 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 **Output**: growing text, resolved citations, final answer or a named failure
 
 **Steps**:
-1. [ ] - `p1` - Use bridge buffering, sequencing and acknowledgements; accept only this subscription and turn; ignore late results after disposal - `inst-scope`
-2. [ ] - `p1` - **MATCH** the event - `inst-match`
+1. [x] - `p1` - Use bridge buffering, sequencing and acknowledgements; accept only this subscription and turn; ignore late results after disposal - `inst-scope`
+2. [x] - `p1` - **MATCH** the event - `inst-match`
    - [ ] - `p1` - **CASE** started: show returned runtime and effective mode; never infer cloud/local from a label - `inst-started`
-   - [ ] - `p1` - **CASE** delta: append escaped text in the bridge's buffered render cadence; do not announce each word - `inst-delta`
-   - [ ] - `p1` - **CASE** citation: resolve its stable number and quote; never renumber earlier references - `inst-citation`
-   - [ ] - `p1` - **CASE** done: replace the partial with authoritative `AskAnswer`; update history and render skipped-source, keyword-only and weak-evidence flags - `inst-done`
-   - [ ] - `p1` - **CASE** failed with `answer_stopped`: retain the stopped partial and clear busy state - `inst-stopped`
-   - [ ] - `p1` - **CASE** other failed: show the typed runtime error with explicit retry; preserve the question - `inst-failed`
-   - [ ] - `p1` - **CASE** ended: release the subscription; an end before done or a user stop shows interrupted-answer recovery, not an invented success - `inst-ended`
-3. [ ] - `p1` - Render Markdown without raw HTML; citation links use typed targets and never model-provided executable markup - `inst-safe-render`
+   - [x] - `p1` - **CASE** delta: append escaped text in the bridge's buffered render cadence; do not announce each word - `inst-delta`
+   - [x] - `p1` - **CASE** citation: resolve its stable number and quote; never renumber earlier references - `inst-citation`
+   - [x] - `p1` - **CASE** done: replace the partial with authoritative `AskAnswer`; update history and render skipped-source, keyword-only and weak-evidence flags - `inst-done`
+   - [x] - `p1` - **CASE** failed with `answer_stopped`: retain the stopped partial and clear busy state - `inst-stopped`
+   - [x] - `p1` - **CASE** other failed: show the typed runtime error with explicit retry; preserve the question - `inst-failed`
+   - [x] - `p1` - **CASE** ended: release the subscription; an end before done or a user stop shows interrupted-answer recovery, not an invented success - `inst-ended`
+3. [x] - `p1` - Render Markdown without raw HTML; citation links use typed targets and never model-provided executable markup - `inst-safe-render`
 4. [ ] - `p1` - On a sequence gap, stop applying deltas, use bridge recovery and reload the stored thread; do not automatically start a second billable answer - `inst-gap`
-5. [ ] - `p1` - On route disposal detach the listener and unsubscribe; explicit Stop cancels generation; a sheet or component unmount must not attach the stream to another thread - `inst-dispose`
-6. [ ] - `p1` - **RETURN** the current turn state - `inst-return`
+5. [x] - `p1` - On route disposal detach the listener and unsubscribe; explicit Stop cancels generation; a sheet or component unmount must not attach the stream to another thread - `inst-dispose`
+6. [x] - `p1` - **RETURN** the current turn state - `inst-return`
 
 ### Copy one cited turn
 
@@ -187,17 +187,17 @@ Implement AK-R1 to AK-R5 and the cited answer, including scope, follow-ups, stop
 **Initial State**: FIRST
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** FIRST **TO** STARTING **WHEN** a nonblank question is submitted - `inst-submit`
+1. [x] - `p1` - **FROM** FIRST **TO** STARTING **WHEN** a nonblank question is submitted - `inst-submit`
 2. [ ] - `p1` - **FROM** STARTING **TO** STREAMING **WHEN** the handle and started event arrive - `inst-started`
-3. [ ] - `p1` - **FROM** STREAMING **TO** READY **WHEN** done has supported citations - `inst-done`
-4. [ ] - `p1` - **FROM** STREAMING **TO** NOT_FOUND **WHEN** done says not found or has no citations - `inst-not-found`
-5. [ ] - `p1` - **FROM** STREAMING **TO** WEAK **WHEN** done reports only weak evidence - `inst-weak`
-6. [ ] - `p1` - **FROM** STARTING **TO** ERROR **WHEN** start fails; a failed stream also enters ERROR - `inst-error`
-7. [ ] - `p1` - **FROM** STREAMING **TO** STOPPING **WHEN** Stop is requested; a confirmed user stop enters STOPPED - `inst-stop`
-8. [ ] - `p1` - **FROM** ERROR **TO** STARTING **WHEN** the user retries; no automatic retry - `inst-retry`
-9. [ ] - `p1` - **FROM** READY **TO** SOURCE_DELETED **WHEN** a citation's source is removed - `inst-deleted`
-10. [ ] - `p1` - **FROM** READY **TO** COPIED **WHEN** clipboard write succeeds; after 2 s restore READY; weak and stopped answers restore their own prior state - `inst-copy`
-11. [ ] - `p1` - **FROM** SOURCE_DELETED **TO** STARTING **WHEN** Ask Again is chosen - `inst-again`
+3. [x] - `p1` - **FROM** STREAMING **TO** READY **WHEN** done has supported citations - `inst-done`
+4. [x] - `p1` - **FROM** STREAMING **TO** NOT_FOUND **WHEN** done says not found or has no citations - `inst-not-found`
+5. [x] - `p1` - **FROM** STREAMING **TO** WEAK **WHEN** done reports only weak evidence - `inst-weak`
+6. [x] - `p1` - **FROM** STARTING **TO** ERROR **WHEN** start fails; a failed stream also enters ERROR - `inst-error`
+7. [x] - `p1` - **FROM** STREAMING **TO** STOPPING **WHEN** Stop is requested; a confirmed user stop enters STOPPED - `inst-stop`
+8. [x] - `p1` - **FROM** ERROR **TO** STARTING **WHEN** the user retries; no automatic retry - `inst-retry`
+9. [x] - `p1` - **FROM** READY **TO** SOURCE_DELETED **WHEN** a citation's source is removed - `inst-deleted`
+10. [x] - `p1` - **FROM** READY **TO** COPIED **WHEN** clipboard write succeeds; after 2 s restore READY; weak and stopped answers restore their own prior state - `inst-copy`
+11. [x] - `p1` - **FROM** SOURCE_DELETED **TO** STARTING **WHEN** Ask Again is chosen - `inst-again`
 
 ## 5. Definitions of Done
 
