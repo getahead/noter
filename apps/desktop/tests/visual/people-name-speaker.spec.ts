@@ -27,6 +27,19 @@ test.describe("cpt-noter-dod-ui-people-identity naming an unnamed speaker", () =
     await openPopover(page);
     await shot(page, "people-name-speaker");
   });
+  test("a name nobody has says No one called it", async ({ page }) => {
+    const popover = await openPopover(page);
+    await popover.getByRole("combobox", { name: "Name…" }).fill("Zoya");
+    await expect(popover).toContainText("No one called “Zoya”");
+    await shot(page, "people-name-speaker-none");
+  });
+  test("after naming, the undo strip offers Undo", async ({ page }) => {
+    const popover = await openPopover(page);
+    await popover.getByRole("combobox", { name: "Name…" }).fill("Dmitri");
+    await popover.getByRole("option", { name: /Dmitri Sokolov/ }).click();
+    await expect(page.getByText(/Named Speaker 3 as Dmitri S\./)).toBeVisible();
+    await shot(page, "people-name-speaker-undo");
+  });
   test("a name nobody has opens the new-person form", async ({ page }) => {
     const popover = await openPopover(page);
     await popover.getByRole("combobox", { name: "Name…" }).fill("Zoya Petrova");
@@ -50,7 +63,7 @@ test.describe("cpt-noter-dod-ui-people-identity naming an unnamed speaker", () =
     await popover.getByRole("option", { name: /New Person/ }).click();
     const form = page.getByRole("dialog", { name: /^New person for Speaker/ });
     await form.getByRole("button", { name: "Create and Name" }).click();
-    await expect(form.getByText(/is already in your people/)).toBeVisible();
+    await expect(form.getByText(/A person called “Anna Kuznetsova” already exists: Anna Kuznetsova/)).toBeVisible();
     await shot(page, "people-name-speaker-taken");
   });
 });

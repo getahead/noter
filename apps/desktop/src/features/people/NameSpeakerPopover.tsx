@@ -1,6 +1,6 @@
 // Name Speaker N: the sample, the person picker and the one call's speaker named through `transcript_rename_speaker`.
 // A speaker is one row per call (no recurring-voice group in the contract), so the change never claims several calls.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonRef, PersonRow, UnnamedSpeaker } from "../../core/bindings";
@@ -41,6 +41,9 @@ export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, o
   const [form, setForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  // a refused naming keeps the list and the typed name; the field was disabled while it ran, so focus comes back to it
+  useEffect(() => void (error && root.current?.querySelector("input")?.focus()), [error]);
   useEffect(() => {
     let current = true;
     void readSample(bridge, speaker).then((s) => current && setSample(s));
@@ -59,8 +62,8 @@ export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, o
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-pick
   return (
     <Popover variant="speaker-name" anchor={anchor} width={320} label={t(form ? "people.name_new_title" : "people.name_title", { label })} onClose={onClose}>
-      <div className="cw-pr">
-        <h3 className="cw-pr__title">{t("people.name_title", { label })}</h3>
+      <div className="cw-pr" ref={root}>
+        <h3 className="cw-pr__title">{t(form ? "people.name_new_title" : "people.name_title", { label })}</h3>
         {sample && <div className="np-dim t-callout" lang={sample.lang}>{sample.text}</div>}
         <PersonPicker
           bridge={bridge}
@@ -72,6 +75,7 @@ export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, o
           error={error}
           disabled={busy}
           confirmOnPick
+          dupExists
           onPick={() => setError(null)}
           onConfirm={(ref, name) => void confirm(ref, name)}
           onClose={onClose}

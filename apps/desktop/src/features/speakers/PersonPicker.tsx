@@ -45,6 +45,8 @@ export interface PersonPickerProps {
   onConfirm?: (ref: PersonRef, name: string, isNew: boolean) => void;
   /** A host with no confirm button (naming from People): clicking a person names them, as Return does. */
   confirmOnPick?: boolean;
+  /** People's wording of a taken name in the New form. */
+  dupExists?: boolean;
   /** The error under the field, from the host's command. */
   error?: string | null;
   disabled?: boolean;
@@ -147,6 +149,7 @@ export function PersonPicker(p: PersonPickerProps) {
         initial={form}
         people={people}
         confirmLabel={p.confirmLabel}
+        dupExists={p.dupExists}
         error={p.error}
         disabled={p.disabled}
         onBack={(name) => {

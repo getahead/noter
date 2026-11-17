@@ -124,4 +124,45 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(person("Anna K.").waitForExistence(timeout: 5), "the deleted person's page gives way to People")
         XCTAssertTrue(person("Oleg M.").waitForNonExistence(timeout: 5), "Oleg M. is gone from People")
     }
+
+    // M3 People (docs/features/ui/people.md › Voice profile): Delete Profile… asks with a native alert whose default is
+    // Cancel; Delete Profile removes the profile and the page offers Set Up Voice Profile… again.
+    func test_cpt_noter_seq_dialogs_set_up_voice_profile__delete_profile() {
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        app.typeKey("4", modifierFlags: .command)
+        func any(_ text: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR title CONTAINS %@", text, text)).firstMatch
+        }
+        func expect(_ el: XCUIElement, _ message: String) {
+            if !el.waitForExistence(timeout: 10) {
+                let tree = XCTAttachment(string: app.debugDescription)
+                tree.lifetime = .keepAlways
+                add(tree)
+            }
+            XCTAssertTrue(el.exists, message)
+        }
+        let row = any("Anna K.")
+        expect(row, "⌘4 shows People with Anna K.")
+        row.doubleClick()
+        // a button, not the first element whose label mentions it: clicking a container's centre would miss the button
+        let delete = app.descendants(matching: .button).matching(NSPredicate(format: "label CONTAINS 'Delete Profile' OR title CONTAINS 'Delete Profile'")).firstMatch
+        expect(delete, "Anna K. has a voice profile to delete")
+        delete.click()
+        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PROFILE AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(alert.staticTexts["Delete Anna K.'s voice profile?"].exists, "Delete Profile… shows no alert")
+        app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        XCTAssertTrue(delete.exists, "Cancel keeps the profile")
+        delete.click()
+        XCTAssertTrue(alert.buttons["Delete Profile"].waitForExistence(timeout: 5))
+        alert.buttons["Delete Profile"].click()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        expect(any("Set Up Voice Profile…"), "the profile is gone: the page offers to set one up")
+    }
 }
