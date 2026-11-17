@@ -138,6 +138,7 @@ function Body(p: CallsViewProps) {
     );
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-filter-empty
   if (state.status === "EMPTY" && p.filtered)
     return (
       <EmptyState
@@ -147,6 +148,7 @@ function Body(p: CallsViewProps) {
         onAction={p.onClearFilters}
       />
     );
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-filter-empty
   if (state.status === "EMPTY")
     return (
       <EmptyState

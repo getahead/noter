@@ -51,7 +51,9 @@ export async function mergeTopic(bridge: Bridge, source: string, target: string,
 
 /** What the Merge button does: nothing (`undefined`) until a different kept topic is chosen and the read of what moves landed; then the merge, counting what moved. */
 export async function confirmMerge(bridge: Bridge, source: string, keep: string, groups: TopicThreadGroup[] | null | undefined, refresh: () => void): Promise<TopicRow | null | undefined> {
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-confirm
   if (!keep || keep === source || !groups) return undefined;
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-confirm
   return mergeTopic(bridge, source, keep, movesOf(groups).rows.length, refresh);
 }
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-merge

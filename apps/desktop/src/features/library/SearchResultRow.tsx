@@ -16,6 +16,7 @@ const PLAY_NOTE: Partial<Record<ErrorCode, MsgKey>> = {
 };
 
 /** Space or ▶ on a transcript hit: plays the span, or stops it while it plays; a refusal says why (no audio left, replay while recording) instead of staying silent. */
+// @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-playback
 export async function togglePlay(bridge: Bridge, span: TimeSpan, playing: boolean): Promise<{ playing: boolean; note: MsgKey | null }> {
   if (playing) {
     await bridge.act("audio_stop", "audio_stop", () => bridge.core.audioStop({}), { screen: "library-search" });
@@ -23,6 +24,7 @@ export async function togglePlay(bridge: Bridge, span: TimeSpan, playing: boolea
   }
   const r = await bridge.act("audio_play", "audio_play", () => bridge.core.audioPlay({ call_id: span.call_id, from_ms: span.t0_ms, to_ms: span.t1_ms, channel: span.channel }), { screen: "library-search" });
   return r.status === "ok" ? { playing: r.data.playing, note: null } : { playing: false, note: PLAY_NOTE[r.error.code] ?? "search.play_failed" };
+// @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-playback
 }
 
 // @cpt-component:cpt-noter-component-ui-search-result-row:p1
@@ -31,8 +33,14 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
   const lang = hit.lang === null ? undefined : typeof hit.lang === "string" ? hit.lang : hit.lang.code;
   const go = () => {
     const x = hit.target;
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-open-span
     if (x.type === "segment") void openSpan(bridge, x.span, "library-search");
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-open-span
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-document
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-open-document
     else if (x.type === "document") void bridge.act("open_external", "open_external", () => bridge.core.openExternal({ target: { type: "document", document_id: x.document_id, chunk_id: x.chunk_id } }), { screen: "library-search" });
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-open-document
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-document
     else if (hit.call) void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: hit.call!.id, tab: "summary" } }), { screen: "library-search" });
   };
   const span = hit.target.type === "segment" ? hit.target.span : null;
@@ -42,7 +50,9 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
   const key = (e: KeyboardEvent<HTMLLIElement>) => {
     if (e.target !== e.currentTarget) return;
     if (e.key === "Enter") go();
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-play
     else if (e.key === " " && span) (e.preventDefault(), play());
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-play
     else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       const rows = Array.from(document.querySelectorAll<HTMLElement>(".lb-hit"));
       rows[rows.indexOf(e.currentTarget) + (e.key === "ArrowDown" ? 1 : -1)]?.focus();
@@ -52,9 +62,11 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
   return (
     <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
       {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}
+      {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
       <span className="lb-hit__snippet" lang={lang}>
         {segments(hit.snippet, hit.highlights).map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : s.text))}
       </span>
+      {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
       {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
       {span && <IconButton icon={state.playing ? "pause" : "play"} label={t(state.playing ? "playback.pause" : "transcript.play")} size="inline" onAction={play} />}

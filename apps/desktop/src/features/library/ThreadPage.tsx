@@ -57,7 +57,9 @@ export function useRegisterTopicSheets(sheets: Sheets | null) {
 export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, all: TopicRow[], retry: () => void, onKeepFailed: (failed: boolean) => void = () => {}): ThreadActions {
   const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()), refresh: retry });
   return {
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
     rename: () => sheets.open("topic-rename", { bridge, topic, known: all, onRenamed: retry, onMergeInstead: (other: TopicRow) => merge(other.id) }),
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
     merge: () => merge(topic.merge_suggestion?.id),
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
     keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => (onKeepFailed(!ok), ok && retry())),

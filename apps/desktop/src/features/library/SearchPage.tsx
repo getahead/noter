@@ -49,7 +49,9 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
   const body = () => {
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
     const r = read.results;
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
     const status = statusOf(r);
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
     const filtered = isFiltered(filter);
@@ -78,6 +80,8 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     const topic = r.topics[0];
     return (
       <>
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
           {" · "}
@@ -85,6 +89,8 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             <Link label={t("search.how")} onAction={() => setHow(!how)} />
           </span>
         </p>
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
         {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>
@@ -116,6 +122,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             )}
           </section>
         ))}
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
         {how && (
           <Popover variant="how-searched" anchor={howAt.current} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
             <div className="lb-pop">
@@ -126,6 +133,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             </div>
           </Popover>
         )}
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
       </>
     );
   };
@@ -160,7 +168,9 @@ export function SearchPage({ query }: { query: string }) {
   const lists = useLists(bridge);
   // the bar changes the held filter; a changed filter reads the search again
   const onFilter = (a: FilterAction) => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     const { next, reread } = reconcile(fstate, a);
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     setFstate(next);
     holdFilter(next);
     if (reread) setAgain((n) => n + 1);
@@ -177,6 +187,7 @@ export function SearchPage({ query }: { query: string }) {
     });
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
   }, [bridge, query, again]);
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-return-search
   return (
     <SearchView
       bridge={bridge}
@@ -198,4 +209,5 @@ export function SearchPage({ query }: { query: string }) {
       onAsk={() => navigate(askRoute(query))}
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-return-search
 }

@@ -86,7 +86,9 @@ export function CallsPage() {
   );
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     const { next } = reconcile(fstate, a);
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
     setFstate(next);
     holdFilter(next);
   };

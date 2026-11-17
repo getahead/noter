@@ -40,12 +40,15 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
     setBusy(true);
     const kept = await confirmMerge(bridge, source.id, keep, groups, refresh ?? (() => {}));
     setBusy(false);
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-return-topic
     if (kept === undefined) return;
     if (!kept) return setFailed(true);
     onMerged(kept);
     close();
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-return-topic
   }
   const into = choices.find((x) => x.id === keep)?.name ?? "";
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-merge-preview
   const title = t("topics.merge_title", { from: source.name, to: into });
   return (
     <Sheet title={title} width={520} busy={busy} onCancel={close} onDefault={() => void run()}>
@@ -68,6 +71,7 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
       </SheetFooter>
     </Sheet>
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-merge-preview
 }
 
 /** "What moves · N items from M calls" and each item's kind and text; an empty topic says only an alias moves. */
