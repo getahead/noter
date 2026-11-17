@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use noter_protocol::model::{AccountIdentity, AccountProvider, CliTool};
+use noter_protocol::model::{AccountIdentity, AccountProvider, CliInfo, CliTool};
 use serde::Deserialize;
 use tokio::sync::Notify;
 
@@ -28,6 +28,17 @@ pub struct CliStatus {
 }
 
 impl CliStatus {
+    /// The tool as the account row and the Prepare step show it.
+    pub fn info(&self, tool: CliTool) -> CliInfo {
+        CliInfo {
+            tool,
+            installed: self.installed,
+            path: self.path.clone(),
+            version: self.version.clone(),
+            supported: self.supported,
+        }
+    }
+
     pub fn missing() -> Self {
         Self {
             installed: false,
@@ -67,6 +78,10 @@ pub struct LoginStart {
 
 pub trait AccountCli: Send + Sync {
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus>;
+    /// Whether `status` speaks for `tool`; when not, the account row shows what the runtime found.
+    fn reports(&self, _tool: CliTool) -> bool {
+        true
+    }
     fn login(&self, provider: AccountProvider) -> BoxFuture<'_, Result<LoginStart, CliError>>;
     /// Ends a sign-in that is waiting for the browser.
     fn cancel(&self, provider: AccountProvider);
@@ -86,6 +101,10 @@ pub fn tool_of(provider: AccountProvider) -> CliTool {
 pub struct NoAccountCli;
 
 impl AccountCli for NoAccountCli {
+    fn reports(&self, _: CliTool) -> bool {
+        false
+    }
+
     fn status(&self, _: CliTool) -> BoxFuture<'_, CliStatus> {
         Box::pin(async { CliStatus::missing() })
     }
@@ -219,6 +238,12 @@ pub struct ScriptedAccountCli {
     release: Arc<[Notify; 2]>,
 }
 
+impl std::fmt::Debug for ScriptedAccountCli {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("ScriptedAccountCli")
+    }
+}
+
 impl ScriptedAccountCli {
     pub fn new() -> Self {
         Self::default()
@@ -241,12 +266,17 @@ impl ScriptedAccountCli {
         self.release[usize::from(provider == AccountProvider::Chatgpt)].notify_one();
     }
 
-    fn script(&self, tool: CliTool) -> Option<ToolScript> {
+    pub(crate) fn script(&self, tool: CliTool) -> Option<ToolScript> {
         lock(&self.state).tools.get(&tool).cloned()
     }
 }
 
 impl AccountCli for ScriptedAccountCli {
+    /// An unscripted tool leaves the row to the scripted runtime.
+    fn reports(&self, tool: CliTool) -> bool {
+        self.script(tool).is_some()
+    }
+
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus> {
         Box::pin(async move {
             self.script(tool)
