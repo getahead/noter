@@ -9,7 +9,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { ScopeFields, useCallTypes } from "./ScopeFields";
+import { ScopeFields, useCallTypes, usePeople } from "./ScopeFields";
 import { ALL_SCOPE, scheduleChoices, submitMcp, type ScopeDraft } from "./sources";
 
 
@@ -20,6 +20,7 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
   const [privacy, setPrivacy] = useState<PrivacyClass>("normal");
   const [scope, setScope] = useState<ScopeDraft>(ALL_SCOPE);
   const types = useCallTypes(bridge);
+  const people = usePeople(bridge);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {

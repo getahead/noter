@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
+import { peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
@@ -118,5 +118,20 @@ describe("scope", () => {
     const b = (res: unknown) => ({ act: vi.fn(async () => res), core: {} }) as never;
     expect(await readCallTypes(b({ status: "ok", data: { call_types: [{ id: "a", label: "A" }] } }))).toHaveLength(1);
     expect(await readCallTypes(b({ status: "error" }))).toEqual([]);
+  });
+});
+
+describe("scope people", () => {
+  const anna = { id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", is_you: false } as never;
+  it("shows the scope's people as chips, an unknown id by its id, and writes ids back", () => {
+    const chips = peopleChips(["per_anna", "per_gone"], [anna]);
+    expect(chips[0]).toMatchObject({ id: "per_anna", short_name: "Anna" });
+    expect(chips[1]).toMatchObject({ id: "per_gone", display_name: "per_gone" });
+    expect(withPeople({ all: false, callTypes: ["a"], people: [] }, chips)).toEqual({ all: false, callTypes: ["a"], people: ["per_anna", "per_gone"] });
+  });
+  it("reads the directory, none on failure", async () => {
+    const b = (res: unknown) => ({ act: vi.fn(async () => res), core: {} }) as never;
+    expect(await readPeople(b({ status: "ok", data: { people: [anna], unnamed: [] } }))).toHaveLength(1);
+    expect(await readPeople(b({ status: "error" }))).toEqual([]);
   });
 });

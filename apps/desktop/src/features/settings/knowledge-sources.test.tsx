@@ -136,16 +136,26 @@ describe("the pane and the form handlers", () => {
 import { ScopeFields } from "./ScopeFields";
 describe("ScopeFields", () => {
   const types = [{ id: "standup", label: "Standup", builtin: true, skill_path: "" }];
-  it("all calls hides the types; limited lists them as checkboxes", () => {
-    expect(renderToString(<ScopeFields types={types} value={{ all: true, callTypes: [], people: [] }} onChange={() => {}} />)).not.toContain("Standup");
-    expect(renderToString(<ScopeFields types={types} value={{ all: false, callTypes: ["standup"], people: [] }} onChange={() => {}} />)).toContain("Standup");
+  const anna = { id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", aliases: [], role: null, is_you: false } as never;
+  const pbridge = { core: {}, act: async () => ({ status: "ok" }), store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } } as never;
+  const props = (value: { all: boolean; callTypes: string[]; people: string[] }, onChange = () => {}) => ({ bridge: pbridge, types, people: [anna], value, onChange });
+  it("all calls hides the types and people; limited lists them", () => {
+    const all = renderToString(<ScopeFields {...props({ all: true, callTypes: [], people: [] })} />);
+    expect(all).not.toContain("Standup");
+    expect(all).not.toContain("People");
+    const limited = renderToString(<ScopeFields {...props({ all: false, callTypes: ["standup"], people: ["per_anna"] })} />);
+    expect(limited).toContain("Standup");
+    expect(limited).toContain("People");
+    expect(limited).toContain("Anna");
   });
   it("choices call back with the new scope", () => {
     const onChange = vi.fn();
-    const tree = rendered(ScopeFields, { types, value: { all: false, callTypes: [], people: [] }, onChange });
+    const tree = rendered(ScopeFields, props({ all: false, callTypes: [], people: [] }, onChange));
     (find(tree, (p) => p.name === "src-scope").props.onAction as (v: string) => void)("all");
     (find(tree, (p) => p.label === "Standup").props.onAction as (on: boolean) => void)(true);
+    (find(tree, (p) => p.multiple === true).props.onChange as (c: unknown[]) => void)([{ id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", is_you: false }]);
     expect(onChange).toHaveBeenNthCalledWith(1, { all: true, callTypes: [], people: [] });
     expect(onChange).toHaveBeenNthCalledWith(2, { all: false, callTypes: ["standup"], people: [] });
+    expect(onChange).toHaveBeenNthCalledWith(3, { all: false, callTypes: [], people: ["per_anna"] });
   });
 });

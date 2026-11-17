@@ -1,5 +1,5 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallTypeInfo, PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
+import type { CallTypeInfo, PersonChip, PersonRow, PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
 import { clock, shortDay, t } from "../../i18n/format";
 import type { UiPrefs } from "../../core/bindings";
 import type { IconName } from "../../ui/icons";
@@ -204,3 +204,14 @@ export const revokeAlert = (r: SourceRow) => ({ title: t("sources.revoke_title",
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert
 export const removeAlert = (r: SourceRow) => ({ title: t("sources.remove_title", { name: r.name }), message: t("sources.remove_message", { count: r.documents }), cancel: t("dialogs.cancel"), confirm: t("sources.remove"), destructive: true });
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert
+
+export async function readPeople(bridge: Bridge): Promise<PersonRow[]> {
+  const res = await bridge.act("sources:people", "people_list", () => bridge.core.peopleList({}));
+  return res.status === "ok" ? res.data.people : [];
+}
+
+const chipOf = (p: PersonRow): PersonChip => ({ id: p.id, display_name: p.display_name, short_name: p.short_name, initials: p.initials, is_you: p.is_you ?? false });
+/** The scope's person ids as chips; an id the directory no longer has still shows, by its id. */
+export const peopleChips = (ids: readonly string[], people: readonly PersonRow[]): PersonChip[] =>
+  ids.map((id) => { const p = people.find((x) => x.id === id); return p ? chipOf(p) : { id, display_name: id, short_name: id, initials: "?", is_you: false }; });
+export const withPeople = (d: ScopeDraft, chips: readonly PersonChip[]): ScopeDraft => ({ ...d, people: chips.map((c) => c.id) });
