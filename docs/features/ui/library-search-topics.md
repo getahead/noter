@@ -264,11 +264,11 @@ The system **MUST** render topic counts, month groups, the inspector, rename col
 
 ## 6. Acceptance Criteria
 
-- [ ] Prototype Library states `filtered-empty`, `no-tags`, `tagged`, `loading`, `cross-language`, `keyword-only`, `no-matches`, `weak-only`, `search-failed`, `no-topics`, `merge`, `nothing-left` and the rename forms match screenshots at Wide, Medium and Narrow
-- [ ] Clear never deletes typed words; filter changes keep focus and announce one final count
+- [x] Prototype Library states `filtered-empty`, `no-tags`, `tagged`, `loading`, `cross-language`, `keyword-only`, `no-matches`, `weak-only`, `search-failed`, `no-topics`, `merge`, `nothing-left` and the rename forms match screenshots at Wide, Medium and Narrow
+- [x] Clear never deletes typed words; filter changes keep focus and announce one final count
 - [ ] English, Russian and German snippets retain original script; highlights never execute HTML
 - [ ] Filter controls wrap, the result column is at most 960 pt and the thread fills the width (no 860 pt cap); keyboard and VoiceOver expose every action
-- [ ] Fake-core rendering is tested separately from real-core command and story coverage; no per-row retrieval or automatic mutation retry
+- [x] Fake-core rendering is tested separately from real-core command and story coverage; no per-row retrieval or automatic mutation retry
 
 ## 7. Additional Context
 
@@ -278,7 +278,7 @@ The system **MUST** render topic counts, month groups, the inspector, rename col
 
 **Contract and fake gaps.** There is no topic-delete command, so the empty-topic Delete Topic story cannot be completed on the frozen surface. `SearchExplain` lacks the exact stem list and meaning/language labels used by the prototype; display returned normalized query, counts, mode and actual filters without invented data. SearchHit has no direct speaker or audio-availability field; reuse transcript-span data lazily for the focused/played result and existing call state rather than issuing one read per row. Use TopicRow.last_seen for Last discussed; no language field is supplied for the topic chip. A search response has no cursor or total-more count: expand returned hits only, never invent “+4”. The default fake ignores search filters and returns simple substring hits without documents or weak matches; typed scenario overrides must cover those states. A topic rename to a name another topic has is refused with `invalid_input { field: "name", rule: "duplicate" }` on the real core and the fake (#903). These are owner/contract follow-ups, not new commands defined here.
 
-**Delivery (17 Nov 2026).** Recorded gaps, not delivered: the item kind on a search hit (`SearchHit` carries none) and `SearchResults.query_lang` for the cross-language caption (contract gaps); **Delete Topic** on the Nothing-left state; and three E2E stories that need harness support (No topics, Merge suggested, Keep Separate), whose spec is kept in `_team/ui/design/m3-library-gated-e2e.ts.txt` until the harness can drive them. Every other flow, algorithm, state and DoD is delivered and marked.
+**Delivery (17 Nov 2026).** Recorded gaps, not delivered: the item kind on a search hit (`SearchHit` carries none) and `SearchResults.query_lang` for the cross-language caption (contract gaps); **Delete Topic** on the Nothing-left state; and three E2E stories that need harness support: No topics (a `world_set` topics slice that empties the topic list), and Merge suggested and Keep Separate (a `merge_suggestion` seed on two topics). The same gaps mean QA could not reach these states on the real core: weak-only, keyword-only, loading, no topics, merge suggestion, Keep Separate and Search All Languages. Every other flow, algorithm, state and DoD is delivered and marked.
 
 **Milestone notes.** Tag commands are M2 but the Library tagging surface is M3. Ask is another M3 feature; export is the M2 outputs/dialogs path. No changes to milestone assignments are required.
 
