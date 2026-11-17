@@ -40,13 +40,11 @@ export function PeoplePage() {
   useEffect(() => void list.load(), [list]);
   // the core changed a person (naming, merge, edit): read the list again, keeping it on screen meanwhile
   useEffect(() => void (first.current ? (first.current = false) : list.load()), [known, list]);
-  // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-overview
   useEffect(() => {
     if (state.status !== "LOADING") return setSlow(false);
     const timer = setTimeout(() => setSlow(true), SLOW_MS);
     return () => clearTimeout(timer);
   }, [state.status]);
-  // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-overview
   const shown = useMemo(() => (state.read ? view(state.read, query) : null), [state.read, query]);
   useEffect(() => {
     holdCount(shown ? (shown.status === "EMPTY" ? 0 : state.read!.people.filter((p) => !p.is_you).length) : null);
@@ -55,10 +53,8 @@ export function PeoplePage() {
   const order = useMemo(() => shown?.rows.map((r) => r.id) ?? [], [shown]);
   useEffect(() => setSelection((s) => retain(s, order)), [order]);
 
-  // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   const open = (id: string) =>
     void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "person", person_id: id } }), { screen: "people" });
-  // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-get
   return <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} />;
 }
 
@@ -106,9 +102,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
     <>
       <h2 className="np-sr" tabIndex={-1}>{t("people.title")}</h2>
       {reloadFailed}
-      {/* @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare */}
       <div data-region="PL-R2" role="region" aria-label={t("people.title")} data-state={shown.status.toLowerCase()}>
-        {/* @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare */}
         {shown.status === "EMPTY" ? (
           <EmptyState variant="first-use" icon="people" title={t("people.empty_title")} body={t("people.empty_body")} />
         ) : shown.status === "NO_MATCH" ? (
@@ -132,7 +126,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
                     <td>
                       <span className="pe-name">
                         <span className="np-person__ini" aria-hidden="true">{p.initials}</span>
-                        <button type="button" className="pe-name__btn" onClick={(e) => (e.stopPropagation(), open(p.id))}>{p.display_name}</button>
+                        <button type="button" tabIndex={-1} className="pe-name__btn" onClick={(e) => (e.stopPropagation(), open(p.id))}>{p.display_name}</button>
                       </span>
                     </td>
                     <td className="np-muted">{roleOrg(p)}</td>
