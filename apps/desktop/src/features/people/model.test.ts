@@ -19,16 +19,19 @@ describe("cpt-noter-state-ui-people-view", () => {
     await list.load();
     expect(list.get().status).toBe("READ");
   });
-  it("a reload keeps the list on screen and drops an answer older than the last request", async () => {
-    let resolve!: (v: unknown) => void;
-    const act = vi.fn().mockResolvedValueOnce({ status: "ok", data: read }).mockReturnValueOnce(new Promise((r) => (resolve = r))).mockResolvedValueOnce({ status: "ok", data: { people: [1], unnamed: [] } });
+  it("a reload keeps the list on screen and shows the newer answer", async () => {
+    const act = vi.fn().mockResolvedValueOnce({ status: "ok", data: read }).mockResolvedValueOnce({ status: "ok", data: { people: [1], unnamed: [] } });
     const list = createPeopleList(bridge(act));
     await list.load();
-    const stale = list.load();
+    const again = list.load();
     expect(list.get().status).toBe("READ");
-    await list.load();
-    resolve({ status: "ok", data: { people: [], unnamed: [] } });
-    await stale;
+    await again;
     expect(list.get()).toMatchObject({ read: { people: [1] } });
+  });
+  it("a read in flight is shared: StrictMode's second mount sends nothing more", async () => {
+    const act = vi.fn(async () => ({ status: "ok", data: read }));
+    const list = createPeopleList(bridge(act));
+    await Promise.all([list.load(), list.load()]);
+    expect(act).toHaveBeenCalledOnce();
   });
 });

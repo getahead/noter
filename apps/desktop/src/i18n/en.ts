@@ -824,6 +824,7 @@ export const en = {
   "person.delete.message": "Their name is removed from every call; the speakers become unnamed again. Their voice profile is deleted. This can’t be undone.",
   "person.delete.confirm": "Delete",
   "person.delete.err": "Couldn’t delete {name}. Nothing was changed.",
+  "person.history_empty": "Changes to {name}'s items, names and voice profile appear here, each with Undo.",
   "person.view": "View",
   "person.tab.overview": "Overview",
   "person.tab.calls": "Calls",

@@ -23,10 +23,20 @@ export interface PersonState {
   error: CoreError | null;
 }
 
-/** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People. */
-export async function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
-  const res = await bridge.act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" });
-  return res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error };
+const reading = new WeakMap<Bridge, Map<string, Promise<PersonState>>>();
+
+/** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People.
+ *  StrictMode mounts a page twice in development: a read in flight is shared, never sent twice. */
+export function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
+  const mine = reading.get(bridge) ?? reading.set(bridge, new Map()).get(bridge)!;
+  const held = mine.get(id);
+  if (held) return held;
+  const read = bridge
+    .act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" })
+    .then((res): PersonState => (res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error }))
+    .finally(() => void mine.delete(id));
+  mine.set(id, read);
+  return read;
 }
 
 /** **Show All** under Last calls opens the person's Calls view. */
@@ -112,7 +122,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
         </div>
       ) : tab === "history" ? (
         <div data-region="PE-HISTORY" role="region" aria-label={t("person.tab.history")}>
-          <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" />
+          <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" emptyBody={t("person.history_empty", { name: p.short_name })} />
         </div>
       ) : (
         <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} />

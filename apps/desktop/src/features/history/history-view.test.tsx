@@ -39,6 +39,8 @@ describe("TimelineView (cpt-noter-flow-ui-history-undo-read)", () => {
 
   it("EMPTY reads No changes yet; a filtered empty names the filter and the filter row stays", () => {
     expect(html({ state: "EMPTY", rows: [] })).toContain("No changes yet");
+    // a person's History says what appears there, in a first-use empty state
+    expect(html({ state: "EMPTY", rows: [], emptyBody: "Changes to Lena K.'s items appear here." })).toContain("Changes to Lena K.&#x27;s items appear here.");
     const filtered = html({ state: "FILTERED_EMPTY", rows: [], actor: "models" });
     expect(filtered).toContain("No changes by models in this history");
     expect(filtered).toContain("All");
