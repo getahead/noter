@@ -47,8 +47,12 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
   const [how, setHow] = useState(false);
   const howAt = useRef<HTMLSpanElement>(null);
   const body = () => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
     const r = read.results;
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
@@ -137,6 +141,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
       </>
     );
   };
+  // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-return
   return (
     <div
       data-region="LS-R1"
@@ -153,6 +158,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
       {body()}
     </div>
   );
+  // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-return
 }
 
 // @cpt-state:cpt-noter-state-ui-library-search-topics-view:p1

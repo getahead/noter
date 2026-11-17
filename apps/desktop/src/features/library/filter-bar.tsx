@@ -66,8 +66,10 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
       </button>
     );
   };
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-choose
   const group = (g: Group, items: { value: string; label: string }[]) =>
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-choose
   const today = new Date().toISOString().slice(0, 10);
   const preset = datePreset(f);
   return (

@@ -93,7 +93,9 @@ export function CallsPage() {
     holdFilter(next);
   };
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-calls
   const filtered = isFiltered(fstate.filter);
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-calls
   useEffect(() => {
     if (filtered && state.status === "LISTED")
       void announce({ kind: "confirmation", text: t("filters.matches", { count: state.total ?? state.rows.length }), key: `m${state.total}` });

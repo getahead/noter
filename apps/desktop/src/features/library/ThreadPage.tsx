@@ -58,9 +58,13 @@ export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, a
   const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()), refresh: retry });
   return {
     // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-rename
     rename: () => sheets.open("topic-rename", { bridge, topic, known: all, onRenamed: retry, onMergeInstead: (other: TopicRow) => merge(other.id) }),
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-rename
     // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-merge
     merge: () => merge(topic.merge_suggestion?.id),
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-merge
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
     keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => (onKeepFailed(!ok), ok && retry())),
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
@@ -127,9 +131,11 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
           ))
           // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-timeline
         ) : (
+          // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-empty-topic
           // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-empty-topic
           <EmptyState variant="large" icon="thread" title={t("topics.nothing_title")} body={t("topics.nothing_body")} />
           // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-empty-topic
+          // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-empty-topic
         )}
       </div>
     </>

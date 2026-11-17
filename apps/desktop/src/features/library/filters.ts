@@ -97,15 +97,18 @@ export function tokens(s: FilterState, look: Lookups): Token[] {
 let held: FilterState = BLANK;
 export const heldFilter = (): FilterState => held;
 const watchers = new Set<() => void>();
+// @cpt-begin:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-return
 export const holdFilter = (s: FilterState): void => {
   held = s;
   watchers.forEach((w) => w());
 };
+// @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-return
 /** A change made outside the Calls page (a # tag choice in the toolbar field). */
 export const watchFilter = (w: () => void): (() => void) => (watchers.add(w), () => void watchers.delete(w));
 
 
 /** Reads the list again once per filter change: the page's own change and the watcher both land here, so the same filter never reads twice (words alone never read). */
+// @cpt-begin:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-read
 export function syncFilter(read: (f: CallFilter) => void, start: CallFilter): (s: FilterState) => void {
   let last = start;
   return (s) => {
@@ -114,6 +117,7 @@ export function syncFilter(read: (f: CallFilter) => void, start: CallFilter): (s
     read(s.filter);
   };
 }
+// @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-read
 
 /** Whether any filter group narrows the list. */
 export const isFiltered = (f: CallFilter): boolean => Object.values(f).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));

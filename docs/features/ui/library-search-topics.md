@@ -91,18 +91,18 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 - Weak-only: warning and applicable widening actions; search failed: **Couldn't search your calls** with **Try Again**
 
 **Steps**:
-1. [ ] - `p1` - User enters words in Calls and commits the search with Return - `inst-submit`
-2. [ ] - `p1` - API: `search` with the words, current `CallFilter` and per-section limit - `inst-search`
+1. [x] - `p1` - User enters words in Calls and commits the search with Return - `inst-submit`
+2. [x] - `p1` - API: `search` with the words, current `CallFilter` and per-section limit - `inst-search`
 3. [ ] - `p1` - UI: skeleton rows after 300 ms; on failure keep words and filters and offer **Try Again**, which repeats only on request - `inst-loading-error`
-4. [ ] - `p1` - Algorithm: present the response with `cpt-noter-algo-ui-library-search-topics-results` - `inst-present`
-5. [ ] - `p1` - User presses ↓ into results, then Space on a span - `inst-play`
-6. [ ] - `p1` - UI: reuse playback with `audio_play` and `playback:state`; Space again pauses; missing audio shows its reason and retained text - `inst-playback`
-7. [ ] - `p1` - User presses Return or › on the span; UI pushes Call page › **Transcript** at the returned span, highlighted for 3 s - `inst-open-span`
-8. [ ] - `p1` - **IF** the user opens a document result - `inst-if-document`
-   1. [ ] - `p1` - API: `open_external` for the returned document target; a deleted source cannot open - `inst-open-document`
-9. [ ] - `p1` - **IF** the user chooses **Ask Instead** - `inst-if-ask`
-   1. [ ] - `p1` - UI: open a new Ask thread and submit the same words once - `inst-ask`
-10. [ ] - `p1` - **RETURN** the current results route - `inst-return-search`
+4. [x] - `p1` - Algorithm: present the response with `cpt-noter-algo-ui-library-search-topics-results` - `inst-present`
+5. [x] - `p1` - User presses ↓ into results, then Space on a span - `inst-play`
+6. [x] - `p1` - UI: reuse playback with `audio_play` and `playback:state`; Space again pauses; missing audio shows its reason and retained text - `inst-playback`
+7. [x] - `p1` - User presses Return or › on the span; UI pushes Call page › **Transcript** at the returned span, highlighted for 3 s - `inst-open-span`
+8. [x] - `p1` - **IF** the user opens a document result - `inst-if-document`
+   1. [x] - `p1` - API: `open_external` for the returned document target; a deleted source cannot open - `inst-open-document`
+9. [x] - `p1` - **IF** the user chooses **Ask Instead** - `inst-if-ask`
+   1. [x] - `p1` - UI: open a new Ask thread and submit the same words once - `inst-ask`
+10. [x] - `p1` - **RETURN** the current results route - `inst-return-search`
 
 ### Filter, tag and export calls
 
@@ -120,16 +120,16 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 **Steps**:
 1. [ ] - `p1` - User sets People, Type, Tags, Language, Date or **Has Open Items**; choices come from core people, call types and `tags_list` - `inst-choose`
-2. [ ] - `p1` - Algorithm: reconcile tokens and filters with `cpt-noter-algo-ui-library-search-topics-filters` - `inst-reconcile`
-3. [ ] - `p1` - API: `calls_list` with the resulting filter when no words are set, otherwise `search`; show the matching count without moving focus - `inst-query`
-4. [ ] - `p1` - User selects three rows and chooses **Add Tag…**; UI shows **Add tag to 3 calls**, **Add tag…**, **In use: release, hotfix**, and **Add Tag** - `inst-add-popover`
-5. [ ] - `p1` - User commits with Return, comma or **Add Tag**; reject a blank tag or more than 32 characters without silently truncating it - `inst-commit-tag`
-6. [ ] - `p1` - API: `call_tags_set` with selected ids and add/remove sets; replace rows from the response and give its `change_id` to the undo strip - `inst-tags-set`
-7. [ ] - `p1` - UI: **Tagged 3 calls “release” · Undo**; removal lists the selection's tags and reads **Removed “release” from 3 calls · Undo**; refresh `tags_list` - `inst-tag-result`
-8. [ ] - `p1` - **IF** the write fails - `inst-if-write-fails`
-   1. [ ] - `p1` - UI: keep selection and draft; show the typed error, leave core rows unchanged and allow an explicit retry - `inst-tag-error`
-9. [ ] - `p1` - User chooses **Export…** or ⌘E with a selection; UI passes only those ids to the existing Export sheet and shows its save-panel result - `inst-export`
-10. [ ] - `p1` - **RETURN** the filtered list; no selection leaves Export disabled with **Select calls to export** - `inst-return-filter`
+2. [x] - `p1` - Algorithm: reconcile tokens and filters with `cpt-noter-algo-ui-library-search-topics-filters` - `inst-reconcile`
+3. [x] - `p1` - API: `calls_list` with the resulting filter when no words are set, otherwise `search`; show the matching count without moving focus - `inst-query`
+4. [x] - `p1` - User selects three rows and chooses **Add Tag…**; UI shows **Add tag to 3 calls**, **Add tag…**, **In use: release, hotfix**, and **Add Tag** - `inst-add-popover`
+5. [x] - `p1` - User commits with Return, comma or **Add Tag**; reject a blank tag or more than 32 characters without silently truncating it - `inst-commit-tag`
+6. [x] - `p1` - API: `call_tags_set` with selected ids and add/remove sets; replace rows from the response and give its `change_id` to the undo strip - `inst-tags-set`
+7. [x] - `p1` - UI: **Tagged 3 calls “release” · Undo**; removal lists the selection's tags and reads **Removed “release” from 3 calls · Undo**; refresh `tags_list` - `inst-tag-result`
+8. [x] - `p1` - **IF** the write fails - `inst-if-write-fails`
+   1. [x] - `p1` - UI: keep selection and draft; show the typed error, leave core rows unchanged and allow an explicit retry - `inst-tag-error`
+9. [x] - `p1` - User chooses **Export…** or ⌘E with a selection; UI passes only those ids to the existing Export sheet and shows its save-panel result - `inst-export`
+10. [x] - `p1` - **RETURN** the filtered list; no selection leaves Export disabled with **Select calls to export** - `inst-return-filter`
 
 ### Follow, rename and merge a topic
 
@@ -146,20 +146,20 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 - Taken name offers **Merge Instead**; a stale revision keeps the draft and refreshes current topic data
 
 **Steps**:
-1. [ ] - `p1` - User opens Topics; API: `topics_list`; UI shows Topic, Calls, Decisions, Open questions, Last discussed and merge glyphs - `inst-list-topics`
-2. [ ] - `p1` - User searches names, selects a row or chip and opens it; API: `topic_get` with topic id - `inst-get-topic`
-3. [ ] - `p1` - UI: title counts and month-grouped entries in date order; Return opens evidence, ⌘I opens the shared Item inspector - `inst-timeline`
+1. [x] - `p1` - User opens Topics; API: `topics_list`; UI shows Topic, Calls, Decisions, Open questions, Last discussed and merge glyphs - `inst-list-topics`
+2. [x] - `p1` - User searches names, selects a row or chip and opens it; API: `topic_get` with topic id - `inst-get-topic`
+3. [x] - `p1` - UI: title counts and month-grouped entries in date order; Return opens evidence, ⌘I opens the shared Item inspector - `inst-timeline`
 4. [ ] - `p1` - User chooses **Ask About This Thread** or **Ask About This**; UI starts Ask scoped to this topic with **What was decided and what is still open about Websocket notifications?** - `inst-topic-ask`
-5. [ ] - `p1` - User chooses **Rename…**; UI opens a Rename sheet (not a popover) showing the current name, requires nonblank text and offers **Merge Instead** for a known name collision - `inst-rename-form`
-6. [ ] - `p1` - API: `topic_rename` with id, `rev` and name; on success update the table, thread and chips and offer Undo with the returned change - `inst-rename`
-7. [ ] - `p1` - User chooses a merge suggestion or **Merge With…**; UI shows the 520-pt sheet, target chooser excluding this topic, item preview and **Cancel** / **Merge** - `inst-merge-preview`
-8. [ ] - `p1` - **IF** the user confirms a distinct target - `inst-if-confirm`
-   1. [ ] - `p1` - API: `topics_merge` with source and target; navigate to the returned topic, refresh entries and show **Merged 3 items into “Notification service” · Undo** - `inst-merge`
-9. [ ] - `p1` - **IF** the user chooses **Keep Separate** - `inst-if-separate`
-   1. [ ] - `p1` - API: `topics_keep_separate` with both ids; clear the suggestion after success - `inst-separate`
+5. [x] - `p1` - User chooses **Rename…**; UI opens a Rename sheet (not a popover) showing the current name, requires nonblank text and offers **Merge Instead** for a known name collision - `inst-rename-form`
+6. [x] - `p1` - API: `topic_rename` with id, `rev` and name; on success update the table, thread and chips and offer Undo with the returned change - `inst-rename`
+7. [x] - `p1` - User chooses a merge suggestion or **Merge With…**; UI shows the 520-pt sheet, target chooser excluding this topic, item preview and **Cancel** / **Merge** - `inst-merge-preview`
+8. [x] - `p1` - **IF** the user confirms a distinct target - `inst-if-confirm`
+   1. [x] - `p1` - API: `topics_merge` with source and target; navigate to the returned topic, refresh entries and show **Merged 3 items into “Notification service” · Undo** - `inst-merge`
+9. [x] - `p1` - **IF** the user chooses **Keep Separate** - `inst-if-separate`
+   1. [x] - `p1` - API: `topics_keep_separate` with both ids; clear the suggestion after success - `inst-separate`
 10. [ ] - `p1` - **IF** all backing calls were deleted - `inst-if-empty-topic`
-    1. [ ] - `p1` - UI: **Nothing left in this topic** and **The calls behind this topic were deleted.**; **Delete Topic** is a contract gap listed below - `inst-empty-topic`
-11. [ ] - `p1` - **RETURN** the kept topic or original route after Cancel; errors keep the sheet and choices - `inst-return-topic`
+    1. [x] - `p1` - UI: **Nothing left in this topic** and **The calls behind this topic were deleted.**; **Delete Topic** is a contract gap listed below - `inst-empty-topic`
+11. [x] - `p1` - **RETURN** the kept topic or original route after Cancel; errors keep the sheet and choices - `inst-return-topic`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -172,11 +172,11 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 **Output**: one `CallFilter`, its tokens and one new read
 
 **Steps**:
-1. [ ] - `p1` - Set or remove the chosen value only once; multi-values are alternatives within a group, and groups combine - `inst-set-value`
-2. [ ] - `p1` - Derive tokens in order: people, types, tags, languages, date, open items; display **Anna**, **Planning**, **Tag: release**, **RU**, **Last 7 Days**, **Has open items** - `inst-tokens`
-3. [ ] - `p1` - **IF** Clear is chosen: clear filters and tokens but keep typed words - `inst-clear`
-4. [ ] - `p1` - **IF** a token is removed by × or ⌫ at the field start: remove its filter value - `inst-remove`
-5. [ ] - `p1` - Offer # suggestions only from tags in use; a choice adds the tag filter and clears the suggestion draft - `inst-suggest`
+1. [x] - `p1` - Set or remove the chosen value only once; multi-values are alternatives within a group, and groups combine - `inst-set-value`
+2. [x] - `p1` - Derive tokens in order: people, types, tags, languages, date, open items; display **Anna**, **Planning**, **Tag: release**, **RU**, **Last 7 Days**, **Has open items** - `inst-tokens`
+3. [x] - `p1` - **IF** Clear is chosen: clear filters and tokens but keep typed words - `inst-clear`
+4. [x] - `p1` - **IF** a token is removed by × or ⌫ at the field start: remove its filter value - `inst-remove`
+5. [x] - `p1` - Offer # suggestions only from tags in use; a choice adds the tag filter and clears the suggestion draft - `inst-suggest`
 6. [ ] - `p1` - Keep the date menu's Any Time, Last 7 Days, Last 30 Days and Custom range in the same state; issue a new read and ignore responses for superseded words or filters - `inst-read`
 7. [ ] - `p1` - **RETURN** synchronized controls; state survives Back in this window, not an app restart - `inst-return`
 
@@ -189,14 +189,14 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 **Output**: topic suggestion, Items, Transcripts, Documents and Ask bridge
 
 **Steps**:
-1. [ ] - `p1` - Render only core-returned hits; never implement retrieval, stemming or strength scoring in React - `inst-authority`
-2. [ ] - `p1` - Show the keyword-only mode and reported progress, or **Best matches · keyword and meaning**; show cross-language information when reported - `inst-mode`
-3. [ ] - `p1` - Put items before transcript chunks; group spans by call with three visible initially and one at Narrow width; **More in This Call** reveals available hidden hits - `inst-groups`
-4. [ ] - `p1` - **IF** all hits are weak: show the warning, active-filter count and applicable Clear Filters, Search All Languages and Ask Instead actions - `inst-all-weak`
-5. [ ] - `p1` - **ELSE** put strong hits first within each result section, then **Weaker matches** before weak rows; every weak row keeps its tag and full contrast - `inst-mixed`
-6. [ ] - `p1` - Render core highlight ranges on escaped original text with its language attribute; do not highlight a normalized copy - `inst-highlights`
-7. [ ] - `p1` - Show **How Noter searched** from returned explanation and active filters; never fill missing terms with fixture text - `inst-explain`
-8. [ ] - `p1` - Announce the final count once, adding **only weak matches** when applicable - `inst-announce`
+1. [x] - `p1` - Render only core-returned hits; never implement retrieval, stemming or strength scoring in React - `inst-authority`
+2. [x] - `p1` - Show the keyword-only mode and reported progress, or **Best matches · keyword and meaning**; show cross-language information when reported - `inst-mode`
+3. [x] - `p1` - Put items before transcript chunks; group spans by call with three visible initially and one at Narrow width; **More in This Call** reveals available hidden hits - `inst-groups`
+4. [x] - `p1` - **IF** all hits are weak: show the warning, active-filter count and applicable Clear Filters, Search All Languages and Ask Instead actions - `inst-all-weak`
+5. [x] - `p1` - **ELSE** put strong hits first within each result section, then **Weaker matches** before weak rows; every weak row keeps its tag and full contrast - `inst-mixed`
+6. [x] - `p1` - Render core highlight ranges on escaped original text with its language attribute; do not highlight a normalized copy - `inst-highlights`
+7. [x] - `p1` - Show **How Noter searched** from returned explanation and active filters; never fill missing terms with fixture text - `inst-explain`
+8. [x] - `p1` - Announce the final count once, adding **only weak matches** when applicable - `inst-announce`
 9. [ ] - `p1` - **RETURN** results; when empty keep filters and the Ask bridge - `inst-return`
 
 ## 4. States (CDSL)
@@ -211,18 +211,18 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 **Transitions**:
 1. [ ] - `p1` - **FROM** LOADING **TO** CALLS **WHEN** a filtered call read returns rows - `inst-calls`
-2. [ ] - `p1` - **FROM** LOADING **TO** FILTER_EMPTY **WHEN** calls exist but none meets the filters - `inst-filter-empty`
-3. [ ] - `p1` - **FROM** LOADING **TO** RESULTS **WHEN** search returns at least one strong hit - `inst-results`
+2. [x] - `p1` - **FROM** LOADING **TO** FILTER_EMPTY **WHEN** calls exist but none meets the filters - `inst-filter-empty`
+3. [x] - `p1` - **FROM** LOADING **TO** RESULTS **WHEN** search returns at least one strong hit - `inst-results`
 4. [ ] - `p1` - **FROM** LOADING **TO** WEAK_ONLY **WHEN** search reports only weak hits - `inst-weak`
-5. [ ] - `p1` - **FROM** LOADING **TO** NO_MATCHES **WHEN** search returns no hits - `inst-no-matches`
+5. [x] - `p1` - **FROM** LOADING **TO** NO_MATCHES **WHEN** search returns no hits - `inst-no-matches`
 6. [ ] - `p1` - **FROM** LOADING **TO** READ_ERROR **WHEN** the read fails; retry returns to LOADING with the same inputs - `inst-error`
-7. [ ] - `p1` - **FROM** LOADING **TO** TOPICS **WHEN** topics arrive; zero topics goes to NO_TOPICS, a name filter matching none to TOPIC_NO_MATCH - `inst-topics`
-8. [ ] - `p1` - **FROM** TOPIC_NO_MATCH **TO** TOPICS **WHEN** Clear Search restores the list - `inst-clear-topic`
-9. [ ] - `p1` - **FROM** LOADING **TO** THREAD **WHEN** a topic has entries; no surviving entries goes to THREAD_EMPTY - `inst-thread`
+7. [x] - `p1` - **FROM** LOADING **TO** TOPICS **WHEN** topics arrive; zero topics goes to NO_TOPICS, a name filter matching none to TOPIC_NO_MATCH - `inst-topics`
+8. [x] - `p1` - **FROM** TOPIC_NO_MATCH **TO** TOPICS **WHEN** Clear Search restores the list - `inst-clear-topic`
+9. [x] - `p1` - **FROM** LOADING **TO** THREAD **WHEN** a topic has entries; no surviving entries goes to THREAD_EMPTY - `inst-thread`
 10. [ ] - `p1` - **FROM** THREAD **TO** RENAMING **WHEN** Rename is chosen; a collision goes to NAME_CLASH - `inst-rename`
-11. [ ] - `p1` - **FROM** NAME_CLASH **TO** MERGING **WHEN** Merge Instead is chosen - `inst-clash-merge`
+11. [x] - `p1` - **FROM** NAME_CLASH **TO** MERGING **WHEN** Merge Instead is chosen - `inst-clash-merge`
 12. [ ] - `p1` - **FROM** THREAD **TO** MERGING **WHEN** Merge is chosen; Cancel returns unchanged, success opens the target THREAD - `inst-merge`
-13. [ ] - `p1` - **FROM** RENAMING **TO** THREAD **WHEN** a rename succeeds; failure keeps the draft in RENAMING - `inst-renamed`
+13. [x] - `p1` - **FROM** RENAMING **TO** THREAD **WHEN** a rename succeeds; failure keeps the draft in RENAMING - `inst-renamed`
 
 ## 5. Definitions of Done
 
