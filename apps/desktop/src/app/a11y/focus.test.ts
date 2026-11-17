@@ -314,3 +314,20 @@ describe("openerOf (WebKit does not focus a button on click)", () => {
     expect(openerOf({ activeElement: null, body: body as never })).toBeNull();
   });
 });
+
+describe("press tracking on the document", () => {
+  it("records a pointerdown target and forgets it on a keydown", async () => {
+    const on: Record<string, (e: unknown) => void> = {};
+    vi.resetModules();
+    vi.stubGlobal("document", { addEventListener: (t: string, f: (e: unknown) => void) => (on[t] = f) });
+    const mod = await import("./focus");
+    const button = { focus: vi.fn() };
+    const body = {};
+    on.pointerdown!({ target: { closest: () => button } });
+    expect(mod.openerOf({ activeElement: body as never, body: body as never })).toBe(button);
+    on.pointerdown!({ target: { closest: () => button } });
+    on.keydown!({});
+    expect(mod.openerOf({ activeElement: body as never, body: body as never })).toBeNull();
+    vi.unstubAllGlobals();
+  });
+});
