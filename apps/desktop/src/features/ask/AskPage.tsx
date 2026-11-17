@@ -73,7 +73,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   // `new:<words>` (Ask Instead, a Library question) asks those words once per history entry
   useEffect(() => {
-    startFromRoute(routeKey, (q) => ask(q));
+    // started from a timer the cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the
+    // asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing
+    const h = setTimeout(() => startFromRoute(routeKey, (q) => ask(q)), 0);
+    return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
   // ...and once it is stored the entry becomes the thread
