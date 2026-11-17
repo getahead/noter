@@ -20,6 +20,7 @@ import {
   CAP_POPOVER,
   existing,
   matchPeople,
+  stepActive,
   type Entry,
 } from "./picker";
 import { PersonChip as SharedChip } from "../../ui/primitives/person-chip";
@@ -113,20 +114,12 @@ export function PersonPicker(p: PersonPickerProps) {
       openForm();
       return;
     }
-    const last = newIndex;
+    // the New person row is the last option in single mode; a multi-select ends at its last match
+    const last = multi ? flat.length - 1 : newIndex;
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
       setOpen(true);
-      const step = e.key === "ArrowDown" ? 1 : -1;
-      setActive(
-        Math.min(
-          last,
-          Math.max(
-            0,
-            (current < 0 ? (step > 0 ? -1 : last + 1) : current) + step,
-          ),
-        ),
-      );
+      setActive(stepActive(current, e.key === "ArrowDown" ? 1 : -1, last));
     } else if (e.key === "Enter" && open && current >= 0) {
       e.preventDefault();
       if (current === newIndex) return openForm();

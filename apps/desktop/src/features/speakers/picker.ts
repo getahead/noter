@@ -134,3 +134,9 @@ export const created = ({ name, email }: NewPerson): PersonRef => ({
 
 /** The command key of a speaker's rename (bridge.act). */
 export const renameKey = (speakerId: string) => `speaker:rename:${speakerId}`;
+
+/** The option ↑/↓ moves to: `current` (-1: none) plus `step`, kept within 0..`last` (`last` -1: nothing to highlight). */
+export function stepActive(current: number, step: 1 | -1, last: number): number {
+  if (last < 0) return -1;
+  return Math.min(last, Math.max(0, (current < 0 ? (step > 0 ? -1 : last + 1) : current) + step));
+}

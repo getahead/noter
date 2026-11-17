@@ -5,7 +5,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, PersonRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { PersonPicker } from "./PersonPicker";
-import { candidates } from "./picker";
+import { candidates, stepActive } from "./picker";
 
 const row = (id: string, name: string, you = false): PersonRow =>
   ({ id, display_name: name, short_name: name.split(" ")[0], initials: name.slice(0, 2), aliases: [], role: null, is_you: you }) as unknown as PersonRow;
@@ -22,6 +22,17 @@ describe("candidates (cpt-noter-algo-ui-speakers-picker)", () => {
     const names = (inc: boolean) => candidates([chip(me)], [], [me, anna], inc).flatMap((g) => g.entries.map((e) => e.id));
     expect(names(false)).toEqual(["per_anna"]);
     expect(names(true)).toEqual(["per_me", "per_anna"]);
+  });
+});
+
+describe("stepActive (cpt-noter-algo-ui-speakers-picker)", () => {
+  it("moves through the options and stops at the ends; the last option is the New person row only in single mode", () => {
+    // single mode, 3 options + the New row at index 3
+    expect([stepActive(-1, 1, 3), stepActive(0, 1, 3), stepActive(3, 1, 3), stepActive(-1, -1, 3)]).toEqual([0, 1, 3, 3]);
+    // multi mode: the last index is the last option, so arrows reach every match
+    expect([stepActive(-1, 1, 2), stepActive(0, 1, 2), stepActive(1, 1, 2), stepActive(2, 1, 2), stepActive(2, -1, 2)]).toEqual([0, 1, 2, 2, 1]);
+    // nothing to highlight: stays unset
+    expect(stepActive(-1, 1, -1)).toBe(-1);
   });
 });
 
@@ -49,13 +60,13 @@ describe("PersonPicker multiple (cpt-noter-component-ui-person-picker)", () => {
     (find(tree, (p) => p.className === "cw-pp__x").props.onClick as () => void)();
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
-  it("Return on the highlighted person adds it without confirming a single choice", () => {
+  it("Return on the highlighted match adds that person and never confirms a single choice", () => {
     const onChange = vi.fn();
     const onConfirm = vi.fn();
-    const tree = rendered(PersonPicker, props({ onChange, onConfirm }));
-    const input = find(tree, (p) => p.role === "combobox").props.onKeyDown as (e: unknown) => void;
-    input(key("ArrowDown"));
-    input(key("Enter"));
+    // the field holds "bor", so the first match (Boris) is highlighted
+    const tree = rendered(PersonPicker, props({ onChange, onConfirm, value: "bor", selected: [chip(anna)] }));
+    (find(tree, (p) => p.role === "combobox").props.onKeyDown as (e: unknown) => void)(key("Enter"));
+    expect(onChange).toHaveBeenCalledWith([chip(anna), expect.objectContaining({ id: "per_boris" })]);
     expect(onConfirm).not.toHaveBeenCalled();
   });
   it("single mode is unchanged: the New person row stays and You stays out", () => {
