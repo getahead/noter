@@ -31,3 +31,6 @@
 .ak-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .ak-recent__list { list-style: none; margin: 0; padding: 0; }
 .ak-recent__li { margin: 0; }
+/* Medium: the title never gives way (it was squeezed to "A."); the search field takes the squeeze instead. */
+[data-region="AK-R1"] .np-toolbar__titles { flex: none; }
+[data-region="AK-R1"] .np-toolbar__search { min-width: 0; }
