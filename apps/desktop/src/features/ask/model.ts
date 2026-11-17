@@ -1,4 +1,5 @@
 // Ask's pure view model: one streamed turn folded from its AskMsg events, and the recent list grouped by day.
+import type { PersonRow } from "../../core/bindings";
 import type { AskAnswer, AskMsg, AskThreadRow, Citation, CoreError } from "../../core/bindings";
 
 export interface TurnView {
@@ -70,19 +71,32 @@ export function phaseOf(v: TurnView): TurnPhase {
 /** Paragraphs of the answer text; React escapes them, so no model text becomes markup. */
 export const paragraphs = (md: string): string[] => md.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
 
-export type DayGroup = "today" | "yesterday" | "earlier";
+export type DayGroup = "today" | "last_week" | "earlier";
 
-/** Recent questions grouped by local day, newest first. */
+/** Recent questions grouped Today, Last week (the seven days before) and Earlier, newest first. */
 export function groupThreads(rows: readonly AskThreadRow[], now: number): { key: DayGroup; rows: AskThreadRow[] }[] {
   const day = (ms: number) => new Date(new Date(ms).getFullYear(), new Date(ms).getMonth(), new Date(ms).getDate()).getTime();
   const today = day(now);
+  const weekAgo = day(new Date(today).setDate(new Date(today).getDate() - 7));
   const groups: { key: DayGroup; rows: AskThreadRow[] }[] = [];
   for (const r of [...rows].sort((a, b) => b.updated_at - a.updated_at)) {
     const d = day(r.updated_at);
-    const key: DayGroup = d >= today ? "today" : new Date(d).getDate() === new Date(today - 1).getDate() && today - d < 2 * 86_400_000 ? "yesterday" : "earlier";
+    const key: DayGroup = d >= today ? "today" : d >= weekAgo ? "last_week" : "earlier";
     const g = groups.find((x) => x.key === key);
     if (g) g.rows.push(r);
     else groups.push({ key, rows: [r] });
   }
   return groups;
 }
+
+/** Up to three suggested first questions, one per recent person; none until the people directory has rows. */
+export const suggestionsOf = (people: readonly PersonRow[] | null | undefined, ask: (name: string) => string): string[] => (people ?? []).slice(0, 3).map((p) => ask(p.display_name));
+
+/** What the page announces once when a turn is ready; nothing for any other phase. */
+export function announcementOf(phase: TurnPhase | null, citations: number): "ask.ready_one" | "ask.ready_other" | "ask.ready_weak" | null {
+  if (phase === "weak") return "ask.ready_weak";
+  return phase === "ready" ? (citations === 1 ? "ask.ready_one" : "ask.ready_other") : null;
+}
+
+/** The error line of a failed turn: the runtime named when the core could not reach it, else the generic one. */
+export const errorKeyOf = (v: TurnView): "ask.error_runtime" | "ask.error" => (v.error?.code === "runtime_unavailable" ? "ask.error_runtime" : "ask.error");

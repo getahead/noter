@@ -19,3 +19,15 @@
 .ak-composer { position: sticky; bottom: 0; display: flex; gap: 8px; align-items: flex-end; padding: 12px 0 18px; background: var(--content-bg); border-top: 1px solid var(--sep); margin-top: auto; }
 .ak-composer.is-first { position: static; border-top: 0; margin-top: 0; padding-top: 0; }
 .ak-composer__field { flex: 1 1 auto; }
+.ak-ans__list { margin: 0; padding-inline-start: 22px; line-height: 1.5; }
+.ak-ref { border: 0; background: none; padding: 0 1px; color: var(--accent); font: inherit; cursor: default; }
+.ak-ref:disabled { color: var(--label-3); }
+.ak-cites { display: grid; gap: 8px; margin: 0; padding-inline-start: 22px; font-size: 12px; color: var(--label-2); }
+.ak-cite.is-focus { background: var(--sel-unemph); border-radius: var(--r-control); }
+.ak-cite__src { margin-inline: 6px; }
+.ak-cite__quote { margin: 4px 0 0; padding-inline-start: 10px; border-inline-start: 2px solid var(--sep); }
+.ak-actions { display: flex; gap: 8px; }
+.ak-suggest { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.ak-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.ak-recent__list { list-style: none; margin: 0; padding: 0; }
+.ak-recent__li { margin: 0; }

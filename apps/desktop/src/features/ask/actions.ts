@@ -1,6 +1,10 @@
 // Ask's core calls as plain async functions, so the page stays thin and the flows are unit-testable without a DOM.
 import type { Bridge } from "../../app/bridge/bridge";
-import type { AskAnswer, AskScope, AskThreadRow, ScopePreset } from "../../core/bindings";
+import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
+import { navigate } from "../shell/navigate";
+import { searchRoute } from "../shell/sections";
+import type { Replay } from "../transcript/playback";
+import { toMarkdown } from "./copy";
 import type { TurnPhase } from "./model";
 
 export const NEW_SCOPE: AskScope = { preset: "all" };
@@ -74,8 +78,8 @@ export const questionOf = (draft: string, busy: boolean): string | null => (busy
 /** The thread id a route key names (`thread:<id>`), if any. */
 export const threadOfRoute = (key: string): string | null => (key.startsWith("thread:") ? key.slice("thread:".length) || null : null);
 
-/** The core stored this turn: reload the thread. A failed or stopped turn keeps its partial on screen instead. */
-export const isStored = (phase: TurnPhase | null): boolean => phase === "ready" || phase === "weak" || phase === "not_found";
+/** The core stored this turn: reload the thread. A failed turn keeps its partial on screen instead. */
+export const isStored = (phase: TurnPhase | null): boolean => phase === "ready" || phase === "weak" || phase === "not_found" || phase === "stopped"; // a stopped turn is stored with its partial answer
 
 /** ⌘. while an answer streams. */
 export const isStopKey = (e: { key: string; metaKey: boolean }): boolean => e.metaKey && e.key === ".";
@@ -85,3 +89,49 @@ export const currentStream = <T extends { turn_id: string }>(data: T | null, pre
 
 /** The turn a new question follows: the one whose data the stream slice holds now (or the one before it while that has not arrived). */
 export const afterTurn = (current: { turn_id: string } | null, previous: string | null): string | null => current?.turn_id ?? previous;
+/** Write the turn as Markdown to the clipboard; a rejected write is reported, never thrown. */
+export async function copyTurn(answer: Pick<AskAnswer, "answer_md" | "citations">, write: (text: string) => Promise<void>): Promise<"copied" | "failed"> {
+  // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-copy
+  try {
+    await write(toMarkdown(answer));
+    return "copied";
+  } catch {
+    return "failed";
+  }
+  // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-copy
+}
+
+/** Delete a thread; true when the core removed it, so the list refreshes and an open thread closes. */
+export async function deleteThread(bridge: Bridge, id: string): Promise<boolean> {
+  const res = await bridge.act("ask:delete", "ask_thread_delete", () => bridge.core.askThreadDelete({ thread_id: id }));
+  return res.status === "ok";
+}
+
+/** Ask the core to play from `from_ms` (to `to_ms`, or the segment's end); its `playback:state` reports back. */
+export const playAudio = (bridge: Bridge, callId: string, from_ms: number, to_ms: number | null) =>
+  bridge.act("audio_play", "audio_play", () => bridge.core.audioPlay({ call_id: callId, from_ms, to_ms }), { slice: "playback" });
+
+export const stopAudio = (bridge: Bridge) => bridge.act("audio_stop", "audio_stop", () => bridge.core.audioStop({}), { slice: "playback" });
+
+/** The replay a citation's span starts. */
+export const replayOf = (span: TimeSpan, version: number): Replay => ({ key: `${span.call_id}:${span.t0_ms}`, call_id: span.call_id, from_ms: span.t0_ms, to_ms: span.t1_ms, speaker: "", since: version, paused: false });
+
+/** Delete a thread; when it was open, show the empty composer, and refresh Recent. */
+export async function removeThread(bridge: Bridge, id: string, openId: string | null, h: { open: (id: string | null) => void; refresh: () => void }): Promise<void> {
+  if (!(await deleteThread(bridge, id))) return;
+  if (id === openId) h.open(null);
+  h.refresh();
+}
+
+/** Listen for ⌘. on `doc` and stop; returns the unlisten function. */
+export function bindStopKey(doc: Pick<Document, "addEventListener" | "removeEventListener">, stop: () => void): () => void {
+  const onKey = (e: KeyboardEvent) => isStopKey(e) && (e.preventDefault(), stop());
+  doc.addEventListener("keydown", onKey);
+  return () => doc.removeEventListener("keydown", onKey);
+}
+
+/** Copy a question's text; a refused write is ignored (the menu closes either way). */
+export const copyText = (text: string, write: (s: string) => Promise<void>): Promise<void> => write(text).catch(() => {});
+
+/** Search by Keyword: the Library's search for the question's own words. */
+export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
