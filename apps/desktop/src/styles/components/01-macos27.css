@@ -48,6 +48,9 @@
 .np-toolbar .np-btn { height: 32px; padding: 0 14px; background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); border: 0; }
 .np-toolbar .np-btn--primary { background: var(--accent-fill); color: var(--on-accent); }
 .np-toolbar .np-btn--quiet { background: transparent; box-shadow: none; }
+/* the toolbar buttons' glass edge must not hide the keyboard focus ring (same specificity, later in the file) */
+.np-toolbar .np-btn:focus-visible, .np-toolbar .np-ibtn--toolbar:focus-visible { box-shadow: var(--focus-ring), var(--glass-edge); }
+.np-toolbar .np-btn--quiet:focus-visible { box-shadow: var(--focus-ring); } /* a quiet button has no glass edge to keep */
 .np-toolbar .np-ibtn--toolbar { width: 32px; height: 32px; border-radius: var(--r-capsule); background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); }
 .np-toolbar .np-ibtn--toolbar[aria-pressed="true"], .np-toolbar .np-ibtn--toolbar.is-on { background: var(--accent-fill); color: var(--on-accent); }
 .np-toolbar .np-seg { height: 32px; align-items: center; background: var(--glass-bg); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-edge); padding: 3px; }

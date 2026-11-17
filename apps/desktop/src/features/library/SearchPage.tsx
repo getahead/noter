@@ -24,6 +24,14 @@ const SECTION = { items: "search.section.items", transcripts: "search.section.tr
 export type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: "OK"; results: SearchResults };
 
 /** The result count the page says: hits of every section, or the one topic row when only a topic matched. */
+/** The link inside a wrapper: the popover is anchored on it, not on the span, so closing it can hand focus back (a span takes none). */
+export const linkIn = (wrap: { querySelector(selector: string): HTMLElement | null } | null): HTMLElement | null => wrap?.querySelector("a") ?? null;
+
+/** A ref callback that keeps the wrapper's link in `to`. */
+export const keepLink = (to: { current: HTMLElement | null }) => (wrap: HTMLElement | null) => {
+  to.current = linkIn(wrap);
+};
+
 export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
 
 export interface SearchViewProps {
@@ -48,7 +56,7 @@ export interface SearchViewProps {
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
 export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
   const [how, setHow] = useState(false);
-  const howAt = useRef<HTMLSpanElement>(null);
+  const howAt = useRef<HTMLElement | null>(null);
   const body = () => {
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
@@ -76,6 +84,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     if (status === "NO_MATCHES")
       return (
         <>
+          <p className="np-sr" role="status">{t("search.none", { query })}</p>
           <EmptyState variant="filtered" title={t("search.none", { query })} body={[filtered ? t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length }) + "." : "", t("search.try_fewer")].filter(Boolean).join(" ")} />
           {widen}
         </>
@@ -90,7 +99,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
           {" · "}
-          <span ref={howAt}>
+          <span ref={keepLink(howAt)}>
             <Link label={t("search.how")} onAction={() => setHow(!how)} />
           </span>
         </p>
