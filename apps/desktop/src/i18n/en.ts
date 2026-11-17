@@ -1379,6 +1379,7 @@ export const en = {
   "library.remove_tag": "Remove Tag",
   "export.scope_calls": { one: "{count} call", other: "{count} calls" },
   "search.ask_instead": "Ask Instead",
+  "search.try_fewer": "Try fewer words.",
   "search.filters_active": { one: "{count} filter active", other: "{count} filters active" },
   "search.title": "Search results",
   "search.loading": "Searching your calls",
