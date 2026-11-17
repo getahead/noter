@@ -77,18 +77,19 @@ async function ask(page: Page, question: string) {
 
 test.describe("cpt-noter-seq-ask-cited-answer", () => {
   test("happy path: ⌘N, question, Return — Answering…, Stop, then the answer with numbered citations and its meta line", async ({ page }) => {
-    await openAsk(page);
+    const steer = await openAsk(page);
     await page.keyboard.press("Meta+KeyN");
     await expect(toolbar(page)).toContainText(/Claude Code · Cloud, redacted|Local model · Local only/);
     await expect(toolbar(page).getByRole("combobox", { name: /scope/i })).toContainText("All calls · all sources");
+    // the real core delivers an answer in one burst: pace it, so the stream stays live long enough to see (the fake streams for ~1.6 s)
+    if (REAL) await steer.invoke("harness.ask_pace", { ms: 250 });
     await ask(page, WEBSOCKET);
 
     await expect(toolbar(page)).toContainText("Answering…");
     await expect(button(composer(page), "Stop")).toBeVisible();
     await expect(button(composer(page), "Ask")).toHaveCount(0);
-    // started: the runtime and mode the core reported. The fake streams for ~1.6 s; the real core's scripted runtime answers at once,
-    // so started, the answer and done reach the page in one buffered flush and the stored turn replaces the live one before any check
-    if (!REAL) await expect(thread(page).locator(".ak-status", { hasText: " · " })).toBeVisible();
+    // started: the runtime and mode the core reported (kept on screen above the streaming answer)
+    await expect(thread(page).locator(".ak-status", { hasText: " · " })).toBeVisible();
 
     await expect(toolbar(page)).not.toContainText("Answering…");
     const answer = answers(page).last();
