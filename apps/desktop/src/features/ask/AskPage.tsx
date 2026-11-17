@@ -1,5 +1,5 @@
 // Ask: recent questions (AK-R2), the thread (AK-R3) and the composer (AK-R4); answers stream from the core.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -7,7 +7,7 @@ import type { AskAnswer, AskThreadRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
-import { isStopKey, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { currentStream, isStopKey, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { foldTurn, groupThreads, paragraphs, phaseOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
@@ -15,7 +15,6 @@ import "./ask.css";
 const GROUP = { today: "ask.group.today", yesterday: "ask.group.yesterday", earlier: "ask.group.earlier" } as const;
 
 // @cpt-component:cpt-noter-component-screen-ask:p1
-// @cpt-dod:cpt-noter-dod-ui-ask-threads:p1
 // @cpt-flow:cpt-noter-flow-ui-ask-question:p1
 export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKey?: string }) {
   const [rows, setRows] = useState<AskThreadRow[]>([]);
@@ -42,7 +41,8 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   const open = (id: string | null) => openThread(bridge, id, { setThread, setTurns, setAsking });
 
-  const data = stream?.data ?? null;
+  const previousTurn = useRef<string | null>(null);
+  const data = currentStream(stream?.data ?? null, previousTurn.current);
   // `thread:<id>` opens that thread; the key is the route's, so Back and the core's nav:request land here
   useEffect(() => {
     const id = threadOfRoute(routeKey);

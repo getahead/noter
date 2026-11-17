@@ -79,3 +79,6 @@ export const isStored = (phase: TurnPhase | null): boolean => phase === "ready" 
 
 /** ⌘. while an answer streams. */
 export const isStopKey = (e: { key: string; metaKey: boolean }): boolean => e.metaKey && e.key === ".";
+
+/** The ask_start stream of the turn now being asked: the previous turn's data stays in the slice until the new subscription replaces it, and must not settle or render as the new answer. */
+export const currentStream = <T extends { turn_id: string }>(data: T | null, previousTurn: string | null): T | null => (data && data.turn_id !== previousTurn ? data : null);

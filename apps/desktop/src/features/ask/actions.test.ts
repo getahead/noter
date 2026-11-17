@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { isStopKey, isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
+import { currentStream, isStopKey, isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -85,5 +85,13 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(isStopKey({ key: ".", metaKey: true })).toBe(true);
     expect(isStopKey({ key: ".", metaKey: false })).toBe(false);
     expect(isStopKey({ key: "a", metaKey: true })).toBe(false);
+  });
+  it("ignores the previous turn's stream until the follow-up's own data arrives", () => {
+    const first = { turn_id: "t1", thread_id: "a" };
+    expect(currentStream(first, null)).toBe(first);
+    expect(currentStream(first, "t1")).toBeNull(); // the follow-up is asked, its stream not yet here
+    const second = { turn_id: "t2", thread_id: "a" };
+    expect(currentStream(second, "t1")).toBe(second);
+    expect(currentStream(null, "t1")).toBeNull();
   });
 });
