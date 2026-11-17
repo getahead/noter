@@ -5,6 +5,11 @@ import { describe, expect, it } from "vitest";
 import { StatusRow } from "./status-row";
 
 describe("StatusRow", () => {
+  it("puts the job's toggle before the status", () => {
+    const html = renderToString(<StatusRow variant="job" tone="off" word="Paused" title="Nightly" toggle={<input type="checkbox" role="switch" />} />);
+    expect(html.indexOf("e-status__toggle")).toBeGreaterThan(-1);
+    expect(html.indexOf("e-status__toggle")).toBeLessThan(html.indexOf("e-status__icon"));
+  });
   it("shows icon, word, title, subtitle, message and actions", () => {
     const html = renderToString(<StatusRow tone="err" icon="error" word="Failed" title="Docs" subtitle="Last sync 9:00" message="Folder missing" tag="Folder" actions={<button>Try Again</button>} />);
     expect(html).toContain("Failed");

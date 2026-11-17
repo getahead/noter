@@ -396,9 +396,11 @@ function Gallery() {
           <StatusRow variant="source" tone="ok" icon="check" word="Up to date" title="Notion" tag="Indexed" subtitle="2 documents · Last sync 9:41" actions={<PushButton label="Re-index" size="small" />} />
           <StatusRow variant="runtime" tone="ok" icon="check" word="Ready" title="Local speech" subtitle="Runs on this Mac" actions={<PushButton label="Details" size="small" />} />
           <StatusRow variant="model" tone="run" word="Downloading" title="Large speech model" progress={{ done: 680, total: 1000 }} progressText="Downloading 680 of 1,000 MB" />
-          <StatusRow variant="job" tone="off" icon="pause" word="Paused" title="Nightly summaries" subtitle="Waiting for power" actions={<PushButton label="Resume" size="small" />} />
-          <StatusRow variant="evidence" tone="warn" icon="warning" word="Unverified" title="Quote from Notion" message="The source changed since this was cited." actions={<PushButton label="Open Source" size="small" />} />
-          <StatusRow variant="share-test" tone="err" icon="error" word="Failed" title="Screen share test" message="Teams did not receive the shared window." actions={<PushButton label="Try Again" size="small" />} />
+          <StatusRow variant="job" tone="off" icon="pause" word="Paused" title="Nightly summaries" subtitle="Last run 02:14 · 12 calls" toggle={<Toggle ariaLabel="Nightly summaries" on={false} size="small" />} actions={<><PushButton label="Resume" size="small" /><PushButton label="Run Now" size="small" /></>} />
+          <StatusRow variant="evidence" tone="ok" icon="check" word="Detected" title="Jira (acli)" subtitle="acli 1.3.2" />
+          <StatusRow variant="evidence" tone="warn" icon="warning" word="Not configured" title="Bitbucket (bkt)" subtitle="Not configured · install bkt" actions={<PushButton label="Check Again" size="small" />} />
+          <StatusRow variant="share-test" tone="ok" icon="check" word="Hidden" title="Call window" />
+          <StatusRow variant="share-test" tone="warn" icon="warning" word="Visible" title="Main window" subtitle="Hide it before presenting" />
           {/* below 600 pt the actions wrap under the text, right-aligned */}
           <div style={{ width: 340 }}>
             <StatusRow variant="source" tone="err" icon="error" word="Failed" title="A source with a name long enough to be cut short" tag="Live" message="The last sync did not finish." actions={<><PushButton label="Try Again" size="small" /><PushButton label="Details" size="small" /></>} />

@@ -38,9 +38,9 @@ test.describe("cpt-noter-dod-ui-primitives-controls primitives page", () => {
   test("renders all six status row variants; below 600 pt the actions wrap under the text (cpt-noter-component-ui-status-row)", async ({ page }) => {
     await open(page);
     const rows = page.locator('[data-gallery="status-row"] .e-status');
-    await expect(rows).toHaveCount(7);
-    expect(await rows.evaluateAll((r) => r.map((e) => e.getAttribute("data-variant")))).toEqual(["source", "runtime", "model", "job", "evidence", "share-test", "source"]);
-    const wide = rows.nth(0), narrow = rows.nth(6);
+    await expect(rows).toHaveCount(9);
+    expect(await rows.evaluateAll((r) => r.map((e) => e.getAttribute("data-variant")))).toEqual(["source", "runtime", "model", "job", "evidence", "evidence", "share-test", "share-test", "source"]);
+    const wide = rows.nth(0), narrow = rows.nth(8);
     const [wideMain, wideActions] = [await wide.locator(".e-status__main").boundingBox(), await wide.locator(".e-status__actions").boundingBox()];
     const [narrowMain, narrowActions] = [await narrow.locator(".e-status__main").boundingBox(), await narrow.locator(".e-status__actions").boundingBox()];
     expect(wideActions!.y).toBeLessThan(wideMain!.y + wideMain!.height); // beside the text
