@@ -16,7 +16,7 @@ const person = (o: Partial<PersonRow> = {}): PersonRow => ({
   aliases: ["Pasha"], is_you: false, voice_profile: true, last_call_at: null, open_items: 0, you_owe: 0, notes: null, ...o,
 });
 const draft = (o = {}) => ({ name: "Pavel Romanov", aka: "Pasha", email: "", role: "Eng", org: "", notes: "", keep: true, ...o });
-const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { personUpdate: vi.fn(), peopleMerge: vi.fn(), personDelete: vi.fn(), personGet: vi.fn(), windowNavigate: vi.fn() } }) as never;
+const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { personUpdate: vi.fn(), peopleMerge: vi.fn(), personDelete: vi.fn(), personGet: vi.fn(), windowNavigate: vi.fn(), peopleList: vi.fn() }, store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } }) as never;
 const ok = (extra = {}) => ({ status: "ok", data: { person: person({ display_name: "Pavel R." }), change_id: "chg_1", ...extra } });
 
 describe("cpt-noter-flow-ui-people-edit-merge", () => {
@@ -103,6 +103,10 @@ describe("cpt-noter-flow-ui-people-edit-merge", () => {
     (find(merge, (p) => p["aria-label"] === "Keep").props.onChange as (e: unknown) => void)({ target: { value: "per_q" } });
     expect(await readPreview(bridgeOf({ status: "ok", data: { calls: [] } }), "per_p")).toEqual({ calls: [] });
     expect(await readPreview(bridgeOf({ status: "error", error: { code: "not_found" } }), "per_p")).toBeNull();
+  });
+  it("opened without a list (from a Person page) the Merge sheet reads the people itself", () => {
+    const h = renderToString(<MergePeopleSheet bridge={bridgeOf({})} source={person()} close={() => {}} />);
+    expect(h).toContain("Merge Pavel with another entry");
   });
   it("the list menu offers Merge 2 People only with exactly two chosen", () => {
     const on = { open: vi.fn(), close: vi.fn(), edit: vi.fn(), merge: vi.fn(), del: vi.fn() };

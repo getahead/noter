@@ -34,7 +34,6 @@ export function PeopleToolbar(props: PageToolbarProps) {
 function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) {
   const tab = usePersonTab(id);
   const sheets = usePeopleSheets();
-  const people = usePeopleHeld();
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const held = usePersonHeld();
   const person = held?.person.id === id ? held.person : null;
@@ -51,7 +50,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
             items={[
               { label: t("person.edit"), onSelect: () => (setMenu(null), sheets.open("person-edit", { bridge, person })) },
               ...(person.is_you ? [] : [
-                { label: t("person.merge_with"), onSelect: () => (setMenu(null), sheets.open("person-merge", { bridge, source: person, people: people ?? [] })) },
+                { label: t("person.merge_with"), onSelect: () => (setMenu(null), sheets.open("person-merge", { bridge, source: person })) },
                 { divider: true as const },
                 { label: t("person.delete"), destructive: true, onSelect: () => (setMenu(null), setPersonNotice(null), void confirmDelete(bridge, person, setPersonNotice)) },
               ]),

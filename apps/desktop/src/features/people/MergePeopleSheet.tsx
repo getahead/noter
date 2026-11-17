@@ -7,6 +7,7 @@ import { t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
+import { usePeople } from "../speakers/people";
 import { mergePeople } from "./actions";
 
 /** The people a merge can keep: everyone but You and the source. */
@@ -18,8 +19,10 @@ export async function readPreview(bridge: Bridge, id: string): Promise<PersonPag
   return r.status === "ok" ? r.data : null;
 }
 
-export function MergePeopleSheet({ close, bridge, source, people, target: first }: { close: () => void; bridge: Bridge; source: PersonRow; people: readonly PersonRow[]; target?: string }) {
-  const targets = mergeTargets(people, source.id);
+/** `people` comes from the list that opened the sheet; opened from a Person page it reads them itself. */
+export function MergePeopleSheet({ close, bridge, source, people, target: first }: { close: () => void; bridge: Bridge; source: PersonRow; people?: readonly PersonRow[]; target?: string }) {
+  const read = usePeople(bridge, people !== undefined);
+  const targets = mergeTargets(people ?? read ?? [], source.id);
   const [targetId, setTargetId] = useState(first && targets.some((p) => p.id === first) ? first : "");
   const [page, setPage] = useState<PersonPage | null>(null);
   const [busy, setBusy] = useState(false);
