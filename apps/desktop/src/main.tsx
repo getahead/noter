@@ -14,6 +14,7 @@ import { FakeCore } from "./core/fake/fake-core";
 import { tauriTransport } from "./core/tauri-transport";
 import { installTabNavigation, installUnobscure } from "./app/a11y/focus";
 import "./features/library/register";
+import "./features/people/register";
 import "./features/items/register";
 import "./features/today/register";
 import "./features/handoff/register";
