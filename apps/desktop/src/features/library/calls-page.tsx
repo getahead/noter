@@ -19,6 +19,10 @@ import { useSheet } from "../../ui/dialogs/host";
 import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
+import { AddTagPopover } from "./add-tag";
+import { tagCalls, tagsKey } from "./tags";
+import { FilterBar, useLists } from "./filter-bar";
+import { heldFilter, holdFilter, isFiltered, reconcile, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
   edgeOf,
@@ -36,7 +40,7 @@ let memory: { state: CallsState; selection: Selection } | null = null;
 const SLOW_MS = 300;
 
 function useCallsList(bridge: Bridge): [CallsState, CallsList] {
-  const list = useMemo(() => createCallsList(bridge, memory?.state), [bridge]);
+  const list = useMemo(() => createCallsList(bridge, memory?.state, heldFilter().filter), [bridge]);
   const state = useSyncExternalStore(list.subscribe, list.get, list.get);
   useEffect(() => void list.load(), [list]);
   return [state, list];
@@ -55,6 +59,23 @@ export function CallsPage() {
   const [failed, setFailed] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
   const announce = useAnnounce(bridge);
+  const [fstate, setFstate] = useState<FilterState>(heldFilter);
+  const [tagging, setTagging] = useState<HTMLElement | null>(null);
+  const [fresh, setFresh] = useState(0);
+  const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  const onFilter = (a: FilterAction) => {
+    const { next, reread } = reconcile(fstate, a);
+    setFstate(next);
+    holdFilter(next);
+    if (reread) void list.setFilter(next.filter);
+  };
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  const filtered = isFiltered(fstate.filter);
+  useEffect(() => {
+    if (filtered && state.status === "LISTED")
+      void announce({ kind: "confirmation", text: t("filters.matches", { count: state.total ?? state.rows.length }), key: `m${state.total}` });
+  }, [filtered, state.total, state.status]);
   const sheets = useSheet();
   const records = useWindow(bridge, (s) => s.entities.call);
   const progress = useWindow(bridge, (s) => s.outputs);
@@ -206,6 +227,26 @@ export function CallsPage() {
 
   return (
     <CallsView
+      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
+      actions={
+        <>
+          {tagging && chosen.length > 0 && (
+            <AddTagPopover
+              anchor={tagging}
+              count={chosen.length}
+              inUse={lists.tags.map((g) => g.tag)}
+              onClose={() => setTagging(null)}
+              onAdd={async (tag) => {
+                const r = await tagCalls(bridge, chosen.map((c) => c.id), [tag], []);
+                if (r.status === "ok") setFresh((n) => n + 1);
+                return r.status === "ok";
+              }}
+            />
+          )}
+        </>
+      }
+      filtered={filtered}
+      onClearFilters={() => onFilter({ type: "clear" })}
       state={shown}
       selection={selection}
       selected={selected}
@@ -228,6 +269,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
+      onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );
 }

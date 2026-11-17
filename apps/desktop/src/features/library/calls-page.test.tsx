@@ -2,6 +2,7 @@ import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { BridgeProvider, useBridge } from "../../app/bridge/context";
 import { DialogsProvider } from "../../ui/dialogs/host";
+import { heldFilter, holdFilter, BLANK } from "./filters";
 import { CallsPage } from "./calls-page";
 
 const bridge = {
@@ -31,6 +32,34 @@ describe("CallsPage (cpt-noter-state-ui-library-calls-list)", () => {
     expect(h).toContain('data-region="LC-R1"');
     expect(h).toContain('data-region="LC-R3"');
     expect(h).not.toContain("lb-crow");
+  });
+});
+
+describe("CallsPage filters (cpt-noter-flow-ui-library-search-topics-filter-tag)", () => {
+  it("a filter action is held for Back and read again, Clear drops it, words alone read nothing", () => {
+    vi.stubGlobal("document", { hasFocus: () => true, querySelector: () => null });
+    holdFilter(BLANK);
+    const act = vi.fn(() => new Promise(() => {}));
+    let out: never = null as never;
+    const Probe = () => ((out = CallsPage() as never), null);
+    renderToString(
+      <BridgeProvider value={{ ...(bridge as object), act } as never}>
+        <DialogsProvider>
+          <Probe />
+        </DialogsProvider>
+      </BridgeProvider>,
+    );
+    const view = out as { props: { bar: { props: { onAction: (a: unknown) => void } }; onClearFilters: () => void; onAddTag: () => void } };
+    const before = act.mock.calls.length;
+    view.props.bar.props.onAction({ type: "words", words: "x" });
+    expect(act.mock.calls.length).toBe(before);
+    view.props.bar.props.onAction({ type: "open_items", on: true });
+    expect(heldFilter().filter.has_open_items).toBe(true);
+    expect(act.mock.calls.length).toBeGreaterThan(before);
+    view.props.onClearFilters();
+    expect(heldFilter().filter).toEqual({});
+    view.props.onAddTag();
+    holdFilter(BLANK);
   });
 });
 

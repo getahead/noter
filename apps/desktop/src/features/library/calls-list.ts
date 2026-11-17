@@ -1,7 +1,8 @@
 // The Calls list's state machine (LOADING, EMPTY, LISTED, ERROR) over `calls_list`: one read per page, an answer
 // older than the last request is dropped, and the core's entity events are merged in by identity.
+import { isFiltered } from "./filters";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallRow, CallSort, CoreError } from "../../core/bindings";
+import type { CallFilter, CallRow, CallSort, CoreError } from "../../core/bindings";
 
 export interface CallsState {
   status: "LOADING" | "EMPTY" | "LISTED" | "ERROR";
@@ -22,8 +23,9 @@ const INITIAL: CallsState = {
 };
 
 // @cpt-state:cpt-noter-state-ui-library-calls-list:p1
-export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
+export function createCallsList(bridge: Bridge, from: CallsState = INITIAL, initial: CallFilter = {}) {
   let state = from;
+  let filter = initial;
   let request = 0;
   let more: Promise<void> | null = null;
   const listeners = new Set<() => void>();
@@ -37,7 +39,7 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
       "calls_list",
       () =>
         bridge.core.callsList({
-          filter: {},
+          filter,
           sort,
           page: cursor ? { cursor } : {},
         }),
@@ -129,6 +131,12 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
     load,
     more: loadMore,
     sort: (sort: CallSort) => load(sort),
+    /** A new filter reads the first page again; an answer for the old one is dropped (it is older than this request). */
+    setFilter(next: CallFilter) {
+      filter = next;
+      reading = null;
+      return load();
+    },
     /** Updates held rows and inserts only calls that belong before the loaded newest-first boundary. */
     merge(records: Record<string, CallRow>, gone: Set<string>) {
       // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-row-update
@@ -148,6 +156,8 @@ export function createCallsList(bridge: Bridge, from: CallsState = INITIAL) {
                 !held.has(r.id) &&
                 !gone.has(r.id) &&
                 state.sort === "newest" &&
+                // a filtered list takes no call it cannot check against the filter; the next read brings the matching ones
+                !isFiltered(filter) &&
                 (!state.rows.length || r.started_at > state.rows[0]!.started_at),
             );
       fresh.sort((a, b) => b.started_at - a.started_at);

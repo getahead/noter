@@ -2,6 +2,7 @@ import {
   useEffect,
   useMemo,
   type KeyboardEvent,
+  type ReactNode,
   type MouseEvent,
   type Ref,
 } from "react";
@@ -24,6 +25,13 @@ export const COLUMNS = {
 } as const satisfies Record<Column, string>;
 
 export interface CallsViewProps {
+  /** The filter bar, above the table. */
+  bar?: ReactNode;
+  /** Filters are set: an empty read is FILTER_EMPTY, not the first-use state. */
+  filtered?: boolean;
+  onClearFilters?: () => void;
+  /** The Add Tag popover of the selection. */
+  actions?: ReactNode;
   state: CallsState;
   selection: Selection;
   selected: ReadonlySet<string>;
@@ -46,6 +54,7 @@ export interface CallsViewProps {
   onDismissFailed: () => void;
   onCloseMenu: () => void;
   onDelete: () => void;
+  onAddTag?: () => void;
 }
 
 const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
@@ -61,7 +70,9 @@ export function CallsView(p: CallsViewProps) {
         <h2 className="lb-title" tabIndex={-1}>
           {t("library.calls.title")}
         </h2>{" "}
-        {state.status === "LISTED" &&
+        {state.status === "LISTED" && p.filtered
+          ? t("filters.matches", { count: state.total ?? state.rows.length })
+          : state.status === "LISTED" &&
           subtitle(
             state.rows,
             state.total ?? state.rows.length,
@@ -69,6 +80,8 @@ export function CallsView(p: CallsViewProps) {
             p.prefs,
           )}
       </div>
+      {p.bar}
+      {p.actions}
       {p.failed && (
         <InlineBanner
           banner={{
@@ -83,7 +96,7 @@ export function CallsView(p: CallsViewProps) {
         data-region="LC-R3"
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
-        data-state={chosen.length > 1 ? "selected-several" : state.status.toLowerCase()}
+        data-state={chosen.length > 1 ? "selected-several" : state.status === "EMPTY" && p.filtered ? "filter-empty" : state.status.toLowerCase()}
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         role="region"
@@ -98,6 +111,7 @@ export function CallsView(p: CallsViewProps) {
             single={chosen.length === 1 ? chosen[0]! : null}
             onOpen={p.onOpen}
             onDelete={p.onDelete}
+            onAddTag={p.onAddTag}
           />
         </div>
       )}
@@ -124,6 +138,15 @@ function Body(p: CallsViewProps) {
     );
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
+  if (state.status === "EMPTY" && p.filtered)
+    return (
+      <EmptyState
+        variant="filtered"
+        title={t("filters.empty_title")}
+        actionLabel={t("filters.clear")}
+        onAction={p.onClearFilters}
+      />
+    );
   if (state.status === "EMPTY")
     return (
       <EmptyState
@@ -250,11 +273,13 @@ export function ContextMenu({
   single,
   onOpen,
   onDelete,
+  onAddTag,
 }: {
   onClose: () => void;
   single: CallRow | null;
   onOpen: (id: string) => void;
   onDelete: () => void;
+  onAddTag?: () => void;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -272,6 +297,7 @@ export function ContextMenu({
             disabled: !single,
             onSelect: run(() => single && onOpen(single.id)),
           },
+          ...(onAddTag ? [{ label: t("library.add_tag"), onSelect: run(onAddTag) }] : []),
           { divider: true },
           {
             label: t("library.menu.delete"),
