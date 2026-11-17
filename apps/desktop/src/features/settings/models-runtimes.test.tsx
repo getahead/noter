@@ -8,9 +8,10 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
-import { installCli, loadAccounts, removeKey, setKey } from "./accounts";
+import { installCli, loadAccounts, removeKey, setKey, signOutAccount, testAccount } from "./accounts";
 import { loadSettings } from "./actions";
-import { KeyRow } from "./CredentialRow";
+import { AccountRow, KeyRow } from "./CredentialRow";
+import { SignOutSheet } from "./SignOutSheet";
 import { refocus } from "./KeyField";
 import { KeySheet } from "./KeySheet";
 import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
@@ -206,3 +207,78 @@ describe("KeySheet and the key commands (cpt-noter-flow-ui-accounts-key)", () =>
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
+  const signedIn = (w: FakeCore["world"]) => {
+    const claude = w.app.accounts.accounts.find((a) => a.provider === "claude")!;
+    claude.status = { type: "signed_in", identity: { email: "you@example.com", plan: "Max" }, since: 1 };
+    claude.agents = [{ id: "agt_pm", name: "Product manager", badge: "agent" }];
+  };
+
+  it("shows the identity, the agents that use it, Test and Sign Out…, and enables the account runtime", async () => {
+    const props = await ready(signedIn);
+    await loadAccounts(bridge);
+    const html = renderToString(<ModelsRuntimesPane {...props} />);
+    expect(html).toContain("Signed in");
+    expect(html).toContain("you@example.com · Max · through Claude Code");
+    expect(html).toContain("Used by 1 agent: Product manager");
+    expect(html).toContain(">Test<");
+    expect(html).toContain(">Sign Out…<");
+  });
+
+  it("shows the expired row with its note and Sign In Again…", async () => {
+    const props = await ready((w) => {
+      w.app.accounts.accounts.find((a) => a.provider === "chatgpt")!.status = { type: "signed_out_by_provider", at: 1 };
+    });
+    await loadAccounts(bridge);
+    const html = renderToString(<ModelsRuntimesPane {...props} />);
+    expect(html).toContain("Signed out by ChatGPT");
+    expect(html).toContain("Agents on it are paused until you sign in again.");
+    expect(html).toContain(">Sign In Again…<");
+  });
+
+  it("Test asks the core and Sign Out sends also_in_cli, replacing the slice only on success", async () => {
+    await ready(signedIn);
+    const seen = sentCommands(fake);
+    expect((await testAccount(bridge, "claude")).status).toBe("ok");
+    expect((await signOutAccount(bridge, "claude", true)).status).toBe("ok");
+    expect(accounts().accounts.find((a) => a.provider === "claude")!.status.type).toBe("not_signed_in");
+    expect(seen).toContainEqual(["account_sign_out", { provider: "claude", also_in_cli: true }]);
+  });
+
+  it("Test shows the answer line and the sign-out sheet confirms with the checkbox or cancels", async () => {
+    await ready(signedIn);
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    const row = rendered(AccountRow, { bridge, view, keyConfigured: true });
+    on(row, "Test")();
+    await vi.waitFor(() => expect(bridge.store.getState().commands["account:test:claude"]?.state).toBe("DONE"));
+    const confirm = vi.fn();
+    const cancel = vi.fn();
+    const sheet = rendered(SignOutSheet, { provider: "claude", agents: view.agents, keyConfigured: false, onConfirm: confirm, onCancel: cancel });
+    on(sheet, "Also sign out of Claude Code on this Mac", "onAction")(true);
+    on(find(sheet, (p) => p.defaultButton !== undefined).props.defaultButton as Tree, "Sign Out")();
+    expect(confirm).toHaveBeenCalledWith(false);
+    on(sheet, "Cancel")();
+    expect(cancel).toHaveBeenCalled();
+    expect(renderToString(<SignOutSheet provider="chatgpt" agents={[]} keyConfigured onConfirm={confirm} onCancel={cancel} />)).toContain("Codex stays signed in");
+  });
+
+  it("a refused sign-out leaves the row signed in and shows a safe error", async () => {
+    await ready(signedIn);
+    fake.failNext("account_sign_out", "offline");
+    expect((await signOutAccount(bridge, "claude", false)).status).toBe("error");
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    expect(view.status.type).toBe("signed_in");
+    const html = renderToString(<AccountRow bridge={bridge} view={view} keyConfigured />);
+    expect(html).toContain("Couldn’t sign out. The account is unchanged.");
+    expect(html).toContain("Signed in");
+  });
+
+  it("keeps Sign In disabled until the sign-in sheet exists", async () => {
+    await ready();
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    const button = find(rendered(AccountRow, { bridge, view, keyConfigured: true }), (p) => p.label === "Sign In with Claude…");
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.onAction).toBeUndefined();
+  });
+});
