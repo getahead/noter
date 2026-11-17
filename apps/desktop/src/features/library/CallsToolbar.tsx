@@ -9,6 +9,7 @@ import { exportStore } from "./export-store";
 export function CallsToolbar({ route, base }: PageToolbarProps) {
   const ids = useSyncExternalStore(exportStore.subscribe, exportStore.get, exportStore.get);
   if (route.key !== "root") return <MainToolbar {...base} />;
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-return-filter
   return (
     <MainToolbar
       {...base}
@@ -20,4 +21,5 @@ export function CallsToolbar({ route, base }: PageToolbarProps) {
       }
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-return-filter
 }
