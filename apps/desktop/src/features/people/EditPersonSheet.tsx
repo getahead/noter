@@ -49,7 +49,7 @@ export function EditPersonSheet({ close, bridge, person: opened }: { close: () =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"conflict" | "failed" | null>(null);
   const [touched, setTouched] = useState<ReadonlySet<Field>>(new Set());
-  const set = (k: keyof typeof d) => (v: string) => (setTouched(new Set(touched).add(k)), setD({ ...d, [k]: v }));
+  const set = (k: keyof typeof d) => (v: string) => (setTouched((s) => new Set(s).add(k)), setD({ ...d, [k]: v }));
   const renamed = d.name.trim() !== "" && d.name.trim() !== person.display_name;
   async function save() {
     setBusy(true);

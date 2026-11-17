@@ -86,7 +86,7 @@ export function PeoplePage() {
       {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => void list.load()} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
-          <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.map((id) => rows.find((p) => p.id === id)!).filter(Boolean), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
+          <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.flatMap((id) => rows.find((p) => p.id === id) ?? []), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
         </div>
       )}
     </>
