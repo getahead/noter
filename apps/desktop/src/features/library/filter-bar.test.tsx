@@ -1,6 +1,8 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
-import { FilterBar, lookups } from "./filter-bar";
+import { describe, expect, it, vi } from "vitest";
+import { FilterBar, PeoplePicker, lookups } from "./filter-bar";
+import { PersonPicker } from "../speakers/PersonPicker";
+import { find, rendered } from "../../ui/testing";
 import { apply, BLANK } from "./filters";
 
 const lists = { people: [{ id: "per_a", short_name: "Anna", display_name: "Anna K" }], types: [], tags: [] } as never;
@@ -16,6 +18,18 @@ describe("FilterBar (cpt-noter-component-ui-filter-bar)", () => {
     const html = bar(apply(BLANK, { type: "toggle", group: "people", value: "per_a" }));
     expect(html).toContain("Anna");
     expect(html).toContain("Clear Filters");
+  });
+  it("the People filter is the multi-select picker: a chip added or dropped toggles that person", () => {
+    const l = { people: [{ id: "per_a", short_name: "Anna", display_name: "Anna K", initials: "AK", is_you: false }, { id: "per_b", short_name: "Bo", display_name: "Bo L", initials: "BL", is_you: false }], types: [], tags: [] } as never;
+    const onAction = vi.fn();
+    const tree = rendered(PeoplePicker, { bridge: {} as never, lists: l, held: ["per_a"], onAction });
+    const picker = find(tree, (p, type) => type === PersonPicker);
+    expect(picker.props.multiple).toBe(true);
+    expect((picker.props.selected as { id: string }[]).map((c) => c.id)).toEqual(["per_a"]);
+    (picker.props.onChange as (n: unknown[]) => void)([{ id: "per_a" }, { id: "per_b" }]);
+    expect(onAction).toHaveBeenLastCalledWith({ type: "toggle", group: "people", value: "per_b" });
+    (picker.props.onChange as (n: unknown[]) => void)([]);
+    expect(onAction).toHaveBeenLastCalledWith({ type: "toggle", group: "people", value: "per_a" });
   });
   it("falls back to the id for an unknown person or type", () => {
     expect(lookups(lists).person("x")).toBe("x");

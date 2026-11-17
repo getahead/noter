@@ -6,6 +6,7 @@ import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Icon } from "../../ui/icons";
+import { PersonPicker } from "../speakers/PersonPicker";
 import { datePreset, tokens, type FilterAction, type FilterState, type Group, type Lookups } from "./filters";
 
 export interface Lists {
@@ -49,7 +50,7 @@ const LANGS = ["en", "ru", "de"];
 
 // @cpt-component:cpt-noter-component-ui-filter-bar:p1
 /** The filter bar: pop-ups and tokens over one filter state; Clear keeps the typed words. */
-export function FilterBar({ state, lists, onAction }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void }) {
+export function FilterBar({ state, lists, onAction, bridge }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void; bridge?: Bridge }) {
   const [open, setOpen] = useState<Menu>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toks = tokens(state, lookups(lists));
@@ -86,7 +87,7 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
       {open && (
         <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
           <div className="lb-pop">
-            {open === "people" && group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })))}
+            {open === "people" && (bridge ? <PeoplePicker bridge={bridge} lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} /> : group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name }))))}
             {open === "type" && group("call_types", lists.types.map((c) => ({ value: c.id, label: c.label })))}
             {open === "tags" && (lists.tags.length ? group("tags", lists.tags.map((g) => ({ value: g.tag, label: g.tag }))) : <p>{t("filters.no_tags")}</p>)}
             {open === "language" && group("languages", LANGS.map((l) => ({ value: l, label: LANG_NAME[l]! })))}
@@ -103,5 +104,27 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
         </Popover>
       )}
     </div>
+  );
+}
+
+/** The People filter: the shared picker in its multi-select form; each chip added or dropped toggles that person. */
+export function PeoplePicker({ bridge, lists, held, onAction }: { bridge: Bridge; lists: Lists; held: string[]; onAction: (a: FilterAction) => void }) {
+  const selected = held.flatMap((id) => lists.people.filter((p) => p.id === id).map(({ id, display_name, short_name, initials, is_you }) => ({ id, display_name, short_name, initials, is_you })));
+  return (
+    <PersonPicker
+      bridge={bridge}
+      variant="popover"
+      multiple
+      participants={[]}
+      speakers={[]}
+      people={lists.people}
+      confirmLabel={t("filters.people")}
+      onPick={() => {}}
+      selected={selected}
+      onChange={(next) => {
+        const ids = new Set(next.map((c) => c.id));
+        for (const id of new Set([...held, ...ids])) if (held.includes(id) !== ids.has(id)) onAction({ type: "toggle", group: "people", value: id });
+      }}
+    />
   );
 }

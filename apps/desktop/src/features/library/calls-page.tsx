@@ -255,7 +255,7 @@ export function CallsPage() {
 
   return (
     <CallsView
-      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
+      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} bridge={bridge} />}
       actions={
         <>
           {exported && <span role="status">{t("export.done", { path: exported })}</span>}
@@ -298,6 +298,7 @@ export function CallsPage() {
       onDismissFailed={() => setFailed(null)}
       onCloseMenu={() => setMenu(null)}
       onDelete={() => void remove(chosen)}
+      onRemoveTag={(tag) => void tagCalls(bridge, chosen.map((c) => c.id), [], [tag]).then((r) => r.status === "ok" && setFresh((n) => n + 1))}
       onAddTag={() => setTagging(document.querySelector<HTMLElement>(".lb-filterbar"))}
     />
   );

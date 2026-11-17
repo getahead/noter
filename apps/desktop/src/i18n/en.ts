@@ -1356,6 +1356,7 @@ export const en = {
   "tags.tagged_n": { one: "Tagged {count} call “{tag}”", other: "Tagged {count} calls “{tag}”" },
   "tags.removed_n": { one: "Removed “{tag}” from {count} call", other: "Removed “{tag}” from {count} calls" },
   "library.add_tag": "Add Tag…",
+  "library.remove_tag": "Remove Tag",
   "export.scope_calls": { one: "{count} call", other: "{count} calls" },
   "search.ask_instead": "Ask Instead",
   "search.filters_active": { one: "{count} filter active", other: "{count} filters active" },

@@ -55,6 +55,8 @@ export interface CallsViewProps {
   onCloseMenu: () => void;
   onDelete: () => void;
   onAddTag?: () => void;
+  /** Removes one tag from the selected calls (Remove Tag in the context menu). */
+  onRemoveTag?: (tag: string) => void;
 }
 
 const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
@@ -112,6 +114,8 @@ export function CallsView(p: CallsViewProps) {
             onOpen={p.onOpen}
             onDelete={p.onDelete}
             onAddTag={p.onAddTag}
+            tags={[...new Set(chosen.flatMap((c) => c.tags))]}
+            onRemoveTag={p.onRemoveTag}
           />
         </div>
       )}
@@ -274,12 +278,17 @@ export function ContextMenu({
   onOpen,
   onDelete,
   onAddTag,
+  tags = [],
+  onRemoveTag,
 }: {
   onClose: () => void;
   single: CallRow | null;
   onOpen: (id: string) => void;
   onDelete: () => void;
   onAddTag?: () => void;
+  /** The tags the selection carries. */
+  tags?: string[];
+  onRemoveTag?: (tag: string) => void;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -298,6 +307,9 @@ export function ContextMenu({
             onSelect: run(() => single && onOpen(single.id)),
           },
           ...(onAddTag ? [{ label: t("library.add_tag"), onSelect: run(onAddTag) }] : []),
+          // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
+          ...(onRemoveTag ? (tags.length ? [{ header: t("library.remove_tag") }, ...tags.map((tag) => ({ label: tag, onSelect: run(() => onRemoveTag(tag)) }))] : [{ label: t("library.remove_tag"), disabled: true }]) : []),
+          // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
           { divider: true },
           {
             label: t("library.menu.delete"),

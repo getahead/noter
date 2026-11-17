@@ -162,6 +162,17 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  it("Remove Tag lists the selection's tags and removes the chosen one; with none it is disabled", () => {
+    const [onClose, onRemoveTag] = [vi.fn(), vi.fn()];
+    const items = (tags: string[]) => find(rendered(ContextMenu, { onClose, single: null, onOpen: vi.fn(), onDelete: vi.fn(), tags, onRemoveTag }), (p) => Array.isArray(p.items)).props.items as { label?: string; header?: string; onSelect?: () => void; disabled?: boolean }[];
+    const some = items(["release", "hotfix"]);
+    expect(some.filter((i) => i.header).map((i) => i.header)).toEqual(["Remove Tag"]);
+    some.find((i) => i.label === "hotfix")!.onSelect!();
+    expect(onRemoveTag).toHaveBeenCalledWith("hotfix");
+    expect(onClose).toHaveBeenCalled();
+    expect(items([]).find((i) => i.label === "Remove Tag")!.disabled).toBe(true);
+  });
+
   it("disables Open when several calls are selected", () => {
     const tree = rendered(ContextMenu, {
       onClose: vi.fn(),
