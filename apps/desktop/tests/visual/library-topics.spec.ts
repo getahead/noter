@@ -93,10 +93,13 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
   });
   test("Rename to a name that is taken offers Merge Instead", async ({ page }) => {
     await thread(page);
+    // the other topic's name is the one the merge suggestion names
+    const banner = await page.getByText(/Looks like the same subject as/).textContent();
+    const other = /“(.+)”/.exec(banner ?? "")?.[1] ?? "";
+    expect(other).not.toBe("");
     await menu(page, "Rename…");
-    const other = await page.locator(TOPIC_ROW).nth(1).textContent().catch(() => null);
     const field = page.getByRole("textbox", { name: "Topic name" });
-    await field.fill(other?.trim() || "Notification service");
+    await field.fill(other);
     await page.getByRole("button", { name: "Rename", exact: true }).click();
     await expect(page.getByRole("button", { name: "Merge Instead" })).toBeVisible();
     await shot(page, "topics-rename-taken", "wide");
