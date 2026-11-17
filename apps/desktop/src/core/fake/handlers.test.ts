@@ -223,6 +223,31 @@ describe("fake core stream and record parity", () => {
     expect(fake.playback.playing).toBe(true);
   });
 
+  it("prepare refuses a missing or unsupported CLI, as the real core does", async () => {
+    const fake = core("settings");
+    const claude = fake.world.app.accounts.accounts.find((a) => a.provider === "claude")!;
+    claude.cli = { ...claude.cli, installed: false, path: null, version: null };
+    await expect(fake.invoke("account_signin_prepare", { provider: "claude" })).rejects.toMatchObject({ code: "cli_missing" });
+    claude.cli = { ...claude.cli, installed: true, supported: false };
+    await expect(fake.invoke("account_signin_prepare", { provider: "claude" })).rejects.toMatchObject({ code: "cli_version_unsupported" });
+  });
+
+  it("installing Ollama leaves the local runtime installed and running", async () => {
+    vi.useFakeTimers();
+    const fake = core("settings");
+    const local = fake.world.app.accounts.local;
+    Object.assign(local, { running: false, cli: { ...local.cli, installed: false, path: null } });
+    await fake.invoke("cli_install", { tool: "ollama" });
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(fake.world.app.accounts.local).toMatchObject({ running: true, cli: { installed: true } });
+  });
+
+  it("a rename to a taken name is refused before the revision is looked at, as the real core does", async () => {
+    const fake = core("main");
+    const [a, b] = fake.world.topics;
+    await expect(fake.invoke("topic_rename", { topic_id: a.id, rev: a.rev + 7, name: b.name })).rejects.toMatchObject({ code: "invalid_input", detail: { rule: "duplicate" } });
+  });
+
   it("stopping Ask keeps the partial answer and cancels the remaining response", async () => {
     vi.useFakeTimers();
     const fake = core("main");
