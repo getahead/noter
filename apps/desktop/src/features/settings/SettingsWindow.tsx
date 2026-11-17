@@ -17,6 +17,7 @@ import { HotkeysPane } from "./HotkeysPane";
 import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
 import type { PaneProps } from "./pane-props";
 import { PerformancePane } from "./PerformancePane";
+import { KnowledgeSourcesPane } from "./KnowledgeSourcesPane";
 import { PrivacyPane } from "./PrivacyPane";
 import { laterNote, paneLabel, searchPanes } from "./search";
 import { UpdatesPane } from "./UpdatesPane";
@@ -36,11 +37,12 @@ export const PANES: Partial<Record<SettingsPane, (p: PaneProps) => React.ReactNo
   call_screen_and_menu_bar: (p) => <CallScreenPane {...p} />,
   hotkeys: (p) => <HotkeysPane bridge={p.bridge} />,
   performance: (p) => <PerformancePane {...p} />,
+  knowledge_sources: (p) => <KnowledgeSourcesPane {...p} />,
   updates: (p) => <UpdatesPane {...p} />,
 };
 
 /** The panes a later feature fills show their frame and the milestone, never a blank area. */
-const LATER = new Set<SettingsPane>(["knowledge_sources", "maintenance"]);
+const LATER = new Set<SettingsPane>(["maintenance"]);
 
 // @cpt-component:cpt-noter-component-screen-settings:p1
 // @cpt-dod:cpt-noter-dod-ui-settings-window:p1
