@@ -183,7 +183,8 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
     let filter = if only.is_some() { " WHERE id = ?1" } else { "" };
     let mut people: Vec<PersonRow> = c
         .prepare(&format!(
-            "SELECT id, rev, display_name, short_name, email, role, org, is_you, voice_profile_optin
+            "SELECT id, rev, display_name, short_name, email, role, org, is_you, voice_profile_optin,
+                    notes
              FROM people{filter}"
         ))?
         .query_map(params_from_iter(only), |r| {
@@ -202,6 +203,8 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
                 voice_profile: r.get(8)?,
                 last_call_at: None,
                 open_items: 0,
+                you_owe: 0,
+                notes: r.get(9)?,
             })
         })?
         .collect::<Result<_, _>>()?;
@@ -245,8 +248,31 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
         ))?
         .query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<Result<_, _>>()?;
+    // The user's open actions from calls each person was on: the page's `you_owe`, counted.
+    let mut owed: HashMap<String, u32> = c
+        .prepare(&format!(
+            "SELECT p.person_id, count(DISTINCT i.id) FROM
+               (SELECT person_id, call_id FROM call_participants
+                UNION SELECT person_id, call_id FROM speakers WHERE person_id IS NOT NULL) p
+             JOIN items i ON i.call_id = p.call_id
+             WHERE i.owner_person_id = (SELECT id FROM people WHERE is_you = 1)
+               AND i.kind = 'action_item' AND {OPEN} {}
+             GROUP BY p.person_id",
+            if only.is_some() {
+                "AND p.person_id = ?1"
+            } else {
+                ""
+            }
+        ))?
+        .query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
     for p in &mut people {
         let id = p.id.as_str();
+        p.you_owe = if p.is_you {
+            0
+        } else {
+            owed.remove(id).unwrap_or(0)
+        };
         p.aliases = aliases.remove(id).unwrap_or_default();
         p.last_call_at = last.remove(id).map(TimestampMs);
         p.open_items = open.remove(id).unwrap_or(0);

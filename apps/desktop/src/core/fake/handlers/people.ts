@@ -8,9 +8,10 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   return {
   // ── People ───────────────────────────────────────────────────────────
   people_list: (a, { world }) => {
-    const query = a.query?.toLowerCase();
+    const fold = (text: string) => text.normalize("NFKC").toLowerCase().replaceAll("ё", "е").replaceAll("ß", "ss");
+    const query = a.query ? fold(a.query.trim()) : "";
     return {
-      people: world.people.filter((p) => !query || [p.display_name, ...p.aliases].some((name) => name.toLowerCase().includes(query))),
+      people: world.people.filter((p) => !query || [p.display_name, p.short_name, ...p.aliases].some((name) => fold(name).includes(query))),
       unnamed: world.transcripts.flatMap((t) =>
         t.speakers.flatMap((s) => (s.label.type === "unnamed" ? [{ call: shared.callRef(shared.call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, suggestion: s.suggestion }] : [])),
       ),
@@ -33,8 +34,7 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   person_create: (a, { world, emit }) => {
     if (!a.display_name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "display_name", rule: "required" });
-    if (world.people.some((p) => p.display_name.toLowerCase() === a.display_name.trim().toLowerCase())) throw coreError("invalid_input", "duplicate", { type: "validation", field: "display_name", rule: "duplicate" });
-    const p: Bindings.PersonRow = { ...world.people[1], id: newId("per"), rev: 1, display_name: a.display_name, short_name: a.display_name, initials: a.display_name.slice(0, 2).toUpperCase(), email: a.email ?? null, role: a.role ?? null, org: a.org ?? null, aliases: [], voice_profile: false, open_items: 0, is_you: false, last_call_at: null };
+    const p: Bindings.PersonRow = { ...world.people[1], id: newId("per"), rev: 1, display_name: a.display_name, short_name: a.display_name, initials: a.display_name.slice(0, 2).toUpperCase(), email: a.email ?? null, role: a.role ?? null, org: a.org ?? null, aliases: [], voice_profile: false, open_items: 0, you_owe: 0, notes: null, is_you: false, last_call_at: null };
     world.people.push(p);
     emit("entity:changed", { type: "person", person: p });
     return { person: p, change_id: shared.logChange(fake, world, { entity: { kind: "person", id: p.id, label: p.display_name }, summary: `Added ${p.display_name}` }) };
@@ -50,6 +50,7 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     if (patch.role !== undefined) p.role = patch.role;
     if (patch.org !== undefined) p.org = patch.org;
     if (patch.aliases != null) p.aliases = patch.aliases;
+    if (patch.notes !== undefined) p.notes = patch.notes;
     p.rev += 1;
     emit("entity:changed", { type: "person", person: p });
     return { person: p, change_id: shared.logChange(fake, world, { entity: { kind: "person", id: p.id, label: p.display_name }, summary: `Edited ${p.display_name}` }) };

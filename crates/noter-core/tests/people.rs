@@ -289,6 +289,13 @@ async fn a_person_page_joins_calls_work_and_questions() {
         vec!["itm_you"],
         "what they asked of you: yours, from their calls"
     );
+    // The list row carries the same count, and the notes the Edit sheet starts from.
+    assert_eq!(page.person.you_owe, 1);
+    assert_eq!(page.person.notes, None);
+    let listed = list(&core, None).await;
+    let row = |id: &str| listed.people.iter().find(|p| p.id.as_str() == id).unwrap();
+    assert_eq!(row("per_dima").you_owe, 1);
+    assert_eq!(listed.people.iter().find(|p| p.is_you).unwrap().you_owe, 0);
     assert_eq!(page.open_questions.len(), 1);
     assert!(page.topics.is_empty());
     assert!(page.talk_share.is_none());
