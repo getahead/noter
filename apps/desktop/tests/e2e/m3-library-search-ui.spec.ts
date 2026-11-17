@@ -12,7 +12,6 @@ import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
-const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 
 /** Topics the way DESIGN's thread has them: the decision and the open question under Websocket notifications, a replay item under the kept topic. */
