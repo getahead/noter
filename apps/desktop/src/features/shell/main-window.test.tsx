@@ -225,6 +225,11 @@ describe("MainWindow controls", () => {
     bar.onToggleSidebar();
     bar.onSearch("zoom");
     bar.onRunSearch(" zoom ");
+    bar.onPickTag?.("release"); // a tag chosen from the # list filters Calls (and opens it from another page)
+    bar.onRunSearch("#nothing-yet"); // not a tag in use: a search
+    const filters = await import("../library/filters");
+    expect(filters.heldFilter().filter.tags).toEqual(["release"]);
+    filters.holdFilter(filters.BLANK);
     bar.onOpenSearch();
 
     const slot = find(tree, (_, type) => type === BannerSlot).props as never as Parameters<typeof BannerSlot>[0];

@@ -4,6 +4,7 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { registerPage } from "../shell/pages";
 import { CallsPage } from "./calls-page";
 import { CallsToolbar } from "./CallsToolbar";
+import { SearchPage } from "./SearchPage";
 
 // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-open
 /** The Library section's root page is the Calls view (⌘3); the call and search routes belong to later features. */
@@ -13,6 +14,8 @@ registerPage("library", {
   render: (route) =>
     route.key === "root"
       ? createElement(CallsPage)
+      : route.key.startsWith("search:")
+      ? createElement(SearchPage, { query: route.key.slice("search:".length) })
       : createElement(EmptyState, {
           variant: "large",
           heading: true,

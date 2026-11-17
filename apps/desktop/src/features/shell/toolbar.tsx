@@ -11,6 +11,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
 import { Toolbar, ToolbarSpacer } from "../../ui/primitives/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
+import { listKey, tagMatches } from "../library/tag-suggest";
 import type { PageDef } from "./pages";
 import type { Route } from "./history";
 
@@ -42,6 +43,10 @@ export interface ToolbarProps {
   onRunSearch: (value: string) => void;
   onOpenSearch: () => void;
   onSearchBlur?: () => void;
+  /** Tags in use: typing `#` offers them in the search field. */
+  tagChoices?: string[];
+  /** A tag chosen from the # list. */
+  onPickTag?: (tag: string) => void;
 }
 
 /** The » menu: the page actions that do not fit at Narrow, opened under the overflow button. */
@@ -65,6 +70,8 @@ export function OverflowMenu({ actions, anchor, onClose }: { actions: NonNullabl
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-frame:p1
 export function MainToolbar(p: ToolbarProps) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const [active, setActive] = useState(-1);
+  const matches = tagMatches(p.search, p.tagChoices ?? []);
   const primary = p.actions.filter((a) => a.primary);
   const shown = p.narrow ? primary : p.actions;
   const overflow = p.narrow ? p.actions.filter((a) => !a.primary) : [];
@@ -106,7 +113,30 @@ export function MainToolbar(p: ToolbarProps) {
         (p.narrow && !p.searchOpen ? (
           <IconButton icon="search" label={t("shell.search")} onAction={p.onOpenSearch} />
         ) : (
-          <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+          <span
+            className="np-toolbar__searchhost"
+            onKeyDownCapture={(e) => {
+              const k = listKey(e.key, active, matches.length);
+              if (!k) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const tag = k.pick === undefined ? undefined : matches[k.pick];
+              if (tag !== undefined) return void (setActive(-1), p.onPickTag?.(tag));
+              if (k.pick !== undefined) return;
+              setActive(k.active);
+            }}
+          >
+            <SearchField id="mw-search" cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={(v) => (setActive(-1), p.onSearch(v))} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+            {matches.length > 0 && (
+              <ul className="np-tagpop" role="listbox" aria-label={t("search.tags_list")}>
+                {matches.map((x, i) => (
+                  <li key={x} role="option" aria-selected={i === active} className="np-tagpop__item" onMouseDown={(e) => (e.preventDefault(), p.onPickTag?.(x))}>
+                    {`#${x}`}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </span>
         ))}
     </Toolbar>
   );

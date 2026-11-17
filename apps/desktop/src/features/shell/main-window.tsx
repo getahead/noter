@@ -28,6 +28,7 @@ import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { navigateEffect } from "./navigate";
 import { searchRoute, searchWords } from "./sections";
+import { holdTag, tagChoice, useTagChoices } from "../library/tag-suggest";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
@@ -60,6 +61,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     );
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const tagChoices = useTagChoices(bridge);
   const [viewport, setViewport] = useState(() => globalThis.innerWidth ?? 1280);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrolls = useRef(createScrollMemory());
@@ -93,6 +95,12 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const route = currentRoute(shell.history);
   const page = pageFor(route.section, route);
   const routeId = `${route.section}/${route.key}`;
+  // a tag chosen in the search field filters the Calls list: from any other page it opens Calls first
+  const pickTag = (tag: string) => {
+    holdTag(tag);
+    setSearch("");
+    if (route.section !== "library" || route.key !== "root") dispatch({ type: "move", move: { type: "push", route: { section: "library", key: "root" } } });
+  };
   const override = useInspectorOverride();
   // a route change closes an inspector a feature opened (its row is gone from the page)
   useEffect(() => () => closeInspector("route"), [routeId]);
@@ -279,8 +287,14 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           onBack={() => act({ type: "back" })}
           onForward={() => act({ type: "forward" })}
           onToggleSidebar={() => act({ type: "toggle-sidebar" })}
+          tagChoices={tagChoices}
           onSearch={setSearch}
-          onRunSearch={(q) => dispatch({ type: "move", move: { type: "push", route: searchRoute(q.trim()) } })}
+          onPickTag={pickTag}
+          onRunSearch={(q) => {
+            const tag = tagChoice(q, tagChoices);
+            if (tag) pickTag(tag); // an exact #tag on Return is a filter, anything else a search
+            else dispatch({ type: "move", move: { type: "push", route: searchRoute(q.trim()) } });
+          }}
           onOpenSearch={() => act({ type: "focus-search" })}
           onSearchBlur={() => setSearchOpen(false)}
         />

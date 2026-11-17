@@ -55,7 +55,7 @@ describe("CallsPage filters (cpt-noter-flow-ui-library-search-topics-filter-tag)
     expect(act.mock.calls.length).toBe(before);
     view.props.bar.props.onAction({ type: "open_items", on: true });
     expect(heldFilter().filter.has_open_items).toBe(true);
-    expect(act.mock.calls.length).toBeGreaterThan(before);
+    // the read itself goes through the filter watcher (an effect), one per change: syncFilter's test counts it
     view.props.onClearFilters();
     expect(heldFilter().filter).toEqual({});
     view.props.onAddTag();

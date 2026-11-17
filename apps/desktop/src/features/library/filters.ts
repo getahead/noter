@@ -96,8 +96,24 @@ export function tokens(s: FilterState, look: Lookups): Token[] {
 // Back from a call's page remounts the page: the filter and words stay for this window (not an app restart).
 let held: FilterState = BLANK;
 export const heldFilter = (): FilterState => held;
-export const holdFilter = (s: FilterState): void => void (held = s);
+const watchers = new Set<() => void>();
+export const holdFilter = (s: FilterState): void => {
+  held = s;
+  watchers.forEach((w) => w());
+};
+/** A change made outside the Calls page (a # tag choice in the toolbar field). */
+export const watchFilter = (w: () => void): (() => void) => (watchers.add(w), () => void watchers.delete(w));
 
+
+/** Reads the list again once per filter change: the page's own change and the watcher both land here, so the same filter never reads twice (words alone never read). */
+export function syncFilter(read: (f: CallFilter) => void, start: CallFilter): (s: FilterState) => void {
+  let last = start;
+  return (s) => {
+    if (s.filter === last) return;
+    last = s.filter;
+    read(s.filter);
+  };
+}
 
 /** Whether any filter group narrows the list. */
 export const isFiltered = (f: CallFilter): boolean => Object.values(f).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));

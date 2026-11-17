@@ -42,6 +42,21 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(html).not.toContain("Show Sidebar");
   });
 
+  it("lists the matching tags under the field while a # is typed, and picking one chooses that tag", () => {
+    const tags = ["release", "vhi-8.0"];
+    const none = renderToString(<MainToolbar {...props({ tagChoices: tags, search: "zoom" })} />);
+    expect(none).not.toContain('role="listbox"');
+    expect(none).not.toContain("list=");
+    const html = renderToString(<MainToolbar {...props({ tagChoices: tags, search: "#re" })} />);
+    expect(html).toContain('role="listbox"');
+    expect(html).toContain("#release");
+    expect(html).not.toContain("#vhi-8.0");
+    const onPickTag = vi.fn();
+    const tree = rendered(MainToolbar, props({ tagChoices: tags, search: "#", onPickTag }));
+    (find(tree, (p) => p.role === "option" && String(p.children).includes("vhi")).props.onMouseDown as (e: { preventDefault(): void }) => void)({ preventDefault: vi.fn() });
+    expect(onPickTag).toHaveBeenCalledWith("vhi-8.0");
+  });
+
   it("disables Back at the start, and shows the sidebar toggle while the sidebar is hidden", () => {
     const html = renderToString(<MainToolbar {...props({ canBack: false, canForward: true, showToggle: true })} />);
     expect(html).toContain('aria-label="Show Sidebar"');
