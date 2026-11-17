@@ -229,7 +229,7 @@
 .lb-thmonth__h { font: 600 11px/14px var(--font); color: var(--label-3); margin: 0 0 6px; }
 .lb-thread { max-width: 860px; }
 
-/* A thread row is two parts: the text (truncates) and one trailing group that never wraps, so every row has one height */
-.lb-throw { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
-.lb-throw .pc-item__text { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-throw > :not(.pc-item__text) { flex: none; white-space: nowrap; }
+/* A thread row: the text truncates on one line; below 760 the meta and actions take a second line instead of leaving the window */
+.lb-throw { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lb-throw .pc-item__text { flex: 1 1 18em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-throw > :not(.pc-item__text) { flex: none; max-width: 100%; white-space: nowrap; }
