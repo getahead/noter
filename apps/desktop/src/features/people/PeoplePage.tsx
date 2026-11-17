@@ -12,6 +12,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Table } from "../../ui/primitives/table";
 import { NONE, press, retain, type Selection } from "../library/selection";
 import { holdPeople } from "./count";
+import { afterNaming } from "./focus-return";
 import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
 import { NameSpeakerPopover } from "./NameSpeakerPopover";
@@ -47,6 +48,11 @@ export function PeoplePage() {
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [naming, setNaming] = useState<{ u: UnnamedSpeaker; anchor: HTMLElement | null } | null>(null);
+  const named = useRef(false);
+  // the named row is gone once the list is read again: focus goes to the next Name…, else the Add Person button
+  useEffect(() => {
+    if (named.current && state.read) (named.current = false), afterNaming(document);
+  }, [state.read]);
   const sheets = usePeopleSheets();
   const seen = useRef(known);
   const reread = usePersonReread(); // Undo of a naming: the core emits no person change, so the strip's refresh bumps this
@@ -83,7 +89,7 @@ export function PeoplePage() {
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
       <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
-      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} all={state.read?.unnamed ?? []} prefs={prefs} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => void list.load()} />}
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} all={state.read?.unnamed ?? []} prefs={prefs} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => ((named.current = true), void list.load())} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.flatMap((id) => rows.find((p) => p.id === id) ?? []), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
@@ -205,12 +211,12 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
         <div data-region="PL-R3" role="region" aria-label={t("people.unnamed")} className="pe-unnamed">
           <h2 className="np-section-h">{t("people.unnamed")} <span className="np-dim">· {shown.unnamed.length}</span></h2>
           <div className="pe-unnamed__list">
-            {shown.unnamed.map((u) => (
+            {shown.unnamed.map((u, i) => (
               <div key={`${u.call.id}:${u.speaker_id}`} className="pe-urow" onClickCapture={(e) => (clicked.current = e.currentTarget)}>
                 <strong>{t("people.unnamed_label", { n: u.n })}</strong>
                 <span className="np-muted">{t("people.unnamed_meta", { call: u.call.title, lines: t("people.unnamed_lines", { count: u.segment_count }) })}</span>
                 <span className="np-tb__spacer" />
-                <PushButton label={t("people.name")} size="small" onAction={() => onName?.(u, clicked.current)} />
+                <PushButton id={i === 0 ? "pe-name-first" : undefined} label={t("people.name")} size="small" onAction={() => onName?.(u, clicked.current)} />
               </div>
             ))}
           </div>

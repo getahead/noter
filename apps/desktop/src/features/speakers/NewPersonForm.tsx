@@ -30,6 +30,9 @@ export interface NewPersonFormProps {
 }
 
 /** The New person form, in place of the list: Name prefilled with the query, Email, Role, a duplicate check against the people. */
+/** A press on the footer's buttons must not blur the field first: its error would push the button away before the click lands. */
+export const keepInputFocus = (e: { preventDefault(): void }) => e.preventDefault();
+
 export function NewPersonForm(p: NewPersonFormProps) {
   const [form, setForm] = useState<{
     name: string;
@@ -163,7 +166,7 @@ export function NewPersonForm(p: NewPersonFormProps) {
           {p.error}
         </span>
       )}
-      <div className="cw-pp__foot">
+      <div className="cw-pp__foot" onMouseDown={keepInputFocus}>
         <PushButton label={p.backLabel ?? t("speakers.new.back")} onAction={() => p.onBack(form.name)} />
         <PushButton
           label={p.confirmLabel}

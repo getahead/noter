@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
@@ -13,6 +13,7 @@ import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
+import { afterVoiceChange } from "./focus-return";
 import { holdPerson, setPersonNotice, setPersonStatus, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
@@ -62,6 +63,10 @@ export function PersonPage({ id }: { id: string }) {
   const notice = usePersonNotice();
   const status = usePersonStatus(id);
   const sheets = usePeopleSheets();
+  // Create or Delete Profile swaps the button that opened the sheet or alert: focus goes to its successor once the page is read again
+  const voice = state.page?.person.voice_profile;
+  const heldVoice = useRef(voice);
+  useEffect(() => (afterVoiceChange(document, heldVoice.current, voice), void (heldVoice.current = voice)), [voice]);
   useEffect(() => () => (setPersonNotice(null), setPersonStatus(null)), [id]); // a refusal or a done action belongs to the person it was shown on
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
@@ -224,7 +229,7 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
             <dd>
               <div>{p.voice_profile ? t("person.voice_on") : t("person.voice_off")}</div>
               <div className="pe-kvact">
-                {p.voice_profile ? <PushButton label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
+                {p.voice_profile ? <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>
             {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields */}

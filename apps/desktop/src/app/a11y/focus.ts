@@ -19,9 +19,12 @@ export function openerOf(doc: Pick<Document, "activeElement" | "body">): FocusTa
   pressed = null;
   return opener;
 }
+// WebKit focuses the nearest focusable ancestor (the page region, tabindex 0) when a button is clicked: that is no opener
+const CONTROL = 'button,a[href],input,select,textarea,summary,[role="button"],[role="combobox"],[contenteditable]:not([contenteditable="false"])';
 const peekOpener = (doc: Pick<Document, "activeElement" | "body">) => {
-  const active = doc.activeElement as FocusTarget | null;
-  return active && active !== (doc.body as unknown) ? active : pressed;
+  const active = doc.activeElement as (FocusTarget & { matches?: (s: string) => boolean }) | null;
+  if (!active || active === (doc.body as unknown)) return pressed;
+  return pressed && active.matches && !active.matches(CONTROL) ? pressed : active;
 };
 
 /** True when `id` is the focused element or the control the mouse pressed (used once): the Remove button that
@@ -71,8 +74,10 @@ export function focusFirstAvailable(doc: Pick<Document, "getElementById">, ids: 
 /** Gives focus to the first of `ids` that can take it, but only when focus was lost (on the body): the control that
  *  had it closed a sheet or form, was replaced, or was never focused by the mouse. Never takes focus from a control. */
 export function focusIfLost(doc: Pick<Document, "activeElement" | "body" | "getElementById">, ids: readonly string[]): boolean {
-  const active = doc.activeElement;
-  return (!active || active === doc.body) && focusFirstAvailable(doc, ids);
+  const active = doc.activeElement as (Element & { matches?: (s: string) => boolean }) | null;
+  // the page region WebKit focuses when a button is clicked counts as lost too: no control has focus
+  const lost = !active || active === (doc.body as unknown) || (!!active.matches && !active.matches(CONTROL));
+  return lost && focusFirstAvailable(doc, ids);
 }
 // `:disabled` also covers controls inside a disabled fieldset.
 const NOT_OFF =

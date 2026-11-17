@@ -82,4 +82,15 @@ test.describe("cpt-noter-dod-ui-people-identity people management", () => {
     await expect(sheet).toContainText(/What moves to /);
     await shot(page, "person-merge-sheet");
   });
+  test("after a merge the target's page shows the Merged strip with Undo", async ({ page }) => {
+    await openAnna(page);
+    await page.getByRole("button", { name: "More" }).click();
+    await page.getByRole("menuitem", { name: "Merge With…" }).click();
+    const sheet = page.getByRole("dialog", { name: /^Merge .* with another entry$/ });
+    await sheet.locator("select").selectOption({ index: 1 });
+    await sheet.getByRole("button", { name: /^Merge$/ }).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Undo" })).toBeVisible();
+    await shot(page, "person-merged");
+  });
 });

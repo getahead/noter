@@ -291,6 +291,15 @@ describe("installUnobscure", () => {
   });
 });
 
+describe("focusIfLost (the page region WebKit focuses on a click is no control)", () => {
+  const target = { hasAttribute: () => false, focus: vi.fn() };
+  const doc = (active: unknown) => ({ activeElement: active as never, body: {} as never, getElementById: () => target as never });
+  it("takes focus from a page region but never from a control", () => {
+    expect(focusIfLost(doc({ matches: () => false }), ["x"])).toBe(true);
+    expect(focusIfLost(doc({ matches: () => true }), ["x"])).toBe(false);
+  });
+});
+
 describe("openerOf (WebKit does not focus a button on click)", () => {
   const body = {};
   const button = { focus: vi.fn() };
@@ -300,6 +309,16 @@ describe("openerOf (WebKit does not focus a button on click)", () => {
     const focused = { focus: vi.fn() };
     press(button);
     expect(openerOf({ activeElement: focused as never, body: body as never })).toBe(focused);
+  });
+
+  it("a page region that took focus is no opener: the pressed button is, a focused control still wins", () => {
+    const region = { focus: vi.fn(), matches: () => false };
+    press(button);
+    expect(openerOf({ activeElement: region as never, body: body as never })).toBe(button);
+    const control = { focus: vi.fn(), matches: () => true };
+    press(button);
+    expect(openerOf({ activeElement: control as never, body: body as never })).toBe(control);
+    expect(openerOf({ activeElement: region as never, body: body as never })).toBe(region); // no press: what had focus
   });
 
   it("falls back to the button the mouse pressed when focus is on the body", () => {
