@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
-import { SearchView, type Read, type SearchViewProps } from "./SearchPage";
+import { resultCount, SearchView, type Read, type SearchViewProps } from "./SearchPage";
 
 const hit = (strength: "strong" | "weak", call = "c1", title = "T") =>
   ({ target: { type: "item", item_id: "i" }, title, snippet: "websocket", highlights: [{ start: 0, end: 9 }], lang: "en", strength, call: { id: call, title: call }, cross_language: false }) as never;
@@ -27,6 +27,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     const filtered = props(results(), { filter: { tags: ["release"] } });
     expect(html(filtered)).toContain("Clear Filters");
     expect(html(filtered)).toContain("1 filter active");
+    expect(html(filtered)).toContain("Try fewer words"); // still offered while filters are set
     const ask = find(rendered(SearchView, none), (x) => x.label === "Ask Instead");
     (ask.props.onAction as () => void)();
     expect(none.onAsk).toHaveBeenCalled();
@@ -95,5 +96,17 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
   it("shows the keyword-only line while the index rebuilds", () => {
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");
+  });
+});
+
+describe("results page head", () => {
+  it("counts every section, or the one topic row when only a topic matched", () => {
+    const r = (o: object) => (results(o) as unknown as { results: never }).results;
+    expect(resultCount(r({ items: [hit("strong")], calls: [hit("strong"), hit("weak")] }))).toBe(3);
+    expect(resultCount(r({ topics: [{}, {}] }))).toBe(1);
+    expect(resultCount(r({}))).toBe(0);
+  });
+  it("draws the filter bar the page hands it above the results", () => {
+    expect(html(props(results({ items: [hit("strong")] }), { bar: <nav>BAR</nav> }))).toContain("<nav>BAR</nav>");
   });
 });

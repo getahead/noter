@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { TopicRow, UiPrefs } from "../../core/bindings";
@@ -52,7 +52,7 @@ export function TopicsPage({ bridge }: { bridge: Bridge }) {
       <Menu variant="context-menu" onClose={() => setMenu(null)} items={topicMenu(() => openTopic(bridge, menu.topic.id), threadActions(sheets, bridge, menu.topic, topics, retry), () => setMenu(null))} />
     </div>
   );
-  return <TopicsBody bridge={bridge} status={read.status} retry={retry} topics={topics} shown={shown} names={names} words={words} prefs={prefs} onContext={(topic, e) => setMenu({ x: e.clientX, y: e.clientY, topic })} menu={rowMenu} />;
+  return <TopicsBody bridge={bridge} status={read.status} retry={retry} topics={topics} shown={shown} names={names} words={words} prefs={prefs} onContext={(topic, at) => setMenu({ ...at, topic })} menu={rowMenu} />;
 }
 
 export interface TopicsBodyProps {
@@ -65,7 +65,7 @@ export interface TopicsBodyProps {
   words: string;
   prefs?: UiPrefs;
   /** A right-click on a row, and the menu the page draws for it. */
-  onContext?: (topic: TopicRow, e: MouseEvent) => void;
+  onContext?: (topic: TopicRow, at: { x: number; y: number }) => void;
   menu?: ReactNode;
 }
 
@@ -102,7 +102,7 @@ export function TopicsBody({ bridge, status, retry, topics, shown, names, words,
         </thead>
         <tbody>
           {shown.map((x, i) => (
-            <TopicLine key={x.id} bridge={bridge} topic={x} stop={i === 0} merge={x.merge_suggestion ? (names.get(x.merge_suggestion.id) ?? x.merge_suggestion.name) : null} last={lastSeen(x.last_seen, prefs)} onContext={onContext && ((e) => (e.preventDefault(), onContext(x, e)))} />
+            <TopicLine key={x.id} bridge={bridge} topic={x} stop={i === 0} merge={x.merge_suggestion ? (names.get(x.merge_suggestion.id) ?? x.merge_suggestion.name) : null} last={lastSeen(x.last_seen, prefs)} onContext={onContext && ((at) => onContext(x, at))} />
           ))}
         </tbody>
       </Table>
@@ -127,7 +127,7 @@ export function topicMenu(open: () => void, actions: { rename: () => void; merge
   ];
 }
 
-export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { bridge: Bridge; topic: TopicRow; stop: boolean; merge: string | null; last: string; onContext?: (e: MouseEvent) => void }) {
+export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { bridge: Bridge; topic: TopicRow; stop: boolean; merge: string | null; last: string; onContext?: (at: { x: number; y: number }) => void }) {
   const open = () => openTopic(bridge, x.id);
   return (
     <tr
@@ -138,8 +138,16 @@ export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { 
       aria-label={x.name}
       tabIndex={stop ? 0 : -1}
       onClick={open}
-      onContextMenu={onContext}
-      onKeyDown={(e) => e.key === "Enter" && !e.metaKey && (e.preventDefault(), open())}
+      onContextMenu={(e) => onContext && (e.preventDefault(), onContext({ x: e.clientX, y: e.clientY }))}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.metaKey) return (e.preventDefault(), open());
+        // the keyboard's way to the context menu: the Menu key or ⇧F10, at the row
+        if (onContext && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+          const r = e.currentTarget.getBoundingClientRect();
+          e.preventDefault();
+          onContext({ x: r.left + 24, y: r.bottom });
+        }
+      }}
     >
       <td>
         <span className="lb-trow__name" >

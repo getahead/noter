@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
-import { SearchResultRow } from "./SearchResultRow";
+import { SearchResultRow, togglePlay } from "./SearchResultRow";
 
 const hit = { target: { type: "item", item_id: "i1" }, title: "Planning", snippet: "<img src=x onerror=alert(1)> websocket", highlights: [{ start: 29, end: 38 }], lang: "ru", strength: "weak", call: { id: "c1", title: "Planning" }, cross_language: true } as never;
 
@@ -23,7 +23,7 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
   });
   it("a transcript hit plays its span with Space and ▶, opens it with Return and walks the hits with the arrows", () => {
     const span = { call_id: "c1", t0_ms: 1000, t1_ms: 4000, channel: null };
-    const act = vi.fn();
+    const act = vi.fn(async () => ({ status: "ok", data: { playing: true } }));
     const seg = { ...(hit as object), target: { type: "segment", span } } as never;
     const tree = rendered(SearchResultRow, { bridge: { act, core: { audioPlay: vi.fn() } } as never, hit: seg });
     const row = find(tree, (p) => p.className === "lb-hit");
@@ -50,5 +50,15 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
     // an item hit has nothing to play
     const none = rendered(SearchResultRow, { bridge: { act } as never, hit });
     expect(() => find(none, (p) => p.label === "Play this line")).toThrow();
+  });
+  it("togglePlay plays, stops while playing, and says why a refused replay did not start", async () => {
+    const span = { call_id: "c1", t0_ms: 0, t1_ms: 1, channel: null };
+    const run = (res: unknown) => ({ act: vi.fn(async () => res), core: { audioPlay: vi.fn(), audioStop: vi.fn() } }) as never;
+    expect(await togglePlay(run({ status: "ok", data: { playing: true } }), span, false)).toEqual({ playing: true, note: null });
+    expect(await togglePlay(run({ status: "ok", data: {} }), span, true)).toEqual({ playing: false, note: null });
+    const fail = (code: string) => run({ status: "error", error: { code } });
+    expect(await togglePlay(fail("audio_deleted"), span, false)).toEqual({ playing: false, note: "transcript.play.no_audio" });
+    expect(await togglePlay(fail("replay_needs_headphones"), span, false)).toMatchObject({ note: "transcript.play.speakers" });
+    expect(await togglePlay(fail("internal"), span, false)).toMatchObject({ note: "search.play_failed" });
   });
 });

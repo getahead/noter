@@ -1359,6 +1359,7 @@ export const en = {
   "export.scope_calls": { one: "{count} call", other: "{count} calls" },
   "search.ask_instead": "Ask Instead",
   "search.try_fewer": "Try fewer words.",
+  "search.play_failed": "Couldn’t play this moment",
   "search.all_languages": "Search All Languages",
   "search.how": "Show How Noter Searched",
   "search.how_title": "How Noter searched",

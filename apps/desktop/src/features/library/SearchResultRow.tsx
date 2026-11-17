@@ -1,11 +1,29 @@
-import type { KeyboardEvent } from "react";
+import { useState, type KeyboardEvent } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { SearchHit } from "../../core/bindings";
+import type { ErrorCode, SearchHit, TimeSpan } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
 import { shortDay, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Link } from "../../ui/primitives/link";
 import { openSpan } from "../items/evidence";
 import { segments } from "./search-model";
+
+const PLAY_NOTE: Partial<Record<ErrorCode, MsgKey>> = {
+  audio_deleted: "transcript.play.no_audio",
+  replay_needs_headphones: "transcript.play.speakers",
+  own_sounds_not_excluded: "transcript.play.own_sounds",
+  output_route_unknown: "transcript.play.unknown",
+};
+
+/** Space or ▶ on a transcript hit: plays the span, or stops it while it plays; a refusal says why (no audio left, replay while recording) instead of staying silent. */
+export async function togglePlay(bridge: Bridge, span: TimeSpan, playing: boolean): Promise<{ playing: boolean; note: MsgKey | null }> {
+  if (playing) {
+    await bridge.act("audio_stop", "audio_stop", () => bridge.core.audioStop({}), { screen: "library-search" });
+    return { playing: false, note: null };
+  }
+  const r = await bridge.act("audio_play", "audio_play", () => bridge.core.audioPlay({ call_id: span.call_id, from_ms: span.t0_ms, to_ms: span.t1_ms, channel: span.channel }), { screen: "library-search" });
+  return r.status === "ok" ? { playing: r.data.playing, note: null } : { playing: false, note: PLAY_NOTE[r.error.code] ?? "search.play_failed" };
+}
 
 // @cpt-component:cpt-noter-component-ui-search-result-row:p1
 /** One hit: the call, the original snippet with the core's highlights (text nodes, never HTML), and › to open it. */
@@ -18,7 +36,8 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
     else if (hit.call) void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: hit.call!.id, tab: "summary" } }), { screen: "library-search" });
   };
   const span = hit.target.type === "segment" ? hit.target.span : null;
-  const play = () => span && void bridge.act("audio_play", "audio_play", () => bridge.core.audioPlay({ call_id: span.call_id, from_ms: span.t0_ms, to_ms: span.t1_ms, channel: span.channel }), { screen: "library-search" });
+  const [state, setState] = useState<{ playing: boolean; note: MsgKey | null }>({ playing: false, note: null });
+  const play = () => span && void togglePlay(bridge, span, state.playing).then(setState);
   // Space plays the span and Return opens it; ↑ and ↓ walk the hits.
   const key = (e: KeyboardEvent<HTMLLIElement>) => {
     if (e.target !== e.currentTarget) return;
@@ -38,7 +57,8 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
       </span>
       {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
-      {span && <IconButton icon="play" label={t("transcript.play")} size="inline" onAction={play} />}
+      {span && <IconButton icon={state.playing ? "pause" : "play"} label={t(state.playing ? "playback.pause" : "transcript.play")} size="inline" onAction={play} />}
+      {state.note && <span className="np-dim" role="status">{t(state.note)}</span>}
       <Link label={t("search.open")} onAction={go} />
     </li>
   );

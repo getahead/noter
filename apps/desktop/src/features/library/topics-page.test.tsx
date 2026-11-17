@@ -185,4 +185,17 @@ describe("small page helpers", () => {
     const ref = { current: null as string | null };
     expect([claim(ref, "a"), claim(ref, "a"), claim(ref, "b")]).toEqual([true, false, true]);
   });
+  it("a Topics row opens its menu from the keyboard (Menu key, ⇧F10) at the row, and from the mouse where it was clicked", () => {
+    const onContext = vi.fn();
+    const row = find(rendered(TopicLine, { bridge: {} as never, topic: { id: "t", name: "T" } as never, stop: true, merge: null, last: "—", onContext }), (p) => typeof p.onKeyDown === "function");
+    const e = (key: string, shiftKey = false) => ({ key, shiftKey, preventDefault: vi.fn(), currentTarget: { getBoundingClientRect: () => ({ left: 10, bottom: 50 }) } });
+    (row.props.onKeyDown as (e: unknown) => void)(e("ContextMenu"));
+    expect(onContext).toHaveBeenLastCalledWith({ x: 34, y: 50 });
+    (row.props.onKeyDown as (e: unknown) => void)(e("F10", true));
+    expect(onContext).toHaveBeenCalledTimes(2);
+    (row.props.onKeyDown as (e: unknown) => void)(e("F10"));
+    expect(onContext).toHaveBeenCalledTimes(2);
+    (row.props.onContextMenu as (e: unknown) => void)({ clientX: 5, clientY: 6, preventDefault: vi.fn() });
+    expect(onContext).toHaveBeenLastCalledWith({ x: 5, y: 6 });
+  });
 });
