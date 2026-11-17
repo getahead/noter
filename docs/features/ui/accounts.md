@@ -33,11 +33,11 @@ milestone: M3
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-ui-accounts`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-ui-accounts`
 
 ## 1. Feature Context
 
-- [ ] `p4` - `cpt-noter-feature-ui-accounts`
+- [x] `p4` - `cpt-noter-feature-ui-accounts`
 
 ### 1.1 Overview
 
@@ -254,9 +254,9 @@ The system **MUST** implement all four steps for each provider, correlation, ins
 
 ## 6. Acceptance Criteria
 
-- [ ] Prototype `key-rejected`, `keychain-locked`, `local-not-ready`, field verification and Saved states match; secure fields never prefill a stored key
+- [x] Prototype `key-rejected`, `keychain-locked`, `local-not-ready`, field verification and Saved states match; secure fields never prefill a stored key
 - [ ] All seven `ACCOUNT_STATES` render, as do intro, browser, checking, bind and four error sheets; simulated browser controls never enter product UI
-- [ ] Claude personal-use confirmation gates both browser and existing-account paths; ChatGPT has no such checkbox
+- [x] Claude personal-use confirmation gates both browser and existing-account paths; ChatGPT has no such checkbox
 - [ ] Hiding a sheet keeps the session; Cancel stops it; account events in one window update all other open account rows
 - [ ] VoiceOver reads provider/state and verification result without reading secure content; focus returns to the triggering row; German actions wrap below text
 
