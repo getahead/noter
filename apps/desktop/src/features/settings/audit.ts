@@ -1,5 +1,5 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { AuditEntry, AuditWhat, ExportResult, LogFormat, Page } from "../../core/bindings";
+import type { AuditEntry, AuditWhat, ExportResult, LogFormat, NavTarget, Page } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { clock, locale, shortDay, t } from "../../i18n/format";
 import type { UiPrefs } from "../../core/bindings";
@@ -32,8 +32,6 @@ export function mergePage(rows: readonly AuditEntry[], page: readonly AuditEntry
   return [...rows, ...page.filter((r) => !seen.has(r.id) && seen.add(r.id))];
 }
 
-/** Filter by the returned call id, never by title. */
-export const forCall = (rows: readonly AuditEntry[], callId: string | null): AuditEntry[] => (callId ? rows.filter((r) => r.call?.id === callId) : [...rows]);
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-audit-rows:p1:inst-page
 
 export function formatBytes(n: number): string {
@@ -66,16 +64,17 @@ export function auditRows(rows: readonly AuditEntry[], prefs: UiPrefs | undefine
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-audit-rows:p1:inst-words
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-read
-export async function readAudit(bridge: Bridge, cursor: string | null): Promise<Page<AuditEntry> | null> {
-  const res = await bridge.act("audit:list", "audit_list", () => bridge.core.auditList({ page: { cursor, limit: 100 } }));
+/** The core filters by call id (never by title), so a page already holds only that call's rows. */
+export async function readAudit(bridge: Bridge, cursor: string | null, callId: string | null = null): Promise<Page<AuditEntry> | null> {
+  const res = await bridge.act("audit:list", "audit_list", () => bridge.core.auditList({ call_id: callId, page: { cursor, limit: 100 } }));
   return res.status === "ok" ? res.data : null;
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-read
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-export
-/** The export covers the whole log: the contract has no call filter, so a filtered view never exports under its label. */
-export async function exportAudit(bridge: Bridge, format: LogFormat): Promise<ExportResult | "cancelled" | "failed"> {
-  const res = await bridge.act("audit:export", "audit_export", () => bridge.core.auditExport({ format }));
+/** The export covers what the view shows: the whole log, or the selected call. */
+export async function exportAudit(bridge: Bridge, format: LogFormat, callId: string | null = null): Promise<ExportResult | "cancelled" | "failed"> {
+  const res = await bridge.act("audit:export", "audit_export", () => bridge.core.auditExport({ call_id: callId, format }));
   // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-save-result
   return res.status === "ok" ? res.data : res.error.code === "cancelled" ? "cancelled" : "failed";
   // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-save-result
@@ -85,6 +84,8 @@ export async function exportAudit(bridge: Bridge, format: LogFormat): Promise<Ex
 export interface AuditView {
   rows: AuditEntry[];
   cursor: string | null;
+  /** The core's count of the whole range (and call) when it has one. */
+  total: number | null;
   /** `loading` until the first page; a failed read keeps the rows already read and sets `failed`. */
   status: "loading" | "ready";
   failed: boolean;
@@ -95,8 +96,8 @@ export interface AuditView {
 }
 
 /** The audit reads and export as a small store: one read or export at a time, and a read that finishes after `dispose` is dropped. */
-export function createAudit(bridge: Bridge, notify: (v: AuditView) => void) {
-  let v: AuditView = { rows: [], cursor: null, status: "loading", failed: false, busy: false, exporting: false, exported: null, exportFailed: false };
+export function createAudit(bridge: Bridge, callId: string | null, notify: (v: AuditView) => void) {
+  let v: AuditView = { rows: [], cursor: null, total: null, status: "loading", failed: false, busy: false, exporting: false, exported: null, exportFailed: false };
   let live = true;
   const set = (p: Partial<AuditView>) => live && notify((v = { ...v, ...p }));
   return {
@@ -106,15 +107,18 @@ export function createAudit(bridge: Bridge, notify: (v: AuditView) => void) {
     async load() {
       if (v.busy) return;
       set({ busy: true, failed: false });
-      const page = await readAudit(bridge, v.cursor);
+      const page = await readAudit(bridge, v.cursor, callId);
       if (!page) return set({ busy: false, failed: true, status: "ready" });
-      set({ busy: false, status: "ready", rows: mergePage(v.rows, page.rows), cursor: page.next_cursor });
+      set({ busy: false, status: "ready", rows: mergePage(v.rows, page.rows), cursor: page.next_cursor, total: page.total ?? null });
     },
     async export() {
       if (v.exporting) return;
       set({ exporting: true, exportFailed: false });
-      const r = await exportAudit(bridge, "markdown");
+      const r = await exportAudit(bridge, "markdown", callId);
       set({ exporting: false, exportFailed: r === "failed", exported: typeof r === "object" ? r.path : v.exported });
     },
   };
 }
+
+/** The call Privacy is opened on. "All calls" dismisses that one request, not the call: the next request for it (a new object) opens on it again. */
+export const auditCall = (nav: NavTarget | null, dismissed: NavTarget | null): string | null => (nav?.type === "settings" && nav !== dismissed ? (nav.call_id ?? null) : null);

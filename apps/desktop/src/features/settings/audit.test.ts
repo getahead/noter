@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AuditEntry } from "../../core/bindings";
-import { auditRows, exportAudit, forCall, formatBytes, mergePage, readAudit, requestCount, totalBytes } from "./audit";
+import { auditCall, auditRows, exportAudit, formatBytes, mergePage, readAudit, requestCount, totalBytes } from "./audit";
 
 const row = (id: string, o: Partial<AuditEntry> = {}): AuditEntry => ({ id, kind: "run", llm_run_id: null, at: 1_700_000_000_000, call: null, runtime: null, destination: "Claude", what: "full_transcript", bytes_out: 1800, redacted: false, ...o });
 const call = (id: string) => ({ id, title: `Call ${id}`, started_at: 0, call_type: "t" });
@@ -8,11 +8,6 @@ const call = (id: string) => ({ id, title: `Call ${id}`, started_at: 0, call_typ
 describe("audit rows", () => {
   it("keeps each id once and the core order", () => {
     expect(mergePage([row("a"), row("b")], [row("b"), row("c")]).map((r) => r.id)).toEqual(["a", "b", "c"]);
-  });
-  it("filters by call id, not title", () => {
-    const rows = [row("a", { call: call("1") }), row("b", { call: { ...call("2"), title: "Call 1" } }), row("c")];
-    expect(forCall(rows, "1").map((r) => r.id)).toEqual(["a"]);
-    expect(forCall(rows, null)).toHaveLength(3);
   });
   it("counts runs and lookups, not tool results", () => {
     const rows = [row("a"), row("b", { kind: "tool_result" }), row("c", { kind: "lookup" })];
@@ -49,12 +44,12 @@ describe("audit commands", () => {
 import { createAudit, type AuditView } from "./audit";
 
 describe("audit store", () => {
-  const page = (ids: string[], next: string | null) => ({ status: "ok", data: { rows: ids.map((i) => row(i)), next_cursor: next, total: null } });
+  const page = (ids: string[], next: string | null, total: number | null = null) => ({ status: "ok", data: { rows: ids.map((i) => row(i)), next_cursor: next, total } });
   function store(answers: unknown[], onExport?: () => unknown) {
     const gates: (() => void)[] = [];
     const act = vi.fn((_k: string, cmd: string) => (cmd === "audit_export" ? Promise.resolve(onExport?.() ?? { status: "error", error: { code: "cancelled" } }) : new Promise((res) => gates.push(() => res(answers.shift())))));
     const views: AuditView[] = [];
-    const s = createAudit({ act, core: { auditList: vi.fn(), auditExport: vi.fn() } } as never, (v) => views.push(v));
+    const s = createAudit({ act, core: { auditList: vi.fn(), auditExport: vi.fn() } } as never, null, (v) => views.push(v));
     return { s, act, gates, views };
   }
   it("starts loading, then keeps the pages read", async () => {
@@ -98,5 +93,39 @@ describe("audit store", () => {
     expect(c.s.view().exportFailed).toBe(false);
     const f = store([], () => ({ status: "error", error: { code: "internal" } })); await f.s.export();
     expect(f.s.view().exportFailed).toBe(true);
+  });
+});
+
+describe("audit with a call", () => {
+  it("sends the call id with every read and export, and keeps the core's total", async () => {
+    const calls: unknown[] = [];
+    const act = vi.fn(async (_k: string, cmd: string, f: () => unknown) => {
+      void f();
+      calls.push(cmd);
+      return cmd === "audit_export" ? { status: "ok", data: { path: "/x", files: 1 } } : { status: "ok", data: { rows: [row("a", { call: { id: "c1", title: "T", started_at: 0, call_type: "t" } })], next_cursor: "n", total: 41 } };
+    });
+    const auditList = vi.fn();
+    const auditExport = vi.fn();
+    const s = createAudit({ act, core: { auditList, auditExport } } as never, "c1", () => {});
+    await s.load();
+    await s.export();
+    expect(auditList).toHaveBeenCalledWith(expect.objectContaining({ call_id: "c1" }));
+    expect(auditExport).toHaveBeenCalledWith({ call_id: "c1", format: "markdown" });
+    expect(s.view().total).toBe(41);
+  });
+});
+
+describe("auditCall", () => {
+  const open = (call?: string) => ({ type: "settings", pane: "privacy", call_id: call }) as never;
+  it("opens on the call of a settings request, and on none for other requests", () => {
+    expect(auditCall(open("c1"), null)).toBe("c1");
+    expect(auditCall(open(), null)).toBeNull();
+    expect(auditCall(null, null)).toBeNull();
+    expect(auditCall({ type: "ask" } as never, null)).toBeNull();
+  });
+  it("All calls drops that request only: a new request for the same call opens on it again", () => {
+    const first = open("c1");
+    expect(auditCall(first, first)).toBeNull();
+    expect(auditCall(open("c1"), first)).toBe("c1");
   });
 });
