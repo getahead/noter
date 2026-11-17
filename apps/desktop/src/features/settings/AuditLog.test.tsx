@@ -1,12 +1,13 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { find, rendered } from "../../ui/testing";
 import type { AuditEntry } from "../../core/bindings";
 import type { AuditView } from "./audit";
 import { AuditLogView } from "./AuditLog";
 
 const row = (id: string, callId: string | null = null): AuditEntry => ({ id, kind: "run", llm_run_id: null, at: 1_700_000_000_000, call: callId ? { id: callId, title: "Planning", started_at: 0, call_type: "t" } : null, runtime: null, destination: "Claude", what: "full_transcript", bytes_out: 1800, redacted: true });
 const view = (o: Partial<AuditView> = {}): AuditView => ({ rows: [], cursor: null, status: "ready", failed: false, busy: false, exporting: false, exported: null, exportFailed: false, total: null, ...o });
-const html = (v: AuditView | null, callId: string | null = null) => renderToString(<AuditLogView v={v} callId={callId} prefs={undefined} onLoad={() => {}} onExport={() => {}} />);
+const html = (v: AuditView | null, callId: string | null = null) => renderToString(<AuditLogView v={v} callId={callId} prefs={undefined} onLoad={() => {}} onExport={() => {}} onAllCalls={() => {}} />);
 
 describe("AuditLogView", () => {
   it("shows a loading line, not an empty frame", () => {
@@ -41,5 +42,18 @@ describe("AuditLogView", () => {
     expect(html(view({ rows: [row("a", "1")], cursor: "n", total: 41 }), "1")).toContain("1 of 41 entries so far");
     expect(html(view({ rows: [row("a")], exported: "/x.md" }))).toContain("Saved to /x.md");
     expect(html(view({ rows: [row("a")], exportFailed: true }))).toContain("could not be exported");
+  });
+  it("a call view says which call and offers the way back to all calls", () => {
+    const out = html(view({ rows: [row("a", "1")] }), "1");
+    expect(out).toContain("Call: Planning");
+    expect(out).toContain("All calls");
+    expect(html(view({ rows: [row("a")] }))).not.toContain("Call: ");
+    expect(html(view(), "1")).toContain("Call: this call");
+  });
+  it("All calls calls back", () => {
+    const onAllCalls = vi.fn();
+    const tree = rendered(AuditLogView, { v: view({ rows: [row("a", "1")] }), callId: "1", prefs: undefined, onLoad: () => {}, onExport: () => {}, onAllCalls });
+    (find(tree, (p) => p.label === "All calls").props.onAction as () => void)();
+    expect(onAllCalls).toHaveBeenCalled();
   });
 });

@@ -434,6 +434,7 @@ export const en = {
   "audit.redacted": "redacted",
   "audit.more": "Load More",
   "audit.export": "Export…",
+  "audit.filter_call": "Call: {title}", "audit.filter_this_call": "this call", "audit.all_calls": "All calls",
   "audit.shown_of": "{shown} of {total} entries so far",
   "audit.export_failed": "The log could not be exported.",
   "audit.exported": "Saved to {path}",
