@@ -291,12 +291,15 @@ describe("installUnobscure", () => {
   });
 });
 
-describe("focusIfLost (the page region WebKit focuses on a click is no control)", () => {
+describe("focusIfLost (only the body or the page region is lost focus)", () => {
   const target = { hasAttribute: () => false, focus: vi.fn() };
   const doc = (active: unknown) => ({ activeElement: active as never, body: {} as never, getElementById: () => target as never });
-  it("takes focus from a page region but never from a control", () => {
-    expect(focusIfLost(doc({ matches: () => false }), ["x"])).toBe(true);
-    expect(focusIfLost(doc({ matches: () => true }), ["x"])).toBe(false);
+  const region = { matches: (s: string) => s.includes('[role="main"]') };
+  const row = { matches: () => false }; // a focusable row, option or tabindex element: someone is on it
+  it("takes focus from the page region, never from a control or a focusable row", () => {
+    expect(focusIfLost(doc(region), ["x"])).toBe(true);
+    expect(focusIfLost(doc(row), ["x"])).toBe(false);
+    expect(focusIfLost(doc({ matches: (s: string) => s.startsWith("button") }), ["x"])).toBe(false);
   });
 });
 
@@ -312,10 +315,10 @@ describe("openerOf (WebKit does not focus a button on click)", () => {
   });
 
   it("a page region that took focus is no opener: the pressed button is, a focused control still wins", () => {
-    const region = { focus: vi.fn(), matches: () => false };
+    const region = { focus: vi.fn(), matches: (s: string) => s.includes('[role="main"]') };
     press(button);
     expect(openerOf({ activeElement: region as never, body: body as never })).toBe(button);
-    const control = { focus: vi.fn(), matches: () => true };
+    const control = { focus: vi.fn(), matches: () => false }; // a focusable row or option the user is on
     press(button);
     expect(openerOf({ activeElement: control as never, body: body as never })).toBe(control);
     expect(openerOf({ activeElement: region as never, body: body as never })).toBe(region); // no press: what had focus

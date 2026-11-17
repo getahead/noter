@@ -12,7 +12,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Table } from "../../ui/primitives/table";
 import { NONE, press, retain, type Selection } from "../library/selection";
 import { holdPeople } from "./count";
-import { afterNaming } from "./focus-return";
+import { settleNaming } from "./focus-return";
 import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
 import { NameSpeakerPopover } from "./NameSpeakerPopover";
@@ -50,9 +50,7 @@ export function PeoplePage() {
   const [naming, setNaming] = useState<{ u: UnnamedSpeaker; anchor: HTMLElement | null } | null>(null);
   const named = useRef(false);
   // the named row is gone once the list is read again: focus goes to the next Name…, else the Add Person button
-  useEffect(() => {
-    if (named.current && state.read) (named.current = false), afterNaming(document);
-  }, [state.read]);
+  useEffect(() => void (named.current = settleNaming(document, named.current, state.status)), [state]);
   const sheets = usePeopleSheets();
   const seen = useRef(known);
   const reread = usePersonReread(); // Undo of a naming: the core emits no person change, so the strip's refresh bumps this
