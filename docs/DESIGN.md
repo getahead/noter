@@ -7615,7 +7615,7 @@ Knowledge sources, maintenance jobs, evidence sources, runtimes and model bundle
 
 #### Component — Credential row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-credential-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-credential-row`
 
 ##### Why this component exists
 

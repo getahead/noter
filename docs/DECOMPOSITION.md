@@ -1517,11 +1517,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.25 Keys and own-account sign-in — M3 · MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-ui-accounts`
+- [x] `p4` - **ID**: `cpt-noter-feature-ui-accounts`
 
 - **Purpose**: Store or replace API keys and sign in separately with the user's own Claude and ChatGPT accounts through Claude Code and Codex, then choose which tasks and agents use them.
 
-- **Milestone**: M3; the API key and Runtime per task part in M2 (discrepancy 9). **Spec**: [`docs/features/ui/accounts.md`](features/ui/accounts.md). **Status**: NOT_STARTED.
+- **Milestone**: M3; the API key and Runtime per task part in M2 (discrepancy 9). **Spec**: [`docs/features/ui/accounts.md`](features/ui/accounts.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-first-run`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1548,7 +1548,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-ui-credential-row`
+  - [x] `p4` - `cpt-noter-component-ui-credential-row`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it differs from the feature's):
   - `accounts_get` (M2)
