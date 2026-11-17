@@ -1,6 +1,7 @@
 // Ask's core calls as plain async functions, so the page stays thin and the flows are unit-testable without a DOM.
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
+import { t } from "../../i18n/format";
 import { navigate } from "../shell/navigate";
 import { searchRoute } from "../shell/sections";
 import type { Replay } from "../transcript/playback";
@@ -194,9 +195,26 @@ export function startFromRoute(key: string, ask: (question: string) => void): bo
   return true;
 }
 
+/** The topic id a `new-topic:<id>` route names (Library's Ask About This Thread), or null for any other route. */
+export const topicOfRoute = (key: string): string | null => (key.startsWith("new-topic:") ? key.slice("new-topic:".length) || null : null);
+
+/** Ask about the routed topic once per history entry: its name makes the question, its id the scope. False when the key names no topic, was asked already, or the topic cannot be read (the key stays askable). */
+export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (question: string, scope: AskScope) => void, alive: () => boolean = () => true): Promise<boolean> {
+  const id = topicOfRoute(key);
+  if (!id || routed.has(key)) return false;
+  routed.add(key);
+  const res = await bridge.act("ask:topic", "topic_get", () => bridge.core.topicGet({ topic_id: id }));
+  if (res.status !== "ok" || !alive()) {
+    routed.delete(key);
+    return false;
+  }
+  ask(t("ask.topic_question", { name: res.data.topic.name }), { ...NEW_SCOPE, topic_id: id });
+  return true;
+}
+
 /** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
 export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
-  if (!key.startsWith("new:") || !threadId || !stored) return;
+  if (!(key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
   routed.delete(key);
   replace({ section: "ask", key: `thread:${threadId}` });
 }
