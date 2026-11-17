@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { BridgeProvider } from "../../app/bridge/context";
 import { find, rendered } from "../../ui/testing";
 import { BLANK, heldFilter, holdFilter } from "./filters";
-import { SearchPage } from "./SearchPage";
+import { linkIn, SearchPage } from "./SearchPage";
 import { SearchResultRow } from "./SearchResultRow";
 
 vi.mock("../shell/navigate", () => ({ navigate: vi.fn() }));
@@ -46,5 +46,14 @@ describe("SearchResultRow actions", () => {
     expect(press(row({ type: "document", document_id: "d", chunk_id: "k" })).mock.calls[0]![1]).toBe("open_external");
     expect(press(row({ type: "item", item_id: "i" })).mock.calls[0]![1]).toBe("window_navigate");
     expect(press(row({ type: "item", item_id: "i" }, null)).mock.calls.length).toBe(0);
+  });
+});
+
+describe("linkIn", () => {
+  it("finds the link a popover anchors on, and nothing without a wrapper or a link", () => {
+    const link = {} as HTMLElement;
+    expect(linkIn({ querySelector: (s) => (s === "a" ? link : null) })).toBe(link);
+    expect(linkIn({ querySelector: () => null })).toBeNull();
+    expect(linkIn(null)).toBeNull();
   });
 });

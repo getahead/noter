@@ -24,6 +24,9 @@ const SECTION = { items: "search.section.items", transcripts: "search.section.tr
 export type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: "OK"; results: SearchResults };
 
 /** The result count the page says: hits of every section, or the one topic row when only a topic matched. */
+/** The link inside a wrapper: the popover is anchored on it, not on the span, so closing it can hand focus back (a span takes none). */
+export const linkIn = (wrap: { querySelector(selector: string): HTMLElement | null } | null): HTMLElement | null => wrap?.querySelector("a") ?? null;
+
 export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
 
 export interface SearchViewProps {
@@ -48,7 +51,7 @@ export interface SearchViewProps {
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
 export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
   const [how, setHow] = useState(false);
-  const howAt = useRef<HTMLSpanElement>(null);
+  const howAt = useRef<HTMLElement | null>(null);
   const body = () => {
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
@@ -91,7 +94,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
           {" · "}
-          <span ref={howAt}>
+          <span ref={(el) => { howAt.current = linkIn(el); }}>
             <Link label={t("search.how")} onAction={() => setHow(!how)} />
           </span>
         </p>
@@ -133,7 +136,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         {/* @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
         {how && (
-          <Popover variant="how-searched" anchor={howAt.current?.querySelector<HTMLElement>("a") ?? null} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
+          <Popover variant="how-searched" anchor={howAt.current} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
             <div className="lb-pop">
               <strong>{t("search.how_title")}</strong>
               <span>{t("search.how_words", { words: r.explain.normalized_query || query })}</span>
