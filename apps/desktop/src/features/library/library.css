@@ -225,9 +225,8 @@
 .lb-trow__name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
 .lb-merge { color: var(--accent-text); }
 .lb-items { display: grid; gap: 2px; list-style: none; margin: 0; padding: 0; }
-.lb-thmonth { margin-bottom: 18px; max-width: 860px; }
+.lb-thmonth { margin-bottom: 18px; }
 .lb-thmonth__h { font: 600 11px/14px var(--font); color: var(--label-3); margin: 0 0 6px; }
-.lb-thread { max-width: 860px; }
 
 /* A thread row: the text truncates on one line; below 760 the meta and actions take a second line instead of leaving the window */
 .lb-throw { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
@@ -237,3 +236,4 @@
 .lb-hit { display: grid; gap: 2px; padding: 6px 8px; list-style: none; max-width: 960px; }
 .lb-hit__title { font-weight: 600; }
 .lb-hit mark { background: var(--accent-fill); color: inherit; border-radius: 2px; }
+.lb-thmerge { margin-bottom: 14px; }

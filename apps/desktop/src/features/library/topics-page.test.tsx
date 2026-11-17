@@ -4,6 +4,7 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { TopicRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
+import { DialogsProvider } from "../../ui/dialogs/host";
 import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
@@ -101,7 +102,7 @@ describe("Topic thread (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(h).toContain(t.name);
     expect(h).toContain('data-state="thread"');
     expect(h).toContain("lb-thmonth");
-    expect(renderToString(<ThreadPage bridge={bridge} topicId={t.id} />)).toContain('aria-busy="true"');
+    expect(renderToString(<DialogsProvider><ThreadPage bridge={bridge} topicId={t.id} /></DialogsProvider>)).toContain('aria-busy="true"');
   });
 });
 
@@ -122,7 +123,8 @@ describe("toolbars and thread rows", () => {
     const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
     expect(bar.props.title).toBe("Drawer redesign");
     expect(bar.props.subtitle).toBe("3 calls");
-    expect((find(bar, (p) => "trailing" in p).props.trailing as { props: { disabled: boolean } }).props.disabled).toBe(true);
+    const trailing = find(bar, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { disabled: boolean } }] } };
+    expect(trailing.props.children[0].props.disabled).toBe(true);
     expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
     setHead({ title: null, subtitle: null });
   });
