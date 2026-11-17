@@ -37,7 +37,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   const [selfTest, setSelfTest] = useState(false);
   const [moveRun, setMoveRun] = useState<string | null>(null);
-  const [moveNote, setMoveNote] = useState<"cloud" | "failed" | null>(null);
+  const [moveNote, setMoveNote] = useState<"cloud" | "failed" | "later" | null>(null);
   const moveStatus = useWindow(bridge, (s) => (moveRun ? s.jobs[moveRun]?.status : undefined));
   // the path changes only when the move job finished and the settings were read again
   useEffect(() => {
@@ -50,7 +50,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
     setMoveNote(null);
     const r = await moveStorage(bridge);
     if (r.kind === "accepted") setMoveRun(r.runId);
-    else if (r.kind === "cloud" || r.kind === "failed") setMoveNote(r.kind);
+    else if (r.kind === "cloud" || r.kind === "failed" || r.kind === "later") setMoveNote(r.kind);
   };
   const rowError = useRowErrors(bridge);
   const setupFailed = useWindow(bridge, (s) => s.commands["window:navigate"]?.state === "ERROR");
@@ -97,7 +97,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.general.summary_language")} error={rowError("general", "summary_language")} note={t("settings.general.summary_language_note")}>
           <PopupButton options={LANGUAGES} value={general.summary_language} label={t("settings.general.summary_language")} onAction={(v) => general_({ summary_language: v as typeof general.summary_language })} />
         </Row>
-        <Row label={t("settings.general.storage")} note={(general.storage_in_cloud_folder || moveNote === "cloud") ? <Warn>{t("settings.general.storage_cloud")}</Warn> : moveNote === "failed" ? <Warn>{t("settings.general.storage_failed")}</Warn> : undefined}>
+        <Row label={t("settings.general.storage")} note={(general.storage_in_cloud_folder || moveNote === "cloud") ? <Warn>{t("settings.general.storage_cloud")}</Warn> : moveNote === "later" ? <Warn icon="info">{t("settings.general.storage_later")}</Warn> : moveNote === "failed" ? <Warn>{t("settings.general.storage_failed")}</Warn> : undefined}>
           <span className="st-path np-mono" title={general.storage_path}>
             {general.storage_path}
           </span>

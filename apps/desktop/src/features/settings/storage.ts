@@ -1,7 +1,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { JobRunStatus } from "../../core/bindings";
 
-export type MoveOutcome = { kind: "accepted"; runId: string } | { kind: "cloud" } | { kind: "cancelled" } | { kind: "failed" };
+export type MoveOutcome = { kind: "accepted"; runId: string } | { kind: "cloud" } | { kind: "cancelled" } | { kind: "later" } | { kind: "failed" };
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-move
 /** No path: the core owns the open panel, the location checks and the move (draft command, M4 on the real core). */
@@ -11,6 +11,7 @@ export async function moveStorage(bridge: Bridge): Promise<MoveOutcome> {
   // @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-warning
   if (res.error.code === "storage_in_cloud_folder") return { kind: "cloud" };
   // @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-warning
+  if (res.error.code === "not_implemented") return { kind: "later" };
   return res.error.code === "cancelled" ? { kind: "cancelled" } : { kind: "failed" };
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-move

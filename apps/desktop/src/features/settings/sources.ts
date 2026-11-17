@@ -142,7 +142,7 @@ export const scheduleChoices = () => [
   { value: "weekly", label: t("sources.schedule_weekly") },
 ];
 
-/** Scope as the form edits it: all calls, or the chosen call types (people stay as the source has them). */
+/** Scope as the form edits it: all calls, or the chosen call types and people. */
 export interface ScopeDraft {
   all: boolean;
   callTypes: string[];
@@ -155,7 +155,8 @@ export const ALL_SCOPE: ScopeDraft = { all: true, callTypes: [], people: [] };
 export const scopeValid = (d: ScopeDraft): boolean => d.all || d.callTypes.length + d.people.length > 0;
 export const scopeOf = (d: ScopeDraft): SourceScope => (d.all ? ALL_CALLS : { type: "limited", call_types: d.callTypes, people: d.people });
 export const toggleCallType = (d: ScopeDraft, id: string, on: boolean): ScopeDraft => ({ ...d, callTypes: on ? [...new Set([...d.callTypes, id])] : d.callTypes.filter((x) => x !== id) });
-const sameScope = (a: ScopeDraft, b: ScopeDraft) => a.all === b.all && a.callTypes.join() === b.callTypes.join() && a.people.join() === b.people.join();
+// an all-calls scope has no call types or people, whatever a form still holds from an earlier choice
+const sameScope = (a: ScopeDraft, b: ScopeDraft) => a.all === b.all && (a.all || (a.callTypes.join() === b.callTypes.join() && a.people.join() === b.people.join()));
 
 export async function readCallTypes(bridge: Bridge): Promise<CallTypeInfo[]> {
   const res = await bridge.act("sources:call-types", "call_types_list", () => bridge.core.callTypesList({}));
@@ -187,7 +188,6 @@ export const draftChanged = (r: SourceRow, d: SourceDraft): boolean => d.name.tr
 export type UpdateResult = SourceResult | { ok: false; conflict: true };
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
-/** Only supported fields go out (never path or mode); the returned row replaces the draft source only after success. */
 /** `base` is the row the draft was made from: only what differs from it goes out, so a field changed elsewhere meanwhile is not written back with an old value. */
 export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft, base: SourceRow = row): Promise<UpdateResult> {
   const was = draftOf(base);
