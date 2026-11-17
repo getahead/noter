@@ -81,6 +81,32 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await expect(page.getByRole("button", { name: "Search All Languages" })).toBeVisible();
       await shot(page, "search-all-languages", width);
     });
+    test("a hit playing shows Pause beside Open", async ({ page }) => {
+      await search(page, px, {});
+      await page.getByRole("button", { name: "Play this line" }).first().click();
+      await expect(page.getByRole("button", { name: "Pause" }).first()).toBeVisible();
+      await shot(page, "search-hit-playing", width);
+    });
+    test("the play glyph and Open link on one line", async ({ page }) => {
+      await search(page, px, {});
+      await page.locator(".lb-hit").first().hover();
+      await expect(page.getByRole("button", { name: "Play this line" }).first()).toBeVisible();
+      await expect(page.getByRole("link", { name: "Open at this moment" }).first()).toBeVisible();
+      await page.mouse.move(0, 0);
+      await settled(page);
+      await expect(page.locator(".lb-hit").first()).toHaveScreenshot(`search-hit-go-${width}.png`);
+    });
+    test("two filters named in the weak warning", async ({ page }) => {
+      await search(page, px, { only_weak: true });
+      await page.getByRole("button", { name: /^Language/ }).click();
+      await page.locator("label.np-check", { hasText: "English" }).click();
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: /^Type/ }).click();
+      await page.locator("label.np-check", { hasText: "Planning" }).click();
+      await page.keyboard.press("Escape");
+      await expect(page.getByText(/2 filters active/)).toBeVisible();
+      await shot(page, "search-two-filters", width);
+    });
     test("keyboard focus on a hit", async ({ page }) => {
       await search(page, px, {});
       await page.locator(".lb-hit").first().focus();

@@ -62,6 +62,15 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await shot(page, "topics-row-menu", width);
     });
 
+    test(`thread: Ask About This Thread is enabled in the toolbar`, async ({ page }) => {
+      await topics(page, px);
+      await page.locator(TOPIC_ROW).first().click();
+      const ask = page.getByRole("button", { name: "Ask About This Thread" });
+      await expect(ask).toBeEnabled();
+      await ask.focus();
+      await shot(page, "topics-thread-ask", width);
+    });
+
     test(`nothing left`, async ({ page }) => {
       await topics(page, px, (w) => (w.items = w.items.map((i) => ({ ...i, topic: null }))));
       await page.locator(TOPIC_ROW).first().click();
