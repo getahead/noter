@@ -156,6 +156,26 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     // The Library search command itself ("search" sent with this query) is asserted with the Library search feature (#922), which is what sends it.
   });
 
+  test("empty path — Not found with a narrowed scope: Widen Scope asks the same question again with All calls · all sources", async ({ page }) => {
+    if (!REAL) return; // the fake core cannot produce this state
+    const steer = await openAsk(page);
+    const scopeSelect = toolbar(page).getByRole("combobox", { name: /scope/i });
+    const narrowed = await scopeSelect.locator("option").evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).find((v) => v !== "all"));
+    expect(narrowed, "the core offers a narrower scope than All calls").toBeTruthy();
+    await scopeSelect.selectOption(narrowed as string);
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
+    const question = "What did we decide about the OpenStack upgrade?";
+    await ask(page, question);
+    await expect(thread(page)).toContainText("I could not find this in your calls.");
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
+    await button(thread(page), "Widen Scope").click();
+    await expect(scopeSelect).toContainText("All calls · all sources");
+    await expect.poll(async () => (await sent(page, "ask_start")).length).toBe(2);
+    const second = (await sent(page, "ask_start"))[1] as { question: string; scope: { preset?: string } };
+    expect(second.question).toBe(question);
+    expect(second.scope.preset).toBe("all");
+  });
+
   test("error path — Claude Code unreachable: Couldn't reach Claude Code, Try Again keeps the question", async ({ page }) => {
     if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
