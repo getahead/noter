@@ -56,9 +56,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
     // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
-    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
     const r = read.results;
-    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present
     const status = statusOf(r);
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
     const filtered = isFiltered(filter);
@@ -105,6 +103,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             <PushButton label={t("topics.ask_this")} size="small" onAction={() => askAboutTopic(topic.id)} />
           </section>
         )}
+        {/* @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>
@@ -130,6 +129,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             )}
           </section>
         ))}
+        {/* @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
         {how && (
           <Popover variant="how-searched" anchor={howAt.current} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
