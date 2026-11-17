@@ -36,6 +36,7 @@ import { Tooltip } from "../../../src/ui/primitives/tooltip";
 import { EmptyState } from "../../../src/ui/feedback/empty-state";
 import { BannerSlot, InlineBanner } from "../../../src/ui/feedback/inline-banner";
 import { InlineStatus } from "../../../src/ui/feedback/inline-status";
+import { StatusRow } from "../../../src/ui/feedback/status-row";
 
 const bridge = createBridge("main", new FakeCore({ window: "main" }));
 
@@ -388,6 +389,23 @@ function Gallery() {
           <InlineStatus variant="row-outcome" text="Moved to Done" actionLabel="Undo" onExpire={none} />
           <InlineStatus variant="notice" text="Saved as draft" onExpire={none} />
         </Row>
+      </Section>
+
+      <Section name="status-row">
+        <div className="stack">
+          <StatusRow variant="source" tone="ok" icon="check" word="Up to date" title="Notion" tag="Indexed" subtitle="2 documents · Last sync 9:41" actions={<PushButton label="Re-index" size="small" />} />
+          <StatusRow variant="runtime" tone="ok" icon="check" word="Ready" title="Local speech" subtitle="Runs on this Mac" actions={<PushButton label="Details" size="small" />} />
+          <StatusRow variant="model" tone="run" word="Downloading" title="Large speech model" progress={{ done: 680, total: 1000 }} progressText="Downloading 680 of 1,000 MB" />
+          <StatusRow variant="job" tone="off" icon="pause" word="Paused" title="Nightly summaries" subtitle="Last run 02:14 · 12 calls" toggle={<Toggle ariaLabel="Nightly summaries" on={false} size="small" />} actions={<><PushButton label="Resume" size="small" /><PushButton label="Run Now" size="small" /></>} />
+          <StatusRow variant="evidence" tone="ok" icon="check" word="Detected" title="Jira (acli)" subtitle="acli 1.3.2" />
+          <StatusRow variant="evidence" tone="warn" icon="warning" word="Not configured" title="Bitbucket (bkt)" subtitle="Not configured · install bkt" actions={<PushButton label="Check Again" size="small" />} />
+          <StatusRow variant="share-test" tone="ok" icon="check" word="Hidden" title="Call window" />
+          <StatusRow variant="share-test" tone="warn" icon="warning" word="Visible" title="Main window" subtitle="Hide it before presenting" />
+          {/* below 600 pt the actions wrap under the text, right-aligned */}
+          <div style={{ width: 340 }}>
+            <StatusRow variant="source" tone="err" icon="error" word="Failed" title="A source with a name long enough to be cut short" tag="Live" message="The last sync did not finish." actions={<><PushButton label="Try Again" size="small" /><PushButton label="Details" size="small" /></>} />
+          </div>
+        </div>
       </Section>
 
       <Section name="key-cap">
