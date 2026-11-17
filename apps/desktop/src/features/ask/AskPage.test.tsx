@@ -74,6 +74,10 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
     expect(html(true).split("Widen Scope").length - 1).toBe(1); // the last turn only
     expect(html(false)).not.toContain("Widen Scope");
   });
+  it("keeps Widen Scope off the previous turn while a follow-up is answering", () => {
+    const miss = { turn_id: "1", question: "Q1", answer_md: "", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 } as never;
+    expect(renderToString(<AskView {...props} thread="a" turns={[miss]} asking="Q2" narrowed onWiden={noop} />)).not.toContain("Widen Scope");
+  });
   it("lists recent questions by day and marks the open one", () => {
     const h = renderToString(<AskView {...props} rows={[row]} thread="a" />);
     expect(h).toContain("Today");

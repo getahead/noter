@@ -66,6 +66,13 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     await openThread(m.bridge, null, none);
     expect(none.setTurns).toHaveBeenCalledWith([]);
   });
+  it("forgets the scope the last question was asked with when another thread opens", async () => {
+    const m = make(ok({ turns: [] }));
+    (m.bridge as unknown as { unsubscribe: unknown }).unsubscribe = vi.fn();
+    const setAskedScope = vi.fn();
+    await openThread(m.bridge, "b", { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), setAskedScope });
+    expect(setAskedScope).toHaveBeenCalledWith(undefined); // Widen Scope belongs to the thread the narrowed question was asked in
+  });
   it("keeps the thread and refreshes Recent for a failed or interrupted turn, leaving its partial on screen", async () => {
     for (const phase of ["error", "interrupted"] as const) {
       const s = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };

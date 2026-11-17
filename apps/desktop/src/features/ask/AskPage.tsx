@@ -54,7 +54,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const open = (id: string | null) => {
     setAnnounce("");
     if (busy) previousTurn.current = afterTurn(data, previousTurn.current); // the turn goes on without the page showing it
-    return openThread(bridge, id, { setThread, setTurns, setAsking }, busy);
+    return openThread(bridge, id, { setThread, setTurns, setAsking, setAskedScope }, busy);
   };
 
   const [askedScope, setAskedScope] = useState<AskScope | undefined>(undefined);
@@ -245,7 +245,7 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             <h3 className="ak-q">{a.question}</h3>
             {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
             {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
-            <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question)} onWiden={narrowed && onWiden && a === turns.at(-1) ? () => onWiden(a.question) : undefined} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
+            <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question)} onWiden={narrowed && onWiden && !asking && a === turns.at(-1) ? () => onWiden(a.question) : undefined} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
             {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
             {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
           </article>
