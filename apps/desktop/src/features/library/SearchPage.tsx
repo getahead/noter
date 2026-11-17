@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBridge } from "../../app/bridge/context";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallFilter, SearchResults } from "../../core/bindings";
@@ -9,7 +9,7 @@ import { navigate } from "../shell/navigate";
 import { PushButton } from "../../ui/primitives/push-button";
 import { apply, heldFilter, holdFilter, isFiltered } from "./filters";
 import { SearchResultRow } from "./SearchResultRow";
-import { askRoute, groupByCall, sections, statusOf } from "./search-model";
+import { askRoute, groupByCall, once, sections, statusOf } from "./search-model";
 import "./library.css";
 
 const SECTION = { items: "search.section.items", transcripts: "search.section.transcripts", documents: "search.section.documents" } as const;
@@ -59,7 +59,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     return (
       <>
         <p className="np-dim" role="status">
-          {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : t("search.keyword_only")}
+          {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
         </p>
         {status === "WEAK_ONLY" && widen}
         {sections(r).map((s) => (
@@ -71,7 +71,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
                   <SearchResultRow key={i} bridge={bridge} hit={h} />
                 ))}
                 {g.hidden.length > 0 && !open.has(`${s.key}:${g.callId}`) && (
-                  <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call")}</button></li>
+                  <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call", { count: g.hidden.length })}</button></li>
                 )}
               </ul>
             ))}
@@ -107,15 +107,16 @@ export function SearchPage({ query }: { query: string }) {
   const [again, setAgain] = useState(0);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const filter = heldFilter().filter;
+  const reads = useRef(once());
   useEffect(() => {
-    let live = true;
+    const mine = reads.current.start(again, query);
+    if (mine === null) return;
     setRead({ status: "LOADING" });
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
     void bridge.act("search", "search", () => bridge.core.search({ query, filter, limit: null }), { screen: "library-search" }).then((r) => {
-      if (live) setRead(r.status === "ok" ? { status: "OK", results: r.data } : { status: "READ_ERROR" });
+      if (reads.current.current(mine)) setRead(r.status === "ok" ? { status: "OK", results: r.data } : { status: "READ_ERROR" });
     });
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
-    return () => void (live = false);
   }, [bridge, query, again]);
   return (
     <SearchView

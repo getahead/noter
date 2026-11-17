@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { askRoute, groupByCall, sections, segments, statusOf } from "./search-model";
+import { askRoute, groupByCall, once, sections, segments, statusOf } from "./search-model";
 
 const hit = (strength: "strong" | "weak", call = "c1") => ({ strength, call: { id: call, title: call } }) as never;
 const res = (o: object) => ({ calls: [], items: [], documents: [], topics: [], only_weak: false, ...o }) as never;
@@ -30,5 +30,18 @@ describe("search presentation (cpt-noter-algo-ui-library-search-topics-results)"
 describe("Ask Instead", () => {
   it("opens a new Ask thread with the same words, encoded once", () => {
     expect(askRoute("websocket уведомления")).toEqual({ section: "ask", key: "new:websocket%20%D1%83%D0%B2%D0%B5%D0%B4%D0%BE%D0%BC%D0%BB%D0%B5%D0%BD%D0%B8%D1%8F" });
+  });
+});
+
+describe("once (one search read per words, even when the page effect runs twice)", () => {
+  it("skips a repeated key, keeps the newest answer and lets a new key through", () => {
+    const o = once();
+    const a = o.start(0, "drawer");
+    expect(a).not.toBeNull();
+    expect(o.start(0, "drawer")).toBeNull(); // the strict-mode replay of the same read
+    const b = o.start(1, "drawer"); // Try Again / Clear Filters
+    expect(b).not.toBeNull();
+    expect(o.current(a!)).toBe(false);
+    expect(o.current(b!)).toBe(true);
   });
 });

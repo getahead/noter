@@ -58,3 +58,16 @@ export function groupByCall(hits: SearchHit[], visible: number): { callId: strin
 /** Ask Instead: a new Ask thread that submits the same words once. */
 export const askRoute = (words: string): Route => ({ section: "ask", key: ["new", encodeURIComponent(words)].join(":") });
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-ask
+
+// @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
+/** One read per (try, words): the same pair again (a replayed effect) starts nothing, and only the newest read's answer may show. */
+export function once(): { start(tries: number, words: string): number | null; current(n: number): boolean } {
+  let tries: number | null = null;
+  let words = "";
+  let n = 0;
+  return {
+    start: (t, w) => (t === tries && w === words ? null : ((tries = t), (words = w), ++n)),
+    current: (m) => m === n,
+  };
+}
+// @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search

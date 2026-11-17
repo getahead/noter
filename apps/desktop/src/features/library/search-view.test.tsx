@@ -52,6 +52,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(p.onMore).toHaveBeenCalledWith("transcripts:c1");
   });
   it("shows the keyword-only line while the index rebuilds", () => {
-    expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Keyword matches only");
+    expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
+    expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");
   });
 });
