@@ -48,7 +48,7 @@ async function search(page: Page, width: number, shape: Shape, words = "drawer")
   const field = page.getByRole("searchbox", { name: /Search/ });
   await field.fill(words);
   await field.press("Enter");
-  await expect(page.getByRole("heading", { name: "Search results" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Search results" }).first()).toBeVisible();
 }
 const shot = async (page: Page, name: string, width: string) => {
   await page.mouse.move(0, 0);
