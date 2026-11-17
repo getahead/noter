@@ -92,7 +92,7 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
 });
 
 test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
-  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. · N lines, the row is gone", async ({ page }) => {
+  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. in 1 call, the row is gone", async ({ page }) => {
     await openPeople(page);
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await expect(unnamed).toContainText("Speaker 3");
@@ -104,7 +104,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toEqual([
       expect.objectContaining({ speaker_id: expect.stringMatching(/./), person: { type: "existing", person_id: "per_dmitri" } }),
     ]);
-    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. · \d+ lines?/)).toBeVisible();
+    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. in 1 call/)).toBeVisible();
     await expect(unnamed.getByText("Speaker 3")).toHaveCount(0);
   });
 
@@ -213,15 +213,13 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
   test("UI — other path: Delete Profile… asks Delete Anna K.'s voice profile?; Cancel keeps it, Delete Profile calls voice_profile_delete and Set Up Voice Profile… comes back", async ({ page }) => {
     await watchAlerts(page);
     await openPerson(page, /Anna K\./);
-    await button(page, "More").click();
-    await page.getByRole("menuitem", { name: "Delete Profile…" }).click();
+    await button(page, "Delete Profile…").click();
     const text = alertText((await alerts(page))[0]);
     expect(text).toContain("Delete Anna K.'s voice profile?");
     expect(text).toContain("Noter stops recognising this voice in new calls. Names already given in past calls stay.");
     await expect.poll(() => sent(page, "voice_profile_delete")).toHaveLength(0); // Cancel is the default answer
     await answerAlerts(page, "confirm");
-    await button(page, "More").click();
-    await page.getByRole("menuitem", { name: "Delete Profile…" }).click();
+    await button(page, "Delete Profile…").click();
     await expect.poll(() => sent(page, "voice_profile_delete")).toEqual([expect.objectContaining({ person_id: "per_anna" })]);
     await expect(button(page, "Set Up Voice Profile…")).toBeVisible();
   });

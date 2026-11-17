@@ -956,6 +956,8 @@ export const en = {
   "people.col.voice": "Voice profile",
   "people.voice_on": "Voice profile on",
   "people.role_org": "{role} · {org}",
+  "people.named": "Named {from} as {to} in 1 call",
+  "people.named_new": "You added {to} and named {from} as {to} in 1 call",
   "people.hint": "Click selects · double-click or a name opens the Person page",
   "people.unnamed": "Unnamed speakers",
   "people.unnamed_label": "Speaker {n}",

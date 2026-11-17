@@ -14,7 +14,7 @@ import { usePeopleHeld } from "./count";
 import { AddPersonPopover, setAddPerson } from "./add-person";
 import { setPeopleQuery, usePeopleQuery } from "./model";
 import { setPersonNotice, setPersonTab, usePersonHeld, usePersonTab, type PersonTab } from "./person-store";
-import { confirmDelete, confirmDeleteProfile, usePeopleSheets } from "./sheets";
+import { confirmDelete, usePeopleSheets } from "./sheets";
 
 /** The person id of a `person:<id>` route key. */
 export const personIdOf = (key: string): string | null => (key.startsWith("person:") ? key.slice("person:".length) : null);
@@ -51,7 +51,6 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
             onClose={() => setMenu(null)}
             items={[
               { label: t("person.edit"), onSelect: () => (setMenu(null), sheets.open("person-edit", { bridge, person })) },
-              ...(person.voice_profile ? [{ label: t("person.voice_delete"), onSelect: () => (setMenu(null), setPersonNotice(null), void confirmDeleteProfile(bridge, person, setPersonNotice)) }] : []),
               ...(person.is_you ? [] : [
                 { label: t("person.merge_with"), onSelect: () => (setMenu(null), sheets.open("person-merge", { bridge, source: person })) },
                 { divider: true as const },
