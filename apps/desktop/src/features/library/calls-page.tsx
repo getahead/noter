@@ -19,6 +19,8 @@ import { useSheet } from "../../ui/dialogs/host";
 import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
+import { useExportCalls } from "../call-page/ExportSheet";
+import { exportStore } from "./export-store";
 import { AddTagPopover } from "./add-tag";
 import { tagCalls, tagsKey } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
@@ -62,6 +64,12 @@ export function CallsPage() {
   const [fstate, setFstate] = useState<FilterState>(heldFilter);
   const [tagging, setTagging] = useState<HTMLElement | null>(null);
   const [fresh, setFresh] = useState(0);
+  const [exported, setExported] = useState<string | null>(null);
+  const exportCalls = useExportCalls(bridge, setExported);
+  useEffect(() => {
+    exportStore.setOpener(exportCalls);
+    return () => exportStore.setOpener(null);
+  });
   const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
@@ -95,6 +103,8 @@ export function CallsPage() {
     setSelection((current) => retain(current, order));
   }, [order]);
   useEffect(() => void (memory = { state, selection }), [state, selection]);
+  useEffect(() => exportStore.setIds(selection.ids), [selection.ids]);
+  useEffect(() => () => exportStore.setIds([]), []);
   // a record the core changed replaces its row, a call it removed leaves the list
   useEffect(() => {
     const gone = new Set([...known.current].filter((id) => !(id in records)));
@@ -196,6 +206,8 @@ export function CallsPage() {
     if (e.metaKey && e.key === "Backspace" && chosen.length)
       return (e.preventDefault(), void remove(chosen));
     // @cpt-end:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
+    if (e.metaKey && e.key.toLowerCase() === "e" && chosen.length)
+      return (e.preventDefault(), exportStore.run());
     if (e.metaKey && e.key.toLowerCase() === "a")
       return (e.preventDefault(), setSelection(selectAll(order)));
     if (e.shiftKey && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -230,6 +242,7 @@ export function CallsPage() {
       bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
       actions={
         <>
+          {exported && <span role="status">{t("export.done", { path: exported })}</span>}
           {tagging && chosen.length > 0 && (
             <AddTagPopover
               anchor={tagging}
