@@ -1577,11 +1577,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.26 Privacy audit and knowledge sources — M3 · MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-ui-privacy-sources`
+- [x] `p4` - **ID**: `cpt-noter-feature-ui-privacy-sources`
 
 - **Purpose**: Show what left this Mac in plain words with export, and add, sync, re-index and remove knowledge sources with their status and fix.
 
-- **Milestone**: M3. **Spec**: [`docs/features/ui/privacy-sources.md`](features/ui/privacy-sources.md). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/privacy-sources.md`](features/ui/privacy-sources.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-settings`, `cpt-noter-feature-ui-dialogs-host`
 
@@ -1607,7 +1607,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-ui-status-row`
+  - [x] `p4` - `cpt-noter-component-ui-status-row`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `audit_list`

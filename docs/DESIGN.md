@@ -7514,7 +7514,7 @@ Every call, action item and person has a History view: a timeline of changes wit
 
 #### Component — Status row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-status-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-status-row`
 
 ##### Why this component exists
 
