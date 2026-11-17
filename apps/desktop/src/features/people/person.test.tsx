@@ -74,6 +74,24 @@ describe("Person toolbar", () => {
   });
 });
 
+describe("Show All (QA #908)", () => {
+  it("switches the person's view to Calls", () => {
+    const withCalls = page({ calls: [call] });
+    const onShowAll = vi.fn();
+    const tree = rendered(Overview, { bridge, page: withCalls, prefs: undefined, onShowAll });
+    (find(tree, (x) => x.className === "pe-showall").props.onClick as () => void)();
+    expect(onShowAll).toHaveBeenCalledOnce();
+  });
+  it("the page wires it to the Calls view of that person", async () => {
+    const { usePersonTab } = await import("./person-store");
+    const { showAll } = await import("./PersonPage");
+    showAll("per_show");
+    let tab = "";
+    renderToString((() => { const P = () => ((tab = usePersonTab("per_show")), null); return <P />; })());
+    expect(tab).toBe("calls");
+  });
+});
+
 describe("PersonPage", () => {
   it("reads one person: OK with the page, ERROR with the core's error", async () => {
     const ok = { status: "ok", data: page() };

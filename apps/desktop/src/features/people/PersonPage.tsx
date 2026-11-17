@@ -11,7 +11,7 @@ import { Table } from "../../ui/primitives/table";
 import { HistoryTimeline } from "../history/HistoryTimeline";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
-import { holdPerson, usePersonTab, type PersonTab } from "./person-store";
+import { holdPerson, setPersonTab, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
 
@@ -28,6 +28,9 @@ export async function readPerson(bridge: Bridge, id: string): Promise<PersonStat
   const res = await bridge.act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" });
   return res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error };
 }
+
+/** **Show All** under Last calls opens the person's Calls view. */
+export const showAll = (id: string) => setPersonTab(id, "calls");
 
 const navigate = (bridge: Bridge, target: Parameters<Bridge["core"]["windowNavigate"]>[0]["target"]) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target }), { screen: "person" });
@@ -60,7 +63,7 @@ export function PersonPage({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [state.status]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-overview
-  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} />;
+  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} onShowAll={() => showAll(id)} />;
 }
 
 export interface PersonBodyProps {
