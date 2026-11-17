@@ -159,11 +159,11 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 - Failed test or sign-out reports a safe error without falsely changing the account row
 
 **Steps**:
-1. [ ] - `p1` - User chooses Test; API: `account_test`; show actual latency only if ok, otherwise its mapped error - `inst-test`
+1. [x] - `p1` - User chooses Test; API: `account_test`; show actual latency only if ok, otherwise its mapped error - `inst-test`
 2. [x] - `p1` - User selects a connected runtime for Live copilot, Post-call analysis or Search answers; UI keeps disconnected choices visible and disabled - `inst-task`
 3. [x] - `p1` - API: `settings_update` with runtimes section and revision through Settings; restore core values on failure - `inst-save-task`
-4. [ ] - `p1` - User chooses Sign Out; alert names agents falling back to the matching key or pausing without one, and explains the CLI stays signed in unless **Also sign out of … on this Mac** is chosen - `inst-signout-alert`
-5. [ ] - `p1` - User confirms; API: `account_sign_out` with provider and `also_in_cli`; accounts events determine the result - `inst-signout`
+4. [x] - `p1` - User chooses Sign Out; alert names agents falling back to the matching key or pausing without one, and explains the CLI stays signed in unless **Also sign out of … on this Mac** is chosen - `inst-signout-alert`
+5. [x] - `p1` - User confirms; API: `account_sign_out` with provider and `also_in_cli`; accounts events determine the result - `inst-signout`
 6. [ ] - `p1` - On provider-ended state show the expired row and affected-agent count; Sign In Again reuses the sign-in flow; never silently bind agents to another account - `inst-expired`
 7. [ ] - `p1` - **RETURN** Models & Runtimes; per-agent editor and quick-fix UI are owned by Agents in M4 - `inst-return-manage`
 

@@ -10,7 +10,8 @@ import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { installCli, loadAccounts, removeKey, setKey, signOutAccount, testAccount } from "./accounts";
 import { loadSettings } from "./actions";
-import { KeyRow } from "./CredentialRow";
+import { AccountRow, KeyRow } from "./CredentialRow";
+import { SignOutSheet } from "./SignOutSheet";
 import { refocus } from "./KeyField";
 import { KeySheet } from "./KeySheet";
 import { ModelsRuntimesPane } from "./ModelsRuntimesPane";
@@ -243,5 +244,22 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     expect((await signOutAccount(bridge, "claude", true)).status).toBe("ok");
     expect(accounts().accounts.find((a) => a.provider === "claude")!.status.type).toBe("not_signed_in");
     expect(seen).toContainEqual(["account_sign_out", { provider: "claude", also_in_cli: true }]);
+  });
+
+  it("Test shows the answer line and the sign-out sheet confirms with the checkbox or cancels", async () => {
+    await ready(signedIn);
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    const row = rendered(AccountRow, { bridge, view, keyConfigured: true });
+    on(row, "Test")();
+    await vi.waitFor(() => expect(bridge.store.getState().commands["account:test:claude"]?.state).toBe("DONE"));
+    const confirm = vi.fn();
+    const cancel = vi.fn();
+    const sheet = rendered(SignOutSheet, { provider: "claude", agents: view.agents, keyConfigured: false, onConfirm: confirm, onCancel: cancel });
+    on(sheet, "Also sign out of Claude Code on this Mac", "onAction")(true);
+    on(find(sheet, (p) => p.defaultButton !== undefined).props.defaultButton as Tree, "Sign Out")();
+    expect(confirm).toHaveBeenCalledWith(false);
+    on(sheet, "Cancel")();
+    expect(cancel).toHaveBeenCalled();
+    expect(renderToString(<SignOutSheet provider="chatgpt" agents={[]} keyConfigured onConfirm={confirm} onCancel={cancel} />)).toContain("Codex stays signed in");
   });
 });
