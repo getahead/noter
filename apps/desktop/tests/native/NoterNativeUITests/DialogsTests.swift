@@ -68,4 +68,32 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
         XCTAssertTrue(recordingLine(in: openMenu()).exists, "Return chose Cancel: the recording goes on")
     }
+
+    // M3 People (docs/features/ui/people.md › Edit, merge or delete a person): Delete Person… asks with a native alert
+    // whose default is Cancel; Delete removes the person and returns to People.
+    func test_cpt_noter_seq_people_name_unnamed_speaker__delete_a_person() {
+        launch("idle")
+        app.typeKey("4", modifierFlags: .command)
+        let people = app.tables["People"].firstMatch
+        let row = people.descendants(matching: .staticText)["Oleg M."].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "⌘4 shows People with Oleg M.")
+        row.click()
+        app.typeKey(.return, modifierFlags: [])
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "Oleg M.'s page has its ⋯ menu")
+        more.click()
+        app.menuItems["Delete Person…"].click()
+        XCTAssertTrue(alert.staticTexts["Delete Oleg M.?"].waitForExistence(timeout: 5), "Delete Person… shows no alert")
+        app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        XCTAssertTrue(more.exists, "Cancel keeps the person's page")
+        more.click()
+        app.menuItems["Delete Person…"].click()
+        XCTAssertTrue(alert.buttons["Delete"].waitForExistence(timeout: 5))
+        alert.buttons["Delete"].click()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        let list = app.tables["People"].firstMatch
+        XCTAssertTrue(list.waitForExistence(timeout: 5), "the deleted person's page gives way to People")
+        XCTAssertFalse(list.descendants(matching: .staticText)["Oleg M."].firstMatch.waitForExistence(timeout: 3), "Oleg M. is gone from People")
+    }
 }
