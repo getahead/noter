@@ -95,6 +95,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(html(props(weak))).not.toContain("Search All Languages");
     const p = props(weak, { filter: { languages: ["de"] } as never, onAllLanguages: vi.fn() });
     expect(html(p)).toContain("Search All Languages");
+    expect(html(p)).toContain("1 filter active"); // the warning says how many filters narrow the search
     const banner = find(rendered(SearchView, p), (x) => (x.banner as { id?: string } | undefined)?.id === "search-weak-only").props.banner as { actions: { label: string; onAction: () => void }[] };
     banner.actions.find((a) => a.label === "Search All Languages")!.onAction();
     expect(p.onAllLanguages).toHaveBeenCalled();

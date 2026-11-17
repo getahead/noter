@@ -69,9 +69,11 @@ export function SearchResultRow({ bridge, hit }: { bridge: Bridge; hit: SearchHi
       {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
       {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
+      <span className="lb-hit__go">
       {span && <IconButton icon={state.playing ? "pause" : "play"} label={t(state.playing ? "playback.pause" : "transcript.play")} size="inline" onAction={play} />}
       {state.note && <span className="np-dim" role="status">{t(state.note)}</span>}
       <Link label={t("search.open")} onAction={go} />
+      </span>
     </li>
   );
 }

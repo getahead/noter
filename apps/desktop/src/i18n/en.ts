@@ -1365,6 +1365,8 @@ export const en = {
   "search.how_title": "How Noter searched",
   "search.how_words": "Words searched: {words}",
   "search.how_meaning": "Meaning search: {state}",
+  "search.how_languages": "Languages: {languages}",
+  "search.all": "all",
   "search.how_filters": "Filters: {filters}",
   "search.how_n": { one: "{count} filter applied", other: "{count} filters applied" },
   "search.how_none": "none",

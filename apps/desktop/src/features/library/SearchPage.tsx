@@ -95,7 +95,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         </p>
         {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
         {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
-        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
+        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) + (filtered ? ` ${t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}.` : ""), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>
             <TopicChip size="suggestion" name={topic.name} counts={topicCounts(topic)} merge={topic.merge_suggestion ? t("topics.merge_glyph") : undefined} onOpen={() => openTopic(bridge, topic.id)} />
@@ -134,6 +134,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
               <strong>{t("search.how_title")}</strong>
               <span>{t("search.how_words", { words: r.explain.normalized_query || query })}</span>
               <span>{t("search.how_meaning", { state: r.mode.type === "hybrid" ? t("search.on") : t("search.off") })}</span>
+              <span>{t("search.how_languages", { languages: filter.languages?.length ? filter.languages.map((l) => (typeof l === "string" ? l : l.code).toUpperCase()).join(", ") : t("search.all") })}</span>
               <span>{t("search.how_filters", { filters: r.explain.filters_applied ? t("search.how_n", { count: r.explain.filters_applied }) : t("search.how_none") })}</span>
             </div>
           </Popover>

@@ -133,7 +133,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 ### Follow, rename and merge a topic
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-topic`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-library-search-topics-topic`
 
 **Actor**: Primary user
 
@@ -149,7 +149,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 1. [x] - `p1` - User opens Topics; API: `topics_list`; UI shows Topic, Calls, Decisions, Open questions, Last discussed and merge glyphs - `inst-list-topics`
 2. [x] - `p1` - User searches names, selects a row or chip and opens it; API: `topic_get` with topic id - `inst-get-topic`
 3. [x] - `p1` - UI: title counts and month-grouped entries in date order; Return opens evidence, ⌘I opens the shared Item inspector - `inst-timeline`
-4. [ ] - `p1` - User chooses **Ask About This Thread** or **Ask About This**; UI starts Ask scoped to this topic with **What was decided and what is still open about Websocket notifications?** - `inst-topic-ask`
+4. [x] - `p1` - User chooses **Ask About This Thread** or **Ask About This**; UI starts Ask scoped to this topic with **What was decided and what is still open about Websocket notifications?** - `inst-topic-ask`
 5. [x] - `p1` - User chooses **Rename…**; UI opens a Rename sheet (not a popover) showing the current name, requires nonblank text and offers **Merge Instead** for a known name collision - `inst-rename-form`
 6. [x] - `p1` - API: `topic_rename` with id, `rev` and name; on success update the table, thread and chips and offer Undo with the returned change - `inst-rename`
 7. [x] - `p1` - User chooses a merge suggestion or **Merge With…**; UI shows the 520-pt sheet, target chooser excluding this topic, item preview and **Cancel** / **Merge** - `inst-merge-preview`

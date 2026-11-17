@@ -172,7 +172,7 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await page.getByRole("button", { name: "Ask About This Thread" }).click();
     await expect(page.getByRole("heading", { name: "Ask", level: 1 })).toBeVisible();
     expect(await sent(page, "ask_start")).toEqual([
-      expect.objectContaining({ question: "What was decided and what is still open about Websocket notifications?", scope: expect.objectContaining({ topic_ids: ["top_ws"] }) }),
+      expect.objectContaining({ question: "What was decided and what is still open about Websocket notifications?", scope: { preset: "topic:top_ws", topic_id: "top_ws" } }),
     ]);
   });
 });
