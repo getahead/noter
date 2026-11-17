@@ -21,7 +21,10 @@ export function createPeopleList(bridge: Bridge) {
     listeners.forEach((l) => l());
   };
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-list
-  const load = async (): Promise<void> => {
+  // StrictMode mounts a page twice in development: a read in flight is shared, never sent twice
+  let reading: Promise<void> | null = null;
+  const load = (): Promise<void> => (reading ??= read().finally(() => void (reading = null)));
+  const read = async (): Promise<void> => {
     const mine = ++request;
     if (!state.read) set({ status: "LOADING", read: null, error: null });
     const res = await bridge.act("people:page", "people_list", () => bridge.core.peopleList({}), { screen: "people" });

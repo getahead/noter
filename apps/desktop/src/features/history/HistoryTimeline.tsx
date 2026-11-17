@@ -25,6 +25,8 @@ export interface HistoryTimelineProps {
   /** The call's title for **Export Log…** (call variant). */
   callId?: string;
   callTitle?: string;
+  /** The empty state's explanation (a person's History says what appears here); without it only the title shows. */
+  emptyBody?: string;
 }
 
 const ACTORS: { value: ActorFilter; label: "history.all" | "history.you" | "history.jobs" | "history.models" }[] = [
@@ -36,7 +38,7 @@ const ACTORS: { value: ActorFilter; label: "history.all" | "history.you" | "hist
 
 // @cpt-dod:cpt-noter-dod-ui-history-undo-timeline:p1
 // @cpt-component:cpt-noter-component-ui-history-timeline:p1
-export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: HistoryTimelineProps) {
+export function HistoryTimeline({ bridge, target, variant, callId, callTitle, emptyBody }: HistoryTimelineProps) {
   const sheets = useSheet();
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const strip = useUndo();
@@ -114,6 +116,7 @@ export function HistoryTimeline({ bridge, target, variant, callId, callTitle }: 
   return (
     <TimelineView
       variant={variant}
+      emptyBody={emptyBody}
       state={state}
       late={late}
       rows={rows}
@@ -143,6 +146,7 @@ export interface TimelineViewProps {
   jobId: string | null;
   jobs: { id: string; name: string }[];
   exported: string | null;
+  emptyBody?: string;
   /** The target of the strip's running command, so its row shows the spinner. */
   busyTarget: UndoTarget | null;
   onActor: (a: string) => void;
@@ -183,7 +187,7 @@ export function TimelineView(p: TimelineViewProps) {
           {[0, 1, 2].map((i) => <div key={i} className="pc-skel__line" style={{ width: "90%" }} />)}
         </div>
       )}
-      {state === "EMPTY" && <EmptyState variant="section" title={t("history.empty")} />}
+      {state === "EMPTY" && (p.emptyBody ? <EmptyState variant="first-use" icon="history" title={t("history.empty")} body={p.emptyBody} /> : <EmptyState variant="section" title={t("history.empty")} />)}
       {state === "FILTERED_EMPTY" && <EmptyState variant="filtered" title={t("history.none_filtered", { filter: filterName })} />}
       {state === "READY" && (
         <div onKeyDown={(e) => moveFocus(e, ".pc-chg", false)}>

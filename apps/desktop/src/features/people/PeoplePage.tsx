@@ -43,10 +43,13 @@ export function PeoplePage() {
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const sheets = usePeopleSheets();
-  const first = useRef(true);
+  const seen = useRef(known);
   useEffect(() => void list.load(), [list]);
   // the core changed a person (naming, merge, edit): read the list again, keeping it on screen meanwhile
-  useEffect(() => void (first.current ? (first.current = false) : list.load()), [known, list]);
+  useEffect(() => {
+    if (seen.current !== known) list.load();
+    seen.current = known;
+  }, [known, list]);
   useEffect(() => {
     if (state.status !== "LOADING") return setSlow(false);
     const timer = setTimeout(() => setSlow(true), SLOW_MS);
@@ -167,7 +170,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
                     <td>
                       <span className="pe-name">
                         <span className="np-person__ini" aria-hidden="true">{p.initials}</span>
-                        <button type="button" tabIndex={-1} className="pe-name__btn" onClick={(e) => (e.stopPropagation(), open(p.id))}>{p.display_name}</button>
+                        <button type="button" tabIndex={-1} className="pe-name__btn" title={p.display_name} onClick={(e) => (e.stopPropagation(), open(p.id))}>{p.short_name}</button>
                       </span>
                     </td>
                     <td className="np-muted">{roleOrg(p)}</td>
