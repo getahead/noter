@@ -21,17 +21,17 @@ const shot = async (page: Page, name: string) => {
 
 test.describe("cpt-noter-dod-ui-people-pages person page", () => {
   test("Overview: commitments, Asked you, topics, Identity and the last calls", async ({ page }) => {
-    await openPerson(page, /Anna K\./);
+    await openPerson(page, /Anna Kuznetsova/);
     await expect(page.getByText("Last calls")).toBeVisible();
     await shot(page, "person-overview");
   });
   test("a person without calls", async ({ page }) => {
-    await openPerson(page, /Lena K\./);
+    await openPerson(page, /Lena Krüger/);
     await expect(page.getByText("No calls with Lena K. yet")).toBeVisible();
     await shot(page, "person-no-calls");
   });
   test("Calls lists every call with this person", async ({ page }) => {
-    await openPerson(page, /Anna K\./);
+    await openPerson(page, /Anna Kuznetsova/);
     await page.getByRole("tab", { name: "Calls" }).click();
     await expect(page.locator('[data-region="PE-CALLS"]')).toBeVisible();
     await shot(page, "person-calls");
