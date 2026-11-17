@@ -89,10 +89,13 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
     await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
     await page.keyboard.press("Enter");
     const status = page.locator(".ak-turn .ak-status");
+    // started is due at 200 ms and the bridge renders it 100 ms later; the first word is due at 400 ms. Each clock step is a
+    // round trip (about a second on CI), so cover the first 250 ms in one and then go by condition, in small steps
+    await page.clock.runFor(250);
     await expect(async () => {
       await page.clock.runFor(20);
       await expect(status.first()).toContainText("·", { timeout: 200 });
-    }).toPass({ timeout: 10000 });
+    }).toPass({ timeout: 20000 });
     await expect(page.getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
     await shot(page, "started-line", "wide");
   });

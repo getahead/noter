@@ -86,6 +86,7 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     await expect(toolbar(page)).toContainText("Answering…");
     await expect(button(composer(page), "Stop")).toBeVisible();
     await expect(button(composer(page), "Ask")).toHaveCount(0);
+    await expect(thread(page).locator(".ak-status", { hasText: " · " })).toBeVisible(); // started: the runtime and mode the core reported
 
     await expect(toolbar(page)).not.toContainText("Answering…");
     const answer = answers(page).last();
