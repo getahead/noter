@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Popover } from "../../ui/primitives/popover";
 import { useBridge } from "../../app/bridge/context";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallFilter, SearchResults } from "../../core/bindings";
@@ -28,11 +29,14 @@ export interface SearchViewProps {
   onMore: (group: string) => void;
   onRetry: () => void;
   onClear: () => void;
+  /** Drops the Language filter (the weak-match warning offers it only while one is set). */
+  onAllLanguages?: () => void;
   onAsk: () => void;
 }
 
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
-export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAsk }: SearchViewProps) {
+export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk }: SearchViewProps) {
+  const [how, setHow] = useState<HTMLElement | null>(null);
   const body = () => {
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
@@ -68,7 +72,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
         </p>
-        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: filtered ? [clear, ask] : [ask] }} />}
+        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>
             <TopicChip size="suggestion" name={topic.name} counts={topicCounts(topic)} merge={topic.merge_suggestion ? t("topics.merge_glyph") : undefined} onOpen={() => openTopic(bridge, topic.id)} />
@@ -99,6 +103,17 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             )}
           </section>
         ))}
+        <button type="button" className="lb-fbtn" aria-expanded={how !== null} onClick={(e) => setHow(how ? null : e.currentTarget)}>{t("search.how")}</button>
+        {how && (
+          <Popover variant="how-searched" anchor={how} width={320} label={t("search.how_title")} onClose={() => setHow(null)}>
+            <div className="lb-pop">
+              <strong>{t("search.how_title")}</strong>
+              <span>{t("search.how_words", { words: r.explain.normalized_query || query })}</span>
+              <span>{t("search.how_meaning", { state: r.mode.type === "hybrid" ? t("search.on") : t("search.off") })}</span>
+              <span>{t("search.how_filters", { filters: r.explain.filters_applied ? t("search.how_n", { count: r.explain.filters_applied }) : t("search.how_none") })}</span>
+            </div>
+          </Popover>
+        )}
       </>
     );
   };
@@ -149,6 +164,7 @@ export function SearchPage({ query }: { query: string }) {
       onMore={(g) => setOpen(new Set(open).add(g))}
       onRetry={() => setAgain((n) => n + 1)}
       onClear={() => (holdFilter(apply(heldFilter(), { type: "clear" })), setAgain((n) => n + 1))}
+      onAllLanguages={() => (holdFilter((filter.languages ?? []).reduce((st, l) => apply(st, { type: "toggle", group: "languages", value: typeof l === "string" ? l : l.code }), heldFilter())), setAgain((n) => n + 1))}
       onAsk={() => navigate(askRoute(query))}
     />
   );
