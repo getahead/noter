@@ -1,5 +1,5 @@
 // The playback bar under an answer (AK-R5): a citation's Play starts a replay; the bar follows the core's `playback:state`.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -16,6 +16,10 @@ export function useAskReplay(bridge: Bridge) {
     const h = setTimeout(() => setReplay(null), ROUTE_STOP_MS);
     return () => clearTimeout(h);
   }, [bar]);
+  // leaving Ask ends the replay it started
+  const live = useRef(false);
+  live.current = replay !== null;
+  useEffect(() => () => void (live.current && stopAudio(bridge)), [bridge]);
   const fresh = playback && replay && playback.call_id === replay.call_id && playback.version > replay.since;
   const position = fresh ? playback.position_ms : (replay?.from_ms ?? 0);
   const start = async (r: Replay) => {

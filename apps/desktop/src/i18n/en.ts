@@ -1423,6 +1423,8 @@ export const en = {
   "ask.play": "Play {at}",
   "ask.open_call": "Open {title}",
   "ask.search_keyword": "Search by Keyword",
+  "ask.runtime_claude_code": "Claude Code",
+  "ask.runtime_local": "Local model",
   "ask.copy_failed": "Couldn’t copy",
   "ask.ask_again": "Ask Again",
   "ask.weak": "Weak match",
