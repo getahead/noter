@@ -53,6 +53,8 @@ export interface ThreadSetters {
   setAsking: (q: string | null) => void;
   /** Forget the scope the last question was asked with (Widen Scope belongs to the thread it was asked in). */
   setAskedScope?: (scope: undefined) => void;
+  /** The thread shown now: opening it again (a routed ask settling into its own thread) keeps the asked scope. */
+  current?: string | null;
 }
 
 /** Show thread `id` (or the empty composer for null) with its stored turns. */
@@ -62,7 +64,7 @@ export async function openThread(bridge: Bridge, id: string | null, set: ThreadS
   // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-return-follow-up
   set.setTurns([]);
   set.setAsking(null);
-  set.setAskedScope?.(undefined);
+  if (id !== (set.current ?? null)) set.setAskedScope?.(undefined);
   if (!keepStream) void bridge.unsubscribe("ask_start"); // a turn still answering is kept listened to, so Recent can learn it ended
   if (!id) return;
   const got = await loadThread(bridge, id);

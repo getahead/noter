@@ -54,7 +54,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const open = (id: string | null) => {
     setAnnounce("");
     if (busy) previousTurn.current = afterTurn(data, previousTurn.current); // the turn goes on without the page showing it
-    return openThread(bridge, id, { setThread, setTurns, setAsking, setAskedScope }, busy);
+    return openThread(bridge, id, { setThread, setTurns, setAsking, setAskedScope, current: thread }, busy);
   };
 
   const [askedScope, setAskedScope] = useState<AskScope | undefined>(undefined);

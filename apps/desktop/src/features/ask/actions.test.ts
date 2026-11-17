@@ -70,8 +70,15 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     const m = make(ok({ turns: [] }));
     (m.bridge as unknown as { unsubscribe: unknown }).unsubscribe = vi.fn();
     const setAskedScope = vi.fn();
-    await openThread(m.bridge, "b", { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), setAskedScope });
+    const set = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), setAskedScope };
+    await openThread(m.bridge, "b", { ...set, current: "a" });
     expect(setAskedScope).toHaveBeenCalledWith(undefined); // Widen Scope belongs to the thread the narrowed question was asked in
+    setAskedScope.mockClear();
+    await openThread(m.bridge, null, { ...set, current: "a" }); // New Question
+    expect(setAskedScope).toHaveBeenCalledOnce();
+    setAskedScope.mockClear();
+    await openThread(m.bridge, "a", { ...set, current: "a" }); // the routed ask's entry settling into its own thread
+    expect(setAskedScope).not.toHaveBeenCalled();
   });
   it("keeps the thread and refreshes Recent for a failed or interrupted turn, leaving its partial on screen", async () => {
     for (const phase of ["error", "interrupted"] as const) {
