@@ -2900,7 +2900,7 @@ Before the first question:
 
 #### Screen — People and Person page
 
-- [ ] `p2` - **ID**: `cpt-noter-component-screen-people`
+- [x] `p2` - **ID**: `cpt-noter-component-screen-people`
 
 ##### Why this component exists
 

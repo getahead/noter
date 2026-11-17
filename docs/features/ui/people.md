@@ -34,11 +34,11 @@ milestone: M3
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-ui-people`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-ui-people`
 
 ## 1. Feature Context
 
-- [ ] `p4` - `cpt-noter-feature-ui-people`
+- [x] `p4` - `cpt-noter-feature-ui-people`
 
 ### 1.1 Overview
 
@@ -272,5 +272,7 @@ The system **MUST** support create, edit, previewed merge, confirmed deletion an
 **DESIGN versus prototype.** DESIGN's no-match example says Lena; the prototype seeds Lenara because Lena exists. Use the actual query in the message. DESIGN orders narrow Overview blocks R2, R3, R5, R4, R6; prototype collapses its existing columns as R2, R3, R4, R5, R6. Follow prototype order. The Person action checks for an unregistered `voice-profile` overlay, so reaches `ppl-voice`: **Create a voice profile for Anna K.?**, local-recognition text and **Built from 6 named calls · about 40 minutes of speech**. The separate Dialogs gallery uses `dlg-voice`, **Set Up Voice Profile** and 31 calls; preserve each entry's prototype layout but derive counts from real data. Delete-profile story wording differs from the screen/prototype; use **in new calls. Names already given in past calls stay.**
 
 **Contract and fake gaps.** `UnnamedSpeaker` is per call with no recurring-voice group, call count or atomic cross-call naming command. `transcript_name_speakers` is also per call; several calls cannot become one batch by UI convention. `person_create` accepts a second person with the same name on the real core and the fake (#906), so Create Anyway succeeds. `PersonPage` lacks language histograms, cadence and profile matching counts; `PersonRow` carries `notes` for prefilling and `you_owe` for the list (contract 2.10, #906). Do not invent missing facts. The fake does not fully propagate merges, deletes or profile changes to transcripts; typed fixtures and conformance must expose those limits. M3 can bind the M2 picker/naming commands, but the full recurring-speaker story remains a contract follow-up.
+
+**Delivery (17 Nov 2026).** Recorded gaps, not delivered: naming a recurring voice across calls as one change (the core has no cross-call naming command, so the UI flags it and never fakes a batch), and the counts behind the Identity **On since…** line (the contract carries no profile matching counts). Every other flow, algorithm, state and DoD is delivered and marked.
 
 **Not applicable.** Speaker clustering, recognition, profile encryption, persistent transactions, schema changes, deployment and external authentication are core responsibilities. UI reads are bounded page queries, no query per row; error logs contain ids/codes only, not samples or identity notes.

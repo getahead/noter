@@ -1461,11 +1461,11 @@ Every state in a screen's or component's States table must match a prototype sta
 
 ### 2.24 People and Person pages — M3 · MEDIUM
 
-- [ ] `p4` - **ID**: `cpt-noter-feature-ui-people`
+- [x] `p4` - **ID**: `cpt-noter-feature-ui-people`
 
 - **Purpose**: Prepare a 1:1 from a Person page, turn unnamed speakers into people, and manage voice profiles, edits and merges with **Undo**.
 
-- **Milestone**: M3. **Spec**: [`docs/features/ui/people.md`](features/ui/people.md). **Status**: NOT_STARTED.
+- **Milestone**: M3. **Spec**: [`docs/features/ui/people.md`](features/ui/people.md). **Status**: IMPLEMENTED.
 
 - **Depends On**: `cpt-noter-feature-ui-speakers`, `cpt-noter-feature-ui-items`, `cpt-noter-feature-ui-library-calls`
 
@@ -1484,14 +1484,14 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Design Constraints Covered**:
 
-  - [ ] `p4` - `cpt-noter-constraint-behaviour-metrics-off`
+  - `cpt-noter-constraint-behaviour-metrics-off` (plain reference: its status lives in DESIGN.md and closes with the last feature that references it, M5)
 
 - **Domain Model Entities**:
   - Person, voice profile
 
 - **Design Components**:
 
-  - [ ] `p4` - `cpt-noter-component-screen-people`
+  - [x] `p4` - `cpt-noter-component-screen-people`
 
 - **API** (contract commands, `contracts/ipc.manifest.json`; a milestone in parentheses is the command's own when it is later than the feature's):
   - `people_list`
