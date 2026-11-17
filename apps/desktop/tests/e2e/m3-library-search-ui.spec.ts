@@ -121,11 +121,14 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     expect(await sent(page, "topics_list")).toHaveLength(1);
     const table = page.getByRole("table");
     for (const col of ["Topic", "Calls", "Decisions", "Last discussed"]) await expect(table.getByRole("columnheader", { name: new RegExp(col) })).toBeVisible();
-    await table.getByRole("row", { name: /Websocket notifications/ }).click();
+    const row = table.getByRole("row", { name: /Websocket notifications/ });
+    const [calls, decisions, open] = (await row.locator("td.np-tnum").allTextContents()).map(Number); // the row's own counts, which the thread header must repeat
+    expect(decisions).toBeGreaterThanOrEqual(1); // the story opens the decision itm_notif
+    await row.click();
     await page.keyboard.press("Enter");
     expect(await sent(page, "topic_get")).toEqual([expect.objectContaining({ topic_id: "top_ws" })]);
     await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
-    await expect(page.getByText(/\d+ calls? · \d+ decisions? · \d+ open questions?/)).toBeVisible();
+    await expect(page.getByText(new RegExp(`${calls} calls? · ${decisions} decisions? · ${open} open questions?`))).toBeVisible();
     await page.locator("[data-item-id=itm_notif]").focus(); // the decision's row
     await page.keyboard.press("Enter");
     await expect(page.getByRole("tab", { name: "Transcript", selected: true })).toBeVisible();
