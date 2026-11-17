@@ -34,6 +34,7 @@ const WIDTH: Record<string, string> = { theirs: "130px", owe: "90px", last: "100
 const roleOrg = (p: PersonRow) => (p.role && p.org ? t("people.role_org", { role: p.role, org: p.org }) : (p.role ?? p.org ?? ""));
 
 /** People: the searchable list (PL-R2) and, when the core has any, the unnamed speakers (PL-R3). */
+// @cpt-dod:cpt-noter-dod-ui-people-pages:p1
 export function PeoplePage() {
   const bridge = useBridge();
   const list = useMemo(() => createPeopleList(bridge), [bridge]);

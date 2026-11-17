@@ -44,8 +44,10 @@ export function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
 /** **Show All** under Last calls opens the person's Calls view. */
 export const showAll = (id: string) => setPersonTab(id, "calls");
 
+// @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-navigate
 const navigate = (bridge: Bridge, target: Parameters<Bridge["core"]["windowNavigate"]>[0]["target"]) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target }), { screen: "person" });
+// @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-navigate
 
 /** A Person page: one `person_get` read, shown as Overview, Calls or History (PE-R2..R6). */
 export function PersonPage({ id }: { id: string }) {
@@ -120,7 +122,9 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
       </div>
     );
   }
+  // @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields
   const p = page.person;
+  // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-fields
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-calls
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-history
   return (
@@ -135,7 +139,9 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
         </div>
       ) : tab === "history" ? (
         <div data-region="PE-HISTORY" role="region" aria-label={t("person.tab.history")}>
+          {/* @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-history */}
           <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" emptyBody={t("person.history_empty", { name: p.short_name })} />
+          {/* @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-history */}
         </div>
       ) : (
         <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} onSetUpVoice={onSetUpVoice} onDeleteVoice={onDeleteVoice} />
@@ -191,8 +197,10 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
       </div>
     );
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-person
+  // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-items
   const items = (list: Page["owns_open"], empty: string) =>
     list.length ? <div className="lb-items">{list.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />)}</div> : <EmptyState variant="section" title={empty} />;
+  // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-items
   return (
     <div className="pe-cols">
       <div className="pe-col">

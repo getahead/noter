@@ -38,6 +38,8 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   const held = usePersonHeld();
   const person = held?.person.id === id ? held.person : null;
   const control = <SegmentedControl items={TABS.map((x) => ({ value: x.value, label: t(x.label) }))} value={tab} label={t("person.view")} onAction={(v) => setPersonTab(id, v as PersonTab)} />;
+  // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-edit
+  // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-merge
   // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
   // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   const more = person && (
@@ -63,6 +65,8 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   );
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
+  // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-merge
+  // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-edit
   return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} hasSearch={false} center={control} trailing={more} />;
 }
 

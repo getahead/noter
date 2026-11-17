@@ -26,6 +26,7 @@ export interface PeopleView {
   unnamed: UnnamedSpeaker[];
 }
 
+// @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-return
 // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-list-result
 // @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-empty
 // @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-unnamed
@@ -39,6 +40,7 @@ export function view(read: PeopleList, query: string): PeopleView {
 // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-unnamed
 // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-empty
 // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-list-result
+// @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-return
 
 // @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-duplicate
 /** A person the typed name may already be: the same full or short name, or a lone first name ("Lena" for Lena K.). The core keeps the final say. */

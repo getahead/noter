@@ -12,6 +12,7 @@ export type Outcome = "ok" | "conflict" | "failed";
 
 // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-update
 /** `person_update` with the rev the sheet was opened on; a stale rev is re-read, never resubmitted. */
+// @cpt-dod:cpt-noter-dod-ui-people-identity:p1
 export async function updatePerson(bridge: Bridge, p: PersonRow, patch: PersonPatch): Promise<Outcome> {
   const res = await bridge.act("people:update", "person_update", () => bridge.core.personUpdate({ person_id: p.id, rev: p.rev, patch }), { screen: "people" });
   if (res.status === "error") {
@@ -34,6 +35,7 @@ export async function mergePeople(bridge: Bridge, source: PersonRow, target: Per
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge
 
+// @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
 // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete
 /** `person_delete`: irreversible (no change id), so nothing goes to Undo. */
 export async function deletePerson(bridge: Bridge, id: string): Promise<boolean> {
@@ -41,7 +43,10 @@ export async function deletePerson(bridge: Bridge, id: string): Promise<boolean>
   return res.status === "ok";
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete
+// @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
 
+// @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-profile-create
+// @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-profile-on
 // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-create-profile
 /** `voice_profile_create`: only ever from the sheet's explicit button, for one person. The result is what the core says; nothing is simulated. */
 export async function createProfile(bridge: Bridge, person: PersonRow): Promise<boolean> {
@@ -54,7 +59,11 @@ export async function createProfile(bridge: Bridge, person: PersonRow): Promise<
   return true;
 }
 // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-create-profile
+// @cpt-end:cpt-noter-state-ui-people-view:p1:inst-profile-on
+// @cpt-end:cpt-noter-state-ui-people-view:p1:inst-profile-create
 
+// @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-profile-off
+// @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-return-profile
 // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile
 /** `voice_profile_delete`: the person is read again so Identity shows Off. */
 export async function deleteProfile(bridge: Bridge, person: PersonRow): Promise<boolean> {
@@ -65,3 +74,5 @@ export async function deleteProfile(bridge: Bridge, person: PersonRow): Promise<
   return true;
 }
 // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile
+// @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-return-profile
+// @cpt-end:cpt-noter-state-ui-people-view:p1:inst-profile-off
