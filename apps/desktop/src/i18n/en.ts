@@ -442,6 +442,7 @@ export const en = {
   "sources.add_folder": "Add Folder…",
   "sources.add_mcp": "Add MCP Server…",
   "sources.read_error": "The sources could not be read.",
+  "sources.announce_done": "{name} finished indexing.", "sources.announce_failed": "{name} failed to index.",
   "sources.up_to_date": "Up to date", "sources.running": "Running…", "sources.failed": "Failed", "sources.expired": "Sign-in expired",
   "sources.failed_note": "The last sync did not finish. Try Again.",
   "sources.expired_note": "Sign-in expired. Sync stays off until you sign in again.",

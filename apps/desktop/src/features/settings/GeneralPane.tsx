@@ -25,9 +25,9 @@ const Warn = ({ children, icon = "warning" }: { children: string; icon?: "warnin
   </span>
 );
 
-// @cpt-dod:cpt-noter-dod-ui-settings-window:p1
 const MOVE_NOTES = { cloud: "settings.general.storage_cloud", later: "settings.general.storage_later", failed: "settings.general.storage_failed" } as const;
 
+// @cpt-dod:cpt-noter-dod-ui-settings-window:p1
 export function GeneralPane({ bridge, settings }: PaneProps) {
   const { general, today } = settings;
   const selfTestPassed = useWindow(bridge, (s) => s.whole.setup?.self_test.type === "passed");
@@ -41,6 +41,7 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
   const [moveRun, setMoveRun] = useState<string | null>(null);
   const [moveNote, setMoveNote] = useState<"cloud" | "failed" | "later" | null>(null);
   const moveStatus = useWindow(bridge, (s) => (moveRun ? s.jobs[moveRun]?.status : undefined));
+  // @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-return-storage
   // the path changes only when the move job finished and the settings were read again
   useEffect(() => {
     if (!moveRun || !moveFinished(moveStatus)) return;
@@ -48,6 +49,8 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
     if (moveStatus !== "succeeded") setMoveNote("failed");
     void loadSettings(bridge);
   }, [moveRun, moveStatus, bridge]);
+  // @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-return-storage
+  // @cpt-flow:cpt-noter-flow-ui-privacy-sources-storage:p1
   const change = async () => {
     setMoveNote(null);
     const r = await moveStorage(bridge);
@@ -105,7 +108,9 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
           <span className="st-path np-mono" title={general.storage_path}>
             {general.storage_path}
           </span>
+          {/* @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-change */}
           <PushButton label={t("settings.general.storage_change")} size="small" disabled={!!moveRun} onAction={() => void change()} />
+          {/* @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-change */}
         </Row>
       </Group>
       <Group title={t("settings.general.today")}>

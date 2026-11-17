@@ -8,6 +8,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Table, Th } from "../../ui/primitives/table";
 import { auditRows, createAudit, formatBytes, requestCount, totalBytes, type AuditView } from "./audit";
 
+// @cpt-dod:cpt-noter-dod-ui-privacy-sources-audit:p4
 // @cpt-flow:cpt-noter-flow-ui-privacy-sources-audit:p1
 export function AuditLog({ bridge, callId = null, onAllCalls }: { bridge: Bridge; callId?: string | null; onAllCalls?: () => void }) {
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
@@ -19,12 +20,18 @@ export function AuditLog({ bridge, callId = null, onAllCalls }: { bridge: Bridge
     return s.dispose;
   }, [bridge, callId]);
   if (!v) return <AuditLogView v={null} callId={callId} prefs={prefs} onLoad={() => {}} onExport={() => {}} onAllCalls={() => {}} />;
+  // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-return-audit
   return <AuditLogView v={v} callId={callId} prefs={prefs} onLoad={() => void store.current?.load()} onExport={() => void store.current?.export()} onAllCalls={() => onAllCalls?.()} />;
+  // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-return-audit
 }
 
 export function AuditLogView({ v, callId, prefs, onLoad, onExport, onAllCalls }: { v: AuditView | null; callId: string | null; prefs: UiPrefs | undefined; onLoad: () => void; onExport: () => void; onAllCalls: () => void }) {
   const shown = v?.rows ?? [];
+  // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-rows
+  // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-audit
   const table = useMemo(() => auditRows(shown, prefs), [shown, prefs]);
+  // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-audit
+  // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-rows
   if (!v || v.status === "loading") return <p className="st-audit__loading" role="status">{t("audit.loading")}</p>;
   const complete = v.cursor === null;
   return (
@@ -35,8 +42,11 @@ export function AuditLogView({ v, callId, prefs, onLoad, onExport, onAllCalls }:
           <PushButton label={t("audit.all_calls")} size="small" onAction={onAllCalls} />
         </div>
       )}
+      {/* @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-if-empty */}
       {table.length === 0 && !v.failed ? (
+        // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-empty
         <EmptyState variant="section" title={complete && !callId ? t("audit.empty") : callId ? t("audit.empty_call") : t("audit.empty_page")} />
+        // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-empty
       ) : (
         table.length > 0 && (
           <Table label={t("settings.privacy.left_mac")} cls="st-audit">
@@ -47,7 +57,10 @@ export function AuditLogView({ v, callId, prefs, onLoad, onExport, onAllCalls }:
           </Table>
         )
       )}
+      {/* @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-if-empty */}
+      {/* @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-error */}
       {v.failed && <p className="hd__err" role="alert">{t("audit.error")} <PushButton label={t("action.try_again")} size="small" disabled={v.busy} onAction={onLoad} /></p>}
+      {/* @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-error */}
       <div className="st-audit__foot" aria-live="polite">
         {table.length > 0 && (complete ? t("audit.total", { count: requestCount(shown), size: formatBytes(totalBytes(shown)) }) : v.total != null ? t("audit.shown_of", { shown: shown.length, total: v.total }) : t("audit.total_so_far", { count: requestCount(shown), size: formatBytes(totalBytes(shown)) }))}
         {!complete && !v.failed && <PushButton label={t("audit.more")} size="small" disabled={v.busy} onAction={onLoad} />}

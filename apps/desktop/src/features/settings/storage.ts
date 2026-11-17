@@ -9,7 +9,9 @@ export async function moveStorage(bridge: Bridge): Promise<MoveOutcome> {
   const res = await bridge.act("storage:move", "storage_move", () => bridge.core.storageMove({ path: null }));
   if (res.status === "ok") return { kind: "accepted", runId: res.data.job_run_id };
   // @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-warning
+  // @cpt-begin:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-if-cloud
   if (res.error.code === "storage_in_cloud_folder") return { kind: "cloud" };
+  // @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-if-cloud
   // @cpt-end:cpt-noter-flow-ui-privacy-sources-storage:p1:inst-warning
   if (res.error.code === "not_implemented") return { kind: "later" };
   return res.error.code === "cancelled" ? { kind: "cancelled" } : { kind: "failed" };

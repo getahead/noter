@@ -80,7 +80,7 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 
 ### Inspect and export what left this Mac
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-audit`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-audit`
 
 **Actor**: Primary user
 
@@ -93,19 +93,19 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 - Selected-call export sends the call id (`audit_export` takes `call_id`), so the file holds that call only; never export all calls under a filtered label
 
 **Steps**:
-1. [ ] - `p1` - User opens Privacy or the Call info **What left this Mac: 3 requests · 41 KB** link; Settings receives the call id and focuses the audit frame - `inst-open`
-2. [ ] - `p1` - API: `audit_list` with date bounds and first page; keep cursor and selected call as view state - `inst-read`
-3. [ ] - `p1` - Algorithm: render rows through `cpt-noter-algo-ui-privacy-sources-audit-rows`; load more pages as needed and filter by returned call id, not title - `inst-rows`
-4. [ ] - `p1` - **IF** the loaded range is empty - `inst-if-empty`
-   1. [ ] - `p1` - UI: **Nothing has left this Mac.** only when the complete all-call range is empty; a selected-call empty range explains that no requests match this call - `inst-empty`
-5. [ ] - `p1` - User chooses Export; API: `audit_export` with matching date bounds and supported log format, for the supported all-call range - `inst-export`
-6. [ ] - `p1` - Core: show the native save panel; UI reports success from returned export path/files only, never from a cancelled panel - `inst-save-result`
-7. [ ] - `p1` - User may open Screen Share Test; delegate to Settings' share-test flow with `share_test_run`, retaining the table and limits line during permission denial or capture failure - `inst-share-test`
-8. [ ] - `p1` - **RETURN** Privacy with unchanged mode and filters - `inst-return-audit`
+1. [x] - `p1` - User opens Privacy or the Call info **What left this Mac: 3 requests · 41 KB** link; Settings receives the call id and focuses the audit frame - `inst-open`
+2. [x] - `p1` - API: `audit_list` with date bounds and first page; keep cursor and selected call as view state - `inst-read`
+3. [x] - `p1` - Algorithm: render rows through `cpt-noter-algo-ui-privacy-sources-audit-rows`; load more pages as needed and filter by returned call id, not title - `inst-rows`
+4. [x] - `p1` - **IF** the loaded range is empty - `inst-if-empty`
+   1. [x] - `p1` - UI: **Nothing has left this Mac.** only when the complete all-call range is empty; a selected-call empty range explains that no requests match this call - `inst-empty`
+5. [x] - `p1` - User chooses Export; API: `audit_export` with matching date bounds and supported log format, for the supported all-call range - `inst-export`
+6. [x] - `p1` - Core: show the native save panel; UI reports success from returned export path/files only, never from a cancelled panel - `inst-save-result`
+7. [x] - `p1` - User may open Screen Share Test; delegate to Settings' share-test flow with `share_test_run`, retaining the table and limits line during permission denial or capture failure - `inst-share-test`
+8. [x] - `p1` - **RETURN** Privacy with unchanged mode and filters - `inst-return-audit`
 
 ### Add a folder or MCP source
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-add`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-add`
 
 **Actor**: Primary user
 
@@ -118,20 +118,20 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 - Missing server or duplicate source: field error, draft retained; offline/auth failures stay on the source with their fix
 
 **Steps**:
-1. [ ] - `p1` - User opens Knowledge Sources; API: `sources_list`; UI shows source status rows or its first-use empty state - `inst-list`
-2. [ ] - `p1` - User chooses + › Add Folder; UI opens the 520-pt source form with Indexed, On change, Normal and all-calls scope defaults - `inst-folder-form`
-3. [ ] - `p1` - User sets supported privacy and call scope and chooses Add Source; API: `source_add_folder` with no path so the core grants access through the native folder picker - `inst-add-folder`
-4. [ ] - `p1` - **IF** a source is returned - `inst-if-created`
-   1. [ ] - `p1` - UI: close the sheet and insert the returned row; indexing progress comes from the core, not the prototype timer - `inst-folder-row`
-5. [ ] - `p1` - User instead chooses Add MCP Server; UI opens `dlg-mcp` with Server, Mode, Schedule, Privacy class and Scope - `inst-mcp-form`
-6. [ ] - `p1` - UI: Live explains read-after-calls/in-Ask, no copied content, Cloud allowed only and logged lookups; Indexed explains local indexing and browser sign-in - `inst-mode-consequences`
-7. [ ] - `p1` - User confirms; API: `source_add_mcp` with server, mode, schedule, privacy and structured source scope - `inst-add-mcp`
-8. [ ] - `p1` - UI: use source responses and entity events for progress, count, last sync and failure; display Sensitive as local-model-only - `inst-progress`
-9. [ ] - `p1` - **RETURN** the source list; source documents appear in Library and Ask only when the core returns them - `inst-return-add`
+1. [x] - `p1` - User opens Knowledge Sources; API: `sources_list`; UI shows source status rows or its first-use empty state - `inst-list`
+2. [x] - `p1` - User chooses + › Add Folder; UI opens the 520-pt source form with Indexed, On change, Normal and all-calls scope defaults - `inst-folder-form`
+3. [x] - `p1` - User sets supported privacy and call scope and chooses Add Source; API: `source_add_folder` with no path so the core grants access through the native folder picker - `inst-add-folder`
+4. [x] - `p1` - **IF** a source is returned - `inst-if-created`
+   1. [x] - `p1` - UI: close the sheet and insert the returned row; indexing progress comes from the core, not the prototype timer - `inst-folder-row`
+5. [x] - `p1` - User instead chooses Add MCP Server; UI opens `dlg-mcp` with Server, Mode, Schedule, Privacy class and Scope - `inst-mcp-form`
+6. [x] - `p1` - UI: Live explains read-after-calls/in-Ask, no copied content, Cloud allowed only and logged lookups; Indexed explains local indexing and browser sign-in - `inst-mode-consequences`
+7. [x] - `p1` - User confirms; API: `source_add_mcp` with server, mode, schedule, privacy and structured source scope - `inst-add-mcp`
+8. [x] - `p1` - UI: use source responses and entity events for progress, count, last sync and failure; display Sensitive as local-model-only - `inst-progress`
+9. [x] - `p1` - **RETURN** the source list; source documents appear in Library and Ask only when the core returns them - `inst-return-add`
 
 ### Update, recover, revoke or remove a source
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-manage`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-manage`
 
 **Actor**: Primary user
 
@@ -145,22 +145,22 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 - Locate and reauthentication lack command support; do not fake a repaired source
 
 **Steps**:
-1. [ ] - `p1` - User presses Return or Details on a row; UI opens the source sheet with actual mode, schedule, privacy, scope and token presence - `inst-details`
-2. [ ] - `p1` - User changes supported fields; API: `source_update` with source id, `rev` and desired fields; apply the returned row only after success - `inst-update`
-3. [ ] - `p1` - **IF** the core reports conflict - `inst-if-conflict`
-   1. [ ] - `p1` - Refresh `sources_list`, keep draft for review against the current source, and require an explicit new save - `inst-conflict`
-4. [ ] - `p1` - User chooses Re-index or Try Again; API: `source_reindex` with source id; disable duplicate run actions while indexing and consume updated source state - `inst-reindex`
-5. [ ] - `p1` - **IF** folder location or sign-in is invalid - `inst-if-recovery`
-   1. [ ] - `p1` - UI: show Locate or Sign In Again with its reason and last sync; these actions require the missing core recovery path listed below, never a timer that clears the error - `inst-recovery-gap`
-6. [ ] - `p1` - User chooses Revoke Token on a source with `has_token`; native alert explains sync stops until sign-in, Cancel default - `inst-revoke-alert`
-7. [ ] - `p1` - On confirmation API: `source_revoke_token`; render returned status/token presence; no token reaches the WebView - `inst-revoke`
-8. [ ] - `p1` - User chooses Remove Source; native alert names the source and indexed document count and says nothing in the original system changes - `inst-remove-alert`
-9. [ ] - `p1` - On confirmation API: `source_remove`; after success remove the row and close its sheet; library/thread views invalidate removed-source links from core data - `inst-remove`
-10. [ ] - `p1` - **RETURN** the source list with the core's result - `inst-return-manage`
+1. [x] - `p1` - User presses Return or Details on a row; UI opens the source sheet with actual mode, schedule, privacy, scope and token presence - `inst-details`
+2. [x] - `p1` - User changes supported fields; API: `source_update` with source id, `rev` and desired fields; apply the returned row only after success - `inst-update`
+3. [x] - `p1` - **IF** the core reports conflict - `inst-if-conflict`
+   1. [x] - `p1` - Refresh `sources_list`, keep draft for review against the current source, and require an explicit new save - `inst-conflict`
+4. [x] - `p1` - User chooses Re-index or Try Again; API: `source_reindex` with source id; disable duplicate run actions while indexing and consume updated source state - `inst-reindex`
+5. [x] - `p1` - **IF** folder location or sign-in is invalid - `inst-if-recovery`
+   1. [x] - `p1` - UI: show Locate or Sign In Again with its reason and last sync; these actions require the missing core recovery path listed below, never a timer that clears the error - `inst-recovery-gap`
+6. [x] - `p1` - User chooses Revoke Token on a source with `has_token`; native alert explains sync stops until sign-in, Cancel default - `inst-revoke-alert`
+7. [x] - `p1` - On confirmation API: `source_revoke_token`; render returned status/token presence; no token reaches the WebView - `inst-revoke`
+8. [x] - `p1` - User chooses Remove Source; native alert names the source and indexed document count and says nothing in the original system changes - `inst-remove-alert`
+9. [x] - `p1` - On confirmation API: `source_remove`; after success remove the row and close its sheet; library/thread views invalidate removed-source links from core data - `inst-remove`
+10. [x] - `p1` - **RETURN** the source list with the core's result - `inst-return-manage`
 
 ### Move local storage
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-storage`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-privacy-sources-storage`
 
 **Actor**: Primary user
 
@@ -172,12 +172,12 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 - Cancel or failed move keeps the previous path; no UI filesystem operations
 
 **Steps**:
-1. [ ] - `p1` - User chooses Change on General Storage location - `inst-change`
-2. [ ] - `p1` - API: draft `storage_move` with no path; the core owns the native open panel, location checks and move - `inst-move`
-3. [ ] - `p1` - **IF** the core reports `storage_in_cloud_folder` - `inst-if-cloud`
-   1. [ ] - `p1` - UI: show the warning under the path and keep Change available; do not show a completed move - `inst-warning`
-4. [ ] - `p1` - **ELSE** retain the accepted job id and observe matching job progress; refresh settings after completion, never replacing the path on job acceptance alone - `inst-job`
-5. [ ] - `p1` - **RETURN** General with the confirmed location or explicit error - `inst-return-storage`
+1. [x] - `p1` - User chooses Change on General Storage location - `inst-change`
+2. [x] - `p1` - API: draft `storage_move` with no path; the core owns the native open panel, location checks and move - `inst-move`
+3. [x] - `p1` - **IF** the core reports `storage_in_cloud_folder` - `inst-if-cloud`
+   1. [x] - `p1` - UI: show the warning under the path and keep Change available; do not show a completed move - `inst-warning`
+4. [x] - `p1` - **ELSE** retain the accepted job id and observe matching job progress; refresh settings after completion, never replacing the path on job acceptance alone - `inst-job`
+5. [x] - `p1` - **RETURN** General with the confirmed location or explicit error - `inst-return-storage`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -198,47 +198,47 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 
 ### Derive source status rows
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-privacy-sources-status`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-privacy-sources-status`
 
 **Input**: SourceRow, effective privacy mode and correlated work progress; shared row variant
 
 **Output**: status word/icon, subtitle, progress and allowed actions
 
 **Steps**:
-1. [ ] - `p1` - Map idle to Up to date, indexing to Running with returned done/total, failed to Failed with a safe error/fix, sign_in_expired to Sign-in expired - `inst-map`
-2. [ ] - `p1` - Keep count and last sync from the core; unknown total uses indeterminate progress, never a fake percentage - `inst-progress`
-3. [ ] - `p1` - For Live sources outside Cloud allowed show **Live lookups paused · they run only in Cloud allowed**; Sensitive always explains local-model-only use - `inst-privacy`
-4. [ ] - `p1` - Show token revocation only when a token exists; disable duplicate work controls while indexing; do not offer a source mode change as a supported update - `inst-actions`
-5. [ ] - `p1` - Announce a visible finish/failure once, not progress increments; status always has both icon and word - `inst-announce`
-6. [ ] - `p1` - **RETURN** the status row; shared job, evidence, runtime, model and share-test variants keep their own actions and state rules from DESIGN - `inst-return`
+1. [x] - `p1` - Map idle to Up to date, indexing to Running with returned done/total, failed to Failed with a safe error/fix, sign_in_expired to Sign-in expired - `inst-map`
+2. [x] - `p1` - Keep count and last sync from the core; unknown total uses indeterminate progress, never a fake percentage - `inst-progress`
+3. [x] - `p1` - For Live sources outside Cloud allowed show **Live lookups paused · they run only in Cloud allowed**; Sensitive always explains local-model-only use - `inst-privacy`
+4. [x] - `p1` - Show token revocation only when a token exists; disable duplicate work controls while indexing; do not offer a source mode change as a supported update - `inst-actions`
+5. [x] - `p1` - Announce a visible finish/failure once, not progress increments; status always has both icon and word - `inst-announce`
+6. [x] - `p1` - **RETURN** the status row; shared job, evidence, runtime, model and share-test variants keep their own actions and state rules from DESIGN - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Sources and audit reads
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-privacy-sources-view`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-privacy-sources-view`
 
 **States**: LOADING, AUDIT_ROWS, AUDIT_EMPTY, SOURCES_EMPTY, SOURCE_IDLE, SOURCE_INDEXING, SOURCE_FAILED, SOURCE_EXPIRED, DETAILS, REMOVE_ASKED, REVOKE_ASKED, ERROR
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** AUDIT_ROWS **WHEN** a page contains audit rows; complete empty range uses AUDIT_EMPTY - `inst-audit`
-2. [ ] - `p1` - **FROM** LOADING **TO** SOURCES_EMPTY **WHEN** sources_list returns no sources - `inst-empty`
-3. [ ] - `p1` - **FROM** SOURCES_EMPTY **TO** SOURCE_INDEXING **WHEN** a folder was added and the core reports indexing - `inst-add`
-4. [ ] - `p1` - **FROM** SOURCE_INDEXING **TO** SOURCE_IDLE **WHEN** the core confirms sync success - `inst-indexed`
-5. [ ] - `p1` - **FROM** SOURCE_INDEXING **TO** SOURCE_FAILED **WHEN** the core reports a failure; explicit retry returns to SOURCE_INDEXING - `inst-failed`
-6. [ ] - `p1` - **FROM** SOURCE_IDLE **TO** SOURCE_EXPIRED **WHEN** sign-in expiry or confirmed token revocation is reported - `inst-expired`
-7. [ ] - `p1` - **FROM** SOURCE_IDLE **TO** DETAILS **WHEN** the user opens the source; error and expired rows may also open DETAILS - `inst-details`
-8. [ ] - `p1` - **FROM** DETAILS **TO** REMOVE_ASKED **WHEN** Remove Source is chosen; Cancel restores DETAILS, confirmed success returns to the list - `inst-remove`
-9. [ ] - `p1` - **FROM** DETAILS **TO** REVOKE_ASKED **WHEN** Revoke Token is chosen; success restores DETAILS with no token - `inst-revoke`
-10. [ ] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** a read fails; Try Again repeats the same read - `inst-error`
+1. [x] - `p1` - **FROM** LOADING **TO** AUDIT_ROWS **WHEN** a page contains audit rows; complete empty range uses AUDIT_EMPTY - `inst-audit`
+2. [x] - `p1` - **FROM** LOADING **TO** SOURCES_EMPTY **WHEN** sources_list returns no sources - `inst-empty`
+3. [x] - `p1` - **FROM** SOURCES_EMPTY **TO** SOURCE_INDEXING **WHEN** a folder was added and the core reports indexing - `inst-add`
+4. [x] - `p1` - **FROM** SOURCE_INDEXING **TO** SOURCE_IDLE **WHEN** the core confirms sync success - `inst-indexed`
+5. [x] - `p1` - **FROM** SOURCE_INDEXING **TO** SOURCE_FAILED **WHEN** the core reports a failure; explicit retry returns to SOURCE_INDEXING - `inst-failed`
+6. [x] - `p1` - **FROM** SOURCE_IDLE **TO** SOURCE_EXPIRED **WHEN** sign-in expiry or confirmed token revocation is reported - `inst-expired`
+7. [x] - `p1` - **FROM** SOURCE_IDLE **TO** DETAILS **WHEN** the user opens the source; error and expired rows may also open DETAILS - `inst-details`
+8. [x] - `p1` - **FROM** DETAILS **TO** REMOVE_ASKED **WHEN** Remove Source is chosen; Cancel restores DETAILS, confirmed success returns to the list - `inst-remove`
+9. [x] - `p1` - **FROM** DETAILS **TO** REVOKE_ASKED **WHEN** Revoke Token is chosen; success restores DETAILS with no token - `inst-revoke`
+10. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** a read fails; Try Again repeats the same read - `inst-error`
 
 ## 5. Definitions of Done
 
 ### Privacy audit and storage
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-privacy-sources-audit`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-privacy-sources-audit`
 
 The system **MUST** render plain-word audit pages with honest range/call filtering, supported exports and safe empty states, delegate Screen Share Test and Updates to Settings, and reflect a storage move only after core confirmation.
 
@@ -255,7 +255,7 @@ The system **MUST** render plain-word audit pages with honest range/call filteri
 
 ### Source management and shared status rows
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-privacy-sources-sources`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-privacy-sources-sources`
 
 The system **MUST** provide source add/details, supported updates, re-index, confirmed revocation/removal and all status-row variants from core data, keep privacy consequences visible and surface unsupported recovery operations as contract gaps. Maintenance job management is M5. `just gate` passes.
 

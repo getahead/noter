@@ -33,13 +33,16 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
     else onClose();
   };
   return (
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-mcp-form
     <Sheet title={t("sources.add_mcp_title")} width={520} busy={busy} onCancel={onClose} onDefault={() => void add()}>
       <div className="np-sheet__head"><div className="np-sheet__title">{t("sources.add_mcp_title")}</div></div>
       <div className="np-sheet__body">
         <TextField id="src-server" label={t("sources.server")} showLabel value={server} placeholder={t("sources.server_placeholder")} invalid={!!error} message={error ?? undefined} onChange={setServer} onEnter={() => void add()} />
         <label className="st-row__label" htmlFor="src-mode">{t("sources.mode")}</label>
         <PopupButton id="src-mode" label={t("sources.mode")} options={[{ value: "indexed", label: t("sources.mode_indexed") }, { value: "live", label: t("sources.mode_live") }]} value={mode} onAction={(v) => setMode(v as SourceMode)} />
+        {/* @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-mode-consequences */}
         <p className="np-dim">{mode === "live" ? t("sources.mode_live_note") : t("sources.mode_indexed_note")}</p>
+        {/* @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-mode-consequences */}
         {mode === "indexed" && (<>
           <label className="st-row__label" htmlFor="src-schedule">{t("sources.schedule")}</label>
           <PopupButton id="src-schedule" label={t("sources.schedule")} options={scheduleChoices()} value={schedule} onAction={setSchedule} />
@@ -53,5 +56,6 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
         <PushButton label={t("dialogs.cancel")} onAction={onClose} />
       </SheetFooter>
     </Sheet>
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-mcp-form
   );
 }

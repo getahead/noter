@@ -35,21 +35,47 @@ export function sourceStatus(row: SourceRow, mode: PrivacyMode, prefs: UiPrefs |
   if (row.privacy === "sensitive") parts.push(t("sources.sensitive_note"));
   if (row.mode === "live" && mode !== "cloud_allowed") parts.push(t("sources.live_paused"));
   const base = { subtitle: parts.join(" · "), working: s.type === "indexing", canRevoke: row.has_token && s.type !== "indexing", canRetry: s.type === "failed" && row.mode !== "live" };
+  // @cpt-begin:cpt-noter-algo-ui-privacy-sources-status:p1:inst-return
   switch (s.type) {
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-indexed
     case "idle":
       return { ...base, state: "up-to-date", tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-indexed
     case "indexing":
       return { ...base, state: "indexing", tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total }, progressText: s.total ? t(row.kind === "folder" ? "sources.indexing_files" : "sources.indexing_documents", { done: s.done, total: s.total }) : t("sources.indexing_unknown", { done: s.done }) };
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-if-recovery
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-recovery-gap
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-failed
     case "failed":
       return { ...base, state: "failed", tone: "err", word: t("sources.failed"), icon: "error", message: t("sources.failed_note") };
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-failed
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-expired
     case "sign_in_expired":
       return { ...base, state: "expired", tone: "warn", word: t("sources.expired"), icon: "warning", message: t("sources.expired_note") };
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-expired
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-recovery-gap
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-if-recovery
   }
+  // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-return
 }
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-actions
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-privacy
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-progress
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-map
+
+// @cpt-begin:cpt-noter-algo-ui-privacy-sources-status:p1:inst-announce
+/** Rows whose indexing finished or failed since `prev` (id to status type): each is said once, progress ticks never. */
+export const finishedSources = (prev: ReadonlyMap<string, string>, rows: readonly SourceRow[]) =>
+  rows
+    .filter((r) => prev.get(r.id) === "indexing" && (r.status.type === "idle" || r.status.type === "failed"))
+    .map((r) => ({ text: t(r.status.type === "idle" ? "sources.announce_done" : "sources.announce_failed", { name: r.name }), key: `source:${r.id}:${r.rev}` }));
+/** Says each finish once, then remembers every row's status type for the next read. */
+export function announceFinished(prev: Map<string, string>, rows: readonly SourceRow[], say: (a: { kind: "confirmation"; text: string; key: string }) => unknown): void {
+  for (const a of finishedSources(prev, rows)) void say({ kind: "confirmation", ...a });
+  prev.clear();
+  for (const r of rows) prev.set(r.id, r.status.type);
+}
+// @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-announce
 
 /** Rows in the core's order, once each. */
 export const orderedSources = (rows: readonly SourceRow[]): SourceRow[] => [...new Map(rows.map((r) => [r.id, r])).values()];

@@ -28,13 +28,20 @@ export function AddFolderSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
     if (!scopeValid(scope)) return setError(t("sources.error_scope"));
     setBusy(true);
     setError(null);
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-add
     const r = await addFolder(bridge, privacy, scopeOf(scope));
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-add
     setBusy(false);
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-folder-row
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-if-created
     if (r.ok) onClose();
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-if-created
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-folder-row
     // a cancelled folder panel adds nothing and keeps the form
     else if (r.code !== "cancelled") setError(r.field === "path" && r.rule === "duplicate" ? t("sources.error_duplicate") : t("sources.error_add"));
   };
   return (
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-folder-form
     <Sheet title={t("sources.add_folder_title")} width={520} busy={busy} onCancel={onClose} onDefault={() => void add()}>
       <div className="np-sheet__head"><div className="np-sheet__title">{t("sources.add_folder_title")}</div><div className="np-sheet__sub">{t("sources.add_folder_note")}</div></div>
       <div className="np-sheet__body">
@@ -49,5 +56,6 @@ export function AddFolderSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
         <PushButton label={t("dialogs.cancel")} onAction={onClose} />
       </SheetFooter>
     </Sheet>
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-folder-form
   );
 }
