@@ -31,3 +31,5 @@
 /* Last calls: When and Call only; the full table is the Calls view */
 .pe-calls--compact :is(th, td):nth-child(n + 3) { display: none; }
 .pe-ctx { position: fixed; z-index: 40; }
+.pe-kvact { margin-top: 6px; }
+.pe-status { font-size: 12px; color: var(--label-2); margin-bottom: 8px; }

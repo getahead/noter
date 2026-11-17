@@ -8,7 +8,8 @@ import { askAlert } from "../../ui/dialogs/alerts";
 import { useSheet } from "../../ui/dialogs/host";
 import { EditPersonSheet } from "./EditPersonSheet";
 import { MergePeopleSheet } from "./MergePeopleSheet";
-import { deletePerson } from "./actions";
+import { VoiceProfileSheet } from "./VoiceProfileSheet";
+import { deletePerson, deleteProfile } from "./actions";
 import { navigate } from "../shell/navigate";
 
 /** Both identity sheets, available to the page and its toolbar. */
@@ -17,6 +18,7 @@ export function usePeopleSheets() {
   useEffect(() => {
     sheets.register("person-edit", EditPersonSheet as never);
     sheets.register("person-merge", MergePeopleSheet as never);
+    sheets.register("person-voice", VoiceProfileSheet as never);
   }, [sheets]);
   return sheets;
 }
@@ -31,3 +33,14 @@ export async function confirmDelete(bridge: Bridge, p: PersonRow, onFailed: (tex
   return false;
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete-alert
+
+// @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile-alert
+/** The native alert for Delete Profile…; Cancel is the default. Resolves whether the profile is gone. */
+export async function confirmDeleteProfile(bridge: Bridge, p: PersonRow, onFailed: (text: string) => void, ask = askAlert): Promise<boolean> {
+  const confirmed = await ask({ title: t("person.voice.delete_title", { name: p.short_name }), message: t("person.voice.delete_message"), cancel: t("dialogs.cancel"), confirm: t("person.voice.delete_confirm"), destructive: true });
+  if (!confirmed) return false;
+  if (await deleteProfile(bridge, p)) return true;
+  onFailed(t("person.voice.delete_err"));
+  return false;
+}
+// @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile-alert

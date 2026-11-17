@@ -37,3 +37,8 @@ export const usePersonReread = reread.use;
 const notice = store<string | null>(null);
 export const setPersonNotice = notice.set;
 export const usePersonNotice = notice.use;
+
+/** A done action of the person's page (Voice profile created): shown as a status line. */
+const status = store<string | null>(null);
+export const setPersonStatus = status.set;
+export const usePersonStatus = status.use;
