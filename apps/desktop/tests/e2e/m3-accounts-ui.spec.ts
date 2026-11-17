@@ -11,7 +11,7 @@ import * as W from "../support/world-presets";
 import { openWindow, type Steer } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
-import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
+import { alerts, answerAlerts, watchAlerts } from "./support/native-alert";
 
 // scripted account CLIs exist only in the real core: on the fake core these stories are not registered
 const describeReal = process.env.NOTER_CORE === "stdio" ? test.describe : (_title: string, _body: () => void): void => {};
