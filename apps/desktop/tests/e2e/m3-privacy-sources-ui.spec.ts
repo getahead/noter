@@ -8,7 +8,6 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 
-import * as W from "../support/world-presets";
 import { openWindow, type Steer } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
@@ -35,16 +34,34 @@ async function knowledgeFolder(steer: Steer): Promise<void> {
   writeFileSync(join(folder, "Launch plan.md"), "# Launch plan\n\n## Rollout\n\nThe gradual rollout ships to the beta ring on Friday.\n");
 }
 
-const noSources = (w: Parameters<typeof W.idle>[0]) => (W.idle(w), (w.sources.sources.length = 0));
+/** The core starts with no audit rows and no sources: a Claude-account run puts a row in the log (harness.llm_run). */
+async function auditRows(steer: Steer, n: number): Promise<void> {
+  for (let i = 0; i < n; i++) await steer.invoke("harness.llm_run", { skill: "ask-answer" });
+}
+
+/** The knowledge folder as a source, indexed (the core's open panel picks it), and the window reloaded onto it. */
+async function folderSource(page: Page, steer: Steer): Promise<void> {
+  await knowledgeFolder(steer);
+  const added = (await steer.invoke("source_add_folder", { path: null, privacy: "normal", scope: { type: "all_calls" } }, "settings")) as { id: string };
+  await documentsOf(steer, added.id, 1);
+  await page.reload();
+}
+
+/** The source's first sync has finished with `n` documents (the window reloads onto a settled core). */
+const documentsOf = (steer: Steer, id: string, n: number) =>
+  expect
+    .poll(async () => ((await steer.invoke("sources_list", {}, "settings")) as { sources: Array<{ id: string; documents: number; last_sync_at: number | null }> }).sources.find((s) => s.id === id)?.last_sync_at, { timeout: 15000 })
+    .not.toBeNull()
+    .then(async () => expect(((await steer.invoke("sources_list", {}, "settings")) as { sources: Array<{ id: string; documents: number }> }).sources.find((s) => s.id === id)?.documents).toBe(n));
 
 describeReal("cpt-noter-seq-settings-check-privacy", () => {
   test("happy path: Privacy lists what left this Mac in plain words and Export writes the log through the save panel", async ({ page }) => {
-    await openWindow(page, "settings", { fixedClock: true, world: (w) => W.idle(w) });
+    const steer = await openWindow(page, "settings", { fixedClock: true });
+    await auditRows(steer, 2);
+    await page.reload();
     await openPane(page, "Privacy");
     const rows = pane(page).getByRole("row");
     await expect(rows.filter({ hasText: "api.anthropic.com" })).toHaveCount(2);
-    await expect(pane(page)).toContainText("Planning: VHI 8.0 drawer redesign");
-    await expect(pane(page)).toContainText("Backend sync");
     await expect(pane(page)).not.toContainText("Nothing has left this Mac.");
     expect((await sent(page, "audit_list")).length).toBeGreaterThan(0);
 
@@ -54,7 +71,9 @@ describeReal("cpt-noter-seq-settings-check-privacy", () => {
   });
 
   test("other path: a cancelled save panel shows no success", async ({ page }) => {
-    const steer = await openWindow(page, "settings", { fixedClock: true, world: (w) => W.idle(w) });
+    const steer = await openWindow(page, "settings", { fixedClock: true });
+    await auditRows(steer, 1);
+    await page.reload();
     await openPane(page, "Privacy");
     await steer.invoke("harness.cancel_next_save_panel", {});
     await button(pane(page), "Export…").click();
@@ -63,7 +82,7 @@ describeReal("cpt-noter-seq-settings-check-privacy", () => {
   });
 
   test("empty path — Nothing has left this Mac: an empty log says so, only for the whole range", async ({ page }) => {
-    await openWindow(page, "settings", { fixedClock: true, world: (w) => (W.idle(w), (w.audit.length = 0)) });
+    await openWindow(page, "settings", { fixedClock: true });
     await openPane(page, "Privacy");
     await expect(pane(page)).toContainText("Nothing has left this Mac.");
     expect((await sent(page, "audit_list")).length).toBeGreaterThan(0);
@@ -72,7 +91,7 @@ describeReal("cpt-noter-seq-settings-check-privacy", () => {
 
 describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
   test("happy path: no sources, Add Folder…, indexing in the row, then the finished document count", async ({ page }) => {
-    const steer = await openWindow(page, "settings", { world: noSources });
+    const steer = await openWindow(page, "settings", {});
     await knowledgeFolder(steer);
     await openPane(page, "Knowledge Sources");
     await expect(pane(page)).toContainText("No knowledge sources yet");
@@ -92,7 +111,7 @@ describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
   });
 
   test("other path: Details changes the name and schedule with a revision; Re-index runs once", async ({ page }) => {
-    const steer = await openWindow(page, "settings", { world: noSources });
+    const steer = await openWindow(page, "settings", {});
     await steer.invoke("harness.mcp_server", {
       server: "notion",
       pages: [{ uri: "notion://roadmap", title: "Roadmap", hash: "h1", text: "# Roadmap\n\n## Milestones\n\nThe importer milestone closes in May.\n" }],
@@ -121,10 +140,11 @@ describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
   });
 
   test("other path: Revoke Token asks first (Cancel default) and the row shows Sign-in expired", async ({ page }) => {
-    const steer = await openWindow(page, "settings", { world: noSources });
-    await watchAlerts(page);
+    await watchAlerts(page); // before openWindow: it wraps the Tauri internals the window installs
+    const steer = await openWindow(page, "settings", {});
     await steer.invoke("harness.mcp_server", { server: "notion", pages: [{ uri: "notion://a", title: "A", hash: "h", text: "# A\n\n## B\n\ntext\n" }] });
-    await steer.invoke("source_add_mcp", { server: "notion", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" } }, "settings");
+    const added = (await steer.invoke("source_add_mcp", { server: "notion", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" } }, "settings")) as { id: string };
+    await documentsOf(steer, added.id, 1);
     await page.reload();
     await openPane(page, "Knowledge Sources");
     const row = sourceRow(page, "notion");
@@ -140,17 +160,18 @@ describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
   });
 
   test("other path — Remove the source: the alert names it and its documents; confirming drops the row", async ({ page }) => {
-    await openWindow(page, "settings", { world: (w) => W.idle(w) }); // the fixture's Frontend specs folder: 128 documents
-    await watchAlerts(page);
+    await watchAlerts(page); // before openWindow: it wraps the Tauri internals the window installs
+    const steer = await openWindow(page, "settings", {});
+    await folderSource(page, steer); // one document
     await openPane(page, "Knowledge Sources");
-    const row = sourceRow(page, "Frontend specs");
-    await expect(row).toContainText("128");
+    const row = sourceRow(page, "Knowledge folder");
+    await expect(row).toContainText("1 document");
     await row.press("Enter");
-    const details = sheet(page, /Frontend specs|Details/);
+    const details = sheet(page, /Knowledge folder|Details/);
     await button(details, "Remove Source").click(); // Cancel is the default answer
     const text = alertText((await alerts(page))[0]!);
-    expect(text).toContain("Frontend specs");
-    expect(text).toContain("128");
+    expect(text).toContain("Knowledge folder");
+    expect(text).toContain("1");
     expect(await sent(page, "source_remove")).toHaveLength(0);
     await expect(row).toBeVisible();
     await answerAlerts(page, "confirm");

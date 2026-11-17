@@ -8,7 +8,7 @@
 import type { Locator, Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { openWindow } from "./support/app";
+import { openWindow, type Steer } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
@@ -28,8 +28,39 @@ const WEBSOCKET = "What did we agree with backend about the websocket notificati
 const FOLLOW_UP = "Who owns the acceptance criteria for the reconnect?";
 const THREAD_QUESTION = "What did we decide about drawer notifications?"; // fixture thread ask_notif, answered today
 
-async function openAsk(page: Page, opts: Parameters<typeof openWindow>[2] = {}) {
-  const steer = await openWindow(page, "main", { fixedClock: true, world: (w) => W.idle(w), ...opts });
+const THREAD_ANSWER = "Drawer events go through the notification service [1].";
+
+/**
+ * The real core starts with no Ask threads (harness.world_set cannot seed ask_threads): ask the thread's question through the
+ * window's own bridge, as a user would, with the scripted runtime answering. The page is then reloaded, which also clears the
+ * calls the window recorded, so the tests count only their own.
+ */
+async function seedThread(page: Page, steer: Steer): Promise<void> {
+  await steer.invoke("harness.llm_next", {
+    skill: "ask-answer",
+    output: { answer_md: THREAD_ANSWER, citations: [{ n: 1, segment_ids: ["seg_1"], chunk_ids: [], quote: "scripted quote" }], found: true },
+  });
+  const scope = { people: [], call_types: [], topic_id: null, call_id: null, include_documents: true };
+  await page.evaluate(
+    ([question, scope]) =>
+      new Promise<void>((resolve, reject) => {
+        const internals = (window as unknown as { __TAURI_INTERNALS__: { transformCallback(cb: (m: { message?: { event: { type: string } } }) => void): number; invoke(cmd: string, p: unknown): Promise<unknown> } }).__TAURI_INTERNALS__;
+        const id = internals.transformCallback((raw) => { // the bridge wraps each channel message as { index, message }
+          const type = raw.message?.event.type;
+          if (type === "done") resolve();
+          else if (type === "failed") reject(new Error("the seeded answer failed"));
+        });
+        internals.invoke("ask_start", { args: { thread_id: null, question, scope }, channel: { id } }).catch(reject);
+      }),
+    [THREAD_QUESTION, scope] as const,
+  );
+  await page.reload();
+}
+
+async function openAsk(page: Page, opts: Parameters<typeof openWindow>[2] & { seed?: boolean } = {}) {
+  const { seed = true, ...plan } = opts;
+  const steer = await openWindow(page, "main", { fixedClock: true, world: (w) => W.idle(w), ...plan });
+  if (REAL && seed) await seedThread(page, steer);
   await page.keyboard.press("Meta+Digit2");
   await expect(toolbar(page).getByRole("heading", { name: "Ask", exact: true })).toBeVisible();
   return steer;
@@ -137,13 +168,16 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
 });
 
 test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
-  test.beforeEach(async ({ context }) => {
-    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  // WebKit has no clipboard permission to grant: the window's writeText is a stand-in that records the text
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() =>
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => void (document.body.dataset.copied = text) } }),
+    );
   });
 
   test("happy path: select a recent question, follow up under it, Copy with Citations shows Copied and writes Markdown", async ({ page }) => {
     await openAsk(page);
-    await expect(recent(page)).toContainText("Today");
+    await expect(recent(page)).toContainText(REAL ? "Today" : "Last week"); // the fixture thread is last week; the seeded one is today
     await recent(page).getByRole("listitem").filter({ hasText: THREAD_QUESTION }).click();
     await expect(thread(page)).toContainText("Drawer events go through the notification service");
     const [get] = await sent(page, "ask_thread_get");
@@ -162,14 +196,14 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
     await copy.click();
     await expect(copy).toContainText("Copied");
     await expect(page.getByRole("status").filter({ hasText: "Copied" })).toHaveCount(1); // announced politely
-    const clip = await page.evaluate(() => navigator.clipboard.readText());
+    const clip = (await page.evaluate(() => document.body.dataset.copied)) ?? "";
     expect(clip).toMatch(/\[1\]|\b1\b/); // reference numbers kept
     expect(clip).not.toContain(THREAD_QUESTION); // only the chosen answer, not the thread
     await expect(copy).not.toContainText("Copied", { timeout: 5000 }); // Copied lasts 2 s
   });
 
   test("empty path — First question: the first composer, suggestions, and the question lands under Today", async ({ page }) => {
-    await openAsk(page, { world: (w) => (W.idle(w), (w.ask_threads.length = 0)) });
+    await openAsk(page, { seed: false, world: REAL ? undefined : (w) => (W.idle(w), (w.ask_threads.length = 0)) }); // the real core starts empty
     await expect(thread(page)).toContainText("Ask anything about your calls and documents");
     await expect(field(page)).toHaveAttribute("placeholder", "Ask about your calls and documents…");
     await expect(recent(page)).toContainText("Your questions appear here");
