@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   focusAndReturn,
+  focusIfLost,
   focusFirstAvailable,
   FOCUSABLE,
   installTabNavigation,
@@ -360,5 +361,40 @@ describe("startedFrom (a Remove button pressed by mouse or keyboard)", () => {
     press({ id: "repo-remove" });
     focusAndReturn(null, () => null)();
     expect(startedFrom(doc(body), "repo-remove")).toBe(false);
+  });
+});
+
+describe("focusIfLost (the button a mouse click never focused, or one a sheet's work replaced)", () => {
+  const body = {};
+  const field = (active: unknown, target: { focus: () => void } | null) => ({ activeElement: active, body, getElementById: () => target } as never);
+
+  it("focuses the first available id when focus is on the body", () => {
+    const target = { focus: vi.fn(), hasAttribute: () => false };
+    expect(focusIfLost(field(body, target), ["account-test-claude"])).toBe(true);
+    expect(target.focus).toHaveBeenCalledOnce();
+  });
+
+  it("never takes focus from a control the user moved to", () => {
+    const target = { focus: vi.fn(), hasAttribute: () => false };
+    expect(focusIfLost(field({ id: "elsewhere" }, target), ["x"])).toBe(false);
+    expect(target.focus).not.toHaveBeenCalled();
+  });
+});
+
+describe("focusAndReturn when the sheet's own work replaced the opener", () => {
+  it("gives focus to the control the opener names as its successor", () => {
+    const successor = { focus: vi.fn(), isConnected: true };
+    vi.stubGlobal("document", { getElementById: (id: string) => (id === "credential-replace-codex" ? successor : null) });
+    const add = { focus: vi.fn(), isConnected: false, getAttribute: () => "credential-replace-codex" };
+    focusAndReturn(null, () => add)();
+    expect(add.focus).not.toHaveBeenCalled();
+    expect(successor.focus).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it("leaves a gone opener without a successor alone", () => {
+    const gone = { focus: vi.fn(), isConnected: false, getAttribute: () => null };
+    focusAndReturn(null, () => gone)();
+    expect(gone.focus).not.toHaveBeenCalled();
   });
 });

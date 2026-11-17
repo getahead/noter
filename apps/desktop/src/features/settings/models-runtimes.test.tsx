@@ -252,8 +252,12 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     await ready(signedIn);
     const view = accounts().accounts.find((a) => a.provider === "claude")!;
     const row = rendered(AccountRow, { bridge, view, keyConfigured: true });
+    const focus = vi.fn();
+    vi.stubGlobal("document", { activeElement: null, body: {}, getElementById: (id: string) => (id === "account-test-claude" ? { focus, hasAttribute: () => false } : null) });
     on(row, "Test")();
     await vi.waitFor(() => expect(bridge.store.getState().commands["account:test:claude"]?.state).toBe("DONE"));
+    await vi.waitFor(() => expect(focus).toHaveBeenCalledOnce()); // a mouse click did not focus Test: the answer gives it back
+    vi.unstubAllGlobals();
     const confirm = vi.fn();
     const cancel = vi.fn();
     const sheet = rendered(SignOutSheet, { provider: "claude", agents: view.agents, keyConfigured: false, onConfirm: confirm, onCancel: cancel });

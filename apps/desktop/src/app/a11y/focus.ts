@@ -1,6 +1,6 @@
 // Focus: return to the opener after an overlay, Tab order independent of the macOS keyboard-navigation
 // setting (D51), and focused elements kept clear of sticky parts (WCAG 2.4.11).
-export type FocusTarget = { focus(): void; isConnected?: boolean };
+export type FocusTarget = { focus(): void; isConnected?: boolean; getAttribute?(name: string): string | null };
 type FocusState = "IN_PAGE" | "IN_OVERLAY" | "RETURNED";
 
 // WebKit does not focus a button on a mouse click, so document.activeElement is the body when a sheet opens;
@@ -44,7 +44,10 @@ export function focusAndReturn(first: FocusTarget | null | undefined, getActive:
     // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
     // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
     // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
-    if (opener && opener.isConnected !== false) opener.focus();
+    // an opener the sheet's own work replaced (Add… became Replace…) names the control that took its place
+    const successor = opener?.getAttribute?.("data-focus-successor");
+    const target = opener && opener.isConnected === false && successor ? (typeof document !== "undefined" ? document.getElementById(successor) : null) : opener;
+    if (target && target.isConnected !== false) target.focus();
     // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
     state = "RETURNED";
     // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
@@ -63,6 +66,12 @@ export function focusFirstAvailable(doc: Pick<Document, "getElementById">, ids: 
     return true;
   }
   return false;
+}
+/** Gives focus to the first of `ids` that can take it, but only when focus was lost (on the body): the control that
+ *  had it closed a sheet or form, was replaced, or was never focused by the mouse. Never takes focus from a control. */
+export function focusIfLost(doc: Pick<Document, "activeElement" | "body" | "getElementById">, ids: readonly string[]): boolean {
+  const active = doc.activeElement;
+  return (!active || active === doc.body) && focusFirstAvailable(doc, ids);
 }
 // `:disabled` also covers controls inside a disabled fieldset.
 const NOT_OFF =
