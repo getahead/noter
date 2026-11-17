@@ -191,9 +191,9 @@
   clip-path: inset(50%);
 }
 /* Medium and Narrow (content width < 1100): no Length column; Narrow (< 760) also drops Type and the tags, leaving the two-line row */
-[data-width="medium"] .lb-table :is(th, td):nth-child(4),
-[data-width="narrow"] .lb-table :is(th, td):nth-child(4),
-[data-width="narrow"] .lb-table :is(th, td):nth-child(3),
+[data-width="medium"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(3),
 [data-width="narrow"] .lb-tag,
 [data-width="narrow"] .lb-more {
   display: none;
@@ -219,3 +219,17 @@
 .lb-actions { display: flex; gap: 8px; justify-content: flex-end; margin: 8px 0; }
 .lb-fchev { margin-left: 4px; vertical-align: -1px; }
 .lb-fbtn[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent); }
+/* Library › Topics and the topic thread: the prototype's .lb-* rules (40-d.css), ported as-is. */
+.lb-tsearch { width: 240px; }
+.lb-ttable .lb-trow { cursor: pointer; }
+.lb-trow__name { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.lb-merge { color: var(--accent-text); }
+.lb-items { display: grid; gap: 2px; list-style: none; margin: 0; padding: 0; }
+.lb-thmonth { margin-bottom: 18px; max-width: 860px; }
+.lb-thmonth__h { font: 600 11px/14px var(--font); color: var(--label-3); margin: 0 0 6px; }
+.lb-thread { max-width: 860px; }
+
+/* A thread row: the text truncates on one line; below 760 the meta and actions take a second line instead of leaving the window */
+.lb-throw { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lb-throw .pc-item__text { flex: 1 1 18em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-throw > :not(.pc-item__text) { flex: none; max-width: 100%; white-space: nowrap; }

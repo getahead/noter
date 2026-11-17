@@ -1,0 +1,141 @@
+import { renderToString } from "react-dom/server";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { createBridge, type Bridge } from "../../app/bridge/bridge";
+import { FakeCore } from "../../core/fake/fake-core";
+import type { TopicRow } from "../../core/bindings";
+import { find, rendered } from "../../ui/testing";
+import { ThreadView, ThreadPage } from "./ThreadPage";
+import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
+import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
+import { ThreadRow } from "./ThreadRow";
+import { setHead } from "./topics-head";
+import { monthsOf } from "./topics-model";
+import { setTopicWords, topicWords } from "./topics-query";
+import { openTopic } from "./topic-nav";
+import { useRead } from "./use-read";
+import "./register-topics";
+import { pageFor } from "../shell/pages";
+
+let bridge: Bridge;
+afterEach(() => (setTopicWords(""), bridge?.close()));
+async function ready() {
+  const fake = new FakeCore({ window: "main" });
+  bridge = createBridge("main", fake);
+  await bridge.open();
+  return fake;
+}
+const row = (o: Partial<TopicRow> = {}): TopicRow => ({ id: "t1", rev: 1, name: "Websocket notifications", aliases: [], calls: 3, decisions: 2, open_items: 1, last_seen: Date.UTC(2026, 9, 5, 12), merge_suggestion: null, ...o });
+const body = (o: Partial<Parameters<typeof TopicsBody>[0]> = {}) => {
+  const topics = [row(), row({ id: "t2", name: "Notification service", merge_suggestion: { id: "t1", name: "Websocket notifications" } })];
+  return renderToString(<TopicsBody bridge={bridge} status="READY" retry={() => {}} topics={topics} shown={topics} names={new Map(topics.map((x) => [x.id, x.name]))} words="" {...o} />);
+};
+
+describe("Topics page (cpt-noter-flow-ui-library-search-topics-topic)", () => {
+  it("lists the topics with counts, a merge glyph for a suggestion, and one Tab stop", async () => {
+    await ready();
+    const h = body();
+    expect(h).toContain("Websocket notifications");
+    expect(h).toContain('data-state="merge-suggested"');
+    expect(h).toContain("Merge suggested");
+    expect(h.match(/tabindex="0"/g)).toHaveLength(1);
+  });
+  it("names the three empty states and the failure", async () => {
+    await ready();
+    expect(body({ topics: [], shown: [] })).toContain("No topics yet");
+    expect(body({ shown: [], words: "zzz" })).toContain("No topics match “zzz”");
+    expect(body({ status: "ERROR" })).toContain("Couldn’t read your topics");
+    expect(body({ status: "LOADING" })).toContain('aria-busy="true"');
+  });
+  it("Return and › open the thread, Clear Search restores the list", async () => {
+    await ready();
+    const act = vi.spyOn(bridge, "act");
+    const tr = rendered(TopicLine, { bridge, topic: row(), stop: true, merge: null, last: "Oct 5" });
+    const prevent = vi.fn();
+    (tr.props.onKeyDown as (e: unknown) => void)({ key: "Enter", metaKey: false, preventDefault: prevent });
+    (tr.props.onKeyDown as (e: unknown) => void)({ key: "a", metaKey: false, preventDefault: prevent });
+    (tr.props.onClick as () => void)();
+    expect(act).toHaveBeenCalledTimes(2);
+    expect(prevent).toHaveBeenCalledTimes(1);
+    setTopicWords("zz");
+    const none = rendered(TopicsBody as never, { bridge, status: "READY", retry: () => {}, topics: [row()], shown: [], names: new Map(), words: "zz" });
+    (find(none, (p) => p.actionLabel === "Clear Search").props.onAction as () => void)();
+    expect(topicWords()).toBe("");
+  });
+  it("the page reads the core's topics and the toolbar writes the search words", async () => {
+    await ready();
+    expect(renderToString(<TopicsPage bridge={bridge} />)).toContain('aria-busy="true"');
+    const bar = rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never);
+    (find(bar, (p) => "trailing" in p).props.trailing as { props: { onChange: (v: string) => void } }).props.onChange("web");
+    expect(topicWords()).toBe("web");
+  });
+  it("registers the root page and the thread route in the Topics section", () => {
+    expect(pageFor("topics", { section: "topics", key: "root" }).toolbar).toBe(TopicsToolbar);
+    const thread = pageFor("topics", { section: "topics", key: "topic:t1" });
+    expect(thread.title({ section: "topics", key: "topic:t1" })).toBe("Topics");
+  });
+  it("openTopic asks the core to navigate to the topic", async () => {
+    await ready();
+    const act = vi.spyOn(bridge, "act");
+    openTopic(bridge, "t1");
+    expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+});
+
+describe("Topic thread (cpt-noter-state-ui-library-search-topics-view)", () => {
+  const data = (groups: never[] = []) => ({ topic: row(), groups });
+  const view = (o: Partial<Parameters<typeof ThreadView>[0]> = {}) =>
+    renderToString(<ThreadView bridge={bridge} status="READY" retry={() => {}} data={data()} months={[]} {...o} />);
+  it("shows THREAD_EMPTY when no entry survives, an error with Try Again, and loading", async () => {
+    await ready();
+    expect(view()).toContain("Nothing left in this topic");
+    expect(view({ status: "ERROR", data: null })).toContain("Couldn’t read this topic");
+    expect(view({ status: "LOADING", data: null })).toContain('aria-busy="true"');
+  });
+  it("draws the title, counts and the month groups of a real topic", async () => {
+    const fake = await ready();
+    const t = fake.world.topics[0]!;
+    const r = await bridge.core.topicGet({ topic_id: t.id });
+    if (r.status !== "ok") throw new Error("topic_get");
+    const months = monthsOf(r.data.groups);
+    const h = view({ data: r.data, months });
+    expect(h).toContain(t.name);
+    expect(h).toContain('data-state="thread"');
+    expect(h).toContain("lb-thmonth");
+    expect(renderToString(<ThreadPage bridge={bridge} topicId={t.id} />)).toContain('aria-busy="true"');
+  });
+});
+
+describe("useRead", () => {
+  it("starts LOADING under server render", async () => {
+    await ready();
+    let s = "";
+    const Probe = () => ((s = useRead(() => new Promise(() => {}), "k")[0].status), null);
+    renderToString(<Probe />);
+    expect(s).toBe("LOADING");
+  });
+});
+
+describe("toolbars and thread rows", () => {
+  it("the toolbars show the published head and the thread's Ask waits for Ask", async () => {
+    await ready();
+    setHead({ title: "Drawer redesign", subtitle: "3 calls" });
+    const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
+    expect(bar.props.title).toBe("Drawer redesign");
+    expect(bar.props.subtitle).toBe("3 calls");
+    expect((find(bar, (p) => "trailing" in p).props.trailing as { props: { disabled: boolean } }).props.disabled).toBe(true);
+    expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
+    setHead({ title: null, subtitle: null });
+  });
+  it("a thread row names its kind, the call with its date, and no topic chip", async () => {
+    const fake = await ready();
+    const item = fake.world.items.find((i) => i.topic)!;
+    const h = renderToString(<ThreadRow bridge={bridge} item={item} call={item.call} />);
+    expect(h).toContain("data-variant=\"thread\"");
+    expect(h).toContain(item.call.title);
+    expect(h).not.toContain(`>${item.topic!.name}<`);
+    const act = vi.spyOn(bridge, "act");
+    const tree = rendered(ThreadRow, { bridge, item, call: item.call });
+    (find(tree, (p) => typeof p.label === "string" && p.label.includes(item.call.title)).props.onAction as () => void)();
+    expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+});

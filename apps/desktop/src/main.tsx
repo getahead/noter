@@ -15,6 +15,7 @@ import { tauriTransport } from "./core/tauri-transport";
 import { installTabNavigation, installUnobscure } from "./app/a11y/focus";
 import "./features/library/register";
 import "./features/people/register";
+import "./features/library/register-topics";
 import "./features/items/register";
 import "./features/today/register";
 import "./features/ask/register";
