@@ -239,6 +239,35 @@ async fn rename_merge_undo_and_keep_separate_through_the_core() {
         .await
         .unwrap_err();
     assert_eq!(blank.code, ErrorCode::InvalidInput);
+    // Another topic's name, in any case: refused, so the page can offer Merge Instead.
+    let taken = core
+        .topic_rename(&main_window(), rename(decided.rev, " rollout "))
+        .await
+        .unwrap_err();
+    assert_eq!(taken.code, ErrorCode::InvalidInput);
+    assert_eq!(
+        taken.detail,
+        Some(ErrorDetail::Validation {
+            field: "name".into(),
+            rule: noter_protocol::error::ValidationRule::Duplicate
+        })
+    );
+    assert_eq!(
+        named(&topics(&core).await, "Scripted decision").rev,
+        decided.rev
+    );
+    // Its own name in another case is a plain rename.
+    let recased = core
+        .topic_rename(&main_window(), rename(decided.rev, "scripted decision"))
+        .await
+        .unwrap();
+    let decided = recased.topic;
+    events.topics();
+    let rename = |rev: Rev, name: &str| TopicRenameArgs {
+        topic_id: decided.id.clone(),
+        rev,
+        name: name.into(),
+    };
     let renamed = core
         .topic_rename(&main_window(), rename(decided.rev, "Decisions"))
         .await
