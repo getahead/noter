@@ -44,6 +44,10 @@ test.describe("cpt-noter-dod-ui-library-search-topics-search Export of selected 
     await page.locator(ROW).nth(1).click({ modifiers: ["Meta"] });
     await page.locator(ROW).first().click({ button: "right" });
     await expect(page.getByRole("menuitem", { name: /^Export…/ })).toBeVisible();
+    const names = (await page.getByRole("menuitem").allTextContents()).map((n) => n.trim());
+    const at = (re: RegExp) => names.findIndex((n) => re.test(n));
+    expect(at(/^Export…/)).toBeGreaterThan(-1);
+    expect(at(/^Export…/)).toBeLessThan(at(/^Delete…/));
     await shot(page, "library-export-menu");
   });
 });

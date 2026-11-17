@@ -67,6 +67,15 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await expect(page.getByRole("button", { name: /Websocket notifications/ })).toBeVisible();
       await shot(page, "search-topic", width);
     });
+    test("Show How Noter Searched popover is opaque over the topic chip", async ({ page }) => {
+      await search(page, px, {}, "websocket");
+      await expect(page.getByRole("button", { name: /Websocket notifications/ })).toBeVisible();
+      await page.getByRole("link", { name: "Show How Noter Searched" }).click();
+      const pop = page.getByRole("dialog", { name: "How Noter searched" });
+      await expect(pop).toBeVisible();
+      await expect(pop).toHaveCSS("background-color", "rgb(255, 255, 255)"); // opaque, not the glass tint
+      await shot(page, "search-how-over-topic", width);
+    });
     test("Show How Noter Searched popover", async ({ page }) => {
       await search(page, px, {});
       await page.getByRole("link", { name: "Show How Noter Searched" }).click();

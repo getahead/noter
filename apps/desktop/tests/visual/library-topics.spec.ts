@@ -71,6 +71,22 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await shot(page, "topics-thread-ask", width);
     });
 
+    test(`thread: Tab to Ask About This Thread draws the focus ring`, async ({ page }) => {
+      await topics(page, px);
+      await page.locator(TOPIC_ROW).first().click();
+      const ask = page.getByRole("button", { name: "Ask About This Thread" });
+      await expect(ask).toBeEnabled();
+      await expect(async () => {
+        await page.keyboard.press("Tab");
+        await expect(ask).toBeFocused({ timeout: 300 });
+      }).toPass();
+      await expect(ask).toHaveCSS("box-shadow", /rgba\(0, 122, 255, 0\.5\)/);
+      // not `shot`: it blurs the focused element first, which would hide the ring this test is about
+      await page.mouse.move(0, 0);
+      await settled(page);
+      await expect(page).toHaveScreenshot(`topics-thread-ask-ring-${width}.png`);
+    });
+
     test(`nothing left`, async ({ page }) => {
       await topics(page, px, (w) => (w.items = w.items.map((i) => ({ ...i, topic: null }))));
       await page.locator(TOPIC_ROW).first().click();
