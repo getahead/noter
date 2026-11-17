@@ -93,6 +93,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-calls
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-history
   return (
+    // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare
     <div data-region="PE" data-state={tab}>
       <h2 className="np-sr" tabIndex={-1}>{p.display_name}</h2>
       {tab === "calls" ? (
@@ -107,6 +108,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
         <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} />
       )}
     </div>
+    // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare
   );
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-history
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-calls

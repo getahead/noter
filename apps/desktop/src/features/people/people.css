@@ -1,4 +1,4 @@
-/* People (prototype 40-d.css, .pe-*): the table rows and the unnamed speakers; the table itself is the Library's .lb-table. */
+/* People and Person pages (prototype 40-d.css, .pe-*): the list table, the unnamed speakers and the Person page's two columns. */
 .pe-search { width: 240px; }
 .pe-row { cursor: default; }
 .pe-name { display: inline-flex; align-items: center; gap: 8px; }
