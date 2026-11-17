@@ -11,7 +11,9 @@ const STATE: Record<AccountView["status"]["type"], AccountRowState> = {
   signed_in: "signed_in",
   signed_out_by_provider: "expired",
 };
+// @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-expired
 export const accountRowState = (v: AccountView): AccountRowState => STATE[v.status.type];
+// @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-expired
 
 const key = (p: AccountProvider, what: "provider" | "tool" | "key"): MsgKey => `settings.accounts.${what}_${p}`;
 export const providerName = (p: AccountProvider) => t(key(p, "provider"));

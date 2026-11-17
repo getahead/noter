@@ -169,7 +169,9 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
             <span className="e-status__sub">{usedByText(view.agents)}</span>
           </>
         ) : status.type === "signed_out_by_provider" ? (
+          // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
           <span className="st-row__err">{t("settings.accounts.expired_note", { provider })}</span>
+          // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
         ) : (
           <span className="e-status__sub">{t(a.use)}</span>
         )}

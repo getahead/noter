@@ -51,7 +51,9 @@ export const signOutKey = (provider: AccountProvider) => `account:sign_out:${pro
 /** `account_sign_out`: the slice is replaced only by the core's answer; the row never changes on a failure. */
 export function signOutAccount(bridge: Bridge, provider: AccountProvider, alsoInCli: boolean) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
+  // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-signout
   return bridge.act(signOutKey(provider), "account_sign_out", () => bridge.core.accountSignOut({ provider, also_in_cli: alsoInCli }), { slice: "accounts" });
+  // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-signout
   // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
 }
 

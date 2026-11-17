@@ -57,7 +57,9 @@ const STEP: Record<SignInProgress["step"], "BROWSER" | "CHECK"> = { waiting_for_
 export function reduce(s: SignIn, e: SignInEvent): SignIn {
   switch (e.type) {
     case "open":
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-prepare
       return { ...closed, phase: "PREPARE", confirmed: s.confirmed };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-prepare
     case "prepared":
       return { ...s, phase: "PREPARE", hidden: false, provider: e.prepare.provider, prepare: e.prepare, cliMissing: false, cliUnsupported: false, installFailed: false, runId: null, choice: e.prepare.existing ? "existing" : "other" };
     case "prepareFailed":
@@ -69,7 +71,9 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
     case "choose":
       return { ...s, choice: e.choice };
     case "installStarted":
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-install
       return { ...s, phase: "INSTALLING", runId: e.runId, installFailed: false };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-install
     case "installDone":
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-correlate
       return s.phase === "INSTALLING" && s.runId === e.runId ? { ...s, phase: "PREPARE", runId: null } : s;
@@ -77,7 +81,9 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
     case "installFailed":
       return s.phase === "INSTALLING" && s.runId === e.runId ? { ...s, phase: "PREPARE", cliMissing: true, installFailed: true, runId: null } : s;
     case "started":
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-browser
       return { ...s, phase: "BROWSER", hidden: false, provider: e.session.provider, session: e.session, sessionId: e.session.id, identity: null, done: false, code: null };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-browser
     case "usedExisting":
       return { ...s, phase: "USE", hidden: false, identity: e.identity, session: null, sessionId: null, done: true };
     case "progress": {
@@ -85,11 +91,17 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
       // a replaced session or the other provider's progress changes nothing
       if (p.session_id !== s.sessionId || (s.provider && p.provider !== s.provider)) return s;
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-map
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-error
       if (p.error) return { ...s, phase: "SIGNIN_ERROR", code: p.error, session: null };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-error
       const phase = STEP[p.step];
       const done = p.step === "done";
       const identity = p.identity ?? s.identity;
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-check
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-use
       return { ...s, phase: done && e.signedIn ? "USE" : phase, identity, done, session: phase === "BROWSER" ? s.session : null };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-use
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-check
       // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-map
     }
     case "accounts":
@@ -100,13 +112,17 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
       return { ...closed, phase: "BROWSER", hidden: true, provider: e.provider ?? null, sessionId: e.sessionId };
     // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-lifecycle
     case "hide":
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-hide
       return s.phase === "SIGNED_OUT" ? s : { ...s, hidden: true };
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-hide
     case "show":
       return { ...s, hidden: false };
     case "cancelled":
     case "finish":
+      // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-done
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-clear
       return closed;
+    // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-done
     // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-clear
   }
 }
