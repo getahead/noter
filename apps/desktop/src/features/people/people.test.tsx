@@ -6,7 +6,7 @@ import { find, rendered } from "../../ui/testing";
 import { view } from "./identity";
 import { PeopleBody, type PeopleBodyProps } from "./PeoplePage";
 import { PeopleToolbar } from "./PeopleToolbar";
-import { holdCount } from "./count";
+import { holdPeople } from "./count";
 import { setPeopleQuery } from "./model";
 
 const person = (o: Partial<PersonRow>): PersonRow => ({
@@ -76,15 +76,15 @@ describe("PeopleToolbar", () => {
   const base = { title: "", actions: [], hasSearch: true, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
   const draw = () => renderToString(<PeopleToolbar route={{ section: "people", key: "root" }} bridge={{} as never} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
   it("shows the count and its own search field, not the global one", () => {
-    holdCount(3);
+    holdPeople([person({}), person({ id: "b" }), person({ id: "c" })]);
     setPeopleQuery("ann");
     const h = draw();
     expect(h).toContain("3 people");
     expect(h).toContain('value="ann"');
     expect(h).not.toContain("mw-search");
-    holdCount(0);
+    holdPeople([]);
     expect(draw()).toContain("No people yet");
-    holdCount(null);
+    holdPeople(null);
     setPeopleQuery("");
   });
 });
