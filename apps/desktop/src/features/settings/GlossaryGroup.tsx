@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { focusFirstAvailable } from "../../app/a11y/focus";
+import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
 import type { GlossaryTerm } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -40,7 +40,7 @@ export function GlossaryGroup({ bridge }: { bridge: Bridge }) {
   const edit = () => { const term = terms.find((item) => item.id === selected); if (!term) return; setEditing(term); setForm({ term: term.term, latin: term.variants_latin.join(", "), cyrillic: term.variants_cyrillic.join(", "), spoken: term.spoken_forms.join(", ") }); };
   const removeSelected = async () => {
     const index = terms.findIndex((term) => term.id === selected);
-    const restore = document.activeElement?.id === "glossary-remove";
+    const restore = startedFrom(document, "glossary-remove");
     if (restore && index >= 0) focusAfterRemove.current = index;
     if (!(await remove())) focusAfterRemove.current = null;
   };
