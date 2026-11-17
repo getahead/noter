@@ -11,7 +11,7 @@ import { holdPerson, setPersonTab } from "./person-store";
 
 const person = (o: Partial<PersonRow> = {}): PersonRow => ({
   id: "per_a", rev: 1, display_name: "Anna Kuznetsova", short_name: "Anna K.", initials: "AK", email: "anna@x.io", role: "PM", org: null,
-  aliases: ["Anya"], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, ...o,
+  aliases: ["Anya"], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, you_owe: 0, notes: null, ...o,
 });
 const page = (o: Partial<Page> = {}): Page => ({ person: person(), calls: [], owns_open: [], you_owe: [], open_questions: [], topics: [], talk_share: null, ...o });
 const bridge = { act: vi.fn(async () => ({ status: "ok" })), core: { windowNavigate: vi.fn() }, store: { getState: () => ({ entities: {}, commands: {}, app: null }), subscribe: () => () => {} } } as never;

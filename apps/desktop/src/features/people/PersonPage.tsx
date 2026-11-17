@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
