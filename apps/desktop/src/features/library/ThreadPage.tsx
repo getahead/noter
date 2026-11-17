@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
@@ -6,7 +6,14 @@ import { ThreadRow } from "./ThreadRow";
 import { usePublishHead } from "./topics-head";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
-import type { TopicThread, UiPrefs } from "../../core/bindings";
+import type { TopicRow, TopicThread, UiPrefs } from "../../core/bindings";
+import { useSheet } from "../../ui/dialogs/host";
+import type { Sheets } from "../../ui/dialogs/sheets";
+import { PushButton } from "../../ui/primitives/push-button";
+import { openTopic } from "./topic-nav";
+import { MergeSheet } from "./MergeSheet";
+import { RenameSheet } from "./RenameSheet";
+import { keepSeparate } from "./topics-actions";
 import { monthsOf, threadSubtitle, type ThreadMonth } from "./topics-model";
 import { useRead } from "./use-read";
 import "./library.css";
@@ -22,7 +29,35 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   const months = useMemo(() => (data ? monthsOf(data.groups, prefs) : []), [data, prefs]);
   const since = data?.groups.length ? Math.min(...data.groups.map((g) => g.call.started_at)) : null;
   usePublishHead(data?.topic.name ?? null, data ? threadSubtitle(data.topic, since, prefs) : null);
-  return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} />;
+  const sheets = useSheet();
+  const [all, setAll] = useState<TopicRow[]>([]);
+  useEffect(() => {
+    void bridge.act("topics_list", "topics_list", () => bridge.core.topicsList({}), { screen: "library-topics" }).then((r) => r.status === "ok" && setAll(r.data.topics));
+  }, [bridge, data?.topic.rev]);
+  useEffect(() => {
+    sheets.register("topic-rename", RenameSheet as never);
+    sheets.register("topic-merge", MergeSheet as never);
+  }, [sheets]);
+  const actions = data && threadActions(sheets, bridge, data.topic, all, retry);
+  return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} />;
+}
+
+/** What the thread's buttons do: the sheets over the page, and Keep Separate at once. */
+export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, all: TopicRow[], retry: () => void): ThreadActions {
+  const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()) });
+  return {
+    rename: () => sheets.open("topic-rename", { bridge, topic, known: all, onRenamed: retry, onMergeInstead: (other: TopicRow) => merge(other.id) }),
+    merge: () => merge(topic.merge_suggestion?.id),
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
+    keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => ok && retry()),
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
+  };
+}
+
+export interface ThreadActions {
+  rename: () => void;
+  merge: () => void;
+  keepSeparate: () => void;
 }
 
 export interface ThreadViewProps {
@@ -32,15 +67,37 @@ export interface ThreadViewProps {
   data: TopicThread | null;
   months: ThreadMonth[];
   prefs?: UiPrefs;
+  actions?: ThreadActions;
 }
 
-export function ThreadView({ bridge, status, retry, data, months, prefs }: ThreadViewProps) {
+export function ThreadView({ bridge, status, retry, data, months, prefs, actions }: ThreadViewProps) {
   if (status === "ERROR")
     return <InlineBanner banner={{ id: "thread-error", severity: "error", text: t("topics.thread_error"), actions: [{ label: t("action.try_again"), onAction: retry }] }} />;
   if (!data) return <div className="lb-loading" data-state="loading" aria-busy="true" aria-label={t("topics.loading")} />;
   // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-thread
   return (
     <>
+      {actions && (
+        <div data-region="TH-R1" className="lb-thactions">
+          <PushButton label={t("topics.rename")} size="small" onAction={actions.rename} />
+          <PushButton label={t("topics.merge_with")} size="small" onAction={actions.merge} />
+        </div>
+      )}
+      {actions && data.topic.merge_suggestion && (
+        <div data-region="TH-R2" className="lb-thmerge">
+          <InlineBanner
+            banner={{
+              id: "thread-merge-suggestion",
+              severity: "info",
+              text: t("topics.suggestion", { name: data.topic.merge_suggestion.name }),
+              actions: [
+                { label: t("topics.merge_confirm"), onAction: actions.merge },
+                { label: t("topics.keep_separate"), onAction: actions.keepSeparate },
+              ],
+            }}
+          />
+        </div>
+      )}
       <div data-region="TH-R3" role="region" aria-label={t("topics.timeline")} className="lb-thread" data-state={months.length ? "thread" : "thread-empty"}>
         {months.length ? (
           months.map((m) => (

@@ -237,3 +237,5 @@
 .lb-hit { display: grid; gap: 2px; padding: 6px 8px; list-style: none; max-width: 960px; }
 .lb-hit__title { font-weight: 600; }
 .lb-hit mark { background: var(--accent-fill); color: inherit; border-radius: 2px; }
+.lb-thactions { display: flex; gap: 6px; margin-bottom: 12px; }
+.lb-thmerge { margin-bottom: 14px; max-width: 860px; }

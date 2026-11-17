@@ -45,3 +45,10 @@ export function threadSubtitle(topic: TopicRow, since: number | null, prefs?: Ui
 
 /** The Last discussed cell: a short day, or a dash for a topic never seen. */
 export const lastSeen = (ms: number, prefs?: UiPrefs): string => (ms > 0 ? shortDay(ms, prefs) : "—");
+
+/** The topic (other than `self`) that already has this name, ignoring case and surrounding blanks: the NAME_CLASH pre-check. */
+export const clashOf = (topics: TopicRow[], self: string, name: string): TopicRow | null =>
+  topics.find((x) => x.id !== self && x.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? null;
+
+/** How many items a merge moves: the source thread's entries. */
+export const itemsOf = (groups: TopicThreadGroup[]): number => groups.reduce((n, g) => n + g.items.length, 0);
