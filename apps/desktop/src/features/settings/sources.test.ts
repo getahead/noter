@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { draftChanged, peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
+import { draftChanged, peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, announceFinished, finishedSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
@@ -35,6 +35,26 @@ describe("sourceStatus", () => {
   });
   it("lists each source once", () => {
     expect(orderedSources([row(), row({ name: "x" }), row({ id: "s2" })]).map((r) => r.id)).toEqual(["s1", "s2"]);
+  });
+});
+
+describe("finishedSources", () => {
+  const prev = new Map([["s1", "indexing"], ["s2", "indexing"], ["s3", "idle"]]);
+  it("names a finish or a failure once, and says nothing for progress or an unchanged row", () => {
+    const out = finishedSources(prev, [row({ id: "s1", name: "Docs" }), row({ id: "s2", name: "Wiki", rev: 4, status: { type: "failed", error: "x" } as never }), row({ id: "s3" }), row({ id: "s4", status: { type: "indexing", done: 1, total: 2 } })]);
+    expect(out).toEqual([{ text: "Docs finished indexing.", key: "source:s1:1" }, { text: "Wiki failed to index.", key: "source:s2:4" }]);
+    expect(finishedSources(new Map([["s1", "indexing"]]), [row({ status: { type: "indexing", done: 2, total: 2 } })])).toEqual([]);
+  });
+});
+
+describe("announceFinished", () => {
+  it("says a finish once and remembers the new statuses", () => {
+    const seen = new Map([["s1", "indexing"]]);
+    const say = vi.fn();
+    announceFinished(seen, [row({ id: "s1" })], say);
+    announceFinished(seen, [row({ id: "s1" })], say);
+    expect(say).toHaveBeenCalledTimes(1);
+    expect(say).toHaveBeenCalledWith({ kind: "confirmation", text: "Docs finished indexing.", key: "source:s1:1" });
   });
 });
 

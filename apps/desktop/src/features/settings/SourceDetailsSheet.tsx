@@ -15,11 +15,14 @@ import { draftChanged, draftOf, rebaseDraft, removeAlert, removeSource, revokeAl
 
 type Ask = (a: ReturnType<typeof removeAlert>) => Promise<boolean>;
 
+// @cpt-flow:cpt-noter-flow-ui-privacy-sources-manage:p1
 // @cpt-state:cpt-noter-state-ui-privacy-sources-view:p1
 export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { bridge: Bridge; row: SourceRow; onRefresh: () => void; onClose: () => void; ask?: Ask }) {
   const confirm = useAlert();
   const asker = ask ?? confirm;
+  // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-details
   const [draft, setDraft] = useState(draftOf(row));
+  // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-details
   const [base, setBase] = useState(row);
   // the row follows the core's entity events: keep the user's edits, adopt the current values for the rest
   useEffect(() => {
@@ -40,16 +43,26 @@ export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { b
   };
   const save = () => run(async () => {
     const r = await updateSource(bridge, row, draft, base);
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-return-manage
     if (r.ok) return onClose();
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-return-manage
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-if-conflict
+    // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-conflict
     if ("conflict" in r) { onRefresh(); return setMessage(t("sources.conflict")); }
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-conflict
+    // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-if-conflict
     setMessage(t("sources.error_save"));
   });
   const revoke = () => run(async () => {
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-revoke
     if (!(await asker(revokeAlert(row)))) return;
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-revoke
     if (!(await revokeToken(bridge, row.id))) setMessage(t("sources.error_revoke"));
   });
   const remove = () => run(async () => {
+    // @cpt-begin:cpt-noter-state-ui-privacy-sources-view:p1:inst-remove
     if (!(await asker(removeAlert(row)))) return;
+    // @cpt-end:cpt-noter-state-ui-privacy-sources-view:p1:inst-remove
     if (await removeSource(bridge, row.id)) { onRefresh(); onClose(); } else setMessage(t("sources.error_remove"));
   });
   return (

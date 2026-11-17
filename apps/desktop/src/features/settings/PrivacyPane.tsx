@@ -69,9 +69,9 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
           <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" disabled help={t("settings.privacy.voice_profiles_later")} />
         </Row>
       </Group>
-      <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
+      <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-share-test */}{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
 <PushButton label={t("settings.privacy.share_test")} onAction={() => setSheet(true)} />
-{/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
+{/* @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-share-test */}{/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
         <AuditLog bridge={bridge} callId={callId} onAllCalls={() => setDismissed(nav)} />
       </Group>
       {sheet && <ShareTestSheet bridge={bridge} onClose={() => setSheet(false)} />}

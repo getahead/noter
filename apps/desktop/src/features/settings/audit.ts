@@ -121,4 +121,6 @@ export function createAudit(bridge: Bridge, callId: string | null, notify: (v: A
 }
 
 /** The call Privacy is opened on. "All calls" dismisses that one request, not the call: the next request for it (a new object) opens on it again. */
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-open
 export const auditCall = (nav: NavTarget | null, dismissed: NavTarget | null): string | null => (nav?.type === "settings" && nav !== dismissed ? (nav.call_id ?? null) : null);
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-open
