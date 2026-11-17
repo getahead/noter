@@ -36,7 +36,13 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
   });
   it("the voice profile row follows the person", () => {
     const on = page({ calls: [call], person: person({ voice_profile: true }) });
-    expect(renderToString(<PersonBody {...props({ state: { status: "OK", page: on, error: null } })} />)).toContain("<dd>On</dd>");
+    expect(renderToString(<PersonBody {...props({ state: { status: "OK", page: on, error: null } })} />)).toContain("Delete Profile…");
+  });
+  it("Identity offers Set Up Voice Profile… when Off and Delete Profile… when On, and shows a done action as a status line", () => {
+    const off = renderToString(<PersonBody {...props({ state: { status: "OK", page: page({ calls: [call] }), error: null }, status: "Voice profile created for Anna K." })} />);
+    expect(off).toContain("Set Up Voice Profile…");
+    expect(off).toContain('role="status"');
+    expect(off).toContain("Voice profile created for Anna K.");
   });
   it("a topic chip opens the topic route", () => {
     const p = page({ calls: [call], topics: [{ id: "top_1", name: "Pricing" }] as never });

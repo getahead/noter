@@ -18,3 +18,5 @@
 .pe-identity { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
 .pe-sel { user-select: text; }
 .pe-showall { justify-self: start; border: 0; background: transparent; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; }
+.pe-kvact { margin-top: 6px; }
+.pe-status { font-size: 12px; color: var(--label-2); margin-bottom: 8px; }
