@@ -3,7 +3,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonPatch, PersonRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
-import { bumpPerson } from "./person-store";
+import { bumpPerson, setPersonStatus } from "./person-store";
 
 const go = (bridge: Bridge, person_id: string) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "person", person_id } }), { screen: "people" });
@@ -41,3 +41,27 @@ export async function deletePerson(bridge: Bridge, id: string): Promise<boolean>
   return res.status === "ok";
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete
+
+// @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-create-profile
+/** `voice_profile_create`: only ever from the sheet's explicit button, for one person. The result is what the core says; nothing is simulated. */
+export async function createProfile(bridge: Bridge, person: PersonRow): Promise<boolean> {
+  const res = await bridge.act("people:voice-create", "voice_profile_create", () => bridge.core.voiceProfileCreate({ person_id: person.id }), { screen: "people" });
+  if (res.status === "error" || !res.data.enabled) return false;
+  // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
+  setPersonStatus(t("person.voice.created", { name: person.short_name }));
+  bumpPerson();
+  // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
+  return true;
+}
+// @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-create-profile
+
+// @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile
+/** `voice_profile_delete`: the person is read again so Identity shows Off. */
+export async function deleteProfile(bridge: Bridge, person: PersonRow): Promise<boolean> {
+  const res = await bridge.act("people:voice-delete", "voice_profile_delete", () => bridge.core.voiceProfileDelete({ person_id: person.id }), { screen: "people" });
+  if (res.status === "error") return false;
+  setPersonStatus(null);
+  bumpPerson();
+  return true;
+}
+// @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-delete-profile
