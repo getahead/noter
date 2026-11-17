@@ -155,10 +155,22 @@ export function questionOfRoute(key: string): string | null {
   return text.trim() || null;
 }
 
-/** Ask the routed question once: returns the route key now handled, so a re-render on the same key does not ask again. */
-export function startFromRoute(key: string, handled: string | null, ask: (question: string) => void): string | null {
+// The route keys already asked. A module set, not a ref: the shell unmounts the page on a section change and history
+// keeps the `new:<words>` entry, so Back, Forward or the sidebar remount it and must not ask again.
+const routed = new Set<string>();
+
+/** Ask the routed question once per history entry; false when the key carries none or was asked already. */
+export function startFromRoute(key: string, ask: (question: string) => void): boolean {
   const question = questionOfRoute(key);
-  if (!question || key === handled) return handled;
+  if (!question || routed.has(key)) return false;
+  routed.add(key);
   ask(question);
-  return key;
+  return true;
+}
+
+/** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
+export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
+  if (!key.startsWith("new:") || !threadId || !stored) return;
+  routed.delete(key);
+  replace({ section: "ask", key: `thread:${threadId}` });
 }
