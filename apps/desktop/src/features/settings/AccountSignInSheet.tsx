@@ -79,6 +79,18 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     const sheet = [...(globalThis.document?.querySelectorAll<HTMLElement>(".f-sheet") ?? [])].find((e) => e.dataset.variant === PROVIDER_TEXT[provider].variant)?.closest<HTMLElement>(".np-sheet");
     if (sheet && !sheet.contains(globalThis.document.activeElement)) sheet.querySelector<HTMLElement>(FOCUSABLE)?.focus();
   }, [open, s.phase, provider]);
+  // Esc is also heard when focus is not in the sheet yet (a step just replaced the focused control); inside the sheet the
+  // Sheet's own handler stops the event first
+  const phase = s.phase;
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      m.dispatch(provider, { type: phase === "BROWSER" || phase === "CHECK" ? "hide" : "cancelled" });
+    };
+    globalThis.document?.addEventListener("keydown", onKey);
+    return () => globalThis.document?.removeEventListener("keydown", onKey);
+  }, [open, phase, provider, m]);
   if (!open) return null;
 
   const account = t(PROVIDER_TEXT[provider].account);

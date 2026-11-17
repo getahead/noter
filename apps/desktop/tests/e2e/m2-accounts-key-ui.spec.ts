@@ -144,7 +144,12 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
   });
 
   test("empty path — No key and no local runtime: Not Now folds the offer, the explanation stays, Finish still leads on", async ({ page }) => {
-    await openWindow(page, "first-run", { world: (w) => (atAssistants(w), (w.app.accounts.local.running = false), (w.app.accounts.local.cli.installed = false)) });
+    const steer = await openWindow(page, "first-run", { world: (w) => (atAssistants(w), (w.app.accounts.local.running = false), (w.app.accounts.local.cli.installed = false)) });
+    // the real core finds Ollama when the step asks it (accounts_get): script it away there; the fake world already says so
+    if (process.env.NOTER_CORE === "stdio") {
+      await steer.invoke("harness.account_cli", { tool: "ollama", installed: false });
+      await page.reload();
+    }
     await expect(step(page)).toContainText("none found");
     await step(page).getByRole("button", { name: "Not Now" }).click();
     await expect(step(page).getByRole("button", { name: "Install Ollama…" })).toHaveCount(0);
