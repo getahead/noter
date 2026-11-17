@@ -275,11 +275,11 @@ The system **MUST** provide source add/details, supported updates, re-index, con
 
 ## 6. Acceptance Criteria
 
-- [ ] `nothing-left`, `no-sources`, `source-failed`, `sign-in-expired`, add/indexing, details and remove/revoke states match prototype screenshots
+- [x] `nothing-left`, `no-sources`, `source-failed`, `sign-in-expired`, add/indexing, details and remove/revoke states match prototype screenshots
 - [ ] All six StatusRow variants keep the prototype's structure, status word/icon, truncation/help tags and wrapped actions below 600-pt pane width
-- [ ] Sensitive and Live consequences remain visible in all modes; the UI never reads or stores a source token
+- [x] Sensitive and Live consequences remain visible in all modes; the UI never reads or stores a source token
 - [ ] Failed writes keep drafts and current rows; repeated activation cannot start duplicate indexing or removal
-- [ ] Fake-core visuals do not count as E2E proof; frozen successful commands and passing story-named tests against the real core count as HARNESS defines
+- [x] Fake-core visuals do not count as E2E proof; frozen successful commands and passing story-named tests against the real core count as HARNESS defines
 
 ## 7. Additional Context
 
