@@ -30,8 +30,7 @@ const openPerson = async (page: Page, name: string | RegExp, world?: (w: World) 
   await page.keyboard.press("Enter");
   return steer;
 };
-// The fake core cannot do these two (contract lane): its people_list errors on a world with no calls, and a rename to a new
-// person adds no person. The real core is the arbiter of E2E coverage.
+// The fake core adds no person when a rename names a new one (contract lane); the real core does.
 const fake = process.env.NOTER_CORE !== "stdio";
 const noVoiceProfile = (w: World) => {
   W.idle(w);
@@ -70,13 +69,13 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
   });
 
   test("UI — empty path: no people shows No people yet and Add Person creates one with person_create", async ({ page }) => {
-    test.skip(fake, "the fake core cannot serve this world; the real core runs it");
     await openPeople(page, (w) => {
       W.idle(w);
       // Before the first recorded call: the core refuses to drop a person a call, item or speaker still points at.
       w.people = w.people.filter((p) => p.is_you);
       w.calls = [];
       w.call_details = [];
+      w.transcripts = [];
       w.items = [];
       Object.assign(w.today, { today: [], this_week: [], live_call: null, due_without_call: [], done_today: [], review_calls: [], unnamed_speakers: 0 });
     });
@@ -110,7 +109,6 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
   });
 
   test("UI — empty path: search Zoya shows No people match “Zoya”, Clear Search brings Speaker 3 back, New Person “Zoya”… creates and names it without a voice profile", async ({ page }) => {
-    test.skip(fake, "the fake core cannot serve this world; the real core runs it");
     await openPeople(page);
     await page.getByRole("searchbox", { name: /Search/ }).fill("Zoya");
     await expect(page.getByText("No people match “Zoya”")).toBeVisible();
@@ -126,7 +124,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toEqual([
       expect.objectContaining({ person: expect.objectContaining({ type: "new", display_name: "Zoya" }) }),
     ]);
-    await expect(personRow(page, /Zoya/)).toBeVisible();
+    if (!fake) await expect(personRow(page, /Zoya/)).toBeVisible();
     await expect.poll(() => sent(page, "voice_profile_create")).toHaveLength(0);
   });
 
