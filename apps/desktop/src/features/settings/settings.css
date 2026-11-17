@@ -97,3 +97,8 @@
 .st-audit__loading { padding: 12px; color: var(--label-2); font-size: 12px; }
 .st-sources__foot { display: flex; gap: 8px; padding: 8px 0 12px; }
 .st-audit__filter { display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px; }
+.st-scope { display: grid; gap: 8px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--sep); }
+.st-scope__h { font-weight: 600; }
+.st-scope__sub { font-size: 12px; color: var(--label-2); margin-top: 4px; }
+.st-scope__types { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.st-scope__people { display: grid; gap: 6px; }

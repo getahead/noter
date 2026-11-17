@@ -22,17 +22,21 @@ export function usePeople(bridge: Bridge): PersonRow[] {
 
 export function ScopeFields({ bridge, types, people, value, onChange }: { bridge: Bridge; types: CallTypeInfo[]; people: PersonRow[]; value: ScopeDraft; onChange: (v: ScopeDraft) => void }) {
   return (
-    <div className="st-scope">
+    <div className="st-scope" role="group" aria-label={t("sources.scope")}>
+      <div className="st-scope__h">{t("sources.scope")}</div>
       <RadioGroup name="src-scope" label={t("sources.scope")} value={value.all ? "all" : "limited"} onAction={(v) => onChange({ ...value, all: v === "all" })}
         options={[{ value: "all", label: t("sources.scope_all_calls") }, { value: "limited", label: t("sources.scope_limited") }]} />
       {!value.all && (
-        <div className="st-scope__types" role="group" aria-label={t("sources.scope_types")}>
-          {types.map((c) => <Checkbox key={c.id} label={c.label} checked={value.callTypes.includes(c.id)} onAction={(on) => onChange(toggleCallType(value, c.id, on))} />)}
+        <div className="st-scope__types-wrap">
+          <div className="st-scope__sub">{t("sources.scope_types")}</div>
+          <div className="st-scope__types" role="group" aria-label={t("sources.scope_types")}>
+            {types.map((c) => <Checkbox key={c.id} label={c.label} checked={value.callTypes.includes(c.id)} onAction={(on) => onChange(toggleCallType(value, c.id, on))} />)}
+          </div>
         </div>
       )}
       {!value.all && (
         <div className="st-scope__people">
-          <div className="st-row__label">{t("sources.scope_people")}</div>
+          <div className="st-scope__sub">{t("sources.scope_people")}</div>
           <PersonPicker bridge={bridge} variant="inline" participants={[]} speakers={[]} people={people} confirmLabel="" onPick={() => {}} multiple selected={peopleChips(value.people, people)} onChange={(next) => onChange(withPeople(value, next))} />
         </div>
       )}

@@ -153,6 +153,12 @@ describe("ScopeFields", () => {
     expect(limited).toContain("People");
     expect(limited).toContain("Anna");
   });
+  it("labels the Scope and its two parts", () => {
+    const html = renderToString(<ScopeFields {...props({ all: false, callTypes: [], people: [] })} />);
+    expect(html).toContain('class="st-scope__h"');
+    expect(html).toContain("Call types");
+    expect(html).toContain("People");
+  });
   it("choices call back with the new scope", () => {
     const onChange = vi.fn();
     const tree = rendered(ScopeFields, props({ all: false, callTypes: [], people: [] }, onChange));

@@ -162,6 +162,18 @@ export async function readCallTypes(bridge: Bridge): Promise<CallTypeInfo[]> {
   return res.status === "ok" ? res.data.call_types : [];
 }
 
+/** The draft after the source changed underneath it: what the user edited stays, every other field takes the current value. */
+export function rebaseDraft(old: SourceRow, draft: SourceDraft, fresh: SourceRow): SourceDraft {
+  const was = draftOf(old);
+  const now = draftOf(fresh);
+  return {
+    name: draft.name === was.name ? now.name : draft.name,
+    schedule: draft.schedule === was.schedule ? now.schedule : draft.schedule,
+    privacy: draft.privacy === was.privacy ? now.privacy : draft.privacy,
+    scope: sameScope(draft.scope, was.scope) ? now.scope : draft.scope,
+  };
+}
+
 export interface SourceDraft {
   name: string;
   schedule: string | null;
@@ -176,8 +188,18 @@ export type UpdateResult = SourceResult | { ok: false; conflict: true };
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
 /** Only supported fields go out (never path or mode); the returned row replaces the draft source only after success. */
-export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft): Promise<UpdateResult> {
-  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate({ source_id: row.id, rev: row.rev, name: d.name.trim(), schedule: d.schedule, privacy: d.privacy, scope: scopeOf(d.scope) }));
+/** `base` is the row the draft was made from: only what differs from it goes out, so a field changed elsewhere meanwhile is not written back with an old value. */
+export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft, base: SourceRow = row): Promise<UpdateResult> {
+  const was = draftOf(base);
+  const args = {
+    source_id: row.id,
+    rev: row.rev,
+    ...(d.name.trim() !== was.name && { name: d.name.trim() }),
+    ...(d.schedule !== was.schedule && { schedule: d.schedule }),
+    ...(d.privacy !== was.privacy && { privacy: d.privacy }),
+    ...(!sameScope(d.scope, was.scope) && { scope: scopeOf(d.scope) }),
+  };
+  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate(args));
   if (res.status === "ok") return { ok: true, row: res.data };
   return res.error.code === "conflict" ? { ok: false, conflict: true } : fail(res);
 }

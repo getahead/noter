@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { SourceDetailsSheet } from "./SourceDetailsSheet";
-import { draftChanged, draftOf, removeAlert, removeSource, revokeAlert, revokeToken, updateSource } from "./sources";
+import { draftChanged, draftOf, rebaseDraft, removeAlert, removeSource, revokeAlert, revokeToken, updateSource } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 2, kind: "mcp", name: "Wiki", location: "wiki", mode: "indexed", schedule: "daily", privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 4, last_sync_at: null, has_token: true, ...o });
 const bridge = (...answers: unknown[]) => {
@@ -29,6 +29,26 @@ describe("source commands for details", () => {
     expect(await updateSource(b, row(), draftOf(row()))).toEqual({ ok: false, conflict: true });
     expect(await updateSource(b, row(), draftOf(row()))).toMatchObject({ ok: false, code: "internal" });
     expect(act).toHaveBeenCalledTimes(3);
+  });
+  it("update sends only the fields the user changed, so an outside change to another field is kept", async () => {
+    const sent: Record<string, unknown>[] = [];
+    const act = vi.fn(async (_k: string, _c: string, f: () => unknown) => (void f(), { status: "ok", data: row({ rev: 4 }) }));
+    const b = { act, core: { sourceUpdate: (a: Record<string, unknown>) => sent.push(a) } } as never;
+    const fresh = row({ rev: 3, name: "Outside" });
+    // the sheet's draft still says "Wiki" (the name the user never touched) while the row was renamed elsewhere
+    await updateSource(b, fresh, { ...draftOf(row()), privacy: "sensitive" }, row());
+    expect(sent[0]).toEqual({ source_id: "s1", rev: 3, privacy: "sensitive" });
+    sent.length = 0;
+    await updateSource(b, fresh, { ...draftOf(row()), name: " Mine ", scope: { all: false, callTypes: ["a"], people: [] } }, row());
+    expect(sent[0]).toEqual({ source_id: "s1", rev: 3, name: "Mine", scope: { type: "limited", call_types: ["a"], people: [] } });
+  });
+  it("rebaseDraft keeps what the user edited and adopts the current values for the rest", () => {
+    const old = row({ name: "Wiki", privacy: "normal", schedule: "daily" });
+    const edited = { ...draftOf(old), privacy: "sensitive" as const };
+    const fresh = row({ rev: 3, name: "Outside", privacy: "normal", schedule: "hourly" });
+    const next = rebaseDraft(old, edited, fresh);
+    expect(next).toMatchObject({ name: "Outside", schedule: "hourly", privacy: "sensitive" });
+    expect(rebaseDraft(old, { ...edited, name: "Mine" }, fresh).name).toBe("Mine");
   });
   it("revoke and remove; a source already gone counts as removed", async () => {
     expect(await revokeToken(bridge({ status: "ok" }).b, "s1")).toBe(true);

@@ -1,6 +1,6 @@
 // Source details: name, schedule and privacy are editable; mode and location are shown, not changed (the contract
 // cannot change them). A refused save keeps the draft; a revision conflict refreshes the list and asks for a new save.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PrivacyClass, SourceRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -11,7 +11,7 @@ import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
 import { ScopeFields, useCallTypes, usePeople } from "./ScopeFields";
-import { draftChanged, draftOf, removeAlert, removeSource, revokeAlert, revokeToken, scopeValid, updateSource } from "./sources";
+import { draftChanged, draftOf, rebaseDraft, removeAlert, removeSource, revokeAlert, revokeToken, scopeValid, updateSource } from "./sources";
 
 type Ask = (a: ReturnType<typeof removeAlert>) => Promise<boolean>;
 
@@ -20,6 +20,13 @@ export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { b
   const confirm = useAlert();
   const asker = ask ?? confirm;
   const [draft, setDraft] = useState(draftOf(row));
+  const [base, setBase] = useState(row);
+  // the row follows the core's entity events: keep the user's edits, adopt the current values for the rest
+  useEffect(() => {
+    if (row.rev === base.rev) return;
+    setDraft((d) => rebaseDraft(base, d, row));
+    setBase(row);
+  }, [row, base]);
   const types = useCallTypes(bridge);
   const people = usePeople(bridge);
   const [busy, setBusy] = useState(false);
@@ -32,7 +39,7 @@ export function SourceDetailsSheet({ bridge, row, onRefresh, onClose, ask }: { b
     try { await f(); } finally { setBusy(false); }
   };
   const save = () => run(async () => {
-    const r = await updateSource(bridge, row, draft);
+    const r = await updateSource(bridge, row, draft, base);
     if (r.ok) return onClose();
     if ("conflict" in r) { onRefresh(); return setMessage(t("sources.conflict")); }
     setMessage(t("sources.error_save"));
