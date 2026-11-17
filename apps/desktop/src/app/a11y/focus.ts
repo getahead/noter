@@ -19,13 +19,14 @@ export function openerOf(doc: Pick<Document, "activeElement" | "body">): FocusTa
   pressed = null;
   return opener;
 }
-// WebKit focuses the nearest focusable ancestor (the page region, tabindex 0) when a button is clicked: that is no opener,
-// and focus on it is lost focus. A focusable row, option or field the user is on is neither.
+// WebKit focuses the nearest focusable ancestor of a clicked button (the page region, a tabindex -1 section, row or aside).
+// That ancestor is no opener: the pressed control is. Focus on the page region is also lost focus; a focusable row,
+// option or field the user is on is not.
 const REGION = 'main,[role="main"]';
 const peekOpener = (doc: Pick<Document, "activeElement" | "body">) => {
   const active = doc.activeElement as (FocusTarget & { matches?: (s: string) => boolean }) | null;
   if (!active || active === (doc.body as unknown)) return pressed;
-  return pressed && active.matches?.(REGION) ? pressed : active;
+  return pressed && active !== (pressed as unknown) && (active as unknown as Node).contains?.(pressed as unknown as Node) ? pressed : active;
 };
 
 /** True when `id` is the focused element or the control the mouse pressed (used once): the Remove button that
