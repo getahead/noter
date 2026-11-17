@@ -9,7 +9,7 @@ import { RenameSheet } from "./RenameSheet";
 import { ThreadView, threadActions } from "./ThreadPage";
 import { createSheets } from "../../ui/dialogs/sheets";
 import { keepSeparate, mergeTopic, renameTopic } from "./topics-actions";
-import { clashOf, itemsOf } from "./topics-model";
+import { clashOf, itemsOf, movesOf } from "./topics-model";
 
 let bridge: Bridge;
 let fake: FakeCore;
@@ -47,6 +47,14 @@ describe("topic actions (cpt-noter-flow-ui-library-search-topics-topic)", () => 
     expect(await renameTopic(bridge, a!, "Other", [a!, b!], () => {})).toEqual({ type: "stale" });
     expect(await renameTopic(bridge, { ...a!, id: "top_missing" }, "Other", [a!, b!], () => {})).toEqual({ type: "failed" });
   });
+  it("a core duplicate refusal names the other topic from a fresh list, never this topic itself", async () => {
+    const [a, b] = await ready();
+    const dup = { type: "validation", field: "name", rule: "duplicate" } as never;
+    fake.failNext("topic_rename", "invalid_input", dup);
+    expect(await renameTopic(bridge, a!, "Brand new name", [a!], () => {})).toEqual({ type: "failed" });
+    fake.failNext("topic_rename", "invalid_input", dup);
+    expect(await renameTopic(bridge, a!, b!.name, [], () => {})).toMatchObject({ type: "clash", other: { id: b!.id } });
+  });
   it("merges only the chosen pair and keeps topics separate", async () => {
     const [a, b] = await ready();
     expect(await keepSeparate(bridge, a!.id, b!.id)).toBe(true);
@@ -58,6 +66,7 @@ describe("topic actions (cpt-noter-flow-ui-library-search-topics-topic)", () => 
     const [a, b] = await ready();
     expect(clashOf([a!, b!], a!.id, ` ${a!.name} `)).toBeNull();
     expect(clashOf([a!, b!], a!.id, b!.name.toLowerCase())?.id).toBe(b!.id);
+    expect(movesOf([{ call: {} as never, items: [{ id: 1 }, { id: 2 }] as never }, { call: {} as never, items: [] }, { call: {} as never, items: [{ id: 3 }] as never }])).toMatchObject({ calls: 2, rows: [{ id: 1 }, { id: 2 }, { id: 3 }] });
     expect(itemsOf([{ call: {} as never, items: [{}, {}] as never }, { call: {} as never, items: [{}] as never }])).toBe(3);
   });
 });
@@ -78,12 +87,27 @@ describe("rename and merge sheets (cpt-noter-state-ui-library-search-topics-view
     const h = renderToString(<MergeSheet bridge={bridge} source={a!} known={[a!, b!]} onMerged={() => {}} close={() => {}} />);
     expect(h).toContain(b!.name);
     expect(h).toContain("Merge into");
-    expect(h).toContain("What moves");
+    expect(h).toContain("Reading what moves");
     expect(h).not.toContain(`value="${a!.id}"`);
     const merged = vi.fn();
     const tree = rendered(MergeSheet as never, { bridge, source: a!, known: [a!, b!], onMerged: merged, close: () => {} } as never);
     (find(tree, (p) => "onDefault" in p).props.onDefault as () => void)();
     await settle();
+    expect(merged).not.toHaveBeenCalled(); // nothing merges before the read says what moves
+  });
+  it("MergeSheet says it is reading, never counts 0 before the read, and cannot merge when the read failed", async () => {
+    const [a, b] = await ready();
+    const props = { bridge, source: a!, known: [a!, b!], onMerged: vi.fn(), close: () => {} };
+    const h = renderToString(<MergeSheet {...props} />);
+    expect(h).toContain(`Merge “${a!.name}” into “${b!.name}”?`);
+    expect(h).toContain("Reading what moves");
+    expect(h).not.toContain("Nothing moves");
+    fake.failNext("topic_get", "internal", null);
+    const tree = rendered(MergeSheet as never, props as never);
+    await settle();
+    await (find(tree, (p) => "onDefault" in p).props.onDefault as () => Promise<void>)();
+    await settle();
+    expect(props.onMerged).not.toHaveBeenCalled();
   });
 });
 
@@ -120,15 +144,10 @@ describe("sheet flows and thread actions", () => {
     expect(still.onRenamed).toHaveBeenCalled();
     expect((await run({ ...a!, name: " " })).close).not.toHaveBeenCalled();
   });
-  it("Merge closes and reports the kept topic", async () => {
+  it("Merge hands the Undo its refresh and reports the kept topic", async () => {
     const [a, b] = await ready();
-    const onMerged = vi.fn();
-    const close = vi.fn();
-    const tree = rendered(MergeSheet as never, { bridge, source: a!, target: b!.id, known: [a!, b!], onMerged, close } as never);
-    await (find(tree, (p) => "onDefault" in p).props.onDefault as () => Promise<void>)();
-    await settle();
-    expect(onMerged).toHaveBeenCalledWith(expect.objectContaining({ id: b!.id }));
-    expect(close).toHaveBeenCalled();
+    const refresh = vi.fn();
+    expect(await mergeTopic(bridge, a!.id, b!.id, 1, refresh)).toMatchObject({ id: b!.id });
   });
   it("the thread's buttons open the sheets and Keep Separate asks the core", async () => {
     const [a, b] = await ready();
@@ -148,5 +167,23 @@ describe("sheet flows and thread actions", () => {
     await settle();
     expect(retry).toHaveBeenCalled();
     threadActions(sheets, bridge, a!, [a!], retry).keepSeparate();
+  });
+  it("a refused Keep Separate is reported, and the Merge sheet's Undo re-reads the page", async () => {
+    const [a, b] = await ready();
+    const topic = { ...a!, merge_suggestion: { id: b!.id, name: b!.name } };
+    const sheets = createSheets();
+    const open = vi.spyOn(sheets, "open");
+    const failed = vi.fn();
+    const retry = vi.fn();
+    fake.failNext("topics_keep_separate", "internal", null);
+    const acts = threadActions(sheets, bridge, topic, [a!, b!], retry, failed);
+    acts.keepSeparate();
+    await settle();
+    expect(failed).toHaveBeenLastCalledWith(true);
+    expect(retry).not.toHaveBeenCalled();
+    acts.merge();
+    expect(open).toHaveBeenCalledWith("topic-merge", expect.objectContaining({ refresh: retry }));
+    const h = renderToString(<ThreadView bridge={bridge} status="READY" retry={() => {}} data={{ topic, groups: [] }} months={[]} actions={acts} keepFailed />);
+    expect(h).toContain("Couldn’t keep the topics separate");
   });
 });

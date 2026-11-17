@@ -29,8 +29,13 @@ export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string,
     const fresh = await bridge.act("topic_get", "topic_get", () => bridge.core.topicGet({ topic_id: topic.id }), { screen: "library-topics" });
     return fresh.status === "ok" ? renameTopic(bridge, fresh.data.topic, name, known, refresh, true) : { type: "stale" };
   }
-  if (res.error.code === "invalid_input" && d?.type === "validation" && d.field === "name")
-    return d.rule === "duplicate" ? { type: "clash", other: known.find((x) => x.id !== topic.id && x.name.toLowerCase() === clean.toLowerCase()) ?? topic } : { type: "blank" };
+  if (res.error.code === "invalid_input" && d?.type === "validation" && d.field === "name") {
+    if (d.rule !== "duplicate") return { type: "blank" };
+    // The page's list can be older than the core's: re-read it, and never name this topic itself.
+    const all = await bridge.act("topics_list", "topics_list", () => bridge.core.topicsList({}), { screen: "library-topics" });
+    const other = all.status === "ok" ? clashOf(all.data.topics, topic.id, clean) : undefined;
+    return other ? { type: "clash", other } : { type: "failed" };
+  }
   return { type: "failed" };
 }
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-rename

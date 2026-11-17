@@ -115,7 +115,7 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
   test("Merge sheet", async ({ page }) => {
     await thread(page);
     await menu(page, "Merge With…");
-    await expect(page.getByRole("dialog", { name: "Merge topics" })).toBeVisible();
+    await expect(page.getByRole("dialog", { name: /^Merge “.+” into “.+”\?$/ })).toBeVisible();
     await shot(page, "topics-merge", "wide");
   });
   test("Merge done with its undo strip", async ({ page }) => {
