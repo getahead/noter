@@ -76,8 +76,18 @@ final class DialogsTests: NoterTestCase {
         // The page takes keys once it has loaded: right after launch ⌘4 can reach an empty web view.
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
         app.typeKey("4", modifierFlags: .command)
-        let row = app.staticTexts["Oleg M."].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10), "⌘4 shows People with Oleg M.")
+        // The web view may expose a row/cell with combined text rather than a bare static text.
+        func person(_ name: String) -> XCUIElement {
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@ OR title CONTAINS %@", name, name, name)).firstMatch
+        }
+        let row = person("Oleg M.")
+        if !row.waitForExistence(timeout: 10) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PEOPLE AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(row.exists, "⌘4 shows People with Oleg M.")
         row.click()
         app.typeKey(.return, modifierFlags: [])
         let more = app.buttons["More"].firstMatch
@@ -93,7 +103,7 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.buttons["Delete"].waitForExistence(timeout: 5))
         alert.buttons["Delete"].click()
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Anna K."].firstMatch.waitForExistence(timeout: 5), "the deleted person's page gives way to People")
-        XCTAssertTrue(app.staticTexts["Oleg M."].firstMatch.waitForNonExistence(timeout: 5), "Oleg M. is gone from People")
+        XCTAssertTrue(person("Anna K.").waitForExistence(timeout: 5), "the deleted person's page gives way to People")
+        XCTAssertTrue(person("Oleg M.").waitForNonExistence(timeout: 5), "Oleg M. is gone from People")
     }
 }
