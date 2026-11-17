@@ -3,6 +3,24 @@
 export type FocusTarget = { focus(): void; isConnected?: boolean };
 type FocusState = "IN_PAGE" | "IN_OVERLAY" | "RETURNED";
 
+// WebKit does not focus a button on a mouse click, so document.activeElement is the body when a sheet opens;
+// the pressed control is the opener then. A keypress forgets it.
+let pressed: FocusTarget | null = null;
+export function notePress(target: EventTarget | null) {
+  pressed = ((target as Element | null)?.closest?.("button,a[href],summary,[role=button],[tabindex]") as FocusTarget | null) ?? null;
+}
+if (typeof document !== "undefined") {
+  document.addEventListener("pointerdown", (e) => notePress(e.target), true);
+  document.addEventListener("keydown", () => notePress(null), true);
+}
+/** The element to give focus back to: the focused one, else the control the mouse pressed (used once). */
+export function openerOf(doc: Pick<Document, "activeElement" | "body">): FocusTarget | null {
+  const active = doc.activeElement as FocusTarget | null;
+  const opener = active && active !== (doc.body as unknown) ? active : pressed;
+  pressed = null;
+  return opener;
+}
+
 /** Move focus into a transient surface and return it to the connected opener on cleanup. */
 // @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
 export function focusAndReturn(first: FocusTarget | null | undefined, getActive: () => FocusTarget | null): () => void {

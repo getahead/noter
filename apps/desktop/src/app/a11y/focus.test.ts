@@ -7,6 +7,8 @@ import {
   installTabNavigation,
   installUnobscure,
   nextFocusable,
+  notePress,
+  openerOf,
   unobscuredScrollTop,
 } from "./focus";
 
@@ -284,5 +286,48 @@ describe("installUnobscure", () => {
     l.focusin!({ target: null } as never);
     off();
     expect(l.focusin).toBeUndefined();
+  });
+});
+
+describe("openerOf (WebKit does not focus a button on click)", () => {
+  const body = {};
+  const button = { focus: vi.fn() };
+  const press = (target: unknown) => notePress({ closest: () => target } as unknown as EventTarget);
+
+  it("takes the focused element when there is one", () => {
+    const focused = { focus: vi.fn() };
+    press(button);
+    expect(openerOf({ activeElement: focused as never, body: body as never })).toBe(focused);
+  });
+
+  it("falls back to the button the mouse pressed when focus is on the body", () => {
+    press(button);
+    expect(openerOf({ activeElement: body as never, body: body as never })).toBe(button);
+  });
+
+  it("uses a press once, and a keypress forgets it", () => {
+    press(button);
+    openerOf({ activeElement: body as never, body: body as never });
+    expect(openerOf({ activeElement: body as never, body: body as never })).toBeNull();
+    press(button);
+    notePress(null);
+    expect(openerOf({ activeElement: null, body: body as never })).toBeNull();
+  });
+});
+
+describe("press tracking on the document", () => {
+  it("records a pointerdown target and forgets it on a keydown", async () => {
+    const on: Record<string, (e: unknown) => void> = {};
+    vi.resetModules();
+    vi.stubGlobal("document", { addEventListener: (t: string, f: (e: unknown) => void) => (on[t] = f) });
+    const mod = await import("./focus");
+    const button = { focus: vi.fn() };
+    const body = {};
+    on.pointerdown!({ target: { closest: () => button } });
+    expect(mod.openerOf({ activeElement: body as never, body: body as never })).toBe(button);
+    on.pointerdown!({ target: { closest: () => button } });
+    on.keydown!({});
+    expect(mod.openerOf({ activeElement: body as never, body: body as never })).toBeNull();
+    vi.unstubAllGlobals();
   });
 });

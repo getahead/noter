@@ -2,7 +2,7 @@
 // Esc cancels; Return runs the default button (⌘Return in a multi-line field); focus stays inside and goes back
 // to where it was when the sheet closes.
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { FOCUSABLE, focusAndReturn, type FocusTarget } from "../../app/a11y/focus";
+import { FOCUSABLE, focusAndReturn, openerOf } from "../../app/a11y/focus";
 import { base } from "./attrs";
 
 /** Keys of a modal surface: Esc and Return to the default button. Tab is kept inside by the window's handler (`aria-modal`). */
@@ -21,7 +21,7 @@ export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, on
  *  focused before. */
 export function focusInside(root: HTMLElement | null, selector = FOCUSABLE) {
   const first = root?.querySelector<HTMLElement>(selector) ?? root;
-  return focusAndReturn(first, () => document.activeElement as FocusTarget | null);
+  return focusAndReturn(first, () => openerOf(document));
 }
 
 export const useFocusInside = (root: { current: HTMLElement | null }, selector = FOCUSABLE) => useEffect(() => focusInside(root.current, selector), [root, selector]);

@@ -9,6 +9,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { openerOf } from "../../app/a11y/focus";
 import { AddMappingSheet } from "../../features/handoff/AddMappingSheet";
 import { askAlert, type AlertSpec } from "./alerts";
 import { DeleteOldAudioSheet } from "./delete-old-audio-sheet";
@@ -58,9 +59,9 @@ export const useSheetIfAny = () => useContext(Ctx);
 /** Asks a native alert; focus returns to the control that asked once it is answered (Cancel on Return and Esc). */
 export function useAlert() {
   return useCallback(async (alert: AlertSpec) => {
-    const asker = document.activeElement as HTMLElement | null;
+    const asker = openerOf(document);
     const confirmed = await askAlert(alert);
-    asker?.focus?.();
+    asker?.focus();
     return confirmed;
   }, []);
 }
