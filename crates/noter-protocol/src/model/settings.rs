@@ -458,6 +458,9 @@ pub struct AuditListArgs {
     pub from: Option<TimestampMs>,
     #[serde(default)]
     pub to: Option<TimestampMs>,
+    /// Only what left this Mac for this call (the Call info link); `null` = every row.
+    #[serde(default)]
+    pub call_id: Option<CallId>,
     pub page: PageRequest,
 }
 
@@ -467,6 +470,9 @@ pub struct AuditExportArgs {
     pub from: Option<TimestampMs>,
     #[serde(default)]
     pub to: Option<TimestampMs>,
+    /// Only this call's rows, as `audit_list` filters them.
+    #[serde(default)]
+    pub call_id: Option<CallId>,
     pub format: crate::model::LogFormat,
 }
 

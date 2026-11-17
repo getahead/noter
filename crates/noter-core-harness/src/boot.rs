@@ -1233,7 +1233,8 @@ impl Controls for Harness {
                             .collect(),
                         None => vec![("seg_1".into(), "Ann agreed to ship the importer.".into())],
                     };
-                    noter_core::testing::llm_run(&self.core, skill, items).await
+                    let call_id = args["call_id"].as_str().map(CallId::new);
+                    noter_core::testing::llm_run_for(&self.core, skill, items, call_id).await
                 }
                 // `{ skill, output? | fail?, after_ms?, cost_usd? }`: a `--llm-script` line (`on`
                 // named `skill`) that answers the next run of `skill`, once, ahead of the script.

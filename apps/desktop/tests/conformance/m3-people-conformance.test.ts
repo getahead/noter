@@ -48,6 +48,10 @@ describe("person_create and person_get", () => {
     expect(page.person.id).toBe(done.person.id);
     expect([page.calls, page.owns_open, page.you_owe, page.open_questions]).toEqual([[], [], [], []]);
     expect(page.person).toMatchObject({ notes: null, you_owe: 0 });
+    // The row's count is the page's list, for everyone listed.
+    for (const row of ok(await main.peopleList({ query: null })).people) expect(row.you_owe).toBe(ok(await main.personGet({ person_id: row.id })).you_owe.length);
+    // Runs of spaces in a query fold like the names do.
+    expect(ok(await main.peopleList({ query: "nina   park" })).people.map((p) => p.id)).toContain(done.person.id);
   });
 
   it("accepts a second person with the same name: Create Anyway is the user's call", async () => {

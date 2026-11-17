@@ -96,6 +96,29 @@ fn check_range(from: Option<TimestampMs>, to: Option<TimestampMs>) -> Result<(),
     Ok(())
 }
 
+/// The WHERE clauses and their values for a date range and, when given, one call.
+fn range(
+    from: Option<TimestampMs>,
+    to: Option<TimestampMs>,
+    call: Option<&CallId>,
+) -> (Vec<String>, Vec<Sql>) {
+    let mut clauses = vec!["1 = 1".to_owned()];
+    let mut binds: Vec<Sql> = Vec::new();
+    if let Some(from) = from {
+        clauses.push("a.ts >= ?".into());
+        binds.push(Sql::Integer(from.0));
+    }
+    if let Some(to) = to {
+        clauses.push("a.ts <= ?".into());
+        binds.push(Sql::Integer(to.0));
+    }
+    if let Some(call) = call {
+        clauses.push("a.call_id = ?".into());
+        binds.push(Sql::Text(call.as_str().to_owned()));
+    }
+    (clauses, binds)
+}
+
 /// A cursor is the `(ts, id)` of the last row served.
 fn cursor_of(row: &AuditEntry) -> Cursor {
     Cursor(format!("{}|{}", row.at.0, row.id.as_str()))
@@ -115,19 +138,11 @@ impl Core {
         &self,
         from: Option<TimestampMs>,
         to: Option<TimestampMs>,
+        call: Option<&CallId>,
         after: Option<(i64, String)>,
         limit: u32,
     ) -> Result<Vec<AuditEntry>, CoreError> {
-        let mut clauses = vec!["1 = 1".to_owned()];
-        let mut binds: Vec<Sql> = Vec::new();
-        if let Some(from) = from {
-            clauses.push("a.ts >= ?".into());
-            binds.push(Sql::Integer(from.0));
-        }
-        if let Some(to) = to {
-            clauses.push("a.ts <= ?".into());
-            binds.push(Sql::Integer(to.0));
-        }
+        let (mut clauses, mut binds) = range(from, to, call);
         if let Some((ts, id)) = after {
             clauses.push("(a.ts, a.id) > (?, ?)".into());
             binds.push(Sql::Integer(ts));
@@ -155,7 +170,19 @@ impl Core {
         check_range(args.from, args.to)?;
         let limit = args.page.limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
         let cursor = args.page.cursor.as_ref().map(after).transpose()?;
-        let mut rows = self.audit_rows(args.from, args.to, cursor, limit + 1)?;
+        let call = args.call_id.as_ref();
+        let mut rows = self.audit_rows(args.from, args.to, call, cursor, limit + 1)?;
+        // The whole range, whatever the page: "N requests" is true before the last page is read.
+        let (clauses, binds) = range(args.from, args.to, call);
+        let count = format!(
+            "SELECT count(*) FROM audit_log a WHERE {}",
+            clauses.join(" AND ")
+        );
+        let total: u32 = self.store().read(move |c| {
+            c.query_row(&count, noter_db::rusqlite::params_from_iter(binds), |r| {
+                r.get(0)
+            })
+        })?;
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-audit:p1:inst-audit-read
         let more = rows.len() > limit as usize;
         rows.truncate(limit as usize);
@@ -163,7 +190,7 @@ impl Core {
         Ok(Page {
             rows,
             next_cursor,
-            total: None,
+            total: Some(total),
         })
     }
 
@@ -205,7 +232,9 @@ impl Core {
             let mut cursor = None;
             let mut first = true;
             loop {
-                let rows = self.audit_rows(args.from, args.to, cursor.take(), EXPORT_BATCH)?;
+                let call = args.call_id.as_ref();
+                let rows =
+                    self.audit_rows(args.from, args.to, call, cursor.take(), EXPORT_BATCH)?;
                 for row in &rows {
                     if json {
                         let sep = if first { "\n" } else { ",\n" };

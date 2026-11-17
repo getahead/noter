@@ -4,7 +4,7 @@ import { fold, matches, sortPeople, view } from "./identity";
 
 const person = (o: Partial<PersonRow>): PersonRow => ({
   id: "per_x", rev: 1, display_name: "Anna Kuznetsova", short_name: "Anna K.", initials: "AK", email: null, role: null,
-  org: null, aliases: [], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, ...o,
+  org: null, aliases: [], is_you: false, voice_profile: false, last_call_at: null, open_items: 0, you_owe: 0, notes: null, ...o,
 });
 const speaker = (n: number): UnnamedSpeaker => ({ call: { id: "call_1", title: "Sync", started_at: 0 } as never, speaker_id: `spk_${n}`, n, segment_count: 3, sample: null, suggestion: null });
 

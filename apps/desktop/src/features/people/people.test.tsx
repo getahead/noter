@@ -11,7 +11,7 @@ import { setPeopleQuery } from "./model";
 
 const person = (o: Partial<PersonRow>): PersonRow => ({
   id: "per_a", rev: 1, display_name: "Anna Kuznetsova", short_name: "Anna K.", initials: "AK", email: null, role: "PM", org: "Acme",
-  aliases: [], is_you: false, voice_profile: true, last_call_at: 1_700_000_000_000, open_items: 2, ...o,
+  aliases: [], is_you: false, voice_profile: true, last_call_at: 1_700_000_000_000, open_items: 2, you_owe: 0, notes: null, ...o,
 });
 const listed = (people: PersonRow[], unnamed = [] as never[], query = "") => view({ people, unnamed }, query);
 const props = (o: Partial<PeopleBodyProps>): PeopleBodyProps => ({

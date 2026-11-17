@@ -126,6 +126,16 @@ pub async fn llm_run(
     skill: &str,
     items: Vec<(String, String)>,
 ) -> Result<serde_json::Value, CoreError> {
+    llm_run_for(core, skill, items, None).await
+}
+
+/// [`llm_run`] on behalf of a call (`harness.llm_run { call_id }`): its audit rows name the call.
+pub async fn llm_run_for(
+    core: &Core,
+    skill: &str,
+    items: Vec<(String, String)>,
+    call_id: Option<noter_protocol::CallId>,
+) -> Result<serde_json::Value, CoreError> {
     use noter_llm::{
         Failure, Packet, PacketItem, Privacy, RunRequest, Skill, SourceClass, TaskKind,
     };
@@ -149,7 +159,8 @@ pub async fn llm_run(
         sensitive: false,
         offline: false,
     });
-    let req = RunRequest::new(skill, "harness", packet, TaskKind::PostCall, rx);
+    let mut req = RunRequest::new(skill, "harness", packet, TaskKind::PostCall, rx);
+    req.call_id = call_id;
     let done = core.llm().run_once(req).await.map_err(|f| match f {
         Failure::Unavailable(e) | Failure::Storage(e) => e,
         other => CoreError::new(ErrorCode::Internal, format!("{other:?}")),

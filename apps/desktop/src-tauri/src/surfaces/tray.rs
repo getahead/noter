@@ -100,6 +100,7 @@ pub fn tray_command(
         TrayAction::OpenLastSummary => navigate(Some(NavTarget::LastSummary)),
         TrayAction::OpenSettings => navigate(Some(NavTarget::Settings {
             pane: SettingsPane::General,
+            call_id: None,
         })),
         // @cpt-end:cpt-noter-flow-ui-menu-bar-start:p1:inst-case-navigate
         TrayAction::QuitNoter => return None,

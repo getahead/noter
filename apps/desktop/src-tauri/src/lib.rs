@@ -139,6 +139,7 @@ pub fn run() {
                     app,
                     noter_protocol::model::NavTarget::Settings {
                         pane: noter_protocol::model::SettingsPane::General,
+                        call_id: None,
                     },
                 );
             } else if event.id() == surfaces::APP_SETUP {

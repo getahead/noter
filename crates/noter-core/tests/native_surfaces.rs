@@ -539,6 +539,7 @@ async fn announce_navigate_and_external_opens_are_checked_before_the_native_laye
 
     let target = NavTarget::Settings {
         pane: SettingsPane::Privacy,
+        call_id: None,
     };
     core.window_navigate(
         &main,
