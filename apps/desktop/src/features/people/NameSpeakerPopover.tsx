@@ -18,7 +18,7 @@ export async function readSample(bridge: Bridge, u: UnnamedSpeaker): Promise<{ t
   const r = await bridge.act("people:sample", "transcript_span", () => bridge.core.transcriptSpan({ span: u.sample! }), { screen: "people" });
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-sample
   const seg = r.status === "ok" ? r.data.segments.find((s) => s.text.trim()) : undefined;
-  return seg ? { text: seg.text, lang: seg.lang.code } : null;
+  return seg ? { text: seg.text, lang: typeof seg.lang === "string" ? seg.lang : seg.lang.code } : null;
 }
 
 // @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-name-single
