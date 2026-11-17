@@ -24,6 +24,8 @@ export interface NewPersonFormProps {
   backLabel?: string;
   /** Create stays disabled until there is a name. */
   requireName?: boolean;
+  /** People's wording of a taken name: A person called “Lena” already exists: Lena K. (QA). */
+  dupExists?: boolean;
   findDuplicate?: (people: readonly PersonRow[] | null, name: string) => PersonRow | undefined;
 }
 
@@ -133,7 +135,7 @@ export function NewPersonForm(p: NewPersonFormProps) {
       {form.dup && (
         <div className="cw-pp__dup" role="status">
           <Icon name="info" size={13} />
-          <span>{t("speakers.new.dup", { name: form.dup.display_name })}</span>
+          <span>{p.dupExists ? t("people.dup_exists", { typed: form.name.trim(), name: form.dup.caption ? `${form.dup.display_name} (${form.dup.caption})` : form.dup.display_name }) : t("speakers.new.dup", { name: form.dup.display_name })}</span>
           <span className="cw-pp__dupacts">
             <PushButton
               size="small"

@@ -47,6 +47,7 @@ export function AddPersonPopover({ bridge, anchor }: { bridge: Bridge; anchor: H
         findDuplicate={possibleDuplicate}
         backLabel={t("dialogs.cancel")}
         requireName
+        dupExists
         error={failed ? t("people.add_error") : null}
         onPick={() => {}}
         onBack={close}
