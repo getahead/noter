@@ -83,6 +83,18 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     await expect(how).toBeFocused();
   });
 
+  test("UI — Tab, then Esc, from the Show How Noter Searched popover puts focus back on its link", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "notification service");
+    const how = page.getByRole("link", { name: "Show How Noter Searched" });
+    await how.click();
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toBeVisible();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toHaveCount(0);
+    await expect(how).toBeFocused();
+  });
+
   test("UI — empty path: no matches for “Lizenzprüfung im Installer” offers Try fewer words, Clear Filters and Ask Instead, which asks the same words in a new thread", async ({ page }) => {
     await openCalls(page);
     await button(page, /^Type/).click();

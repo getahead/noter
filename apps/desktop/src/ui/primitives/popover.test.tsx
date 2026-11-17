@@ -1,6 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOnOutside, measure, placeFloating, Popover, returnFocus } from "./popover";
+import { closeOnEscape, closeOnOutside, measure, placeFloating, Popover, returnFocus } from "./popover";
 
 describe("Popover (cpt-noter-dod-ui-primitives-controls)", () => {
   it("renders the prototype's popover as a dialog", () => {
@@ -58,6 +58,22 @@ describe("Popover behaviour", () => {
     closeOnOutside({ current: null }, null, onClose);
     listener!({ target: inside });
     expect(onClose).toHaveBeenCalledTimes(2);
+    vi.unstubAllGlobals();
+  });
+
+  it("closes on Escape anywhere, unless something already handled it, and stops listening when removed", () => {
+    let listener: ((e: unknown) => void) | undefined;
+    const doc = { addEventListener: vi.fn((_: string, fn: (e: unknown) => void) => (listener = fn)), removeEventListener: vi.fn() };
+    vi.stubGlobal("document", doc);
+    const onClose = vi.fn();
+    const remove = closeOnEscape(onClose);
+    listener!({ key: "Tab" });
+    listener!({ key: "Escape", defaultPrevented: true });
+    expect(onClose).not.toHaveBeenCalled();
+    listener!({ key: "Escape", defaultPrevented: false });
+    expect(onClose).toHaveBeenCalledOnce();
+    remove();
+    expect(doc.removeEventListener).toHaveBeenCalledWith("keydown", listener);
     vi.unstubAllGlobals();
   });
 
