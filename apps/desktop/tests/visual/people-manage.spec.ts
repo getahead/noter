@@ -8,9 +8,12 @@ import { openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 
+// the fake counts You owe from open items the user owes on calls the person was in
 const owes = (w: World) => {
   W.idle(w);
-  w.people.find((p) => p.id === "per_anna")!.you_owe = 2;
+  const me = w.people.find((p) => p.is_you)!;
+  const item = w.items.find((i) => i.status === "open" && w.calls.some((c) => c.id === i.call.id && c.participants.some((x) => x.id === "per_anna")))!;
+  Object.assign(item, { owner: { id: me.id, display_name: me.display_name, short_name: me.short_name, initials: me.initials, is_you: true }, owed: "by_you" });
 };
 async function openPeople(page: Page, world: (w: World) => void = W.idle) {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -33,7 +36,7 @@ const shot = async (page: Page, name: string) => {
 test.describe("cpt-noter-dod-ui-people-identity people management", () => {
   test("You owe shows the core's count and stays blank at zero", async ({ page }) => {
     await openPeople(page, owes);
-    await expect(page.getByRole("table", { name: "People" }).getByRole("cell", { name: "2", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("table", { name: "People" }).getByRole("cell", { name: "1", exact: true }).first()).toBeVisible();
     await shot(page, "people-you-owe");
   });
   test("Add Person opens the New person form under the button", async ({ page }) => {

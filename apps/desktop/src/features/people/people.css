@@ -31,3 +31,6 @@
 /* Last calls: When and Call only; the full table is the Calls view */
 .pe-calls--compact :is(th, td):nth-child(n + 3) { display: none; }
 .pe-ctx { position: fixed; z-index: 40; }
+/* Add Person: padded, and opaque so the table behind never shows through */
+.pe-add { padding: 12px; }
+.np-pop[data-variant="new-person-form"] { background: var(--card-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }

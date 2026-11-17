@@ -27,6 +27,11 @@ describe("cpt-noter-flow-ui-people-name", () => {
     setAddPerson(true);
     const h = renderToString(<AddPersonPopover bridge={bridge} anchor={null} />);
     for (const s of ["New person", "Name", "Email", "Role", "Create"]) expect(h).toContain(s);
+    // DESIGN: Cancel closes it, and Create waits for a name
+    expect(h).toContain("Cancel");
+    expect(h).not.toContain(">Back<");
+    expect(h).toMatch(/<button[^>]*disabled[^>]*>(?:(?!<\/button>).)*Create/s);
+    expect(h).toContain("pe-add");
     setAddPerson(false);
     holdPeople(null);
   });

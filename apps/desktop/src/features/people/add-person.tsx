@@ -38,12 +38,15 @@ export function AddPersonPopover({ bridge, anchor }: { bridge: Bridge; anchor: H
   // @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-new-form
   return (
     <Popover variant="new-person-form" anchor={anchor} width={320} label={t("people.add_title")} onClose={close}>
+      <div className="pe-add">
       <NewPersonForm
         variant="popover"
         confirmLabel={t("people.add_confirm")}
         initial=""
         people={people}
         findDuplicate={possibleDuplicate}
+        backLabel={t("dialogs.cancel")}
+        requireName
         error={failed ? t("people.add_error") : null}
         onPick={() => {}}
         onBack={close}
@@ -55,6 +58,7 @@ export function AddPersonPopover({ bridge, anchor }: { bridge: Bridge; anchor: H
           else setFailed(true);
         }}
       />
+      </div>
     </Popover>
   );
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-new-form

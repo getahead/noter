@@ -20,6 +20,10 @@ export interface NewPersonFormProps {
   people: readonly PersonRow[] | null;
   onBack: (name: string) => void;
   /** The host's own duplicate rule (People also catches a short name or a lone first name); the default is the exact full name. */
+  /** The back button's words (People says Cancel: it closes the popover). */
+  backLabel?: string;
+  /** Create stays disabled until there is a name. */
+  requireName?: boolean;
   findDuplicate?: (people: readonly PersonRow[] | null, name: string) => PersonRow | undefined;
 }
 
@@ -158,11 +162,11 @@ export function NewPersonForm(p: NewPersonFormProps) {
         </span>
       )}
       <div className="cw-pp__foot">
-        <PushButton label={t("speakers.new.back")} onAction={() => p.onBack(form.name)} />
+        <PushButton label={p.backLabel ?? t("speakers.new.back")} onAction={() => p.onBack(form.name)} />
         <PushButton
           label={p.confirmLabel}
           variant="primary"
-          disabled={p.disabled}
+          disabled={p.disabled || (p.requireName && !form.name.trim())}
           onAction={() => submit()}
         />
       </div>
