@@ -40,7 +40,12 @@ export function KnowledgeSourcesPane({ bridge, settings }: PaneProps) {
 export function SourcesView({ rows, failed, mode, prefs, onRetry, onAdd, onReindex, onDetails }: { rows: SourceRow[] | null; failed: boolean; mode: PrivacyMode; prefs: UiPrefs | undefined; onRetry: () => void; onAdd: (s: "folder" | "mcp") => void; onReindex: (id: string) => void; onDetails: (id: string) => void }) {
   if (failed && !rows) return <p className="hd__err" role="alert">{t("sources.read_error")} <PushButton label={t("action.try_again")} size="small" onAction={onRetry} /></p>;
   if (!rows) return <p className="np-dim" role="status">{t("sources.loading")}</p>;
-  if (rows.length === 0) return <EmptyState title={t("sources.empty_title")} body={t("sources.empty_body")} icon="books" actionId="source-add-folder" actionLabel={t("sources.add_folder")} onAction={() => onAdd("folder")} />;
+  if (rows.length === 0) return (
+    <>
+      <EmptyState title={t("sources.empty_title")} body={t("sources.empty_body")} icon="books" actionId="source-add-folder" actionLabel={t("sources.add_folder")} onAction={() => onAdd("folder")} />
+      <div className="st-sources__foot"><PushButton label={t("sources.add_mcp")} size="small" onAction={() => onAdd("mcp")} /></div>
+    </>
+  );
   return (
     <Group foot={<div className="st-sources__foot">
       <PushButton id="source-add-folder" label={t("sources.add_folder")} size="small" onAction={() => onAdd("folder")} />
@@ -50,7 +55,7 @@ export function SourcesView({ rows, failed, mode, prefs, onRetry, onAdd, onReind
       {rows.map((r) => {
         const v = sourceStatus(r, mode, prefs);
         return (
-          <StatusRow key={r.id} variant="source" tone={v.tone} word={v.word} icon={v.icon} title={r.name} tag={sourceTag(r)} subtitle={v.subtitle} message={v.message} progress={v.progress} progressText={v.progressText} state={v.state}
+          <StatusRow key={r.id} variant="source" tone={v.tone} word={v.word} icon={v.icon} title={r.name} tag={sourceTag(r)} subtitle={v.subtitle} message={v.message} progress={v.progress} progressText={v.progressText} state={v.state} onOpen={() => onDetails(r.id)}
             actions={<>
               {v.canRetry ? <PushButton label={t("sources.try_again")} size="small" onAction={() => onReindex(r.id)} /> : r.status.type === "idle" && r.mode !== "live" ? <PushButton label={t("sources.reindex")} size="small" onAction={() => onReindex(r.id)} /> : null}
               <PushButton label={t("sources.details")} size="small" onAction={() => onDetails(r.id)} />

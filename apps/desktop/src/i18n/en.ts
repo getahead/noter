@@ -413,6 +413,8 @@ export const en = {
   "sources.indexing_files": "Indexing {done} of {total} files",
   "sources.indexing_documents": "Indexing {done} of {total} documents",
   "sources.indexing_unknown": "Indexing · {done} so far",
+  "sources.folder_indexed_note": "Copied into the local index for fast search.",
+  "sources.folder_live_off": "A folder is always indexed and watched for changes.",
   "sources.details": "Details",
   "sources.details_title": "{name}",
   "sources.name": "Name",

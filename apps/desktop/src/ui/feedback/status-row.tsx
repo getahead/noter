@@ -29,16 +29,18 @@ export interface StatusRowProps {
   progressText?: string;
   /** The status name, for data-state ("up-to-date", "failed", "expired"); defaults to the tone. */
   state?: string;
+  /** Return on the row opens it (the source sheet); makes the row a keyboard stop. */
+  onOpen?: () => void;
   /** Hidden while running: no duplicate work. */
   actions?: ReactNode;
 }
 
 // @cpt-component:cpt-noter-component-ui-status-row:p1
-export function StatusRow({ variant = "source", tone, word, icon, title, tag, subtitle, message, progress, progressText, state, actions }: StatusRowProps) {
+export function StatusRow({ variant = "source", tone, word, icon, title, tag, subtitle, message, progress, progressText, state, onOpen, actions }: StatusRowProps) {
   const running = tone === "run" || !!progress;
   const value = progress && progress.total ? Math.min(100, Math.round((progress.done / progress.total) * 100)) : null;
   return (
-    <div className={`e-status e-status--${running ? "run" : tone}`} data-component="cpt-noter-component-ui-status-row" data-variant={variant} data-state={running ? "running" : (state ?? tone)}>
+    <div className={`e-status e-status--${running ? "run" : tone}`} data-component="cpt-noter-component-ui-status-row" data-variant={variant} data-state={running ? "running" : (state ?? tone)} tabIndex={onOpen ? 0 : undefined} onKeyDown={onOpen && ((e) => e.target === e.currentTarget && e.key === "Enter" && (e.preventDefault(), onOpen()))}>
       <span className="e-status__icon" aria-hidden={progress ? true : undefined}>{running ? <Progress variant="spinner" label={t("status.running")} /> : icon && <Icon name={icon} size={14} />}</span>
       <div className="e-status__main">
         <div className="e-status__name">
