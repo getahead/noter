@@ -92,3 +92,6 @@
 .st-keyfield > :first-child { flex: 1 1 240px; min-width: 0; }
 .st-keyfield__ok { flex-basis: 100%; font-size: 12px; color: var(--label-2); }
 .st-cred--field { display: grid; gap: 6px; }
+.st-audit td:first-child { white-space: nowrap; }
+.st-audit__foot { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 8px 12px; font-size: 12px; color: var(--label-2); }
+.st-audit__loading { padding: 12px; color: var(--label-2); font-size: 12px; }

@@ -20,9 +20,9 @@ describe("audit rows", () => {
     expect(totalBytes(rows)).toBe(5400);
   });
   it("formats bytes", () => {
-    expect(formatBytes(512)).toMatch(/512/);
-    expect(formatBytes(1800)).toMatch(/1\.8/);
-    expect(formatBytes(2_500_000)).toMatch(/2\.5/);
+    expect(formatBytes(612)).toBe("612 B");
+    expect(formatBytes(1800)).toBe("1.8 KB");
+    expect(formatBytes(2_500_000)).toBe("2.5 MB");
   });
   it("words the rows without payload", () => {
     const [r] = auditRows([row("a", { call: call("1"), redacted: true })], undefined);

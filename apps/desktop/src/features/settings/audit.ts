@@ -37,8 +37,8 @@ export const forCall = (rows: readonly AuditEntry[], callId: string | null): Aud
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-audit-rows:p1:inst-page
 
 export function formatBytes(n: number): string {
-  const [unit, div] = n >= 1_000_000 ? (["megabyte", 1_000_000] as const) : n >= 1000 ? (["kilobyte", 1000] as const) : (["byte", 1] as const);
-  return new Intl.NumberFormat(locale(), { style: "unit", unit, unitDisplay: "short", maximumFractionDigits: unit === "byte" ? 0 : 1 }).format(n / div);
+  const [key, div] = n >= 1_000_000 ? (["audit.mb", 1_000_000] as const) : n >= 1000 ? (["audit.kb", 1000] as const) : (["audit.b", 1] as const);
+  return t(key, { n: new Intl.NumberFormat(locale(), { maximumFractionDigits: div === 1 ? 0 : 1 }).format(n / div) });
 }
 
 // @cpt-begin:cpt-noter-algo-ui-privacy-sources-audit-rows:p1:inst-counts
