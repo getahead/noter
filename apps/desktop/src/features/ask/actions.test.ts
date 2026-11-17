@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, startFromRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -194,5 +194,25 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(unsubscribe).not.toHaveBeenCalled();
     await openThread(m.bridge, null, set);
     expect(unsubscribe).toHaveBeenCalledWith("ask_start");
+  });
+  it("reads the words of a new:<words> route, decoded, and nothing from other routes", () => {
+    expect(questionOfRoute("new:What%20did%20we%20decide%3F")).toBe("What did we decide?");
+    expect(questionOfRoute("new:  spaced  ")).toBe("spaced");
+    expect(questionOfRoute("new:")).toBeNull();
+    expect(questionOfRoute("new:%E0%A4%A")).toBe("%E0%A4%A"); // malformed: the words as they came
+    expect(questionOfRoute("root")).toBeNull();
+    expect(questionOfRoute("thread:a1")).toBeNull();
+  });
+  it("starts the routed question once per route key", () => {
+    const ask = vi.fn();
+    let handled = startFromRoute("new:Why%3F", null, ask);
+    expect(ask).toHaveBeenCalledWith("Why?");
+    expect(handled).toBe("new:Why%3F");
+    handled = startFromRoute("new:Why%3F", handled, ask); // a re-render on the same route does not ask again
+    expect(ask).toHaveBeenCalledOnce();
+    handled = startFromRoute("new:Next", handled, ask); // a new route asks its own question
+    expect(ask).toHaveBeenCalledTimes(2);
+    expect(startFromRoute("root", handled, ask)).toBe(handled);
+    expect(ask).toHaveBeenCalledTimes(2);
   });
 });

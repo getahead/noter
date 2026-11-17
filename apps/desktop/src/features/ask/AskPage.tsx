@@ -12,7 +12,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, startFromRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
@@ -67,6 +67,13 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   useEffect(() => {
     const id = threadOfRoute(routeKey);
     if (id) void open(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeKey]);
+
+  // `new:<words>` (Ask Instead, a Library question) asks those words once on arrival
+  const routed = useRef<string | null>(null);
+  useEffect(() => {
+    routed.current = startFromRoute(routeKey, routed.current, (q) => ask(q));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 

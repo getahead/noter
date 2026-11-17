@@ -141,3 +141,24 @@ export function endedWhileAway(raw: { turn_id: string } | null, phase: TurnPhase
   if (!raw || asking !== null || phase === null || phase === "streaming" || raw.turn_id === handled) return null;
   return raw.turn_id;
 }
+
+/** The question a `new:<words>` route carries (Search's **Ask Instead**, a Library question), or null for any other route. */
+export function questionOfRoute(key: string): string | null {
+  if (!key.startsWith("new:")) return null;
+  const words = key.slice("new:".length);
+  let text = words;
+  try {
+    text = decodeURIComponent(words);
+  } catch {
+    // malformed escapes: the words as they came
+  }
+  return text.trim() || null;
+}
+
+/** Ask the routed question once: returns the route key now handled, so a re-render on the same key does not ask again. */
+export function startFromRoute(key: string, handled: string | null, ask: (question: string) => void): string | null {
+  const question = questionOfRoute(key);
+  if (!question || key === handled) return handled;
+  ask(question);
+  return key;
+}
