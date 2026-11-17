@@ -103,10 +103,10 @@ export const suggestionsOf = (people: readonly PersonRow[] | null | undefined, a
 // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready
 /** What the page announces once when a turn is ready; nothing for any other phase. */
 export function announcementOf(phase: TurnPhase | null, citations: number): "ask.ready_one" | "ask.ready_other" | "ask.ready_weak" | null {
-// @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready
   if (phase === "weak") return "ask.ready_weak";
   return phase === "ready" ? (citations === 1 ? "ask.ready_one" : "ask.ready_other") : null;
 }
+// @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready
 
 // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-failed
 /** The error line of a failed turn: the runtime named when the core could not reach it, else the generic one. */

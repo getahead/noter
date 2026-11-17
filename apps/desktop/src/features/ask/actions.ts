@@ -154,6 +154,10 @@ export const copyText = (text: string, write: (s: string) => Promise<void>): Pro
 // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage
 
 // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
+/** Open a cited document (at its chunk) in the app that holds it; the core reports an unreachable one. */
+export const openDocument = (bridge: Bridge, document_id: string, chunk_id: string) =>
+  bridge.act("ask:open_document", "open_external", () => bridge.core.openExternal({ target: { type: "document", document_id, chunk_id } }));
+
 /** Search by Keyword: the Library's search for the question's own words. */
 export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
 // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-search

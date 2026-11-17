@@ -7,7 +7,7 @@ import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { ProvenanceChip } from "../items/ProvenanceChip";
 import { openSpan, spanTime } from "../items/evidence";
-import { copyTurn } from "./actions";
+import { copyTurn, openDocument } from "./actions";
 import { blocks, type Inline } from "./markdown";
 
 const COPIED_MS = 2000;
@@ -85,7 +85,7 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
   );
 }
 
-function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: Bridge; c: Citation; focused: boolean; onPlay?: (span: TimeSpan) => void; register: (el: HTMLLIElement | null) => void; back: () => void }) {
+export function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: Bridge; c: Citation; focused: boolean; onPlay?: (span: TimeSpan) => void; register: (el: HTMLLIElement | null) => void; back: () => void }) {
   const p = c.provenance;
   const span = p.type === "past_call" || p.type === "this_call" ? p.span : null;
   return (
@@ -102,18 +102,25 @@ function CitationRow({ bridge, c, focused, onPlay, register, back }: { bridge: B
           <span className="ak-cite__src">{p.call.title}</span>
         ) : (
           <a href="#open" className="np-link ak-cite__src" onClick={(e) => (e.preventDefault(), void openSpan(bridge, p.span, "ask"))}>
-      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-evidence */}
             {p.call.title}
           </a>
         ))}
+      {p.type === "document" &&
+        (c.deleted ? (
+          <span className="ak-cite__src">{[p.title, p.source_name].join(" · ")}</span>
+        ) : (
+          <a href="#open" className="np-link ak-cite__src" onClick={(e) => (e.preventDefault(), void openDocument(bridge, p.document_id, p.chunk_id))}>
+            {[p.title, p.source_name].join(" · ")}
+          </a>
+        ))}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-evidence */}
       {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-play */}
       {span && (
         <button type="button" className="np-link" disabled={c.deleted} aria-label={t("ask.play", { at: spanTime(span) })} onClick={() => onPlay?.(span)}>
-      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-play */}
           ▶
         </button>
       )}
-      {p.type === "document" && <span className="ak-cite__src">{[p.title, p.source_name].join(" · ")}</span>}
+      {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-play */}
       {c.strength === "weak" && <span className="np-dim">{t("ask.weak")}</span>}
       {c.quote && <blockquote className="ak-cite__quote">{c.quote}</blockquote>}
     </li>

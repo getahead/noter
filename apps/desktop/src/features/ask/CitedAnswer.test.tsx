@@ -1,9 +1,9 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Citation } from "../../core/bindings";
-import { CitedAnswer } from "./CitedAnswer";
+import { CitationRow, CitedAnswer } from "./CitedAnswer";
 
 const bridge = { act: () => new Promise(() => {}), core: {} } as unknown as Bridge;
 const call = (n: number, o: Partial<Citation> = {}): Citation => ({ n, provenance: { type: "past_call", call: { id: "c", title: "Backend sync", started_at: 0, call_type: "x" }, span: { call_id: "c", t0_ms: 5000, t1_ms: 9000 } } as never, quote: "We ship Friday.", speaker: null, strength: "strong", deleted: false, ...o });
@@ -50,5 +50,21 @@ describe("CitedAnswer (cpt-noter-dod-ui-ask-citations)", () => {
     expect(h).toContain("Plan · Drive");
     expect(h).toContain("Weak match");
     expect(h).toContain("Source deleted");
+  });
+  it("links a live document source so it opens through open_external; a deleted one stays plain text", () => {
+    const live = call(1, { provenance: { type: "document", document_id: "d", chunk_id: "k", title: "Plan", source_name: "Drive", section: null } as never });
+    expect(html("See [1]", [live])).toContain('<a href="#open" class="np-link ak-cite__src">Plan · Drive</a>');
+    // CitationRow has no hooks: call it, find the link in the element tree and click it
+    const openExternal = vi.fn(async () => ({ status: "ok" }));
+    const bridge = { core: { openExternal }, act: (_k: string, _c: string, f: () => unknown) => f() } as never;
+    const find = (n: unknown): { onClick?: (e: unknown) => void } | null => {
+      const e = n as { type?: unknown; props?: { children?: unknown; onClick?: (e: unknown) => void } } | null;
+      if (!e || typeof e !== "object") return null;
+      if (e.type === "a") return e.props as never;
+      return [e.props?.children].flat(9).map(find).find(Boolean) ?? null;
+    };
+    const link = find(CitationRow({ bridge, c: live, focused: false, register: () => {}, back: () => {} }));
+    link?.onClick?.({ preventDefault: () => {} });
+    expect(openExternal).toHaveBeenCalledWith({ target: { type: "document", document_id: "d", chunk_id: "k" } });
   });
 });
