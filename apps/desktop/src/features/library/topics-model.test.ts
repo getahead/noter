@@ -6,6 +6,11 @@ const topic = (id: string, name: string, o: Partial<TopicRow> = {}): TopicRow =>
 const group = (id: string, at: number): TopicThreadGroup => ({ call: { id, title: id, started_at: at, call_type: "planning" }, items: [{ id: `i-${id}` } as never] });
 
 describe("topics model (cpt-noter-state-ui-library-search-topics-view)", () => {
+  it("orders the entries of a call by where they were said", () => {
+    const g = group("c", Date.UTC(2026, 9, 5, 12));
+    g.items = [{ id: "late", spans: [{ t0_ms: 900, t1_ms: 1000 }] }, { id: "early", spans: [{ t0_ms: 100, t1_ms: 200 }] }, { id: "none", spans: [] }] as never;
+    expect(monthsOf([g], { time_zone: "UTC" } as never)[0]!.entries.map((e) => e.item.id)).toEqual(["none", "early", "late"]);
+  });
   it("the route key round-trips and rejects other keys", () => {
     expect(parseTopicKey(topicKey("top_1"))).toBe("top_1");
     expect(parseTopicKey("root")).toBeNull();

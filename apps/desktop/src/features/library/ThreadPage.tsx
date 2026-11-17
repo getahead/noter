@@ -2,7 +2,8 @@ import { useMemo } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
-import { OutputItemRow } from "../call-page/OutputItemRow";
+import { ThreadRow } from "./ThreadRow";
+import { usePublishHead } from "./topics-head";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import type { TopicThread, UiPrefs } from "../../core/bindings";
@@ -19,6 +20,8 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const data = read.status === "READY" ? read.data : null;
   const months = useMemo(() => (data ? monthsOf(data.groups, prefs) : []), [data, prefs]);
+  const since = data?.groups.length ? Math.min(...data.groups.map((g) => g.call.started_at)) : null;
+  usePublishHead(data?.topic.name ?? null, data ? threadSubtitle(data.topic, since, prefs) : null);
   return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} />;
 }
 
@@ -35,16 +38,9 @@ export function ThreadView({ bridge, status, retry, data, months, prefs }: Threa
   if (status === "ERROR")
     return <InlineBanner banner={{ id: "thread-error", severity: "error", text: t("topics.thread_error"), actions: [{ label: t("action.try_again"), onAction: retry }] }} />;
   if (!data) return <div className="lb-loading" data-state="loading" aria-busy="true" aria-label={t("topics.loading")} />;
-  const since = Math.min(...data.groups.map((g) => g.call.started_at));
   // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-thread
   return (
     <>
-      <div data-region="TH-R1" className="lb-head">
-        <h2 className="lb-title" tabIndex={-1}>
-          {data.topic.name}
-        </h2>{" "}
-        {threadSubtitle(data.topic, Number.isFinite(since) ? since : null, prefs)}
-      </div>
       <div data-region="TH-R3" role="region" aria-label={t("topics.timeline")} className="lb-thread" data-state={months.length ? "thread" : "thread-empty"}>
         {months.length ? (
           months.map((m) => (
@@ -52,7 +48,7 @@ export function ThreadView({ bridge, status, retry, data, months, prefs }: Threa
               <h2 className="lb-thmonth__h">{m.label}</h2>
               <ul className="lb-items">
                 {m.entries.map((e) => (
-                  <OutputItemRow key={e.item.id} bridge={bridge} item={e.item} />
+                  <ThreadRow key={e.item.id} bridge={bridge} item={e.item} call={e.call} prefs={prefs} />
                 ))}
               </ul>
             </div>

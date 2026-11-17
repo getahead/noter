@@ -6,7 +6,9 @@ import type { TopicRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
-import { TopicsToolbar } from "./TopicsToolbar";
+import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
+import { ThreadRow } from "./ThreadRow";
+import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
 import { setTopicWords, topicWords } from "./topics-query";
 import { openTopic } from "./topic-nav";
@@ -110,5 +112,30 @@ describe("useRead", () => {
     const Probe = () => ((s = useRead(() => new Promise(() => {}), "k")[0].status), null);
     renderToString(<Probe />);
     expect(s).toBe("LOADING");
+  });
+});
+
+describe("toolbars and thread rows", () => {
+  it("the toolbars show the published head and the thread's Ask waits for Ask", async () => {
+    await ready();
+    setHead({ title: "Drawer redesign", subtitle: "3 calls" });
+    const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
+    expect(bar.props.title).toBe("Drawer redesign");
+    expect(bar.props.subtitle).toBe("3 calls");
+    expect((find(bar, (p) => "trailing" in p).props.trailing as { props: { disabled: boolean } }).props.disabled).toBe(true);
+    expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
+    setHead({ title: null, subtitle: null });
+  });
+  it("a thread row names its kind, the call with its date, and no topic chip", async () => {
+    const fake = await ready();
+    const item = fake.world.items.find((i) => i.topic)!;
+    const h = renderToString(<ThreadRow bridge={bridge} item={item} call={item.call} />);
+    expect(h).toContain("data-variant=\"thread\"");
+    expect(h).toContain(item.call.title);
+    expect(h).not.toContain(`>${item.topic!.name}<`);
+    const act = vi.spyOn(bridge, "act");
+    const tree = rendered(ThreadRow, { bridge, item, call: item.call });
+    (find(tree, (p) => typeof p.label === "string" && p.label.includes(item.call.title)).props.onAction as () => void)();
+    expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
   });
 });

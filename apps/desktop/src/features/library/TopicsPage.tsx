@@ -11,6 +11,7 @@ import { Table } from "../../ui/primitives/table";
 import { filterTopics, lastSeen, mergeTopics } from "./topics-model";
 import { setTopicWords, useTopicWords } from "./topics-query";
 import { openTopic } from "./topic-nav";
+import { usePublishHead } from "./topics-head";
 import { useRead } from "./use-read";
 import "./library.css";
 
@@ -35,6 +36,7 @@ export function TopicsPage({ bridge }: { bridge: Bridge }) {
   }, [held]);
   const topics = useMemo(() => (all ? mergeTopics(all, held, gone) : []), [all, held, gone]);
   useEffect(() => () => setTopicWords(""), []);
+  usePublishHead(null, all ? t("topics.count", { count: topics.length }) : null);
   const shown = useMemo(() => filterTopics(topics, words), [topics, words]);
   const names = useMemo(() => new Map(topics.map((x) => [x.id, x.name])), [topics]);
 

@@ -27,7 +27,7 @@ export function monthsOf(groups: TopicThreadGroup[], prefs?: UiPrefs): ThreadMon
   for (const g of [...groups].sort((a, b) => b.call.started_at - a.call.started_at)) {
     const label = zoned(g.call.started_at, { month: "long", year: "numeric" }, prefs, locale());
     if (months.at(-1)?.label !== label) months.push({ label, entries: [] });
-    months.at(-1)!.entries.push(...g.items.map((item) => ({ call: g.call, item })));
+    months.at(-1)!.entries.push(...[...g.items].sort((a, b) => (a.spans[0]?.t0_ms ?? 0) - (b.spans[0]?.t0_ms ?? 0)).map((item) => ({ call: g.call, item })));
   }
   return months;
 }
