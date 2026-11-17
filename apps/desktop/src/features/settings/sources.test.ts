@@ -1,14 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { addFolder, addMcp, createSources, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
+import { peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
 describe("sourceStatus", () => {
   it("maps idle, indexing, failed and expired to word, icon and tone", () => {
-    expect(sourceStatus(row(), "cloud_allowed", undefined)).toMatchObject({ tone: "ok", word: "Up to date", icon: "checkCircle", working: false, canRetry: false });
+    expect(sourceStatus(row(), "cloud_allowed", undefined)).toMatchObject({ tone: "ok", state: "up-to-date", word: "Up to date", icon: "checkCircle", working: false, canRetry: false });
     const run = sourceStatus(row({ status: { type: "indexing", done: 2, total: null } }), "cloud_allowed", undefined);
-    expect(run).toMatchObject({ tone: "run", working: true, progress: { done: 2, total: null } });
+    expect(run).toMatchObject({ tone: "run", state: "indexing", working: true, progress: { done: 2, total: null }, progressText: "Indexing · 2 so far" });
+    expect(sourceStatus(row({ status: { type: "indexing", done: 9, total: 24 } }), "cloud_allowed", undefined).progressText).toBe("Indexing 9 of 24 files");
+    expect(sourceStatus(row({ kind: "mcp", status: { type: "indexing", done: 1, total: 4 } }), "cloud_allowed", undefined).progressText).toBe("Indexing 1 of 4 documents");
     expect(sourceStatus(row({ status: { type: "failed", code: "internal", at: 1 } }), "cloud_allowed", undefined)).toMatchObject({ tone: "err", word: "Failed", canRetry: true });
     expect(sourceStatus(row({ status: { type: "sign_in_expired" } }), "cloud_allowed", undefined)).toMatchObject({ tone: "warn", word: "Sign-in expired", canRetry: false });
   });
@@ -56,7 +58,7 @@ describe("source commands", () => {
 
 describe("submitMcp", () => {
   const b = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, f: () => unknown) => (void f(), res)), core: { sourceAddMcp: vi.fn() } }) as never;
-  const draft = { server: " wiki ", mode: "indexed" as const, schedule: "daily", privacy: "normal" as const };
+  const draft = { server: " wiki ", mode: "indexed" as const, schedule: "daily", privacy: "normal" as const, scope: ALL_SCOPE };
   it("a blank server is refused before anything is sent", async () => {
     const bridge = b(null);
     expect(await submitMcp(bridge, { ...draft, server: "  " })).toBe("Enter the server name.");
@@ -87,5 +89,49 @@ describe("createSources", () => {
     expect(s.view()).toMatchObject({ failed: true });
     expect(s.view().rows).toHaveLength(1);
     expect(seen).toHaveLength(2);
+  });
+});
+
+describe("scope", () => {
+  it("round-trips all calls and a limited scope, keeping the people", () => {
+    expect(scopeDraftOf({ type: "all_calls" })).toEqual(ALL_SCOPE);
+    const d = scopeDraftOf({ type: "limited", call_types: ["standup"], people: ["p1"] });
+    expect(d).toEqual({ all: false, callTypes: ["standup"], people: ["p1"] });
+    expect(scopeOf(d)).toEqual({ type: "limited", call_types: ["standup"], people: ["p1"] });
+    expect(scopeOf(ALL_SCOPE)).toEqual({ type: "all_calls" });
+  });
+  it("a limited scope needs a call type or a person", () => {
+    expect(scopeValid(ALL_SCOPE)).toBe(true);
+    expect(scopeValid({ all: false, callTypes: [], people: [] })).toBe(false);
+    expect(scopeValid({ all: false, callTypes: [], people: ["p"] })).toBe(true);
+  });
+  it("toggles a call type once", () => {
+    const on = toggleCallType(toggleCallType({ ...ALL_SCOPE, all: false }, "a", true), "a", true);
+    expect(on.callTypes).toEqual(["a"]);
+    expect(toggleCallType(on, "a", false).callTypes).toEqual([]);
+  });
+  it("an empty limited scope is refused by the MCP form before sending", async () => {
+    const b = { act: vi.fn(), core: {} } as never;
+    expect(await submitMcp(b, { server: "x", mode: "indexed", schedule: "daily", privacy: "normal", scope: { all: false, callTypes: [], people: [] } })).toContain("Choose at least one call type");
+  });
+  it("reads the call types, none on failure", async () => {
+    const b = (res: unknown) => ({ act: vi.fn(async () => res), core: {} }) as never;
+    expect(await readCallTypes(b({ status: "ok", data: { call_types: [{ id: "a", label: "A" }] } }))).toHaveLength(1);
+    expect(await readCallTypes(b({ status: "error" }))).toEqual([]);
+  });
+});
+
+describe("scope people", () => {
+  const anna = { id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", is_you: false } as never;
+  it("shows the scope's people as chips, an unknown id by its id, and writes ids back", () => {
+    const chips = peopleChips(["per_anna", "per_gone"], [anna]);
+    expect(chips[0]).toMatchObject({ id: "per_anna", short_name: "Anna" });
+    expect(chips[1]).toMatchObject({ id: "per_gone", display_name: "per_gone" });
+    expect(withPeople({ all: false, callTypes: ["a"], people: [] }, chips)).toEqual({ all: false, callTypes: ["a"], people: ["per_anna", "per_gone"] });
+  });
+  it("reads the directory, none on failure", async () => {
+    const b = (res: unknown) => ({ act: vi.fn(async () => res), core: {} }) as never;
+    expect(await readPeople(b({ status: "ok", data: { people: [anna], unnamed: [] } }))).toHaveLength(1);
+    expect(await readPeople(b({ status: "error" }))).toEqual([]);
   });
 });

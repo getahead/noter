@@ -10,7 +10,7 @@ import { SourcesView } from "./KnowledgeSourcesPane";
 import { AddFolderSheet } from "./SourceFormSheet";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
-const view = (rows: SourceRow[] | null, o: { failed?: boolean } = {}) => renderToString(<SourcesView rows={rows} failed={!!o.failed} mode="cloud_allowed" prefs={undefined} onRetry={() => {}} onAdd={() => {}} onReindex={() => {}} />);
+const view = (rows: SourceRow[] | null, o: { failed?: boolean } = {}) => renderToString(<SourcesView rows={rows} failed={!!o.failed} mode="cloud_allowed" prefs={undefined} onRetry={() => {}} onAdd={() => {}} onReindex={() => {}} onDetails={() => {}} />);
 
 describe("SourcesView", () => {
   it("loading, error and the first-use empty state", () => {
@@ -43,9 +43,12 @@ describe("SourcesView", () => {
   it("actions call back", () => {
     const onAdd = vi.fn();
     const onReindex = vi.fn();
-    const tree = rendered(SourcesView, { rows: [row()], failed: false, mode: "cloud_allowed" as const, prefs: undefined, onRetry: () => {}, onAdd, onReindex });
-    const action = (find(tree, (p) => p.tone === "ok").props.actions as { props: { onAction: () => void } }).props.onAction;
-    action();
+    const onDetails = vi.fn();
+    const tree = rendered(SourcesView, { rows: [row()], failed: false, mode: "cloud_allowed" as const, prefs: undefined, onRetry: () => {}, onAdd, onReindex, onDetails });
+    const buttons = (find(tree, (p) => p.tone === "ok").props.actions as { props: { children: { props: { onAction: () => void } }[] } }).props.children;
+    buttons[0]!.props.onAction();
+    buttons[1]!.props.onAction();
+    expect(onDetails).toHaveBeenCalledWith("s1");
     const foot = find(tree, (p) => !!p.foot).props.foot as { props: { children: { props: { onAction: () => void } }[] } };
     foot.props.children[1]!.props.onAction();
     expect(onReindex).toHaveBeenCalledWith("s1");
@@ -75,7 +78,8 @@ describe("AddFolderSheet", () => {
   it("shows what the form sends and its note", () => {
     const html = renderToString(<AddFolderSheet bridge={bridge(null)} onClose={() => {}} />);
     expect(html).toContain("Add Folder");
-    expect(html).toContain("Scope: all calls");
+    expect(html).toContain("All calls");
+    expect(html).toContain("Only some call types");
     expect(html).toContain("Add Source");
   });
 });
@@ -85,6 +89,11 @@ describe("AddMcpSourceSheet", () => {
     const html = renderToString(<AddMcpSourceSheet bridge={bridge(null)} onClose={() => {}} />);
     expect(html).toContain("sign in once in the browser");
     expect(html).toContain("Schedule");
+  });
+  it("offers the scope choice: all calls, or only some call types", () => {
+    const html = renderToString(<AddMcpSourceSheet bridge={bridge(null)} onClose={() => {}} />);
+    expect(html).toContain("All calls");
+    expect(html).toContain("Only some call types");
   });
   it("an empty server is a field error and sends nothing", async () => {
     const b = bridge(null);
@@ -126,5 +135,38 @@ describe("the pane and the form handlers", () => {
       await addButton(tree);
       expect(onClose).not.toHaveBeenCalled();
     }
+  });
+});
+
+import { ScopeFields } from "./ScopeFields";
+describe("ScopeFields", () => {
+  const types = [{ id: "standup", label: "Standup", builtin: true, skill_path: "" }];
+  const anna = { id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", aliases: [], role: null, is_you: false } as never;
+  const pbridge = { core: {}, act: async () => ({ status: "ok" }), store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } } as never;
+  const props = (value: { all: boolean; callTypes: string[]; people: string[] }, onChange = () => {}) => ({ bridge: pbridge, types, people: [anna], value, onChange });
+  it("all calls hides the types and people; limited lists them", () => {
+    const all = renderToString(<ScopeFields {...props({ all: true, callTypes: [], people: [] })} />);
+    expect(all).not.toContain("Standup");
+    expect(all).not.toContain("People");
+    const limited = renderToString(<ScopeFields {...props({ all: false, callTypes: ["standup"], people: ["per_anna"] })} />);
+    expect(limited).toContain("Standup");
+    expect(limited).toContain("People");
+    expect(limited).toContain("Anna");
+  });
+  it("labels the Scope and its two parts", () => {
+    const html = renderToString(<ScopeFields {...props({ all: false, callTypes: [], people: [] })} />);
+    expect(html).toContain('class="st-scope__h"');
+    expect(html).toContain("Call types");
+    expect(html).toContain("People");
+  });
+  it("choices call back with the new scope", () => {
+    const onChange = vi.fn();
+    const tree = rendered(ScopeFields, props({ all: false, callTypes: [], people: [] }, onChange));
+    (find(tree, (p) => p.name === "src-scope").props.onAction as (v: string) => void)("all");
+    (find(tree, (p) => p.label === "Standup").props.onAction as (on: boolean) => void)(true);
+    (find(tree, (p) => p.multiple === true).props.onChange as (c: unknown[]) => void)([{ id: "per_anna", display_name: "Anna Kuz", short_name: "Anna", initials: "AK", is_you: false }]);
+    expect(onChange).toHaveBeenNthCalledWith(1, { all: true, callTypes: [], people: [] });
+    expect(onChange).toHaveBeenNthCalledWith(2, { all: false, callTypes: ["standup"], people: [] });
+    expect(onChange).toHaveBeenNthCalledWith(3, { all: false, callTypes: [], people: ["per_anna"] });
   });
 });

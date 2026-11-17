@@ -45,4 +45,18 @@ test.describe("Knowledge Sources states", () => {
     await expect(page.getByRole("dialog", { name: "Add MCP Server" })).toBeVisible();
     await shot(page, "add-mcp");
   });
+  test("Details sheet of an MCP source with a token", async ({ page }) => {
+    await show(page, [source({ id: "src_6", kind: "mcp", name: "Wiki", location: "wiki", schedule: "daily", has_token: true, documents: 42 })]);
+    await pane(page).getByRole("button", { name: "Details" }).click();
+    await expect(page.getByRole("dialog", { name: "Wiki" })).toBeVisible();
+    await shot(page, "details");
+  });
+  test("Add Folder with a scope limited to call types", async ({ page }) => {
+    await show(page, []);
+    await pane(page).getByRole("button", { name: "Add Folder…" }).click();
+    const dlg = page.getByRole("dialog", { name: "Add Folder" });
+    await dlg.getByText("Only some call types").click();
+    await expect(dlg.getByRole("group", { name: "Call types" })).toBeVisible();
+    await shot(page, "add-folder-limited-scope");
+  });
 });

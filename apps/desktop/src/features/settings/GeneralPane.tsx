@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
@@ -9,7 +9,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Toggle } from "../../ui/primitives/toggle";
 import { permissionState } from "../notifications/notifications";
-import { saveSection, unignoreKey, useRowErrors } from "./actions";
+import { loadSettings, saveSection, unignoreKey, useRowErrors } from "./actions";
+import { moveFinished, moveStorage } from "./storage";
 import { SelfTestSheet } from "./SelfTestSheet";
 import { Group, Row } from "./form";
 import { choices, type PaneProps } from "./pane-props";
@@ -35,6 +36,22 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-off-line
   // @cpt-end:cpt-noter-flow-ui-notifications-allow:p1:inst-if-denied
   const [selfTest, setSelfTest] = useState(false);
+  const [moveRun, setMoveRun] = useState<string | null>(null);
+  const [moveNote, setMoveNote] = useState<"cloud" | "failed" | null>(null);
+  const moveStatus = useWindow(bridge, (s) => (moveRun ? s.jobs[moveRun]?.status : undefined));
+  // the path changes only when the move job finished and the settings were read again
+  useEffect(() => {
+    if (!moveRun || !moveFinished(moveStatus)) return;
+    setMoveRun(null);
+    if (moveStatus !== "succeeded") setMoveNote("failed");
+    void loadSettings(bridge);
+  }, [moveRun, moveStatus, bridge]);
+  const change = async () => {
+    setMoveNote(null);
+    const r = await moveStorage(bridge);
+    if (r.kind === "accepted") setMoveRun(r.runId);
+    else if (r.kind === "cloud" || r.kind === "failed") setMoveNote(r.kind);
+  };
   const rowError = useRowErrors(bridge);
   const setupFailed = useWindow(bridge, (s) => s.commands["window:navigate"]?.state === "ERROR");
   const general_ = (edits: Partial<typeof general>) => void saveSection(bridge, "general", edits);
@@ -80,10 +97,11 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.general.summary_language")} error={rowError("general", "summary_language")} note={t("settings.general.summary_language_note")}>
           <PopupButton options={LANGUAGES} value={general.summary_language} label={t("settings.general.summary_language")} onAction={(v) => general_({ summary_language: v as typeof general.summary_language })} />
         </Row>
-        <Row label={t("settings.general.storage")} note={general.storage_in_cloud_folder && <Warn>{t("settings.general.storage_cloud")}</Warn>}>
+        <Row label={t("settings.general.storage")} note={(general.storage_in_cloud_folder || moveNote === "cloud") ? <Warn>{t("settings.general.storage_cloud")}</Warn> : moveNote === "failed" ? <Warn>{t("settings.general.storage_failed")}</Warn> : undefined}>
           <span className="st-path np-mono" title={general.storage_path}>
             {general.storage_path}
           </span>
+          <PushButton label={t("settings.general.storage_change")} size="small" disabled={!!moveRun} onAction={() => void change()} />
         </Row>
       </Group>
       <Group title={t("settings.general.today")}>

@@ -9,7 +9,8 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { scheduleChoices, submitMcp } from "./sources";
+import { ScopeFields, useCallTypes, usePeople } from "./ScopeFields";
+import { ALL_SCOPE, scheduleChoices, submitMcp, type ScopeDraft } from "./sources";
 
 
 export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose: () => void }) {
@@ -17,13 +18,16 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
   const [mode, setMode] = useState<SourceMode>("indexed");
   const [schedule, setSchedule] = useState("daily");
   const [privacy, setPrivacy] = useState<PrivacyClass>("normal");
+  const [scope, setScope] = useState<ScopeDraft>(ALL_SCOPE);
+  const types = useCallTypes(bridge);
+  const people = usePeople(bridge);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     if (busy) return;
     setBusy(true);
     setError(null);
-    const message = await submitMcp(bridge, { server, mode, schedule, privacy });
+    const message = await submitMcp(bridge, { server, mode, schedule, privacy, scope });
     setBusy(false);
     if (message) setError(message);
     else onClose();
@@ -43,7 +47,7 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
         <label className="st-row__label" htmlFor="src-mcp-privacy">{t("sources.privacy")}</label>
         <PopupButton id="src-mcp-privacy" label={t("sources.privacy")} options={PRIVACY_CHOICES()} value={privacy} onAction={(v) => setPrivacy(v as PrivacyClass)} />
         <p className="np-dim">{privacy === "sensitive" ? t("sources.privacy_sensitive_note") : t("sources.privacy_normal_note")}</p>
-        <p className="np-dim">{t("sources.scope_all")}</p>
+        <ScopeFields bridge={bridge} types={types} people={people} value={scope} onChange={setScope} />
       </div>
       <SheetFooter defaultButton={<PushButton label={t("sources.add_source")} variant="primary" disabled={busy} onAction={() => void add()} />}>
         <PushButton label={t("dialogs.cancel")} onAction={onClose} />

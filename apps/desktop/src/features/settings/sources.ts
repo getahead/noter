@@ -1,5 +1,5 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
+import type { CallTypeInfo, PersonChip, PersonRow, PrivacyClass, PrivacyMode, SourceMode, SourceRow, SourceScope } from "../../core/bindings";
 import { clock, shortDay, t } from "../../i18n/format";
 import type { UiPrefs } from "../../core/bindings";
 import type { IconName } from "../../ui/icons";
@@ -12,6 +12,9 @@ export interface SourceStatusView {
   subtitle: string;
   message?: string;
   progress?: { done: number; total: number | null };
+  progressText?: string;
+  /** The status name for data-state. */
+  state: string;
   /** Re-index and Remove stay off while the source is indexing; a Live source is never indexed. */
   working: boolean;
   /** Revoke Token only with a token. */
@@ -34,13 +37,13 @@ export function sourceStatus(row: SourceRow, mode: PrivacyMode, prefs: UiPrefs |
   const base = { subtitle: parts.join(" · "), working: s.type === "indexing", canRevoke: row.has_token && s.type !== "indexing", canRetry: s.type === "failed" && row.mode !== "live" };
   switch (s.type) {
     case "idle":
-      return { ...base, tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
+      return { ...base, state: "up-to-date", tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
     case "indexing":
-      return { ...base, tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total } };
+      return { ...base, state: "indexing", tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total }, progressText: s.total ? t(row.kind === "folder" ? "sources.indexing_files" : "sources.indexing_documents", { done: s.done, total: s.total }) : t("sources.indexing_unknown", { done: s.done }) };
     case "failed":
-      return { ...base, tone: "err", word: t("sources.failed"), icon: "error", message: t("sources.failed_note") };
+      return { ...base, state: "failed", tone: "err", word: t("sources.failed"), icon: "error", message: t("sources.failed_note") };
     case "sign_in_expired":
-      return { ...base, tone: "warn", word: t("sources.expired"), icon: "warning", message: t("sources.expired_note") };
+      return { ...base, state: "expired", tone: "warn", word: t("sources.expired"), icon: "warning", message: t("sources.expired_note") };
   }
 }
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-actions
@@ -98,13 +101,15 @@ export interface McpDraft {
   mode: SourceMode;
   schedule: string;
   privacy: PrivacyClass;
+  scope: ScopeDraft;
 }
 
 /** Check, send and word the outcome: a message for the field/sheet, or null when the source was added. */
 export async function submitMcp(bridge: Bridge, d: McpDraft): Promise<string | null> {
   const local = mcpServerError(d.server);
   if (local) return local;
-  const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: ALL_CALLS });
+  if (!scopeValid(d.scope)) return t("sources.error_scope");
+  const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: scopeOf(d.scope) });
   if (r.ok) return null;
   if (r.field === "server" && r.rule === "duplicate") return t("sources.error_server_duplicate");
   return r.field === "server" && r.rule === "invalid_format" ? t("sources.error_server_unknown") : t("sources.error_add");
@@ -136,3 +141,99 @@ export const scheduleChoices = () => [
   { value: "daily", label: t("sources.schedule_daily") },
   { value: "weekly", label: t("sources.schedule_weekly") },
 ];
+
+/** Scope as the form edits it: all calls, or the chosen call types (people stay as the source has them). */
+export interface ScopeDraft {
+  all: boolean;
+  callTypes: string[];
+  people: string[];
+}
+
+export const scopeDraftOf = (s: SourceScope): ScopeDraft => (s.type === "all_calls" ? { all: true, callTypes: [], people: [] } : { all: false, callTypes: s.call_types, people: s.people });
+export const ALL_SCOPE: ScopeDraft = { all: true, callTypes: [], people: [] };
+/** A limited scope needs at least one call type or person; the form says so instead of sending an empty one. */
+export const scopeValid = (d: ScopeDraft): boolean => d.all || d.callTypes.length + d.people.length > 0;
+export const scopeOf = (d: ScopeDraft): SourceScope => (d.all ? ALL_CALLS : { type: "limited", call_types: d.callTypes, people: d.people });
+export const toggleCallType = (d: ScopeDraft, id: string, on: boolean): ScopeDraft => ({ ...d, callTypes: on ? [...new Set([...d.callTypes, id])] : d.callTypes.filter((x) => x !== id) });
+const sameScope = (a: ScopeDraft, b: ScopeDraft) => a.all === b.all && a.callTypes.join() === b.callTypes.join() && a.people.join() === b.people.join();
+
+export async function readCallTypes(bridge: Bridge): Promise<CallTypeInfo[]> {
+  const res = await bridge.act("sources:call-types", "call_types_list", () => bridge.core.callTypesList({}));
+  return res.status === "ok" ? res.data.call_types : [];
+}
+
+/** The draft after the source changed underneath it: what the user edited stays, every other field takes the current value. */
+export function rebaseDraft(old: SourceRow, draft: SourceDraft, fresh: SourceRow): SourceDraft {
+  const was = draftOf(old);
+  const now = draftOf(fresh);
+  return {
+    name: draft.name === was.name ? now.name : draft.name,
+    schedule: draft.schedule === was.schedule ? now.schedule : draft.schedule,
+    privacy: draft.privacy === was.privacy ? now.privacy : draft.privacy,
+    scope: sameScope(draft.scope, was.scope) ? now.scope : draft.scope,
+  };
+}
+
+export interface SourceDraft {
+  name: string;
+  schedule: string | null;
+  privacy: PrivacyClass;
+  scope: ScopeDraft;
+}
+
+export const draftOf = (r: SourceRow): SourceDraft => ({ name: r.name, schedule: r.schedule, privacy: r.privacy, scope: scopeDraftOf(r.scope) });
+export const draftChanged = (r: SourceRow, d: SourceDraft): boolean => d.name.trim() !== r.name || d.schedule !== r.schedule || d.privacy !== r.privacy || !sameScope(d.scope, scopeDraftOf(r.scope));
+
+export type UpdateResult = SourceResult | { ok: false; conflict: true };
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
+/** Only supported fields go out (never path or mode); the returned row replaces the draft source only after success. */
+/** `base` is the row the draft was made from: only what differs from it goes out, so a field changed elsewhere meanwhile is not written back with an old value. */
+export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft, base: SourceRow = row): Promise<UpdateResult> {
+  const was = draftOf(base);
+  const args = {
+    source_id: row.id,
+    rev: row.rev,
+    ...(d.name.trim() !== was.name && { name: d.name.trim() }),
+    ...(d.schedule !== was.schedule && { schedule: d.schedule }),
+    ...(d.privacy !== was.privacy && { privacy: d.privacy }),
+    ...(!sameScope(d.scope, was.scope) && { scope: scopeOf(d.scope) }),
+  };
+  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate(args));
+  if (res.status === "ok") return { ok: true, row: res.data };
+  return res.error.code === "conflict" ? { ok: false, conflict: true } : fail(res);
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke
+export async function revokeToken(bridge: Bridge, id: string): Promise<boolean> {
+  const res = await bridge.act(`source:${id}`, "source_revoke_token", () => bridge.core.sourceRevokeToken({ source_id: id }));
+  return res.status === "ok";
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove
+/** A source that is already gone counts as removed. */
+export async function removeSource(bridge: Bridge, id: string): Promise<boolean> {
+  const res = await bridge.act(`source:${id}`, "source_remove", () => bridge.core.sourceRemove({ source_id: id }));
+  return res.status === "ok" || res.error.code === "not_found";
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke-alert
+export const revokeAlert = (r: SourceRow) => ({ title: t("sources.revoke_title", { name: r.name }), message: t("sources.revoke_message"), cancel: t("dialogs.cancel"), confirm: t("sources.revoke"), destructive: true });
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke-alert
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert
+export const removeAlert = (r: SourceRow) => ({ title: t("sources.remove_title", { name: r.name }), message: t("sources.remove_message", { count: r.documents }), cancel: t("dialogs.cancel"), confirm: t("sources.remove"), destructive: true });
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert
+
+export async function readPeople(bridge: Bridge): Promise<PersonRow[]> {
+  const res = await bridge.act("sources:people", "people_list", () => bridge.core.peopleList({}));
+  return res.status === "ok" ? res.data.people : [];
+}
+
+const chipOf = (p: PersonRow): PersonChip => ({ id: p.id, display_name: p.display_name, short_name: p.short_name, initials: p.initials, is_you: p.is_you ?? false });
+/** The scope's person ids as chips; an id the directory no longer has still shows, by its id. */
+export const peopleChips = (ids: readonly string[], people: readonly PersonRow[]): PersonChip[] =>
+  ids.map((id) => { const p = people.find((x) => x.id === id); return p ? chipOf(p) : { id, display_name: id, short_name: id, initials: "?", is_you: false }; });
+export const withPeople = (d: ScopeDraft, chips: readonly PersonChip[]): ScopeDraft => ({ ...d, people: chips.map((c) => c.id) });
