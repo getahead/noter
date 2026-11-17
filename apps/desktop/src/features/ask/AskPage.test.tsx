@@ -48,6 +48,12 @@ describe("Answer (cpt-noter-state-ui-ask-turn)", () => {
     expect(h).toContain("Search by Keyword");
     expect(h).toContain("could not find");
   });
+  it("offers Widen Scope on a not-found answer when asked, and names the runtime and mode of a started turn", () => {
+    expect(renderToString(<Answer bridge={bridge} onWiden={() => {}} view={view(done({ found: false, stopped: false }))} />)).toContain("Widen Scope");
+    expect(renderToString(<Answer bridge={bridge} view={view(done({ found: false }))} />)).not.toContain("Widen Scope");
+    const h = renderToString(<Answer bridge={bridge} view={view({ type: "started", runtime: "claude_account", mode: "local_only" } as never)} />);
+    expect(h).toContain("Local only");
+  });
   it("names the not-found, stopped, interrupted and error states", () => {
     expect(renderToString(<Answer bridge={bridge} view={view(done({ found: false }))} />)).toContain("could not find");
     expect(renderToString(<Answer bridge={bridge} view={view({ type: "failed", error: { code: "answer_stopped", message: "", retryable: false } as never })} />)).toContain("Stopped by you");

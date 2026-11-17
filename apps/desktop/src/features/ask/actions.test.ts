@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { askState } from "./ask-state";
+import { askState, setAskState } from "./ask-state";
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, startRoute, topicOfRoute, scopeOf } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, startFromTopicRoute, startRoute, topicOfRoute, scopeOf, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, releaseFailedRoute, recoverGap, widenScope, startFromRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -229,6 +229,26 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(startFromRoute("new:Again", ask)).toBe(true);
     expect(ask).toHaveBeenCalledTimes(2);
   });
+  it("after a sequence gap drops the live turn and shows the stored thread", async () => {
+    const { bridge } = make(ok({ turns: [{ turn_id: "t" }] }));
+    const set = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };
+    await recoverGap(bridge, "th", set);
+    expect(set.setThread).toHaveBeenCalledWith("th");
+    expect(set.setTurns).toHaveBeenCalledWith([{ turn_id: "t" }]);
+    expect(set.setAsking).toHaveBeenCalledWith(null);
+    const gone = make(err);
+    const set2 = { ...set, setTurns: vi.fn() };
+    await recoverGap(gone.bridge, "th", set2);
+    expect(set2.setTurns).not.toHaveBeenCalled();
+    expect(set2.setAsking).toHaveBeenCalledWith(null);
+  });
+  it("widens to all calls and asks the same question again", () => {
+    const ask = vi.fn();
+    setAskState({ scopeId: "mine" });
+    widenScope("Why?", ask);
+    expect(askState().scopeId).toBe("all");
+    expect(ask).toHaveBeenCalledWith("Why?", NEW_SCOPE);
+  });
   it("opens a cited document at its chunk through open_external", async () => {
     const { bridge, core } = make(ok({}));
     await openDocument(bridge, "doc_1", "ch_2");
@@ -280,5 +300,14 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(scopeOf([listed], "topic:tp_9")).toEqual((listed as { scope: unknown }).scope);
     expect(scopeOf([], "topic:tp_9")).toEqual({ preset: "topic:tp_9", topic_id: "tp_9" }); // the follow-up's scope, not All calls
     expect(scopeOf([], "all")).toBeUndefined();
+  });
+  it("asks a routed entry again after its turn failed, but not after it was stopped or stored", () => {
+    const ask = vi.fn();
+    expect(startFromRoute("new:Flaky", ask)).toBe(true);
+    releaseFailedRoute("new:Flaky", "stopped");
+    releaseFailedRoute("new:Flaky", null);
+    expect(startFromRoute("new:Flaky", ask)).toBe(false);
+    releaseFailedRoute("new:Flaky", "error");
+    expect(startFromRoute("new:Flaky", ask)).toBe(true);
   });
 });

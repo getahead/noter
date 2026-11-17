@@ -235,9 +235,29 @@ export function startRoute(bridge: Bridge, key: string, ask: (question: string, 
   };
 }
 
+/** A routed turn failed: forget that its entry was asked, so Back, Forward or a remount asks it again (Try Again already does). */
+export function releaseFailedRoute(key: string, phase: TurnPhase | null): void {
+  if (phase === "error") routed.delete(key);
+}
+
 /** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
 export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
   if (!(key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
   routed.delete(key);
   replace({ section: "ask", key: `thread:${threadId}` });
+}
+
+/** The ask_start stream lost events (the bridge ended it as lagged): the applied deltas cannot be trusted, so drop the live turn and show what the core stored. */
+export async function recoverGap(bridge: Bridge, threadId: string, set: ThreadSetters & { refresh: () => Promise<void> }): Promise<void> {
+  set.setThread(threadId);
+  void set.refresh();
+  const got = await loadThread(bridge, threadId);
+  if (got) set.setTurns(got);
+  set.setAsking(null);
+}
+
+/** Widen Scope: choose All calls · all sources and ask the same question again with it. */
+export function widenScope(question: string, ask: (question: string, scope: AskScope) => void): void {
+  setAskState({ scopeId: "all" });
+  ask(question, NEW_SCOPE);
 }

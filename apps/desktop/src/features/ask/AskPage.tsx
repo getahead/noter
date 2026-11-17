@@ -13,15 +13,18 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute } from "./actions";
-import { setAskState, useAskState } from "./ask-state";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute, NEW_SCOPE } from "./actions";
+import { setAskState, setPresets, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
+import { runtimeLabel } from "../call-page/outputs-logic";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
 
+const MODE = { cloud: "mode.cloud", cloud_redacted: "mode.cloud_redacted", local_only: "mode.local_only", sensitive_local: "mode.sensitive_local", switched_to_local: "mode.switched_to_local" } as const;
 const GROUP = { today: "ask.group.today", last_week: "ask.group.last_week", earlier: "ask.group.earlier" } as const;
 
 // @cpt-component:cpt-noter-component-screen-ask:p1
+// @cpt-dod:cpt-noter-dod-ui-ask-threads:p1
 // @cpt-flow:cpt-noter-flow-ui-ask-question:p1
 export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKey?: string }) {
   const [rows, setRows] = useState<AskThreadRow[]>([]);
@@ -42,7 +45,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   useEffect(() => {
     void refresh();
-    void loadPresets(bridge).then((p) => p && setAskState({ presets: p }));
+    void loadPresets(bridge).then((p) => p && setPresets(p));
     // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
     return () => void bridge.unsubscribe("ask_start");
     // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
@@ -86,6 +89,8 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-stream
   const turn: TurnView | null = data ? foldTurn(data.messages) : stream?.error && asking ? failedView(stream.error.code) : null;
   const phase = turn ? phaseOf(turn) : null;
+  // a failed turn leaves its route entry askable again
+  useEffect(() => releaseFailedRoute(routeKey, phase), [routeKey, phase]);
   const busy = asking !== null && (phase === null || phase === "streaming") && !stream?.error;
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-stream
 
@@ -107,6 +112,14 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [asking, data, phase, bridge, refresh]);
 
+  // the stream lost events: the bridge ended it as lagged
+  // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-gap
+  useEffect(() => {
+    if (asking && data && stream?.ended === "lagged") void recoverGap(bridge, data.thread_id, { setThread, setTurns, setAsking, refresh });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stream?.ended]);
+  // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-gap
+
   // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-submit
   const ask = (question: string, scope?: AskScope) => {
     previousTurn.current = afterTurn(data, previousTurn.current); // the answered turn's data must not settle or show as the follow-up
@@ -116,6 +129,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     startAsk(bridge, thread, question, scope ?? scopeOf(presets, scopeId));
   };
   // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-submit
+  const widen = (question: string) => widenScope(question, ask);
   // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-follow-up
   const send = () => {
     const question = questionOf(draft, busy);
@@ -156,6 +170,8 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       announce={announce}
       suggestions={suggestionsOf(people, (name) => t("ask.suggest_person", { name }))}
       onSuggest={ask}
+      narrowed={scopeId !== "all"}
+      onWiden={widen}
       onStop={stop}
       // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-retry
       onRetry={() => asking && ask(asking)}
@@ -185,6 +201,9 @@ export interface AskViewProps {
   announce: string;
   suggestions: string[];
   onSuggest: (question: string) => void;
+  /** The chosen scope is narrower than All calls · all sources: a not-found answer offers Widen Scope. */
+  narrowed?: boolean;
+  onWiden?: (question: string) => void;
   onStop: () => void;
   onRetry: () => void;
   onPlay: (span: TimeSpan) => void;
@@ -193,7 +212,7 @@ export interface AskViewProps {
 }
 
 /** The three regions of the page: recent questions, the thread and the composer. */
-export function AskView({ bridge, rows, loadError, routeError, thread, turns, asking, turn, phase, draft, busy, onOpen, onCopyQuestion, onDelete, onDraft, onSend, announce, suggestions, onSuggest, onStop, onRetry, onPlay, bar }: AskViewProps) {
+export function AskView({ bridge, rows, loadError, routeError, thread, turns, asking, turn, phase, draft, busy, onOpen, onCopyQuestion, onDelete, onDraft, onSend, announce, suggestions, onSuggest, narrowed, onWiden, onStop, onRetry, onPlay, bar }: AskViewProps) {
   const empty = turns.length === 0 && !asking;
   const groups = groupThreads(rows, Date.now());
   return (
@@ -231,7 +250,7 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
         {asking && turn && (
           <article className="ak-turn">
             <h3 className="ak-q">{asking}</h3>
-            <Answer bridge={bridge} view={turn} onPlay={onPlay} onRetry={onRetry} onSearch={() => searchByKeyword(asking)} />
+            <Answer bridge={bridge} view={turn} onPlay={onPlay} onRetry={onRetry} onSearch={() => searchByKeyword(asking)} onWiden={narrowed && onWiden ? () => onWiden(asking) : undefined} />
             {phase === "interrupted" && <PushButton label={t("ask.try_again")} onAction={onRetry} />}
           </article>
         )}
@@ -264,7 +283,7 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
 }
 
 /** One turn's answer: its text as escaped paragraphs; citations and richer states arrive with the cited-answer slice. */
-export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch }: { view: TurnView; bridge: Bridge; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void; onRetry?: () => void; onSearch?: () => void }) {
+export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, onWiden }: { view: TurnView; bridge: Bridge; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void; onRetry?: () => void; onSearch?: () => void; onWiden?: () => void }) {
   const phase = phaseOf(view);
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   if (phase === "not_found")
@@ -274,11 +293,17 @@ export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch }: 
         {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-search */}
         {onSearch && <PushButton label={t("ask.search_keyword")} onAction={onSearch} />}
         {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-if-search */}
+        {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-widen */}
+        {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-widen */}
+        {onWiden && <PushButton label={t("ask.widen")} onAction={onWiden} />}
+        {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-widen */}
+        {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-if-widen */}
       </div>
     );
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   return (
     <div className="ak-ans" data-component="cpt-noter-component-ui-cited-answer">
+      {view.runtime && view.mode && <div className="ak-status">{t("mode.runtime", { runtime: runtimeLabel(view.runtime), mode: t(MODE[view.mode]) })}</div>}
       {phase === "streaming" && !view.text && <div className="ak-status">{t("ask.answering")}</div>}
       {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
       {view.text && <CitedAnswer bridge={bridge} text={view.text} citations={view.citations} live={phase === "streaming"} onAskAgain={onAskAgain} onPlay={onPlay} />}
