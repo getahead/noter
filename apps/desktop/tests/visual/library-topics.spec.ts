@@ -8,7 +8,7 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { settled } from "./freeze";
 
-const WIDTHS = { wide: 1400, medium: 1000, narrow: 700 } as const;
+const WIDTHS = { wide: 1400, default: 1280, medium: 1000, narrow: 700 } as const;
 
 async function topics(page: Page, width: number, world: (w: World) => void = () => {}) {
   await page.setViewportSize({ width, height: 800 });

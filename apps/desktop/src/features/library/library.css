@@ -191,9 +191,9 @@
   clip-path: inset(50%);
 }
 /* Medium and Narrow (content width < 1100): no Length column; Narrow (< 760) also drops Type and the tags, leaving the two-line row */
-[data-width="medium"] .lb-table :is(th, td):nth-child(4),
-[data-width="narrow"] .lb-table :is(th, td):nth-child(4),
-[data-width="narrow"] .lb-table :is(th, td):nth-child(3),
+[data-width="medium"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(4),
+[data-width="narrow"] .lb-table:not(.lb-ttable) :is(th, td):nth-child(3),
 [data-width="narrow"] .lb-tag,
 [data-width="narrow"] .lb-more {
   display: none;
@@ -228,3 +228,8 @@
 .lb-thmonth { margin-bottom: 18px; max-width: 860px; }
 .lb-thmonth__h { font: 600 11px/14px var(--font); color: var(--label-3); margin: 0 0 6px; }
 .lb-thread { max-width: 860px; }
+
+/* A thread row is two parts: the text (truncates) and one trailing group that never wraps, so every row has one height */
+.lb-throw { display: flex; flex-wrap: nowrap; align-items: center; gap: 8px; }
+.lb-throw .pc-item__text { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-throw > :not(.pc-item__text) { flex: none; white-space: nowrap; }
