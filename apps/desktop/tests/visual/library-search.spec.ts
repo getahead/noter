@@ -67,6 +67,26 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await expect(page.getByRole("button", { name: /Websocket notifications/ })).toBeVisible();
       await shot(page, "search-topic", width);
     });
+    test("Show How Noter Searched popover", async ({ page }) => {
+      await search(page, px, {});
+      await page.getByRole("link", { name: "Show How Noter Searched" }).click();
+      await expect(page.getByRole("dialog", { name: "How Noter searched" })).toBeVisible();
+      await shot(page, "search-how", width);
+    });
+    test("only weak matches with a Language filter offer Search All Languages", async ({ page }) => {
+      await search(page, px, { only_weak: true });
+      await page.getByRole("button", { name: /^Language/ }).click();
+      await page.locator("label.np-check", { hasText: "English" }).click();
+      await page.keyboard.press("Escape");
+      await expect(page.getByRole("button", { name: "Search All Languages" })).toBeVisible();
+      await shot(page, "search-all-languages", width);
+    });
+    test("keyboard focus on a hit", async ({ page }) => {
+      await search(page, px, {});
+      await page.locator(".lb-hit").first().focus();
+      await expect(page.locator(".lb-hit").first()).toBeFocused();
+      await shot(page, "search-hit-focus", width);
+    });
     test("weak matches under the divider", async ({ page }) => {
       await search(page, px, { weak: true });
       await expect(page.getByText("Weaker matches").first()).toBeVisible();

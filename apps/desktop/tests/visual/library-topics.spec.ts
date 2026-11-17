@@ -55,6 +55,13 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await shot(page, "topics-thread", width);
     });
 
+    test(`row context menu`, async ({ page }) => {
+      await topics(page, px);
+      await page.locator(TOPIC_ROW).first().click({ button: "right" });
+      await expect(page.getByRole("menuitem", { name: "Rename…" })).toBeVisible();
+      await shot(page, "topics-row-menu", width);
+    });
+
     test(`nothing left`, async ({ page }) => {
       await topics(page, px, (w) => (w.items = w.items.map((i) => ({ ...i, topic: null }))));
       await page.locator(TOPIC_ROW).first().click();
