@@ -12,6 +12,7 @@ import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
+const isFake = process.env.NOTER_CORE !== "stdio";
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 
 /** Topics the way DESIGN's thread has them: the decision and the open question under Websocket notifications, a replay item under the kept topic. */
@@ -46,12 +47,14 @@ async function search(page: Page, words: string) {
 }
 
 test.describe("cpt-noter-seq-library-search-calls", () => {
-  test("UI — happy path: “notification service” shows Items and Transcripts, ↓ Space plays the span, Return opens the Call page at it", async ({ page }) => {
+  test("UI — happy path: “websocket уведомления” shows Items and Transcripts, ↓ Space plays the span, Return opens the Call page at it", async ({ page }) => {
     await openCalls(page);
-    await search(page, "notification service");
+    // The story's cross-language words on the real core; the fake matches the whole query as one substring (a contract-lane gap), so it gets words both of its rows contain.
+    const words = isFake ? "notification service" : "websocket уведомления";
+    await search(page, words);
     await expect(page.getByText(/Best matches · keyword and meaning/)).toBeVisible();
     for (const section of ["Items", "Transcripts"]) await expect(page.getByRole("heading", { name: section })).toBeVisible();
-    expect(await sent(page, "search")).toEqual([expect.objectContaining({ query: "notification service", filter: {} })]);
+    expect(await sent(page, "search")).toEqual([expect.objectContaining({ query: words, filter: {} })]);
     await expect(page.getByText("Websocket уведомления идут через notification service")).toBeVisible(); // the original words, not a normalized copy
 
     await page.keyboard.press("ArrowDown"); // the Items hit, then the first transcript match
