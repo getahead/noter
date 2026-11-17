@@ -70,7 +70,9 @@ export function CallsView(p: CallsViewProps) {
         <h2 className="lb-title" tabIndex={-1}>
           {t("library.calls.title")}
         </h2>{" "}
-        {state.status === "LISTED" &&
+        {state.status === "LISTED" && p.filtered
+          ? t("filters.matches", { count: state.total ?? state.rows.length })
+          : state.status === "LISTED" &&
           subtitle(
             state.rows,
             state.total ?? state.rows.length,

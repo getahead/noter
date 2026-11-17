@@ -58,7 +58,7 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
     return (
       <button key={m} type="button" className="lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
         {t(MENU_LABEL[m])}{value && <span className="np-dim"> {value}</span>}
-        <Icon name="updown" size={11} cls="np-popup__chev" />
+        <Icon name="updown" size={11} cls="lb-fchev" />
       </button>
     );
   };
@@ -68,7 +68,7 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
   const preset = datePreset(f);
   return (
     <div data-region="LC-R2" className="lb-filterbar" role="search" aria-label={t("filters.label")}>
-      {toks.map((k, i) => (
+      {toks.map((k, i) => k.kind === "open_items" ? null : (
         <span key={`${k.kind}:${k.value}`} className="np-token" data-token-kind={k.kind}>
           {k.label}
           <button type="button" className="np-token__x" aria-label={t("search.remove_token", { label: k.label })} onClick={() => onAction({ type: "remove", token: toks[i]! })}>

@@ -217,3 +217,5 @@
   backdrop-filter: none;
 }
 .lb-actions { display: flex; gap: 8px; justify-content: flex-end; margin: 8px 0; }
+.lb-fchev { margin-left: 4px; vertical-align: -1px; }
+.lb-fbtn[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent); }
