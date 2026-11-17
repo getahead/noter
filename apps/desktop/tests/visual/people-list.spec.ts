@@ -24,11 +24,11 @@ test.describe("cpt-noter-dod-ui-people-pages people list", () => {
     await expect(page.getByRole("table", { name: "People" })).toBeVisible();
     await shot(page, "people-list");
   });
-  test("Wide keeps every column: Name, Role · org, Their open items, Last call and Voice profile", async ({ page }) => {
+  test("Wide keeps every column: Name, Role · org, Their open items, You owe, Last call and Voice profile", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await open(page, W.idle);
     const heads = page.getByRole("table", { name: "People" }).getByRole("columnheader");
-    await expect(heads).toHaveText(["Name", "Role · org", "Their open items", "Last call", "Voice profile"]);
+    await expect(heads).toHaveText(["Name", "Role · org", "Their open items", "You owe", "Last call", "Voice profile"]);
     await shot(page, "people-list-wide");
   });
   test("no people yet", async ({ page }) => {

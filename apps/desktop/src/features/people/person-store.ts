@@ -26,3 +26,14 @@ export const usePersonTab = (id: string): PersonTab => tabs.use()[id] ?? "overvi
 const page = store<PersonPage | null>(null);
 export const holdPerson = page.set;
 export const usePersonHeld = page.use;
+
+/** Re-reads the open person (a save refused as stale, a merge): the page watches this counter. */
+const reread = store(0);
+let rereadHeld = 0;
+export const bumpPerson = () => reread.set(++rereadHeld);
+export const usePersonReread = reread.use;
+
+/** A refused action of the person's menu (Delete): the page shows it as a banner until the next action. */
+const notice = store<string | null>(null);
+export const setPersonNotice = notice.set;
+export const usePersonNotice = notice.use;
