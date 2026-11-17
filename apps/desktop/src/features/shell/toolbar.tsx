@@ -108,7 +108,7 @@ export function MainToolbar(p: ToolbarProps) {
         (p.narrow && !p.searchOpen ? (
           <IconButton icon="search" label={t("shell.search")} onAction={p.onOpenSearch} />
         ) : (
-          <SearchField id="mw-search" list={p.tagChoices?.length ? "mw-tags" : undefined} cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
+          <SearchField id="mw-search" list={p.tagChoices?.length && p.search.startsWith("#") ? "mw-tags" : undefined} cls="np-toolbar__search" placeholder={t("shell.search_placeholder")} value={p.search} onChange={p.onSearch} onEnter={p.onRunSearch} onBlur={() => !p.search && p.onSearchBlur?.()} />
         ))}
       {p.tagChoices?.length ? (
         <datalist id="mw-tags">

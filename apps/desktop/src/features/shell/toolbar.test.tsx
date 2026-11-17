@@ -42,6 +42,13 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(html).not.toContain("Show Sidebar");
   });
 
+  it("attaches the # tag list to the field only while a tag is being typed (a list turns the searchbox into a combobox)", () => {
+    const tags = ["release", "vhi-8.0"];
+    expect(renderToString(<MainToolbar {...props({ tagChoices: tags })} />)).not.toContain('list="mw-tags"');
+    expect(renderToString(<MainToolbar {...props({ tagChoices: tags, search: "zoom" })} />)).not.toContain('list="mw-tags"');
+    expect(renderToString(<MainToolbar {...props({ tagChoices: tags, search: "#re" })} />)).toContain('list="mw-tags"');
+  });
+
   it("disables Back at the start, and shows the sidebar toggle while the sidebar is hidden", () => {
     const html = renderToString(<MainToolbar {...props({ canBack: false, canForward: true, showToggle: true })} />);
     expect(html).toContain('aria-label="Show Sidebar"');
