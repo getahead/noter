@@ -78,7 +78,7 @@ final class DialogsTests: NoterTestCase {
         app.typeKey("4", modifierFlags: .command)
         // The web view may expose a row/cell with combined text rather than a bare static text.
         func person(_ name: String) -> XCUIElement {
-            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR value CONTAINS %@ OR title CONTAINS %@", name, name, name)).firstMatch
+            app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR title CONTAINS %@", name, name)).firstMatch
         }
         let row = person("Oleg M.")
         if !row.waitForExistence(timeout: 10) {
