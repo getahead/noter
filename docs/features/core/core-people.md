@@ -103,7 +103,7 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - Unknown person: `not_found`; read failure: typed error suitable for retry.
 
 **Steps**:
-1. [x] - `p1` - API: `people_list { query }` from main or call-screen; normalize names and aliases for lookup without changing their display text - `inst-read-list`
+1. [x] - `p1` - API: `people_list { query }` from main, call-screen or settings (read-only there: a knowledge source's people scope); normalize names and aliases for lookup without changing their display text - `inst-read-list`
 2. [x] - `p1` - Read people and the unnamed queue with `cpt-noter-algo-core-people-page`; return `PeopleList` - `inst-read-people`
 3. [x] - `p1` - API: `person_get { person_id }` from main; assemble `PersonPage` from read-only queries - `inst-read-page`
 4. [x] - `p1` - **RETURN** the complete page, with nullable `talk_share`; selected items, calls and topics open through existing navigation and evidence commands - `inst-read-return`

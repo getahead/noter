@@ -23,6 +23,15 @@ afterEach(async () => {
 const make = async (name = `Conf Person ${++n}`) => ok(await main.personCreate({ display_name: name, email: null, role: null, org: null })).person;
 
 describe("people_list", () => {
+  it("answers the Settings window too (the source scope's people), and still refuses the windows that have no people", async () => {
+    const made = await make();
+    const fromSettings = ok(await s.core("settings").peopleList({ query: null }));
+    expect(fromSettings.people.map((p) => p.id)).toContain(made.id);
+    expect(refused(await s.core("record-prompt").peopleList({ query: null })).code).toBe("window_not_allowed");
+    // Read-only there: Settings still cannot change people.
+    expect(refused(await s.core("settings").personCreate({ display_name: "Not From Settings", email: null, role: null, org: null })).code).toBe("window_not_allowed");
+  });
+
   it("lists people with You and the unnamed queue, and finds a person by a name part", async () => {
     const made = await make("Zinaida Quill");
     const aliased = ok(await main.personUpdate({ person_id: made.id, rev: made.rev, patch: { aliases: ["ZQAlias"] } })).person;
