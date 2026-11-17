@@ -351,6 +351,7 @@ export const en = {
   "settings.general.storage_cloud":
     "This folder is in iCloud Drive or Dropbox, so your recordings sync off this Mac. Choose a local folder.",
   "settings.general.storage_change": "Change…",
+  "settings.general.storage_later": "Moving the storage location is available in a later version. The current location stays in use.",
   "settings.general.storage_failed": "The recordings were not moved. The previous location is still in use.",
   "settings.general.today": "Today",
   "settings.general.horizon": "Horizon",

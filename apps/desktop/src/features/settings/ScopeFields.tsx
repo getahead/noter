@@ -1,4 +1,4 @@
-// Source scope: all calls, or the chosen call types. People in a limited scope are kept as the source has them.
+// Source scope: all calls, or the chosen call types and people.
 import { useEffect, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallTypeInfo, PersonRow } from "../../core/bindings";

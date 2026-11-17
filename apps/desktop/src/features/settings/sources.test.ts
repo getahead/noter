@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
+import { draftChanged, peopleChips, readPeople, withPeople, ALL_SCOPE, addFolder, addMcp, createSources, readCallTypes, scopeDraftOf, scopeOf, scopeValid, toggleCallType, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
@@ -104,6 +104,10 @@ describe("scope", () => {
     expect(scopeValid(ALL_SCOPE)).toBe(true);
     expect(scopeValid({ all: false, callTypes: [], people: [] })).toBe(false);
     expect(scopeValid({ all: false, callTypes: [], people: ["p"] })).toBe(true);
+  });
+  it("a stale call-type list does not make an all-calls scope look edited", () => {
+    const r = { id: "s1", rev: 1, kind: "folder", name: "A", location: "/a", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 0, last_sync_at: null, has_token: false } as never;
+    expect(draftChanged(r, { name: "A", schedule: null, privacy: "normal", scope: { all: true, callTypes: ["leftover"], people: ["p"] } })).toBe(false);
   });
   it("toggles a call type once", () => {
     const on = toggleCallType(toggleCallType({ ...ALL_SCOPE, all: false }, "a", true), "a", true);
