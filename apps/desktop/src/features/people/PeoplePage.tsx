@@ -79,7 +79,7 @@ export function PeoplePage() {
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
       <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
-      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} />}
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => void list.load()} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.map((id) => rows.find((p) => p.id === id)!).filter(Boolean), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
@@ -128,6 +128,8 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
     if (e.key === "Enter") (e.preventDefault(), open(id));
     else if (e.key === " ") (e.preventDefault(), onSelect(id, {}));
   };
+  // the row whose button was pressed: in WKWebView a mouse click leaves document.activeElement on body
+  const clicked = useRef<HTMLElement | null>(null);
   const order = shown?.rows.map((r) => r.id) ?? [];
   if (status === "ERROR" && !shown)
     return <InlineBanner banner={{ id: "people-error", severity: "error", text: t("people.error"), actions: [{ label: t("action.try_again"), onAction: onRetry }] }} />;
@@ -198,11 +200,11 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
           <h2 className="np-section-h">{t("people.unnamed")} <span className="np-dim">· {shown.unnamed.length}</span></h2>
           <div className="pe-unnamed__list">
             {shown.unnamed.map((u) => (
-              <div key={`${u.call.id}:${u.speaker_id}`} className="pe-urow">
+              <div key={`${u.call.id}:${u.speaker_id}`} className="pe-urow" onClickCapture={(e) => (clicked.current = e.currentTarget)}>
                 <strong>{t("people.unnamed_label", { n: u.n })}</strong>
                 <span className="np-muted">{t("people.unnamed_meta", { call: u.call.title, lines: t("people.unnamed_lines", { count: u.segment_count }) })}</span>
                 <span className="np-tb__spacer" />
-                <PushButton label={t("people.name")} size="small" onAction={() => onName?.(u, (globalThis.document?.activeElement as HTMLElement | null) ?? null)} />
+                <PushButton label={t("people.name")} size="small" onAction={() => onName?.(u, clicked.current)} />
               </div>
             ))}
           </div>

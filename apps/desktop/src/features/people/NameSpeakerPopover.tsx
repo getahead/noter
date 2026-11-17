@@ -34,7 +34,7 @@ export async function nameSpeaker(bridge: Bridge, u: UnnamedSpeaker, ref: Person
 }
 // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-name-single
 
-export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose }: { bridge: Bridge; speaker: UnnamedSpeaker; people: readonly PersonRow[]; anchor: HTMLElement | null; onClose: () => void }) {
+export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, onNamed }: { bridge: Bridge; speaker: UnnamedSpeaker; people: readonly PersonRow[]; anchor: HTMLElement | null; onClose: () => void; onNamed?: () => void }) {
   const label = t("people.unnamed_label", { n: speaker.n });
   const [sample, setSample] = useState<{ text: string; lang: string } | null>(null);
   const [form, setForm] = useState(false);
@@ -52,7 +52,7 @@ export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose }:
     setError(null);
     const ok = await nameSpeaker(bridge, speaker, ref, name);
     setBusy(false);
-    if (ok) onClose();
+    if (ok) (onNamed?.(), onClose());
     else setError(t("speakers.name_err", { name: label }));
   }
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-pick

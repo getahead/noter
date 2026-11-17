@@ -33,11 +33,13 @@ describe("cpt-noter-flow-ui-people-name", () => {
   });
   it("the picker's confirm names the speaker and closes; a refused one stays open", async () => {
     const onClose = vi.fn();
-    const tree = rendered(NameSpeakerPopover, { bridge: bridgeOf(named), speaker: u(), people: [], anchor: null, onClose });
+    const onNamed = vi.fn();
+    const tree = rendered(NameSpeakerPopover, { bridge: bridgeOf(named), speaker: u(), people: [], anchor: null, onClose, onNamed });
     const picker = find(tree, (p) => typeof p.onConfirm === "function");
     await (picker.props.onConfirm as (r: unknown, n: string) => Promise<void>)({ type: "existing", person_id: "per_d" }, "Dmitri");
     await flush();
     expect(onClose).toHaveBeenCalledOnce();
+    expect(onNamed).toHaveBeenCalledOnce(); // the list is read again: the core emits no person change for a rename
     const refused = rendered(NameSpeakerPopover, { bridge: bridgeOf({ status: "error", error: { code: "internal" } }), speaker: u(), people: [], anchor: null, onClose });
     await (find(refused, (p) => typeof p.onConfirm === "function").props.onConfirm as (r: unknown, n: string) => Promise<void>)({ type: "existing", person_id: "per_d" }, "Dmitri");
     await flush();
