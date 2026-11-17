@@ -18,7 +18,7 @@ export async function updatePerson(bridge: Bridge, p: PersonRow, patch: PersonPa
     if (res.error.code === "conflict") bumpPerson();
     return res.error.code === "conflict" ? "conflict" : "failed";
   }
-  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("person.saved", { name: res.data.person.display_name }) });
+  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("person.saved", { name: res.data.person.display_name }), refresh: bumpPerson });
   return "ok";
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-update
@@ -28,7 +28,7 @@ export async function updatePerson(bridge: Bridge, p: PersonRow, patch: PersonPa
 export async function mergePeople(bridge: Bridge, source: PersonRow, target: PersonRow): Promise<boolean> {
   const res = await bridge.act("people:merge", "people_merge", () => bridge.core.peopleMerge({ source: source.id, target: target.id }), { screen: "people" });
   if (res.status === "error") return false;
-  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("person.merged", { from: source.short_name, to: res.data.person.display_name }) });
+  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("person.merged", { from: source.short_name, to: res.data.person.display_name }), refresh: bumpPerson });
   go(bridge, res.data.person.id);
   return true;
 }

@@ -10,6 +10,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { updatePerson } from "./actions";
+import { readPerson } from "./PersonPage";
 
 const list = (s: string) => s.split(",").map((x) => x.trim()).filter(Boolean);
 
@@ -30,7 +31,9 @@ export function patchOf(p: PersonRow, d: { name: string; aka: string; email: str
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-alias
 
-export function EditPersonSheet({ close, bridge, person }: { close: () => void; bridge: Bridge; person: PersonRow }) {
+export function EditPersonSheet({ close, bridge, person: opened }: { close: () => void; bridge: Bridge; person: PersonRow }) {
+  // the record the sheet saves against: a refused stale save replaces it with the current one, the draft stays
+  const [person, setPerson] = useState(opened);
   const [d, setD] = useState({ name: person.display_name, aka: person.aliases.join(", "), email: person.email ?? "", role: person.role ?? "", org: person.org ?? "", notes: person.notes ?? "", keep: true });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"conflict" | "failed" | null>(null);
@@ -43,6 +46,10 @@ export function EditPersonSheet({ close, bridge, person }: { close: () => void; 
     setBusy(false);
     if (outcome === "ok") return close();
     setError(outcome); // the draft stays
+    if (outcome === "conflict") {
+      const fresh = await readPerson(bridge, person.id);
+      if (fresh.page) setPerson(fresh.page.person);
+    }
     // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-if-error
   }
   const field = (k: keyof typeof d, label: string, multi = false) => <TextField label={label} showLabel value={d[k] as string} multiline={multi} onChange={set(k)} onEnter={multi ? undefined : () => void save()} />;

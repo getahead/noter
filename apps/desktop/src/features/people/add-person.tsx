@@ -8,6 +8,7 @@ import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
 import { NewPersonForm } from "../speakers/NewPersonForm";
 import { usePeopleHeld } from "./count";
+import { possibleDuplicate } from "./identity";
 
 let open = false;
 const listeners = new Set<() => void>();
@@ -42,6 +43,7 @@ export function AddPersonPopover({ bridge, anchor }: { bridge: Bridge; anchor: H
         confirmLabel={t("people.add_confirm")}
         initial=""
         people={people}
+        findDuplicate={possibleDuplicate}
         error={failed ? t("people.add_error") : null}
         onPick={() => {}}
         onBack={close}

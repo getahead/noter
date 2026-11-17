@@ -94,7 +94,8 @@ export function rowMenu(chosen: PersonRow[], on: { open: (id: string) => void; c
     { label: t("person.open"), disabled: !one, onSelect: run(() => on.open(one!.id)) },
     { label: t("person.edit"), disabled: !one, onSelect: run(() => on.edit(one!)) },
     { divider: true },
-    { label: t("person.merge_two"), disabled: chosen.length !== 2, onSelect: run(() => on.merge(chosen[0]!, chosen[1])) },
+    // one row merges with a person chosen in the sheet; two rows are the pair
+    { label: chosen.length === 1 ? t("person.merge_with") : t("person.merge_two"), disabled: chosen.length < 1 || chosen.length > 2, onSelect: run(() => on.merge(chosen[0]!, chosen[1])) },
     { divider: true },
     { label: t("person.delete"), destructive: true, disabled: !one, onSelect: run(() => on.del(one!)) },
   ];

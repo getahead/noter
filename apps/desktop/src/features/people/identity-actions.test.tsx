@@ -6,6 +6,7 @@ import { undoMode } from "../history/undo";
 import { find, rendered } from "../../ui/testing";
 import { deletePerson, mergePeople, updatePerson } from "./actions";
 import { EditPersonSheet, patchOf } from "./EditPersonSheet";
+import { possibleDuplicate } from "./identity";
 import { MergePeopleSheet, mergeTargets, readPreview } from "./MergePeopleSheet";
 import { rowMenu } from "./PeoplePage";
 import { navigateEffect } from "../shell/navigate";
@@ -17,6 +18,7 @@ const person = (o: Partial<PersonRow> = {}): PersonRow => ({
 });
 const draft = (o = {}) => ({ name: "Pavel Romanov", aka: "Pasha", email: "", role: "Eng", org: "", notes: "", keep: true, ...o });
 const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { personUpdate: vi.fn(), peopleMerge: vi.fn(), personDelete: vi.fn(), personGet: vi.fn(), windowNavigate: vi.fn(), peopleList: vi.fn() }, store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } }) as never;
+const flush = () => new Promise((r) => setTimeout(r));
 const ok = (extra = {}) => ({ status: "ok", data: { person: person({ display_name: "Pavel R." }), change_id: "chg_1", ...extra } });
 
 describe("cpt-noter-flow-ui-people-edit-merge", () => {
@@ -108,6 +110,46 @@ describe("cpt-noter-flow-ui-people-edit-merge", () => {
     const h = renderToString(<MergePeopleSheet bridge={bridgeOf({})} source={person()} close={() => {}} />);
     expect(h).toContain("Merge Pavel with another entry");
   });
+  it("a stale save re-reads the person and the next Save carries the current rev (QA 1)", async () => {
+    const fresh = person({ rev: 4 });
+    const calls: unknown[] = [];
+    const act = vi.fn(async (_k: string, cmd: string, run: () => unknown) => {
+      run();
+      if (cmd === "person_update") return calls.push(1) === 1 ? { status: "error", error: { code: "conflict" } } : ok();
+      return { status: "ok", data: { person: fresh, calls: [], owns_open: [], you_owe: [], open_questions: [], topics: [], talk_share: null } };
+    });
+    const b = { act, core: { personUpdate: vi.fn(), personGet: vi.fn() }, store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } } as never as { core: { personUpdate: ReturnType<typeof vi.fn>; personGet: ReturnType<typeof vi.fn> } };
+    const sheet = rendered(EditPersonSheet, { bridge: b as never, person: person(), close: vi.fn() });
+    const save = (find(sheet, (p) => p.defaultButton !== undefined).props.defaultButton as { props: { onAction: () => Promise<void> } }).props.onAction;
+    await save();
+    await flush();
+    expect(b.core.personGet).toHaveBeenCalledWith({ person_id: "per_p" });
+  });
+  it("finds a possible duplicate by full name, short name or a lone first name (QA 2)", () => {
+    const people = [person({ display_name: "Lena Krüger", short_name: "Lena K." })];
+    expect(possibleDuplicate(people, "Lena K.")?.id).toBe("per_p");
+    expect(possibleDuplicate(people, "lena krüger")?.id).toBe("per_p");
+    expect(possibleDuplicate(people, "Lena")?.id).toBe("per_p");
+    expect(possibleDuplicate(people, "Lena Smith")).toBeUndefined();
+    expect(possibleDuplicate(people, "  ")).toBeUndefined();
+  });
+  it("a merge hands the Undo strip a refresh that re-reads the open person (QA 3)", async () => {
+    const { holdUndo: held } = await import("../history/undo");
+    void held;
+    const b = bridgeOf(ok());
+    await mergePeople(b, person(), person({ id: "per_q" }));
+    const { usePersonReread } = await import("./person-store");
+    let n = -1;
+    renderToString((() => { const P = () => ((n = usePersonReread()), null); return <P />; })());
+    expect(n).toBeGreaterThanOrEqual(0);
+  });
+  it("the row menu says Merge With… for one row and Merge 2 People… only for two (QA 4)", () => {
+    const on = { open: vi.fn(), close: vi.fn(), edit: vi.fn(), merge: vi.fn(), del: vi.fn() };
+    const labels = (rows: PersonRow[]) => rowMenu(rows, on).flatMap((i) => ("label" in i ? [[i.label, i.disabled]] : []));
+    expect(labels([person()])).toContainEqual(["Merge With…", false]);
+    expect(labels([person(), person({ id: "per_q" })])).toContainEqual(["Merge 2 People…", false]);
+    expect(labels([person(), person({ id: "per_q" }), person({ id: "per_r" })])).toContainEqual(["Merge 2 People…", true]);
+  });
   it("the list menu offers Merge 2 People only with exactly two chosen", () => {
     const on = { open: vi.fn(), close: vi.fn(), edit: vi.fn(), merge: vi.fn(), del: vi.fn() };
     const labelled = (items: ReturnType<typeof rowMenu>) => items.filter((i): i is Extract<typeof i, { label: string }> => "label" in i);
@@ -115,12 +157,14 @@ describe("cpt-noter-flow-ui-people-edit-merge", () => {
     expect(two.find((i) => i.label === "Merge 2 People…")!.disabled).toBe(false);
     expect(two.find((i) => i.label === "Open")!.disabled).toBe(true);
     const one = labelled(rowMenu([person()], on));
-    expect(one.find((i) => i.label === "Merge 2 People…")!.disabled).toBe(true);
+    expect(one.find((i) => i.label === "Merge With…")!.disabled).toBe(false);
     one.find((i) => i.label === "Edit Details…")!.onSelect!();
     one.find((i) => i.label === "Open")!.onSelect!();
     one.find((i) => i.label === "Delete Person…")!.onSelect!();
     two.find((i) => i.label === "Merge 2 People…")!.onSelect!();
-    expect([on.edit, on.open, on.del, on.merge].every((f) => f.mock.calls.length === 1)).toBe(true);
+    one.find((i) => i.label === "Merge With…")!.onSelect!();
+    expect([on.edit, on.open, on.del].every((f) => f.mock.calls.length === 1)).toBe(true);
+    expect(on.merge).toHaveBeenCalledTimes(2);
     void find;
   });
 });

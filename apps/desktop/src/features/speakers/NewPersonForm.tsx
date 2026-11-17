@@ -19,6 +19,8 @@ export interface NewPersonFormProps {
   initial: string;
   people: readonly PersonRow[] | null;
   onBack: (name: string) => void;
+  /** The host's own duplicate rule (People also catches a short name or a lone first name); the default is the exact full name. */
+  findDuplicate?: (people: readonly PersonRow[] | null, name: string) => PersonRow | undefined;
 }
 
 /** The New person form, in place of the list: Name prefilled with the query, Email, Role, a duplicate check against the people. */
@@ -37,7 +39,7 @@ export function NewPersonForm(p: NewPersonFormProps) {
   const set = (patch: Partial<typeof form>) =>
     setForm({ ...form, ...patch, dup: null });
   const dupOf = () =>
-    people?.find((x) => fold(x.display_name) === fold(form.name));
+    p.findDuplicate ? p.findDuplicate(people, form.name) : people?.find((x) => fold(x.display_name) === fold(form.name));
   // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-duplicate
   const submit = (anyway = false) => {
     setForm({ ...form, shown: true });
