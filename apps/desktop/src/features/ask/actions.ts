@@ -3,6 +3,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { offerPreset, setAskState } from "./ask-state";
+import { focusFirstAvailable, focusIfLost } from "../../app/a11y/focus";
 import { navigate } from "../shell/navigate";
 import { searchRoute } from "../shell/sections";
 import type { Replay } from "../transcript/playback";
@@ -262,6 +263,35 @@ export async function recoverGap(bridge: Bridge, threadId: string, set: ThreadSe
   if (got) set.setTurns(got);
   set.setAsking(null);
 }
+
+/** A cited speaker's person page. */
+export const personRoute = (id: string) => ({ section: "people" as const, key: `person:${id}` });
+export const openPerson = (id: string): void => navigate(personRoute(id));
+
+/** The composer's element id, and a recent row's: where focus is handed after a control goes away. */
+export const COMPOSER_ID = "ak-composer";
+export const rowId = (id: string): string => `ak-row-${id}`;
+
+/** Where focus goes once a recent row is deleted: the next row, else the previous one, else the composer. */
+export function afterDelete(rows: ReadonlyArray<{ id: string }>, deleted: string): string[] {
+  const i = rows.findIndex((r) => r.id === deleted);
+  return [...(i >= 0 && rows[i + 1] ? [rowId(rows[i + 1].id)] : []), ...(i > 0 ? [rowId(rows[i - 1].id)] : []), COMPOSER_ID];
+}
+
+/** An open request from the toolbar's Recent pop-up: the thread to open once, and the request number now seen. */
+export const nextOpenRequest = (req: { id: string | null; n: number }, seen: number): { open: string | null; seen: number } => (req.n === seen ? { open: null, seen } : { open: req.id, seen: req.n });
+
+/** Give a deleted row's focus to its successor once the list has it; the ids still pending (or null once handed over or none). */
+export const keepRowFocus = (doc: Parameters<typeof focusIfLost>[0], pending: string[] | null): string[] | null => (pending && !focusIfLost(doc, pending) ? pending : null);
+
+/** The composer takes focus only when it was lost (Stop, Widen Scope or Try Again replaced the control that had it). */
+export const focusComposer = (doc: Parameters<typeof focusIfLost>[0]): boolean => focusIfLost(doc, [COMPOSER_ID]);
+
+/** A new question starts with focus in the composer. */
+export const focusNewQuestion = (doc: Parameters<typeof focusFirstAvailable>[0]): boolean => focusFirstAvailable(doc, [COMPOSER_ID]);
+
+/** The toolbar's Recent pop-up (it takes the place of the pane below Wide): a title choice, then every recent question. */
+export const recentChoices = (rows: ReadonlyArray<Pick<AskThreadRow, "id" | "title">>, title: string) => [{ value: "", label: title }, ...rows.map((r) => ({ value: r.id, label: r.title }))];
 
 /** Whether a question was asked with a scope narrower than All calls · all sources (no scope means all). */
 export const isNarrowed = (scope: AskScope | undefined): boolean => !!scope && scope.preset !== NEW_SCOPE.preset;

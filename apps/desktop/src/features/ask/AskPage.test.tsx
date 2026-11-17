@@ -78,6 +78,11 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
     const miss = { turn_id: "1", question: "Q1", answer_md: "", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 } as never;
     expect(renderToString(<AskView {...props} thread="a" turns={[miss]} asking="Q2" narrowed onWiden={noop} />)).not.toContain("Widen Scope");
   });
+  it("names the composer and each recent row, so focus can be handed to them", () => {
+    const h = renderToString(<AskView {...props} rows={[row]} />);
+    expect(h).toContain('id="ak-composer"');
+    expect(h).toContain('id="ak-row-a"');
+  });
   it("lists recent questions by day and marks the open one", () => {
     const h = renderToString(<AskView {...props} rows={[row]} thread="a" />);
     expect(h).toContain("Today");

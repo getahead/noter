@@ -201,6 +201,16 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     await expect(button(thread(page), "Widen Scope")).toBeVisible();
   });
 
+  test("a cited named speaker shows as a person chip on the citation row", async ({ page }) => {
+    if (!REAL) return; // the fake's cited call carries no speaker
+    const steer = await openAsk(page);
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: THREAD_ANSWER, citations: [{ n: 1, segment_ids: ["seg_1"], chunk_ids: [], quote: "scripted quote" }], found: true } });
+    await ask(page, WEBSOCKET);
+    const row = citationRows(answers(page).last()).first();
+    await expect(row).toBeVisible();
+    await expect(row.locator('[data-component="cpt-noter-component-ui-person-chip"]')).toBeVisible(); // the core fills Citation.speaker for a named speaker
+  });
+
   test("error path — Claude Code unreachable: Couldn't reach Claude Code, Try Again keeps the question", async ({ page }) => {
     if (!REAL) return; // the fake core cannot produce this state
     const steer = await openAsk(page);
@@ -274,6 +284,36 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
     await expect(row).toHaveCount(0);
     expect(await sent(page, "ask_thread_delete")).toHaveLength(1);
     await expect(recent(page)).toContainText("Your questions appear here");
+  });
+
+  test("focus: Delete hands focus on (here to the composer, the list being empty), ⌘N starts in the composer, Stop returns to it", async ({ page }) => {
+    const steer = await openAsk(page);
+    const row = recent(page).getByRole("listitem").filter({ hasText: THREAD_QUESTION });
+    await row.click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete" }).click();
+    await expect(row).toHaveCount(0);
+    await expect(field(page)).toBeFocused(); // no row is left to take it
+    await page.locator("body").click({ position: { x: 1, y: 1 } });
+    await page.keyboard.press("Meta+KeyN");
+    await expect(field(page)).toBeFocused();
+    if (REAL) await steer.invoke("harness.ask_pace", { ms: 400 }); // the real core answers in one burst
+    await ask(page, WEBSOCKET);
+    await button(composer(page), "Stop").click();
+    await expect(field(page)).toBeFocused(); // the Stop button was replaced
+  });
+
+  test("Medium and Narrow: Recent lives in the toolbar pop-up and opens a thread; the 260 pt pane is gone", async ({ page }) => {
+    await openAsk(page);
+    await expect(recent(page)).toBeVisible(); // Wide (the default window)
+    await page.setViewportSize({ width: 1000, height: 800 });
+    await expect(recent(page)).toBeHidden();
+    const pop = toolbar(page).getByRole("combobox", { name: /recent/i });
+    await expect(pop).toBeVisible();
+    await pop.selectOption({ label: THREAD_QUESTION });
+    await expect(thread(page)).toContainText(THREAD_QUESTION);
+    await page.setViewportSize({ width: 700, height: 800 });
+    await expect(toolbar(page).getByRole("combobox", { name: /scope/i })).toHaveCount(0); // its choices moved into »
+    await expect(pop).toBeVisible();
   });
 
   test("error path — Cited source deleted: Source deleted, no play or link, and Ask Again cites only what is left", async ({ page }) => {

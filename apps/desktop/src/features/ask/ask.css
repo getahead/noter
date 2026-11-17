@@ -34,3 +34,7 @@
 /* Medium: the title never gives way (it was squeezed to "A."); the search field takes the squeeze instead. */
 [data-region="AK-R1"] .np-toolbar__titles { flex: none; }
 [data-region="AK-R1"] .np-toolbar__search { min-width: 0; }
+
+/* Size behaviour (DESIGN › Ask): Medium and Narrow collapse Recent into the toolbar's Recent pop-up; Wide keeps the 260 pt pane. */
+[data-width="wide"] .ak-recent-pop { display: none; }
+[data-width="medium"] .ak-recent, [data-width="narrow"] .ak-recent { display: none; }

@@ -1723,6 +1723,7 @@ export const en = {
   "ask.title": "Ask",
   "ask.answering": "Answering…",
   "ask.new_question": "New Question",
+  "ask.open_person": "Open {name}",
   "ask.recent": "Recent questions",
   "ask.recent_empty": "Your questions appear here",
   "ask.topic_error": "Couldn’t open this topic",
