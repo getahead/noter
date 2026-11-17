@@ -7,12 +7,13 @@ import { undoMode } from "../history/undo";
 import { NameSpeakerPopover, nameSpeaker, readSample } from "./NameSpeakerPopover";
 
 const u = (o: Partial<UnnamedSpeaker> = {}): UnnamedSpeaker => ({ call: { id: "call_1", title: "Sync", started_at: 0, call_type: "x" } as never, speaker_id: "spk_3", n: 3, segment_count: 4, sample: { call_id: "call_1", t0_ms: 0, t1_ms: 1 } as never, suggestion: null, ...o });
-const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { transcriptSpan: vi.fn(), transcriptRenameSpeaker: vi.fn() } }) as never;
+const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { transcriptSpan: vi.fn(), transcriptRenameSpeaker: vi.fn() }, store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } }) as never;
+const flush = () => new Promise((r) => setTimeout(r));
 const named = { status: "ok", data: { change_id: "chg_1", speakers: [{ id: "spk_3", segment_count: 4, label: { type: "person", person: { short_name: "Dmitri S." } } }] } };
 
 describe("cpt-noter-flow-ui-people-name", () => {
   it("the sample is the first spoken line in its own language; no sample, or a failed read, shows none", async () => {
-    expect(await readSample(bridgeOf({ status: "ok", data: { segments: [{ text: " ", lang: { code: "en" } }, { text: "Привет", lang: { code: "ru" } }] } }), u())).toEqual({ text: "Привет", lang: "ru" });
+    expect(await readSample(bridgeOf({ status: "ok", data: { segments: [{ text: " ", lang: "en" }, { text: "Привет", lang: "ru" }] } }), u())).toEqual({ text: "Привет", lang: "ru" });
     expect(await readSample(bridgeOf({}), u({ sample: null }))).toBeNull();
     expect(await readSample(bridgeOf({ status: "error", error: { code: "internal" } }), u())).toBeNull();
   });
@@ -35,9 +36,11 @@ describe("cpt-noter-flow-ui-people-name", () => {
     const tree = rendered(NameSpeakerPopover, { bridge: bridgeOf(named), speaker: u(), people: [], anchor: null, onClose });
     const picker = find(tree, (p) => typeof p.onConfirm === "function");
     await (picker.props.onConfirm as (r: unknown, n: string) => Promise<void>)({ type: "existing", person_id: "per_d" }, "Dmitri");
+    await flush();
     expect(onClose).toHaveBeenCalledOnce();
     const refused = rendered(NameSpeakerPopover, { bridge: bridgeOf({ status: "error", error: { code: "internal" } }), speaker: u(), people: [], anchor: null, onClose });
     await (find(refused, (p) => typeof p.onConfirm === "function").props.onConfirm as (r: unknown, n: string) => Promise<void>)({ type: "existing", person_id: "per_d" }, "Dmitri");
+    await flush();
     expect(onClose).toHaveBeenCalledOnce();
     (picker.props.onPick as () => void)();
     (picker.props.onForm as (o: boolean) => void)(true);
