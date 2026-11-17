@@ -38,6 +38,7 @@ export const lookups = (l: Lists): Lookups => ({
   type: (id) => l.types.find((c) => c.id === id)?.label ?? id,
 });
 
+const MENU_LABEL = { people: "filters.people", type: "filters.type", tags: "filters.tags", language: "filters.language", date: "filters.date" } as const;
 type Menu = "people" | "type" | "tags" | "language" | "date" | null;
 const LANGS = ["en", "ru", "de"];
 
@@ -50,7 +51,7 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
   const f = state.filter;
   const pick = (m: Exclude<Menu, null>) => (
     <button key={m} type="button" className="lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
-      {t(`filters.${m}` as "filters.people")}
+      {t(MENU_LABEL[m])}
     </button>
   );
   const group = (g: Group, items: { value: string; label: string }[]) =>
@@ -72,7 +73,7 @@ export function FilterBar({ state, lists, onAction, onRun }: { state: FilterStat
       <Checkbox label={t("filters.open_items")} checked={!!f.has_open_items} onAction={(on) => onAction({ type: "open_items", on })} />
       {toks.length > 0 && <PushButton label={t("filters.clear")} variant="quiet" size="small" onAction={() => onAction({ type: "clear" })} />}
       {open && (
-        <Popover variant={`filter-${open}`} anchor={anchor} width={280} label={t(`filters.${open}` as "filters.people")} onClose={() => setOpen(null)}>
+        <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
           <div className="lb-pop">
             {open === "people" && group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })))}
             {open === "type" && group("call_types", lists.types.map((c) => ({ value: c.id, label: c.label })))}

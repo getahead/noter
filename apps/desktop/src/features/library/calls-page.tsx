@@ -19,6 +19,8 @@ import { useSheet } from "../../ui/dialogs/host";
 import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
+import { AddTagPopover } from "./add-tag";
+import { tagCalls } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
 import { apply, heldFilter, holdFilter, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
@@ -58,7 +60,9 @@ export function CallsPage() {
   const [slow, setSlow] = useState(false);
   const announce = useAnnounce(bridge);
   const [fstate, setFstate] = useState<FilterState>(heldFilter);
-  const lists = useLists(bridge);
+  const [tagging, setTagging] = useState<HTMLElement | null>(null);
+  const [fresh, setFresh] = useState(0);
+  const lists = useLists(bridge, fresh);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
     const next = apply(fstate, a);
@@ -227,6 +231,25 @@ export function CallsPage() {
   return (
     <CallsView
       bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} onRun={() => {}} />}
+      actions={
+        <div className="lb-actions">
+          <button type="button" className="lb-fbtn" disabled={!chosen.length} onClick={(e) => setTagging(e.currentTarget)}>{t("library.add_tag")}</button>
+          <button type="button" className="lb-fbtn" disabled title={t("library.export_hint")}>{t("library.export")}</button>
+          {tagging && chosen.length > 0 && (
+            <AddTagPopover
+              anchor={tagging}
+              count={chosen.length}
+              inUse={lists.tags.map((g) => g.tag)}
+              onClose={() => setTagging(null)}
+              onAdd={async (tag) => {
+                const r = await tagCalls(bridge, chosen.map((c) => c.id), [tag], []);
+                if (r.status === "ok") setFresh((n) => n + 1);
+                return r.status === "ok";
+              }}
+            />
+          )}
+        </div>
+      }
       filtered={filtered}
       onClearFilters={() => onFilter({ type: "clear" })}
       state={shown}
