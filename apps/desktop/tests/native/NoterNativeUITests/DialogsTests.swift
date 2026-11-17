@@ -88,18 +88,26 @@ final class DialogsTests: NoterTestCase {
             print("PEOPLE AX TREE\n\(app.debugDescription)")
         }
         XCTAssertTrue(row.exists, "⌘4 shows People with Oleg M.")
-        row.click()
-        app.typeKey(.return, modifierFlags: [])
-        let more = app.buttons["More"].firstMatch
-        XCTAssertTrue(more.waitForExistence(timeout: 5), "Oleg M.'s page has its ⋯ menu")
+        // The ⋯ menu is a web popover: its items are not native menu items.
+        var deleteItem: XCUIElement { app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Delete Person…'")).firstMatch }
+        row.doubleClick() // opens the person, as Return does
+        // The ⋯ button may be exposed as a button, a pop-up or a menu button: match by label.
+        let more = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'More'")).firstMatch
+        if !more.waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PERSON AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(more.exists, "Oleg M.'s page has its ⋯ menu")
         more.click()
-        app.menuItems["Delete Person…"].click()
+        deleteItem.click()
         XCTAssertTrue(alert.staticTexts["Delete Oleg M.?"].waitForExistence(timeout: 5), "Delete Person… shows no alert")
         app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
         XCTAssertTrue(more.exists, "Cancel keeps the person's page")
         more.click()
-        app.menuItems["Delete Person…"].click()
+        deleteItem.click()
         XCTAssertTrue(alert.buttons["Delete"].waitForExistence(timeout: 5))
         alert.buttons["Delete"].click()
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
