@@ -4,11 +4,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { openWindow } from "../e2e/support/app";
+import { recurring } from "../e2e/support/speakers-world";
 import * as W from "../support/world-presets";
 
-async function openPopover(page: Page) {
+async function openPopover(page: Page, world: (w: Parameters<typeof W.idle>[0]) => void = W.idle) {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openWindow(page, "main", { world: W.idle });
+  await openWindow(page, "main", { world });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
   await page.keyboard.press("Meta+Digit4");
   await expect(page.locator('[data-region="PL-R3"]')).toBeVisible();
@@ -65,5 +66,10 @@ test.describe("cpt-noter-dod-ui-people-identity naming an unnamed speaker", () =
     await form.getByRole("button", { name: "Create and Name" }).click();
     await expect(form.getByText(/A person called “Anna Kuznetsova” already exists: Anna Kuznetsova/)).toBeVisible();
     await shot(page, "people-name-speaker-taken");
+  });
+  test("a speaker unnamed in several calls shows the calls and that only this call is named", async ({ page }) => {
+    const popover = await openPopover(page, (w) => (W.idle(w), recurring(w, 2)));
+    await expect(popover).toContainText(/2 calls · last on/);
+    await shot(page, "people-name-speaker-recurring");
   });
 });

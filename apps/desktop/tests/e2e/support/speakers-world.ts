@@ -41,6 +41,23 @@ export function unnamed(w: World, n: number, lines = 3): void {
   }
 }
 
+/** Speaker 3 stays unnamed in `calls` more stored calls (copies of the live call's transcript under their own ids),
+ *  so People lists "Speaker 3" once per call and the Name popover shows the calls it appears in. */
+export function recurring(w: World, calls = 2): void {
+  const live = transcript(w);
+  const others = w.call_details.filter((d) => d.call.id !== CALL).slice(0, calls);
+  for (const d of others) {
+    const copy = structuredClone(live);
+    copy.call_id = d.call.id;
+    for (const seg of copy.segments) (seg.id = `${d.call.id}_${seg.id}`), (seg.speaker.speaker_id = `${d.call.id}_${seg.speaker.speaker_id}`);
+    copy.marks = []; // marks and speakers are keyed across calls in the real core
+    for (const sp of copy.speakers) sp.id = `${d.call.id}_${sp.id}`; // the real core keys speakers by id across calls
+    for (const sp of copy.speakers) if (sp.sample) sp.sample = { ...sp.sample, call_id: d.call.id };
+    w.transcripts = [...w.transcripts.filter((t) => t.call_id !== d.call.id), copy];
+    d.speakers = copy.speakers;
+  }
+}
+
 /** An invited attendee who is not yet assigned to a voice in the live call. */
 export function inviteSuggestion(w: World): void {
   const invitee = {

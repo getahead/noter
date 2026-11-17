@@ -1005,6 +1005,8 @@ export const en = {
   "people.name": "Name…",
   "people.name_title": "Name {label}",
   "people.name_new_title": "New person for {label}",
+  "people.name_batch": { one: "{label} · {count} call · last on {last}", other: "{label} · {count} calls · last on {last}" },
+  "people.name_batch_gap": "Names {label} in this call only. Naming it in every call at once isn’t supported yet.",
   "people.name_note": "Names {label} in this call as one change you can undo.",
   "people.unnamed_lines": { one: "{count} line", other: "{count} lines" },
   "person.voice_setup": "Set Up Voice Profile…",

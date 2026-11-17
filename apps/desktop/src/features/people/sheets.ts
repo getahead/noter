@@ -28,7 +28,9 @@ export function usePeopleSheets() {
 export async function confirmDelete(bridge: Bridge, p: PersonRow, onFailed: (text: string) => void, ask = askAlert): Promise<boolean> {
   const confirmed = await ask({ title: t("person.delete.title", { name: p.short_name }), message: t("person.delete.message"), cancel: t("dialogs.cancel"), confirm: t("person.delete.confirm"), destructive: true });
   if (!confirmed) return false;
+  // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
   if (await deletePerson(bridge, p.id)) return (navigate({ section: "people", key: "root" }), true);
+  // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
   onFailed(t("person.delete.err", { name: p.short_name }));
   return false;
 }

@@ -83,7 +83,7 @@ export function PeoplePage() {
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
       <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
-      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => void list.load()} />}
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} all={state.read?.unnamed ?? []} prefs={prefs} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => void list.load()} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.flatMap((id) => rows.find((p) => p.id === id) ?? []), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
@@ -94,6 +94,7 @@ export function PeoplePage() {
 }
 
 // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
+// @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-merge
 /** The right-click menu of the selected rows: Merge 2 People… only with exactly two selected. */
 export function rowMenu(chosen: PersonRow[], on: { open: (id: string) => void; close: () => void; edit: (p: PersonRow) => void; merge: (a: PersonRow, b?: PersonRow) => void; del: (p: PersonRow) => void }): MenuItem[] {
   const one = chosen.length === 1 ? chosen[0]! : null;
@@ -108,6 +109,7 @@ export function rowMenu(chosen: PersonRow[], on: { open: (id: string) => void; c
     { label: t("person.delete"), destructive: true, disabled: !one, onSelect: run(() => on.del(one!)) },
   ];
 }
+// @cpt-end:cpt-noter-state-ui-people-view:p1:inst-merge
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
 
 export interface PeopleBodyProps {

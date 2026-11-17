@@ -9,6 +9,7 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
+import { recurring } from "./support/speakers-world";
 import { expect, test } from "./support/fixtures";
 import { alertText, alerts, answerAlerts, watchAlerts } from "./support/native-alert";
 
@@ -108,6 +109,18 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect(unnamed.getByText("Speaker 3")).toHaveCount(0);
   });
 
+  test("UI — other path: Speaker 3 unnamed in two calls shows the calls and names this call only", async ({ page }) => {
+    await openPeople(page, (w) => (W.idle(w), recurring(w, 2)));
+    const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
+    await unnamed.getByRole("button", { name: "Name…" }).first().click();
+    const pop = page.getByRole("dialog", { name: "Name Speaker 3" });
+    await expect(pop).toContainText(/Speaker 3 · 2 calls · last on/);
+    await expect(pop).toContainText("Names Speaker 3 in this call only. Naming it in every call at once isn’t supported yet.");
+    await pop.getByRole("combobox", { name: "Name…" }).fill("Dmitri");
+    await pop.getByRole("option", { name: /Dmitri Sokolov/ }).click();
+    await expect.poll(() => sent(page, "transcript_rename_speaker")).toHaveLength(1); // one call, never one change for the group
+  });
+
   test("UI — empty path: search Zoya shows No people match “Zoya”, Clear Search brings Speaker 3 back, New Person “Zoya”… creates and names it without a voice profile", async ({ page }) => {
     await openPeople(page);
     await page.getByRole("searchbox", { name: /Search/ }).fill("Zoya");
@@ -128,7 +141,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect.poll(() => sent(page, "voice_profile_create")).toHaveLength(0);
   });
 
-  test("UI — error path: Undo in the named person's History restores Speaker 3 under Unnamed speakers", async ({ page }) => {
+  test("UI — other path: Undo in the named person's History restores Speaker 3 under Unnamed speakers", async ({ page }) => {
     await openPeople(page);
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await unnamed.getByRole("button", { name: "Name…" }).click();

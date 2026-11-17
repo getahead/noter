@@ -35,7 +35,6 @@ export async function mergePeople(bridge: Bridge, source: PersonRow, target: Per
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge
 
-// @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
 // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete
 /** `person_delete`: irreversible (no change id), so nothing goes to Undo. */
 export async function deletePerson(bridge: Bridge, id: string): Promise<boolean> {
@@ -43,7 +42,6 @@ export async function deletePerson(bridge: Bridge, id: string): Promise<boolean>
   return res.status === "ok";
 }
 // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-delete
-// @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-return-edit
 
 // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-profile-create
 // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-profile-on

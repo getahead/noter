@@ -13,7 +13,7 @@ import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
-import { holdPerson, setPersonNotice, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
+import { holdPerson, setPersonNotice, setPersonStatus, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
 
@@ -62,7 +62,7 @@ export function PersonPage({ id }: { id: string }) {
   const notice = usePersonNotice();
   const status = usePersonStatus(id);
   const sheets = usePeopleSheets();
-  useEffect(() => () => setPersonNotice(null), [id]); // a refusal belongs to the person it was shown on
+  useEffect(() => () => (setPersonNotice(null), setPersonStatus(null)), [id]); // a refusal or a done action belongs to the person it was shown on
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
@@ -123,9 +123,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
       </div>
     );
   }
-  // @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields
   const p = page.person;
-  // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-fields
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-calls
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-history
   return (
@@ -229,9 +227,11 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
                 {p.voice_profile ? <PushButton label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>
+            {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields */}
             <dt>{t("person.names")}</dt>
             <dd>{names}</dd>
             {p.email && (<><dt>{t("person.email")}</dt><dd className="pe-sel">{p.email}</dd></>)}
+            {/* @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-fields */}
             {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-metrics */}
             {page.talk_share !== null && (<><dt>{t("person.talk_share")}</dt><dd>{`${Math.round(page.talk_share * 100)}%`}</dd></>)}
             {/* @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-metrics */}
