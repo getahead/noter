@@ -258,7 +258,7 @@ The system **MUST** implement all four steps for each provider, correlation, ins
 - [x] All seven `ACCOUNT_STATES` render, as do intro, browser, checking, bind and four error sheets; simulated browser controls never enter product UI (QA verified 6 of 7; the agents-bound state cannot be driven until M4 Agents)
 - [x] Claude personal-use confirmation gates both browser and existing-account paths; ChatGPT has no such checkbox
 - [x] Hiding a sheet keeps the session; Cancel stops it; account events in one window update all other open account rows
-- [x] VoiceOver reads provider/state and verification result without reading secure content; focus returns to the triggering row; German actions wrap below text (QA verified the labels and the focus return on every account path, including Sign Out; VoiceOver itself was not run)
+- [x] VoiceOver reads provider/state and verification result without reading secure content; focus returns to the triggering row; German actions wrap below text (QA verified the labels and the focus return on every account path, including Sign Out; VoiceOver itself was not run, and the German wrap-below case could not be provoked at real width because the actions fit without clipping)
 
 ## 7. Additional Context
 
