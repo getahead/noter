@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PersonRow, UnnamedSpeaker } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { undoMode } from "../history/undo";
-import { NameSpeakerPopover, nameSpeaker, readSample } from "./NameSpeakerPopover";
+import { NameSpeakerPopover, nameSpeaker, readSample, recurrence } from "./NameSpeakerPopover";
 
 const u = (o: Partial<UnnamedSpeaker> = {}): UnnamedSpeaker => ({ call: { id: "call_1", title: "Sync", started_at: 0, call_type: "x" } as never, speaker_id: "spk_3", n: 3, segment_count: 4, sample: { call_id: "call_1", t0_ms: 0, t1_ms: 1 } as never, suggestion: null, ...o });
 const bridgeOf = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, run: () => unknown) => (run(), res)), core: { transcriptSpan: vi.fn(), transcriptRenameSpeaker: vi.fn() }, store: { getState: () => ({ entities: { person: {} } }), subscribe: () => () => {} } }) as never;
@@ -30,6 +30,17 @@ describe("cpt-noter-flow-ui-people-name", () => {
     expect(h).toContain("Name Speaker 3");
     expect(h).toContain("Names Speaker 3 in this call as one change you can undo.");
     expect(h).not.toContain("all 3 calls");
+  });
+  it("a speaker number that recurs in several calls shows the calls, flags that only this call is named and never merges the rows", () => {
+    const at = (id: string, ms: number, over: Partial<UnnamedSpeaker> = {}) => u({ call: { id, title: id, started_at: ms, call_type: "x" } as never, speaker_id: `spk_${id}`, n: 2, ...over });
+    const all = [at("call_a", Date.UTC(2026, 9, 2)), at("call_b", Date.UTC(2026, 9, 9)), at("call_c", Date.UTC(2026, 9, 5)), at("call_d", 0, { n: 3 })];
+    expect(recurrence(all, all[0]!)).toEqual({ calls: 3, last: Date.UTC(2026, 9, 9) });
+    expect(recurrence(all, all[3]!)).toBeNull();
+    expect(recurrence([all[0]!, at("call_a", 5, { speaker_id: "spk_other" })], all[0]!)).toBeNull(); // two speakers of one call are not two calls
+    const h = renderToString(<NameSpeakerPopover bridge={bridgeOf({})} speaker={all[0]!} all={all} people={[]} anchor={null} onClose={() => {}} />);
+    expect(h).toContain("Speaker 2 · 3 calls · last on");
+    expect(h).toContain("Names Speaker 2 in this call only. Naming it in every call at once isn’t supported yet.");
+    expect(h).not.toContain("as one change you can undo");
   });
   it("the picker's confirm names the speaker and closes; a refused one stays open", async () => {
     const onClose = vi.fn();

@@ -14,7 +14,7 @@ import { usePeopleHeld } from "./count";
 import { AddPersonPopover, setAddPerson } from "./add-person";
 import { setPeopleQuery, usePeopleQuery } from "./model";
 import { setPersonNotice, setPersonTab, usePersonHeld, usePersonTab, type PersonTab } from "./person-store";
-import { confirmDelete, confirmDeleteProfile, usePeopleSheets } from "./sheets";
+import { confirmDelete, usePeopleSheets } from "./sheets";
 
 /** The person id of a `person:<id>` route key. */
 export const personIdOf = (key: string): string | null => (key.startsWith("person:") ? key.slice("person:".length) : null);
@@ -38,6 +38,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   const held = usePersonHeld();
   const person = held?.person.id === id ? held.person : null;
   const control = <SegmentedControl items={TABS.map((x) => ({ value: x.value, label: t(x.label) }))} value={tab} label={t("person.view")} onAction={(v) => setPersonTab(id, v as PersonTab)} />;
+  // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-edit
   // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
   // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   const more = person && (
@@ -49,7 +50,6 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
             onClose={() => setMenu(null)}
             items={[
               { label: t("person.edit"), onSelect: () => (setMenu(null), sheets.open("person-edit", { bridge, person })) },
-              ...(person.voice_profile ? [{ label: t("person.voice_delete"), onSelect: () => (setMenu(null), setPersonNotice(null), void confirmDeleteProfile(bridge, person, setPersonNotice)) }] : []),
               ...(person.is_you ? [] : [
                 { label: t("person.merge_with"), onSelect: () => (setMenu(null), sheets.open("person-merge", { bridge, source: person })) },
                 { divider: true as const },
@@ -63,6 +63,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   );
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
+  // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-edit
   return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} hasSearch={false} center={control} trailing={more} />;
 }
 

@@ -49,10 +49,11 @@ export function EditPersonSheet({ close, bridge, person: opened }: { close: () =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"conflict" | "failed" | null>(null);
   const [touched, setTouched] = useState<ReadonlySet<Field>>(new Set());
-  const set = (k: keyof typeof d) => (v: string) => (setTouched(new Set(touched).add(k)), setD({ ...d, [k]: v }));
+  const set = (k: keyof typeof d) => (v: string) => (setTouched((s) => new Set(s).add(k)), setD({ ...d, [k]: v }));
   const renamed = d.name.trim() !== "" && d.name.trim() !== person.display_name;
   async function save() {
     setBusy(true);
+    // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-error
     // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-if-error
     const outcome = await updatePerson(bridge, person, patchOf(person, d));
     setBusy(false);
@@ -63,6 +64,7 @@ export function EditPersonSheet({ close, bridge, person: opened }: { close: () =
       if (fresh.page) (setPerson(fresh.page.person), setD(rebaseDraft(d, fresh.page.person, touched, d.name)));
     }
     // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-if-error
+    // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-error
   }
   const field = (k: keyof typeof d, label: string, multi = false) => <TextField label={label} showLabel value={d[k] as string} multiline={multi} onChange={set(k)} onEnter={multi ? undefined : () => void save()} />;
   return (

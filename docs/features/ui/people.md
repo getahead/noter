@@ -77,7 +77,7 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 
 ### Prepare a 1:1
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-people-prepare`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-people-prepare`
 
 **Actor**: Primary user
 
@@ -91,19 +91,19 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 - Failed read keeps route and query, offers Try Again; deleted person returns to People
 
 **Steps**:
-1. [ ] - `p1` - User opens People; API: `people_list`; UI shows Name, Role · org, Their open items, You owe, Last call and Voice profile where data exists - `inst-list`
-2. [ ] - `p1` - User searches a name or alias; UI uses the identity matching rules in `cpt-noter-algo-ui-people-identity` and ignores superseded reads - `inst-search`
-3. [ ] - `p1` - User selects a row; Return, double-click or its name opens Overview; API: `person_get` with person id - `inst-get`
-4. [ ] - `p1` - UI: skeletons after 300 ms, then returned commitments, Asked you, topics, identity and five most recent calls - `inst-overview`
-5. [ ] - `p1` - User chooses a topic or call; UI pushes its route; Back restores Person view and scroll - `inst-navigate`
-6. [ ] - `p1` - User switches to Calls or chooses Show All; UI reuses Call rows for this person's returned calls - `inst-calls`
-7. [ ] - `p1` - User switches to History; API: `history_list` for this person; shared history renders actor filters, job filter, diffs, Undo and Redo - `inst-history`
-8. [ ] - `p1` - User acts on an item; UI delegates tick, review, evidence, inspector and Handoff to Items without inventing a second item state - `inst-items`
-9. [ ] - `p1` - **RETURN** the selected Person view; behaviour metrics rows exist only when explicitly enabled - `inst-return-prepare`
+1. [x] - `p1` - User opens People; API: `people_list`; UI shows Name, Role · org, Their open items, You owe, Last call and Voice profile where data exists - `inst-list`
+2. [x] - `p1` - User searches a name or alias; UI uses the identity matching rules in `cpt-noter-algo-ui-people-identity` and ignores superseded reads - `inst-search`
+3. [x] - `p1` - User selects a row; Return, double-click or its name opens Overview; API: `person_get` with person id - `inst-get`
+4. [x] - `p1` - UI: skeletons after 300 ms, then returned commitments, Asked you, topics, identity and five most recent calls - `inst-overview`
+5. [x] - `p1` - User chooses a topic or call; UI pushes its route; Back restores Person view and scroll - `inst-navigate`
+6. [x] - `p1` - User switches to Calls or chooses Show All; UI reuses Call rows for this person's returned calls - `inst-calls`
+7. [x] - `p1` - User switches to History; API: `history_list` for this person; shared history renders actor filters, job filter, diffs, Undo and Redo - `inst-history`
+8. [x] - `p1` - User acts on an item; UI delegates tick, review, evidence, inspector and Handoff to Items without inventing a second item state - `inst-items`
+9. [x] - `p1` - **RETURN** the selected Person view; behaviour metrics rows exist only when explicitly enabled - `inst-return-prepare`
 
 ### Add a person and name a speaker
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-people-name`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-people-name`
 
 **Actor**: Primary user
 
@@ -116,22 +116,22 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 - Cross-call naming as one change is a contract gap; the UI cannot claim a batch succeeded from several separate calls
 
 **Steps**:
-1. [ ] - `p1` - User clicks Add Person; UI shows New person with Name, Email, Role and Create - `inst-new-form`
-2. [ ] - `p1` - User enters a name; UI offers **Use Lena K.** and **Create Anyway** for a possible duplicate, retaining the core's final validation authority - `inst-duplicate`
-3. [ ] - `p1` - User chooses Create; API: `person_create`; on success show the returned person without a voice profile; errors keep the form - `inst-create`
-4. [ ] - `p1` - User clicks Name on an unnamed row; UI shows Name Speaker 2, its sample and person picker with up to five matches - `inst-name-popover`
-5. [ ] - `p1` - API: `transcript_span` for the row's sample when present; quote stays in its original language; absent samples show no fabricated speech - `inst-sample`
-6. [ ] - `p1` - User types “Дима” and chooses Dmitri, or New Person “Lena”… followed by Create and Name - `inst-pick`
-7. [ ] - `p1` - **IF** naming only the returned call's speaker - `inst-if-single`
-   1. [ ] - `p1` - Reuse Speakers: `transcript_rename_speaker` with call id, speaker id and existing or new person; consume its change id and refresh People - `inst-name-single`
-8. [ ] - `p1` - **IF** the design's recurring speaker spans several calls - `inst-if-batch`
-   1. [ ] - `p1` - Keep the intended batch preview and flag the missing cross-call identity/atomic mutation contract; do not merge equal speaker numbers from different calls - `inst-batch-gap`
-9. [ ] - `p1` - User chooses Undo on a successful change or in the Person History; shared history calls `change_undo` and refreshes names and unnamed rows - `inst-undo`
-10. [ ] - `p1` - **RETURN** core-confirmed People rows; no profile is created by naming - `inst-return-name`
+1. [x] - `p1` - User clicks Add Person; UI shows New person with Name, Email, Role and Create - `inst-new-form`
+2. [x] - `p1` - User enters a name; UI offers **Use Lena K.** and **Create Anyway** for a possible duplicate, retaining the core's final validation authority - `inst-duplicate`
+3. [x] - `p1` - User chooses Create; API: `person_create`; on success show the returned person without a voice profile; errors keep the form - `inst-create`
+4. [x] - `p1` - User clicks Name on an unnamed row; UI shows Name Speaker 2, its sample and person picker with up to five matches - `inst-name-popover`
+5. [x] - `p1` - API: `transcript_span` for the row's sample when present; quote stays in its original language; absent samples show no fabricated speech - `inst-sample`
+6. [x] - `p1` - User types “Дима” and chooses Dmitri, or New Person “Lena”… followed by Create and Name - `inst-pick`
+7. [x] - `p1` - **IF** naming only the returned call's speaker - `inst-if-single`
+   1. [x] - `p1` - Reuse Speakers: `transcript_rename_speaker` with call id, speaker id and existing or new person; consume its change id and refresh People - `inst-name-single`
+8. [x] - `p1` - **IF** the design's recurring speaker spans several calls - `inst-if-batch`
+   1. [x] - `p1` - Keep the intended batch preview and flag the missing cross-call identity/atomic mutation contract; do not merge equal speaker numbers from different calls - `inst-batch-gap`
+9. [x] - `p1` - User chooses Undo on a successful change or in the Person History; shared history calls `change_undo` and refreshes names and unnamed rows - `inst-undo`
+10. [x] - `p1` - **RETURN** core-confirmed People rows; no profile is created by naming - `inst-return-name`
 
 ### Edit, merge or delete a person
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-people-edit-merge`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-people-edit-merge`
 
 **Actor**: Primary user
 
@@ -144,21 +144,21 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 - Delete is irreversible; Cancel is the default and leaves the person unchanged
 
 **Steps**:
-1. [ ] - `p1` - User chooses Edit Details from a row or Person menu; UI opens the 520-pt sheet with Name, Also known as, Email, Role, Organisation and Notes - `inst-edit-sheet`
-2. [ ] - `p1` - On a changed name show **Keep “Pavel” as an alias**, initially on; Cancel discards the draft - `inst-alias`
-3. [ ] - `p1` - User saves; API: `person_update` with id, current `rev` and patch including the desired aliases; success replaces the entity; `conflict` refreshes current data without resubmitting - `inst-update`
-4. [ ] - `p1` - User chooses Merge With, or Merge 2 People with exactly two rows selected; prefill the second under Keep - `inst-merge-open`
-5. [ ] - `p1` - UI: 540-pt sheet, target picker excluding the source, **What moves** with calls/labels, owned items, aliases and voice profile when present - `inst-preview`
-6. [ ] - `p1` - User confirms; API: `people_merge` with source and target; open returned target and show **Merged Anna K. into Anna Kuznetsova · Undo** with its change id - `inst-merge`
-7. [ ] - `p1` - **IF** a merge or save fails - `inst-if-error`
-   1. [ ] - `p1` - Keep choices and show the typed error; not-found refreshes the source/target choices; do not locally remove a person - `inst-error`
-8. [ ] - `p1` - User chooses Delete Person; native alert explains that names are removed from every call, speakers become unnamed and the profile is deleted, with Cancel default - `inst-delete-alert`
-9. [ ] - `p1` - User explicitly confirms Delete; API: `person_delete`; success returns to People, failure keeps the person with an error - `inst-delete`
-10. [ ] - `p1` - **RETURN** the kept person or People list after confirmed deletion - `inst-return-edit`
+1. [x] - `p1` - User chooses Edit Details from a row or Person menu; UI opens the 520-pt sheet with Name, Also known as, Email, Role, Organisation and Notes - `inst-edit-sheet`
+2. [x] - `p1` - On a changed name show **Keep “Pavel” as an alias**, initially on; Cancel discards the draft - `inst-alias`
+3. [x] - `p1` - User saves; API: `person_update` with id, current `rev` and patch including the desired aliases; success replaces the entity; `conflict` refreshes current data without resubmitting - `inst-update`
+4. [x] - `p1` - User chooses Merge With, or Merge 2 People with exactly two rows selected; prefill the second under Keep - `inst-merge-open`
+5. [x] - `p1` - UI: 540-pt sheet, target picker excluding the source, **What moves** with calls/labels, owned items, aliases and voice profile when present - `inst-preview`
+6. [x] - `p1` - User confirms; API: `people_merge` with source and target; open returned target and show **Merged Anna K. into Anna Kuznetsova · Undo** with its change id - `inst-merge`
+7. [x] - `p1` - **IF** a merge or save fails - `inst-if-error`
+   1. [x] - `p1` - Keep choices and show the typed error; not-found refreshes the source/target choices; do not locally remove a person - `inst-error`
+8. [x] - `p1` - User chooses Delete Person; native alert explains that names are removed from every call, speakers become unnamed and the profile is deleted, with Cancel default - `inst-delete-alert`
+9. [x] - `p1` - User explicitly confirms Delete; API: `person_delete`; success returns to People, failure keeps the person with an error - `inst-delete`
+10. [x] - `p1` - **RETURN** the kept person or People list after confirmed deletion - `inst-return-edit`
 
 ### Opt in to a voice profile
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-people-voice-profile`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-people-voice-profile`
 
 **Actor**: Primary user
 
@@ -171,59 +171,59 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 - Cancel creates or deletes nothing
 
 **Steps**:
-1. [ ] - `p1` - User clicks Set Up Voice Profile on Identity; UI opens the prototype's 480-pt Person voice sheet, explains local recognition and shows only known source counts - `inst-open-profile`
-2. [ ] - `p1` - User chooses Create Profile; API: `voice_profile_create` with person id and optional named seed speaker; disable duplicate submission - `inst-create-profile`
-3. [ ] - `p1` - UI: use `VoiceProfileView.enabled`, centroids and opt-in time for the result; refresh the person and show the success, never a simulated timeout - `inst-profile-result`
-4. [ ] - `p1` - User chooses Delete Profile; native alert reads **Noter stops recognising this voice in new calls. Names already given in past calls stay.** with Cancel default - `inst-delete-profile-alert`
-5. [ ] - `p1` - User confirms; API: `voice_profile_delete`; success shows Off and Set Up Voice Profile again - `inst-delete-profile`
-6. [ ] - `p1` - **RETURN** Identity with the core's profile status; no audio or profile leaves the Mac - `inst-return-profile`
+1. [x] - `p1` - User clicks Set Up Voice Profile on Identity; UI opens the prototype's 480-pt Person voice sheet, explains local recognition and shows only known source counts - `inst-open-profile`
+2. [x] - `p1` - User chooses Create Profile; API: `voice_profile_create` with person id and optional named seed speaker; disable duplicate submission - `inst-create-profile`
+3. [x] - `p1` - UI: use `VoiceProfileView.enabled`, centroids and opt-in time for the result; refresh the person and show the success, never a simulated timeout - `inst-profile-result`
+4. [x] - `p1` - User chooses Delete Profile; native alert reads **Noter stops recognising this voice in new calls. Names already given in past calls stay.** with Cancel default - `inst-delete-profile-alert`
+5. [x] - `p1` - User confirms; API: `voice_profile_delete`; success shows Off and Set Up Voice Profile again - `inst-delete-profile`
+6. [x] - `p1` - **RETURN** Identity with the core's profile status; no audio or profile leaves the Mac - `inst-return-profile`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Present identity and privacy safely
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-people-identity`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-people-identity`
 
 **Input**: returned people, unnamed rows, query, Person page and privacy settings
 
 **Output**: matching identities, stable selection and permitted Identity rows
 
 **Steps**:
-1. [ ] - `p1` - Match display name, short name and aliases ignoring case and folding ё/е and ß/ss; preserve original spelling in labels - `inst-match`
-2. [ ] - `p1` - Sort visible names with interface-language collation; use core initials in the name's script and exclude You from merge targets - `inst-sort`
-3. [ ] - `p1` - Key unnamed rows by call and speaker id, not display number; never infer a shared voice from the number Speaker 2 - `inst-unnamed`
-4. [ ] - `p1` - Omit the unnamed group when empty; distinguish no people from no query match; use the returned commitment and asked-you collections without recomputing ownership - `inst-empty`
-5. [ ] - `p1` - **IF** behaviour metrics are off or the core sends no permitted value: omit the talk-time row entirely - `inst-metrics`
-6. [ ] - `p1` - Render the Identity fields actually returned; do not fabricate language percentages, call cadence or profile match counts from fixture facts - `inst-fields`
-7. [ ] - `p1` - **RETURN** text and rows; clear stale selections after entity removal and refresh active Person data - `inst-return`
+1. [x] - `p1` - Match display name, short name and aliases ignoring case and folding ё/е and ß/ss; preserve original spelling in labels - `inst-match`
+2. [x] - `p1` - Sort visible names with interface-language collation; use core initials in the name's script and exclude You from merge targets - `inst-sort`
+3. [x] - `p1` - Key unnamed rows by call and speaker id, not display number; never infer a shared voice from the number Speaker 2 - `inst-unnamed`
+4. [x] - `p1` - Omit the unnamed group when empty; distinguish no people from no query match; use the returned commitment and asked-you collections without recomputing ownership - `inst-empty`
+5. [x] - `p1` - **IF** behaviour metrics are off or the core sends no permitted value: omit the talk-time row entirely - `inst-metrics`
+6. [x] - `p1` - Render the Identity fields actually returned; do not fabricate language percentages, call cadence or profile match counts from fixture facts - `inst-fields`
+7. [x] - `p1` - **RETURN** text and rows; clear stale selections after entity removal and refresh active Person data - `inst-return`
 
 ## 4. States (CDSL)
 
 ### People and identity operations
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-people-view`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-people-view`
 
 **States**: LOADING, EMPTY, NO_MATCH, LISTED, OVERVIEW, NO_CALLS, CALLS, HISTORY, NO_HISTORY, EDITING, MERGING, PROFILE_OFF, PROFILE_CREATING, PROFILE_ON, ERROR
 
 **Initial State**: LOADING
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** no people exist; NO_MATCH when only the query excludes them; otherwise LISTED - `inst-list-result`
-2. [ ] - `p1` - **FROM** LISTED **TO** OVERVIEW **WHEN** person_get succeeds; no shared calls uses NO_CALLS - `inst-person`
-3. [ ] - `p1` - **FROM** OVERVIEW **TO** CALLS **WHEN** Calls or Show All is selected - `inst-calls`
-4. [ ] - `p1` - **FROM** OVERVIEW **TO** HISTORY **WHEN** History is selected; no entries uses NO_HISTORY - `inst-history`
-5. [ ] - `p1` - **FROM** OVERVIEW **TO** EDITING **WHEN** Edit Details is chosen; success or Cancel returns to OVERVIEW - `inst-edit`
-6. [ ] - `p1` - **FROM** LISTED **TO** MERGING **WHEN** two selected people are merged; success opens the target OVERVIEW, Cancel restores the selection - `inst-merge`
-7. [ ] - `p1` - **FROM** PROFILE_OFF **TO** PROFILE_CREATING **WHEN** Create Profile is confirmed - `inst-profile-create`
-8. [ ] - `p1` - **FROM** PROFILE_CREATING **TO** PROFILE_ON **WHEN** the core confirms enabled; failure returns to PROFILE_OFF with the error - `inst-profile-on`
-9. [ ] - `p1` - **FROM** PROFILE_ON **TO** PROFILE_OFF **WHEN** Delete Profile succeeds after confirmation - `inst-profile-off`
-10. [ ] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** a read fails; explicit Try Again returns to LOADING - `inst-error`
+1. [x] - `p1` - **FROM** LOADING **TO** EMPTY **WHEN** no people exist; NO_MATCH when only the query excludes them; otherwise LISTED - `inst-list-result`
+2. [x] - `p1` - **FROM** LISTED **TO** OVERVIEW **WHEN** person_get succeeds; no shared calls uses NO_CALLS - `inst-person`
+3. [x] - `p1` - **FROM** OVERVIEW **TO** CALLS **WHEN** Calls or Show All is selected - `inst-calls`
+4. [x] - `p1` - **FROM** OVERVIEW **TO** HISTORY **WHEN** History is selected; no entries uses NO_HISTORY - `inst-history`
+5. [x] - `p1` - **FROM** OVERVIEW **TO** EDITING **WHEN** Edit Details is chosen; success or Cancel returns to OVERVIEW - `inst-edit`
+6. [x] - `p1` - **FROM** LISTED **TO** MERGING **WHEN** two selected people are merged; success opens the target OVERVIEW, Cancel restores the selection - `inst-merge`
+7. [x] - `p1` - **FROM** PROFILE_OFF **TO** PROFILE_CREATING **WHEN** Create Profile is confirmed - `inst-profile-create`
+8. [x] - `p1` - **FROM** PROFILE_CREATING **TO** PROFILE_ON **WHEN** the core confirms enabled; failure returns to PROFILE_OFF with the error - `inst-profile-on`
+9. [x] - `p1` - **FROM** PROFILE_ON **TO** PROFILE_OFF **WHEN** Delete Profile succeeds after confirmation - `inst-profile-off`
+10. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** a read fails; explicit Try Again returns to LOADING - `inst-error`
 
 ## 5. Definitions of Done
 
 ### People and preparation views
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-people-pages`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-people-pages`
 
 The system **MUST** provide searchable People, Overview, Calls and person-scoped History, core-owned item actions, evidence, Back restoration and the distinct empty states, with metrics absent until enabled.
 
@@ -240,7 +240,7 @@ The system **MUST** provide searchable People, Overview, Calls and person-scoped
 
 ### Identity edits and voice consent
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-people-identity`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-people-identity`
 
 The system **MUST** support create, edit, previewed merge, confirmed deletion and explicit profile consent from core results, offer returned changes to History, and never turn a name assignment into consent. Cross-call atomic naming remains blocked by the contract gap below. `just gate` passes.
 

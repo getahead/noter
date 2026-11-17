@@ -13,7 +13,7 @@ import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
-import { holdPerson, setPersonNotice, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
+import { holdPerson, setPersonNotice, setPersonStatus, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
 
@@ -44,8 +44,10 @@ export function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
 /** **Show All** under Last calls opens the person's Calls view. */
 export const showAll = (id: string) => setPersonTab(id, "calls");
 
+// @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-navigate
 const navigate = (bridge: Bridge, target: Parameters<Bridge["core"]["windowNavigate"]>[0]["target"]) =>
   void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target }), { screen: "person" });
+// @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-navigate
 
 /** A Person page: one `person_get` read, shown as Overview, Calls or History (PE-R2..R6). */
 export function PersonPage({ id }: { id: string }) {
@@ -58,8 +60,9 @@ export function PersonPage({ id }: { id: string }) {
   const [reads, setReads] = useState(0);
   const reread = usePersonReread();
   const notice = usePersonNotice();
-  const status = usePersonStatus();
+  const status = usePersonStatus(id);
   const sheets = usePeopleSheets();
+  useEffect(() => () => (setPersonNotice(null), setPersonStatus(null)), [id]); // a refusal or a done action belongs to the person it was shown on
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     let current = true;
@@ -83,7 +86,7 @@ export function PersonPage({ id }: { id: string }) {
     // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
     onSetUpVoice={() => state.page && sheets.open("person-voice", { bridge, person: state.page.person, calls: state.page.calls.length })}
     // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
-    onDeleteVoice={() => state.page && void confirmDeleteProfile(bridge, state.page.person, setPersonNotice)} />;
+    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice))} />;
 }
 
 export interface PersonBodyProps {
@@ -135,7 +138,9 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
         </div>
       ) : tab === "history" ? (
         <div data-region="PE-HISTORY" role="region" aria-label={t("person.tab.history")}>
+          {/* @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-history */}
           <HistoryTimeline bridge={bridge} target={{ type: "person", person_id: p.id }} variant="person" emptyBody={t("person.history_empty", { name: p.short_name })} />
+          {/* @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-history */}
         </div>
       ) : (
         <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} onSetUpVoice={onSetUpVoice} onDeleteVoice={onDeleteVoice} />
@@ -191,8 +196,10 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
       </div>
     );
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-person
+  // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-items
   const items = (list: Page["owns_open"], empty: string) =>
     list.length ? <div className="lb-items">{list.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />)}</div> : <EmptyState variant="section" title={empty} />;
+  // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-items
   return (
     <div className="pe-cols">
       <div className="pe-col">
@@ -220,9 +227,11 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
                 {p.voice_profile ? <PushButton label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>
+            {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields */}
             <dt>{t("person.names")}</dt>
             <dd>{names}</dd>
             {p.email && (<><dt>{t("person.email")}</dt><dd className="pe-sel">{p.email}</dd></>)}
+            {/* @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-fields */}
             {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-metrics */}
             {page.talk_share !== null && (<><dt>{t("person.talk_share")}</dt><dd>{`${Math.round(page.talk_share * 100)}%`}</dd></>)}
             {/* @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-metrics */}

@@ -21,4 +21,20 @@ test.describe("cpt-noter-dod-ui-people-identity voice profile", () => {
     await page.evaluate(() => scrollTo(0, 0));
     await expect(page).toHaveScreenshot("person-voice-setup.png");
   });
+
+  test("Create Profile confirms on the person's page", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await openWindow(page, "main", { world: W.idle });
+    await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
+    await page.keyboard.press("Meta+Digit4");
+    await expect(page.locator('[data-region="PL-R2"]')).toBeVisible();
+    await page.getByRole("table", { name: "People" }).getByRole("row", { name: /Pavel/ }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('[data-region="PE"]')).toBeVisible();
+    await page.getByRole("button", { name: "Set Up Voice Profile…" }).click();
+    await page.getByRole("dialog", { name: "Set Up Voice Profile" }).getByRole("button", { name: "Create Profile" }).click();
+    await expect(page.getByText("Voice profile created for Pavel")).toBeVisible();
+    await page.evaluate(() => scrollTo(0, 0));
+    await expect(page).toHaveScreenshot("person-voice-created.png");
+  });
 });

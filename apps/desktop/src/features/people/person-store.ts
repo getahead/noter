@@ -38,7 +38,10 @@ const notice = store<string | null>(null);
 export const setPersonNotice = notice.set;
 export const usePersonNotice = notice.use;
 
-/** A done action of the person's page (Voice profile created): shown as a status line. */
-const status = store<string | null>(null);
+/** A done action of the person's page (Voice profile created): a status line on that person's page only. */
+const status = store<{ id: string; text: string } | null>(null);
 export const setPersonStatus = status.set;
-export const usePersonStatus = status.use;
+export const usePersonStatus = (id: string): string | null => {
+  const held = status.use();
+  return held?.id === id ? held.text : null;
+};

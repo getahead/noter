@@ -69,6 +69,13 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(recordingLine(in: openMenu()).exists, "Return chose Cancel: the recording goes on")
     }
 
+    private func dumpTree(_ tag: String) {
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.lifetime = .keepAlways
+        add(tree)
+        print("\(tag)\n\(app.debugDescription)")
+    }
+
     // M3 People (docs/features/ui/people.md › Edit, merge or delete a person): Delete Person… asks with a native alert
     // whose default is Cancel; Delete removes the person and returns to People.
     func test_cpt_noter_seq_people_name_unnamed_speaker__delete_a_person() {
@@ -82,20 +89,14 @@ final class DialogsTests: NoterTestCase {
         }
         let row = person("Oleg M.")
         if !row.waitForExistence(timeout: 10) {
-            let tree = XCTAttachment(string: app.debugDescription)
-            tree.lifetime = .keepAlways
-            add(tree)
-            print("PEOPLE AX TREE\n\(app.debugDescription)")
+            dumpTree("PEOPLE AX TREE")
         }
         XCTAssertTrue(row.exists, "⌘4 shows People with Oleg M.")
         // The ⋯ menu is a web popover: its items are not native menu items.
         func clickDelete() {
             let item = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Delete Person' OR title CONTAINS 'Delete Person'")).firstMatch
             if !item.waitForExistence(timeout: 5) {
-                let tree = XCTAttachment(string: app.debugDescription)
-                tree.lifetime = .keepAlways
-                add(tree)
-                print("MENU AX TREE\n\(app.debugDescription)")
+                dumpTree("MENU AX TREE")
             }
             XCTAssertTrue(item.exists, "the ⋯ menu offers Delete Person…")
             item.click()
@@ -104,10 +105,7 @@ final class DialogsTests: NoterTestCase {
         // The ⋯ button may be exposed as a button, a pop-up or a menu button: match by label.
         let more = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'More'")).firstMatch
         if !more.waitForExistence(timeout: 5) {
-            let tree = XCTAttachment(string: app.debugDescription)
-            tree.lifetime = .keepAlways
-            add(tree)
-            print("PERSON AX TREE\n\(app.debugDescription)")
+            dumpTree("PERSON AX TREE")
         }
         XCTAssertTrue(more.exists, "Oleg M.'s page has its ⋯ menu")
         more.click()
@@ -135,11 +133,7 @@ final class DialogsTests: NoterTestCase {
             app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@ OR title CONTAINS %@", text, text)).firstMatch
         }
         func expect(_ el: XCUIElement, _ message: String) {
-            if !el.waitForExistence(timeout: 10) {
-                let tree = XCTAttachment(string: app.debugDescription)
-                tree.lifetime = .keepAlways
-                add(tree)
-            }
+            if !el.waitForExistence(timeout: 10) { dumpTree("AX TREE") }
             XCTAssertTrue(el.exists, message)
         }
         let row = any("Anna K.")
@@ -149,12 +143,7 @@ final class DialogsTests: NoterTestCase {
         let delete = app.descendants(matching: .button).matching(NSPredicate(format: "label CONTAINS 'Delete Profile' OR title CONTAINS 'Delete Profile'")).firstMatch
         expect(delete, "Anna K. has a voice profile to delete")
         delete.click()
-        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) {
-            let tree = XCTAttachment(string: app.debugDescription)
-            tree.lifetime = .keepAlways
-            add(tree)
-            print("PROFILE AX TREE\n\(app.debugDescription)")
-        }
+        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) { dumpTree("PROFILE AX TREE") }
         XCTAssertTrue(alert.staticTexts["Delete Anna K.'s voice profile?"].exists, "Delete Profile… shows no alert")
         app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
