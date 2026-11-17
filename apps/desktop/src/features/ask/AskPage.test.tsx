@@ -1,8 +1,9 @@
 import { renderToString } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskMsg } from "../../core/bindings";
+import { find, rendered } from "../../ui/testing";
 import { Answer, AskPage, AskView } from "./AskPage";
 import { foldTurn } from "./model";
 
@@ -87,5 +88,39 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
   });
   it("carries the announcement in a polite status region", () => {
     expect(renderToString(<AskView {...props} announce="Answer ready, 2 citations" />)).toContain("Answer ready, 2 citations");
+  });
+});
+
+describe("AskPage wiring (cpt-noter-flow-ui-ask-question)", () => {
+  it("hands the view working handlers: copy, delete, play, suggest, retry, search and Ask Again", async () => {
+    const act = vi.fn(async (_k: string, _c: string, f: () => unknown) => f());
+    const core = { askThreadDelete: vi.fn(async () => ({ status: "ok", data: {} })), audioPlay: vi.fn(async () => ({ status: "ok", data: {} })), askThreadsList: vi.fn(async () => ({ status: "ok", data: { threads: [] } })), askThreadGet: vi.fn(async () => ({ status: "ok", data: { turns: [] } })), askScopePresets: vi.fn(async () => ({ status: "ok", data: { presets: [] } })) };
+    const subscribe = vi.fn();
+    const b = { ...(bridge as object), act, core, subscribe, unsubscribe: vi.fn() } as unknown as Bridge;
+    const write = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { clipboard: { writeText: write } });
+    const tree = rendered(AskPage, { bridge: b });
+    const p = find(tree, (_p, type) => type === AskView).props as unknown as import("./AskPage").AskViewProps;
+    p.onCopyQuestion("Q?");
+    expect(write).toHaveBeenCalledWith("Q?");
+    p.onDelete("a");
+    await Promise.resolve();
+    p.onPlay({ call_id: "c", t0_ms: 1, t1_ms: 2 } as never);
+    p.onSuggest("What did Ann commit to?");
+    expect(subscribe).toHaveBeenCalledWith("ask_start", expect.objectContaining({ question: "What did Ann commit to?" }));
+    p.onSend();
+    p.onRetry();
+    p.onStop();
+    p.onOpen("a");
+    expect(p.suggestions).toEqual([]);
+    vi.unstubAllGlobals();
+  });
+  it("offers Search by Keyword, Ask Again and the local-model action through the answers it draws", () => {
+    const answer = { turn_id: "t", question: "Why?", answer_md: "", citations: [], found: false, stopped: false } as never;
+    const props = { bridge, rows: [], loadError: false, thread: "a", turns: [answer], asking: "Q", turn: null, phase: null, draft: "", busy: false, onOpen() {}, onCopyQuestion() {}, onDelete() {}, onDraft() {}, onSend() {}, announce: "", suggestions: [], onSuggest() {}, onStop() {}, onRetry() {}, onPlay() {}, bar: null };
+    const tree = rendered(AskView, props);
+    const answers = find(tree, (p) => typeof p.onSearch === "function").props as { onSearch: () => void; onAskAgain: () => void };
+    expect(() => answers.onSearch()).not.toThrow();
+    expect(() => answers.onAskAgain()).not.toThrow();
   });
 });

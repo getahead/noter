@@ -9,7 +9,7 @@ import { useEffect } from "react";
 import { ModeIndicator } from "../shell/mode-indicator-view";
 import { modeIndicator } from "../shell/mode-indicator";
 import { foldTurn, phaseOf } from "./model";
-import { isNewKey, newQuestion, setAskState, useAskState } from "./ask-state";
+import { bindNewKey, newQuestion, setAskState, useAskState } from "./ask-state";
 
 // @cpt-component:cpt-noter-component-screen-ask:p1
 export function AskToolbar({ bridge, base }: PageToolbarProps) {
@@ -26,11 +26,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
     presets.length > 0 ? (
       <PopupButton variant="toolbar" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
     ) : undefined;
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => isNewKey(e) && (e.preventDefault(), newQuestion());
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  useEffect(() => bindNewKey(document), []);
   return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion, primary: true }]} trailing={
       <>
         <ModeIndicator view={mode} variant="ask" runtime={privacy?.mode === "local_only" ? "Local model" : "Claude Code"} onOpenPrivacy={openPrivacy} />

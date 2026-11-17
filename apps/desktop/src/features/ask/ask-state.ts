@@ -24,3 +24,10 @@ export const useAskState = (): AskState => useSyncExternalStore(subscribe, askSt
 export const newQuestion = (): void => setAskState({ fresh: state.fresh + 1 });
 /** ⌘N. */
 export const isNewKey = (e: { key: string; metaKey: boolean; shiftKey: boolean }): boolean => e.metaKey && !e.shiftKey && e.key.toLowerCase() === "n";
+
+/** Listen for ⌘N on `doc`; returns the unlisten function. */
+export function bindNewKey(doc: Pick<Document, "addEventListener" | "removeEventListener">): () => void {
+  const onKey = (e: KeyboardEvent) => isNewKey(e) && (e.preventDefault(), newQuestion());
+  doc.addEventListener("keydown", onKey);
+  return () => doc.removeEventListener("keydown", onKey);
+}
