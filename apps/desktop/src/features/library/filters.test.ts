@@ -72,3 +72,10 @@ describe("reconcile and isFiltered", () => {
     expect(isFiltered(reconcile(r.next, { type: "clear" }).next.filter)).toBe(false);
   });
 });
+
+describe("custom date range", () => {
+  it("turns a backwards range round instead of sending from > to", () => {
+    const s = apply(BLANK, { type: "date", preset: "custom", from: "2026-11-10", to: "2026-11-01" });
+    expect(s.filter).toMatchObject({ from: "2026-11-01", to: "2026-11-10" });
+  });
+});

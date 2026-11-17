@@ -16,17 +16,19 @@ export function copyShare(bridge: Bridge, callId: string, scope: ShareScope, for
 }
 
 /** `calls_export`: the core shows the save panel; a whole-call export sends no scope. */
-export function exportCall(bridge: Bridge, callId: string, include: ExportInclude, scope: ShareScope | null) {
+export function exportCall(bridge: Bridge, callId: string | string[], include: ExportInclude, scope: ShareScope | null) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-export
-  return bridge.act(`calls:export:${callId}`, "calls_export", () => bridge.core.callsExport({ call_ids: [callId], include, scope }));
+  const ids = [callId].flat();
+  return bridge.act(`calls:export:${ids.join(",")}`, "calls_export", () => bridge.core.callsExport({ call_ids: ids, include, scope }));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-export
 }
 
 /** The sheet's button: what the save panel and the core made of it. A cancelled panel is no error and no status. */
-export async function runExport(bridge: Bridge, callId: string, include: ExportInclude, scope: ShareScope | null): Promise<{ kind: "done"; path: string } | { kind: "cancelled" | "failed" }> {
+export async function runExport(bridge: Bridge, callId: string | string[], include: ExportInclude, scope: ShareScope | null): Promise<{ kind: "done"; path: string } | { kind: "cancelled" | "failed" | "not_ready" }> {
   const r = await exportCall(bridge, callId, include, scope);
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-cancel
-  if (r.status === "error") return { kind: r.error.code === "cancelled" ? "cancelled" : "failed" };
+  // `outputs_not_ready`: a selected call has nothing to export yet; asking again cannot change that
+  if (r.status === "error") return { kind: r.error.code === "cancelled" ? "cancelled" : r.error.code === "outputs_not_ready" ? "not_ready" : "failed" };
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-share:p1:inst-cancel
   return { kind: "done", path: r.data.path };
 }

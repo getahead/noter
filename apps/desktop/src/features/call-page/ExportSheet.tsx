@@ -15,10 +15,11 @@ import { runExport } from "./share-actions";
 import { scopeLine, scopeOf, type ShareOrigin } from "./share-logic";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-share:p1
-export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKept, onExported }: SheetProps & { bridge: Bridge; callId: string; scopeLabel: string; scope: ShareScope | null; audioKept: boolean; onExported: (path: string) => void }) {
+export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKept, onExported }: SheetProps & { bridge: Bridge; callId: string | string[]; scopeLabel: string; scope: ShareScope | null; audioKept: boolean; onExported: (path: string) => void }) {
   const [on, setOn] = useState({ summary_and_items: true, transcript: false, audio: false });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  const [notReady, setNotReady] = useState(false);
   const none = !on.summary_and_items && !on.transcript && !(audioKept && on.audio);
   const flip = (k: keyof typeof on) => (v: boolean) => setOn((p) => ({ ...p, [k]: v }));
 
@@ -27,7 +28,8 @@ export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKep
     setBusy(true);
     const r = await runExport(bridge, callId, { ...on, audio: audioKept && on.audio }, scope);
     setBusy(false);
-    if (r.kind === "failed") return setFailed(true); // options stay for another try
+    if (r.kind === "not_ready") return (setFailed(false), setNotReady(true)); // no Try Again: it would be refused the same way
+    if (r.kind === "failed") return (setNotReady(false), setFailed(true)); // options stay for another try
     if (r.kind === "done") onExported(r.path);
     close();
   };
@@ -44,6 +46,7 @@ export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKep
         {audioKept && <Checkbox label={t("export.audio")} checked={on.audio} onAction={flip("audio")} />}
         <p className="np-dim">{t("export.note")}</p>
         {none && <p className="np-dim" role="status">{t("export.none")}</p>}
+        {notReady && <InlineBanner banner={{ id: "export-not-ready", severity: "warning", text: t("export.not_ready") }} />}
         {failed && <InlineBanner banner={{ id: "export-error", severity: "error", text: t("export.failed"), actions: [{ label: t("action.try_again"), onAction: () => void run() }] }} />}
       </div>
       <SheetFooter defaultButton={<PushButton label={t("export.confirm")} variant="primary" submit loading={busy} disabled={none} onAction={() => void run()} />}>
@@ -58,4 +61,11 @@ export function useExport(bridge: Bridge, callId: string, audioKept: boolean, on
   const sheets = useSheetIfAny();
   useEffect(() => sheets?.register("export", ExportSheet as never), [sheets]);
   return (origin: ShareOrigin) => sheets?.open("export", { bridge, callId, scopeLabel: scopeLine(origin), scope: origin.type === "toolbar" ? null : scopeOf(origin, false), audioKept, onExported });
+}
+
+/** Export… for the calls selected in the Library: one sheet, only those ids, no scope (audio is not offered for a set). */
+export function useExportCalls(bridge: Bridge, onExported: (path: string) => void) {
+  const sheets = useSheetIfAny();
+  useEffect(() => sheets?.register("export", ExportSheet as never), [sheets]);
+  return (ids: string[]) => sheets?.open("export", { bridge, callId: ids, scopeLabel: t("export.scope_calls", { count: ids.length }), scope: null, audioKept: false, onExported });
 }
