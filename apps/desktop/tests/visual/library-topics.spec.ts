@@ -55,6 +55,22 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await shot(page, "topics-thread", width);
     });
 
+    test(`row context menu`, async ({ page }) => {
+      await topics(page, px);
+      await page.locator(TOPIC_ROW).first().click({ button: "right" });
+      await expect(page.getByRole("menuitem", { name: "Rename…" })).toBeVisible();
+      await shot(page, "topics-row-menu", width);
+    });
+
+    test(`thread: Ask About This Thread is enabled in the toolbar`, async ({ page }) => {
+      await topics(page, px);
+      await page.locator(TOPIC_ROW).first().click();
+      const ask = page.getByRole("button", { name: "Ask About This Thread" });
+      await expect(ask).toBeEnabled();
+      await ask.focus();
+      await shot(page, "topics-thread-ask", width);
+    });
+
     test(`nothing left`, async ({ page }) => {
       await topics(page, px, (w) => (w.items = w.items.map((i) => ({ ...i, topic: null }))));
       await page.locator(TOPIC_ROW).first().click();
@@ -115,7 +131,7 @@ test.describe("cpt-noter-dod-ui-library-search-topics-topics Rename and merge at
     await menu(page, "Rename…");
     await page.getByRole("textbox", { name: "Topic name" }).fill("Drawer redesign, renamed");
     await page.getByRole("button", { name: "Rename", exact: true }).click();
-    await expect(page.getByText(/Renamed topic to/)).toBeVisible();
+    await expect(page.getByText(/Renamed “.+” to “.+”/)).toBeVisible();
     await shot(page, "topics-renamed-undo", "wide");
   });
   test("Merge sheet", async ({ page }) => {

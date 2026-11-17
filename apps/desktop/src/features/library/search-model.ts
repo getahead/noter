@@ -27,7 +27,13 @@ export type SearchStatus = "LOADING" | "RESULTS" | "WEAK_ONLY" | "NO_MATCHES" | 
 // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-all-weak
 export const statusOf = (r: SearchResults): SearchStatus => {
   const total = r.calls.length + r.items.length + r.documents.length;
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-weak
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-results
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-no-matches
   return !total && !r.topics.length ? "NO_MATCHES" : r.only_weak ? "WEAK_ONLY" : "RESULTS";
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-no-matches
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-results
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-weak
 };
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-all-weak
 
@@ -40,7 +46,9 @@ export interface Section {
 // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mixed
 /** Items before transcript chunks, then documents; strong hits first within a section and the weak ones after them. */
 export function sections(r: SearchResults): Section[] {
+  // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-authority
   const split = (key: Section["key"], hits: SearchHit[]): Section => ({ key, strong: hits.filter((h) => h.strength === "strong"), weak: hits.filter((h) => h.strength !== "strong") });
+  // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-authority
   return [split("items", r.items), split("transcripts", r.calls), split("documents", r.documents)].filter((s) => s.strong.length + s.weak.length);
 }
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mixed

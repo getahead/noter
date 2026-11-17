@@ -37,4 +37,13 @@ test.describe("cpt-noter-dod-ui-library-search-topics-search Export of selected 
     await expect(page.getByRole("status").filter({ hasText: "Exported to" })).toBeVisible();
     await shot(page, "library-export-done");
   });
+
+  test("the Calls context menu offers Export… with ⌘E before Delete…", async ({ page }) => {
+    await calls(page);
+    await page.locator(ROW).first().click();
+    await page.locator(ROW).nth(1).click({ modifiers: ["Meta"] });
+    await page.locator(ROW).first().click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: /^Export…/ })).toBeVisible();
+    await shot(page, "library-export-menu");
+  });
 });

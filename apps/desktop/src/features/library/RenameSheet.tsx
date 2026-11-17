@@ -27,11 +27,14 @@ export function RenameSheet({ close, bridge, topic, known, onRenamed, onMergeIns
     setBusy(true);
     const out = await renameTopic(bridge, topic, name, known, onRenamed);
     setBusy(false);
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-renamed
     if (out.type === "renamed") return close();
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-renamed
     if (out.type === "clash") return setProblem({ text: t("topics.rename_clash", { name: out.other.name }), clash: out.other });
     setProblem({ text: t(out.type === "blank" ? "topics.rename_blank" : out.type === "stale" ? "topics.rename_stale" : "topics.rename_failed") });
     if (out.type === "stale") onRenamed();
   }
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-rename-form
   return (
     <Sheet title={t("topics.rename_title")} width={480} busy={busy} onCancel={close} onDefault={() => void run()}>
       <div className="np-sheet__head">
@@ -46,4 +49,5 @@ export function RenameSheet({ close, bridge, topic, known, onRenamed, onMergeIns
       </SheetFooter>
     </Sheet>
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-rename-form
 }

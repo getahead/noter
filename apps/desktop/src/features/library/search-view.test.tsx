@@ -1,7 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
-import { SearchView, type Read, type SearchViewProps } from "./SearchPage";
+import { navigateEffect } from "../shell/navigate";
+import { resultCount, SearchView, type Read, type SearchViewProps } from "./SearchPage";
 
 const hit = (strength: "strong" | "weak", call = "c1", title = "T") =>
   ({ target: { type: "item", item_id: "i" }, title, snippet: "websocket", highlights: [{ start: 0, end: 9 }], lang: "en", strength, call: { id: call, title: call }, cross_language: false }) as never;
@@ -22,10 +23,12 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     const none = props(results(), { filter: {} });
     expect(html(none)).toContain("No matches for “websocket”");
     expect(html(none)).toContain("Ask Instead");
+    expect(html(none)).toContain("Try fewer words");
     expect(html(none)).not.toContain("Clear Filters");
     const filtered = props(results(), { filter: { tags: ["release"] } });
     expect(html(filtered)).toContain("Clear Filters");
     expect(html(filtered)).toContain("1 filter active");
+    expect(html(filtered)).toContain("Try fewer words"); // still offered while filters are set
     const ask = find(rendered(SearchView, none), (x) => x.label === "Ask Instead");
     (ask.props.onAction as () => void)();
     expect(none.onAsk).toHaveBeenCalled();
@@ -62,12 +65,64 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     expect(h).toContain("Websocket notifications");
     expect(h).toContain("6 calls · 3 decisions · 1 open question");
     expect(h).toContain("1 result");
+    expect(html(props(results({ topics: [topic, { ...topic, id: "top_9", name: "Other" }] }), { bridge }))).toContain("1 result"); // one chip renders, so one result
     expect(h).not.toContain("0 results");
     (find(rendered(SearchView, p), (x) => typeof x.onOpen === "function").props.onOpen as () => void)();
+    const moves: unknown[] = [];
+    const stop = navigateEffect((e) => moves.push(e));
+    (find(rendered(SearchView, p), (x) => x.label === "Ask About This").props.onAction as () => void)();
+    stop();
+    expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "ask", key: "new-topic:top_1" } } }]);
     expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+  it("↓ on the results title enters the first hit", () => {
+    const focus = vi.fn();
+    const title = {};
+    const root = { querySelector: (q: string) => (q === "h2" ? title : { focus }) };
+    const tree = rendered(SearchView, props(results({ items: [hit("strong")] })));
+    const region = find(tree, (p) => p.className === "lb-search");
+    const press = (key: string, target: unknown) => (region.props.onKeyDown as (e: unknown) => void)({ key, target, currentTarget: root, preventDefault: vi.fn() });
+    press("ArrowDown", {});
+    expect(focus).not.toHaveBeenCalled();
+    press("ArrowUp", title);
+    expect(focus).not.toHaveBeenCalled();
+    press("ArrowDown", title);
+    expect(focus).toHaveBeenCalled();
+  });
+  it("ends every result state with Show How Noter Searched; Search All Languages only with a Language filter", () => {
+    expect(html(props(results({ items: [hit("strong")] })))).toContain("Show How Noter Searched");
+    const weak = results({ items: [hit("weak")], only_weak: true });
+    expect(html(props(weak))).not.toContain("Search All Languages");
+    const p = props(weak, { filter: { languages: ["de"] } as never, onAllLanguages: vi.fn() });
+    expect(html(p)).toContain("Search All Languages");
+    expect(html(p)).toContain("1 filter active"); // the warning says how many filters narrow the search
+    const banner = find(rendered(SearchView, p), (x) => (x.banner as { id?: string } | undefined)?.id === "search-weak-only").props.banner as { actions: { label: string; onAction: () => void }[] };
+    banner.actions.find((a) => a.label === "Search All Languages")!.onAction();
+    expect(p.onAllLanguages).toHaveBeenCalled();
   });
   it("shows the keyword-only line while the index rebuilds", () => {
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");
+  });
+});
+
+describe("results page head", () => {
+  it("counts every section, or the one topic row when only a topic matched", () => {
+    const r = (o: object) => (results(o) as unknown as { results: never }).results;
+    expect(resultCount(r({ items: [hit("strong")], calls: [hit("strong"), hit("weak")] }))).toBe(3);
+    expect(resultCount(r({ topics: [{}, {}] }))).toBe(1);
+    expect(resultCount(r({}))).toBe(0);
+  });
+  it("draws the filter bar the page hands it above the results", () => {
+    expect(html(props(results({ items: [hit("strong")] }), { bar: <nav>BAR</nav> }))).toContain("<nav>BAR</nav>");
+  });
+});
+
+describe("playback in the results", () => {
+  it("hands the window's playback to each transcript row", () => {
+    const seg = { ...(hit("strong") as object), target: { type: "segment", span: { call_id: "c1", t0_ms: 0, t1_ms: 5, channel: null } } } as never;
+    const playback = { playing: true, call_id: "c1", position_ms: 1 } as never;
+    expect(html(props(results({ calls: [seg] }), { playback }))).toContain('aria-label="Pause"');
+    expect(html(props(results({ calls: [seg] })))).toContain('aria-label="Play this line"');
   });
 });

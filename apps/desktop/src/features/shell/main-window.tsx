@@ -291,9 +291,11 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           onSearch={setSearch}
           onPickTag={pickTag}
           onRunSearch={(q) => {
+            // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-submit
             const tag = tagChoice(q, tagChoices);
             if (tag) pickTag(tag); // an exact #tag on Return is a filter, anything else a search
             else dispatch({ type: "move", move: { type: "push", route: searchRoute(q.trim()) } });
+            // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-submit
           }}
           onOpenSearch={() => act({ type: "focus-search" })}
           onSearchBlur={() => setSearchOpen(false)}

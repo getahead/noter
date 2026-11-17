@@ -57,6 +57,8 @@ export interface CallsViewProps {
   onAddTag?: () => void;
   /** Removes one tag from the selected calls (Remove Tag in the context menu). */
   onRemoveTag?: (tag: string) => void;
+  /** Export… of the selection (⌘E), as the toolbar button does. */
+  onExport?: () => void;
 }
 
 const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
@@ -116,6 +118,7 @@ export function CallsView(p: CallsViewProps) {
             onAddTag={p.onAddTag}
             tags={[...new Set(chosen.flatMap((c) => c.tags))]}
             onRemoveTag={p.onRemoveTag}
+            onExport={p.onExport}
           />
         </div>
       )}
@@ -142,6 +145,7 @@ function Body(p: CallsViewProps) {
     );
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
+  // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-filter-empty
   if (state.status === "EMPTY" && p.filtered)
     return (
       <EmptyState
@@ -151,6 +155,7 @@ function Body(p: CallsViewProps) {
         onAction={p.onClearFilters}
       />
     );
+  // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-filter-empty
   if (state.status === "EMPTY")
     return (
       <EmptyState
@@ -280,6 +285,7 @@ export function ContextMenu({
   onAddTag,
   tags = [],
   onRemoveTag,
+  onExport,
 }: {
   onClose: () => void;
   single: CallRow | null;
@@ -289,6 +295,7 @@ export function ContextMenu({
   /** The tags the selection carries. */
   tags?: string[];
   onRemoveTag?: (tag: string) => void;
+  onExport?: () => void;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -310,6 +317,7 @@ export function ContextMenu({
           // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
           ...(onRemoveTag ? (tags.length ? [{ header: t("library.remove_tag") }, ...tags.map((tag) => ({ label: tag, onSelect: run(() => onRemoveTag(tag)) }))] : [{ label: t("library.remove_tag"), disabled: true }]) : []),
           // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
+          ...(onExport ? [{ label: t("library.export"), kbd: "⌘E", onSelect: run(onExport) }] : []),
           { divider: true },
           {
             label: t("library.menu.delete"),

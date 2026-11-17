@@ -1,22 +1,30 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Link } from "../../ui/primitives/link";
+import { Popover } from "../../ui/primitives/popover";
 import { useBridge } from "../../app/bridge/context";
+import { useWindow } from "../../app/use-window";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallFilter, SearchResults } from "../../core/bindings";
+import type { CallFilter, PlaybackState, SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { navigate } from "../shell/navigate";
 import { TopicChip } from "../../ui/primitives/topic-chip";
 import { PushButton } from "../../ui/primitives/push-button";
-import { apply, heldFilter, holdFilter, isFiltered } from "./filters";
+import { apply, heldFilter, holdFilter, isFiltered, reconcile, type FilterAction } from "./filters";
+import { FilterBar, useLists } from "./filter-bar";
+import { usePublishHead } from "./topics-head";
 import { SearchResultRow } from "./SearchResultRow";
-import { openTopic } from "./topic-nav";
+import { askAboutTopic, openTopic } from "./topic-nav";
 import { topicCounts } from "./topics-model";
 import { askRoute, groupByCall, once, sections, statusOf } from "./search-model";
 import "./library.css";
 
 const SECTION = { items: "search.section.items", transcripts: "search.section.transcripts", documents: "search.section.documents" } as const;
 export type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: "OK"; results: SearchResults };
+
+/** The result count the page says: hits of every section, or the one topic row when only a topic matched. */
+export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
 
 export interface SearchViewProps {
   bridge: Bridge;
@@ -28,14 +36,26 @@ export interface SearchViewProps {
   onMore: (group: string) => void;
   onRetry: () => void;
   onClear: () => void;
+  /** Drops the Language filter (the weak-match warning offers it only while one is set). */
+  onAllLanguages?: () => void;
   onAsk: () => void;
+  /** The filter bar (LS-R1), above the info line. */
+  bar?: ReactNode;
+  /** The window's playback state, for each row's Play / Pause. */
+  playback?: PlaybackState | null;
 }
 
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
-export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAsk }: SearchViewProps) {
+export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
+  const [how, setHow] = useState(false);
+  const howAt = useRef<HTMLSpanElement>(null);
   const body = () => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-error
     const r = read.results;
     const status = statusOf(r);
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
@@ -46,7 +66,6 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
       <div className="lb-actions">
         {filtered && (
           <>
-            <span className="np-dim">{t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}</span>
             <PushButton label={clear.label} size="small" onAction={clear.onAction} />
           </>
         )}
@@ -57,31 +76,41 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     if (status === "NO_MATCHES")
       return (
         <>
-          <EmptyState variant="filtered" title={t("search.none", { query })} />
+          <EmptyState variant="filtered" title={t("search.none", { query })} body={[filtered ? t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length }) + "." : "", t("search.try_fewer")].filter(Boolean).join(" ")} />
           {widen}
         </>
       );
-    // A search that only found topics still has results to count.
-    const total = r.calls.length + r.items.length + r.documents.length || r.topics.length;
+    // A search that only found topics still has a result to count: the one topic row.
+    const total = resultCount(r);
     const topic = r.topics[0];
     return (
       <>
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
+          {" · "}
+          <span ref={howAt}>
+            <Link label={t("search.how")} onAction={() => setHow(!how)} />
+          </span>
         </p>
-        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }), actions: filtered ? [clear, ask] : [ask] }} />}
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
+        {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) + (filtered ? ` ${t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}.` : ""), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>
             <TopicChip size="suggestion" name={topic.name} counts={topicCounts(topic)} merge={topic.merge_suggestion ? t("topics.merge_glyph") : undefined} onOpen={() => openTopic(bridge, topic.id)} />
+            <PushButton label={t("topics.ask_this")} size="small" onAction={() => askAboutTopic(topic.id)} />
           </section>
         )}
+        {/* @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>
             {groupByCall(s.strong, 3).map((g) => (
               <ul key={g.callId} className="lb-items">
                 {(open.has(`${s.key}:${g.callId}`) ? [...g.shown, ...g.hidden] : g.shown).map((h, i) => (
-                  <SearchResultRow key={i} bridge={bridge} hit={h} />
+                  <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
                 ))}
                 {g.hidden.length > 0 && !open.has(`${s.key}:${g.callId}`) && (
                   <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call", { count: g.hidden.length })}</button></li>
@@ -93,33 +122,73 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
                 {status !== "WEAK_ONLY" && <h4 className="lb-thmonth__h">{t("search.weaker")}</h4>}
                 <ul className="lb-items">
                   {s.weak.map((h, i) => (
-                    <SearchResultRow key={i} bridge={bridge} hit={h} />
+                    <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
                   ))}
                 </ul>
               </>
             )}
           </section>
         ))}
+        {/* @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
+        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
+        {how && (
+          <Popover variant="how-searched" anchor={howAt.current} width={320} label={t("search.how_title")} onClose={() => setHow(false)}>
+            <div className="lb-pop">
+              <strong>{t("search.how_title")}</strong>
+              <span>{t("search.how_words", { words: r.explain.normalized_query || query })}</span>
+              <span>{t("search.how_meaning", { state: r.mode.type === "hybrid" ? t("search.on") : t("search.off") })}</span>
+              <span>{t("search.how_languages", { languages: filter.languages?.length ? filter.languages.map((l) => (typeof l === "string" ? l : l.code).toUpperCase()).join(", ") : t("search.all") })}</span>
+              <span>{t("search.how_filters", { filters: r.explain.filters_applied ? t("search.how_n", { count: r.explain.filters_applied }) : t("search.how_none") })}</span>
+            </div>
+          </Popover>
+        )}
+        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-explain */}
       </>
     );
   };
+  // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-return
   return (
-    <div data-region="LS-R1" className="lb-search">
-      <h2 className="lb-title" tabIndex={-1}>{t("search.title")}</h2>
+    <div
+      data-region="LS-R1"
+      className="lb-search"
+      // focus lands on the title after a search: ↓ from there enters the first hit
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowDown" || e.target !== e.currentTarget.querySelector("h2")) return;
+        const hit = e.currentTarget.querySelector<HTMLElement>(".lb-hit");
+        if (hit) (e.preventDefault(), hit.focus());
+      }}
+    >
+      <h2 className="np-sr" tabIndex={-1}>{t("search.title")}</h2>
+      {bar}
       {body()}
     </div>
   );
+  // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-return
 }
 
 // @cpt-state:cpt-noter-state-ui-library-search-topics-view:p1
 // @cpt-component:cpt-noter-component-screen-library:p1
+// @cpt-dod:cpt-noter-dod-ui-library-search-topics-search:p1
 /** Library › Search results: one `search` read per words and filter, an answer for older ones is dropped, Try Again only on request. */
 export function SearchPage({ query }: { query: string }) {
   const bridge = useBridge();
   const [read, setRead] = useState<Read>({ status: "LOADING" });
   const [again, setAgain] = useState(0);
   const [open, setOpen] = useState<Set<string>>(new Set());
-  const filter = heldFilter().filter;
+  const [fstate, setFstate] = useState(heldFilter);
+  const filter = fstate.filter;
+  const lists = useLists(bridge);
+  const playback = useWindow(bridge, (s) => s.whole.playback);
+  // the bar changes the held filter; a changed filter reads the search again
+  const onFilter = (a: FilterAction) => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
+    const { next, reread } = reconcile(fstate, a);
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
+    setFstate(next);
+    holdFilter(next);
+    if (reread) setAgain((n) => n + 1);
+  };
+  usePublishHead(null, read.status === "OK" ? t("search.count", { count: resultCount(read.results) }) : null);
   const reads = useRef(once());
   useEffect(() => {
     const mine = reads.current.start(again, query);
@@ -131,6 +200,7 @@ export function SearchPage({ query }: { query: string }) {
     });
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
   }, [bridge, query, again]);
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-return-search
   return (
     <SearchView
       bridge={bridge}
@@ -140,8 +210,18 @@ export function SearchPage({ query }: { query: string }) {
       open={open}
       onMore={(g) => setOpen(new Set(open).add(g))}
       onRetry={() => setAgain((n) => n + 1)}
-      onClear={() => (holdFilter(apply(heldFilter(), { type: "clear" })), setAgain((n) => n + 1))}
+      playback={playback}
+      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
+      onClear={() => onFilter({ type: "clear" })}
+      onAllLanguages={() => {
+        // one state from every toggle: separate actions would each start from the same stale state
+        const next = (filter.languages ?? []).reduce((st, l) => apply(st, { type: "toggle", group: "languages", value: typeof l === "string" ? l : l.code }), fstate);
+        setFstate(next);
+        holdFilter(next);
+        setAgain((n) => n + 1);
+      }}
       onAsk={() => navigate(askRoute(query))}
     />
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-return-search
 }

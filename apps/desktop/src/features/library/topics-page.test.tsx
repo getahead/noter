@@ -8,12 +8,17 @@ import { DialogsProvider } from "../../ui/dialogs/host";
 import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
+import { slots } from "../call-page/slots";
+import { closeOnPointer, topicMenu } from "./TopicsPage";
+import { navigateEffect } from "../shell/navigate";
+import { askTopicRoute } from "./topic-nav";
 import { ThreadRow } from "./ThreadRow";
 import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
 import { setTopicWords, topicWords } from "./topics-query";
 import { openTopic } from "./topic-nav";
-import { useRead } from "./use-read";
+import { claim, useRead } from "./use-read";
+import { registerTopicSheets } from "./ThreadPage";
 import "./register-topics";
 import { pageFor } from "../shell/pages";
 
@@ -80,6 +85,18 @@ describe("Topics page (cpt-noter-flow-ui-library-search-topics-topic)", () => {
     openTopic(bridge, "t1");
     expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
   });
+  it("a thread row is reachable with Tab and hands Return and ⌘I to the item keys", async () => {
+    const fake = await ready();
+    const item = fake.world.items.find((i) => i.topic)!;
+    const keys = vi.fn();
+    slots.itemKeys = keys;
+    const row = find(rendered(ThreadRow, { bridge, item, call: item.call }), (p) => p.className === "pc-item lb-throw" || (typeof p.className === "string" && p.className.includes("lb-throw")));
+    expect(row.props.tabIndex).toBe(0);
+    const e = { key: "Enter" };
+    (row.props.onKeyDown as (e: unknown) => void)(e);
+    expect(keys).toHaveBeenCalledWith(bridge, item, e);
+    slots.itemKeys = null;
+  });
 });
 
 describe("Topic thread (cpt-noter-state-ui-library-search-topics-view)", () => {
@@ -117,14 +134,23 @@ describe("useRead", () => {
 });
 
 describe("toolbars and thread rows", () => {
-  it("the toolbars show the published head and the thread's Ask waits for Ask", async () => {
+  it("the toolbars show the published head, and the thread's Ask About This Thread asks about its topic", async () => {
     await ready();
     setHead({ title: "Drawer redesign", subtitle: "3 calls" });
-    const bar = rendered(ThreadToolbar as never, { base: {}, route: {}, bridge } as never);
+    const bar = rendered(ThreadToolbar as never, { base: {}, route: { section: "topics", key: "topic:top_ws" }, bridge } as never);
     expect(bar.props.title).toBe("Drawer redesign");
     expect(bar.props.subtitle).toBe("3 calls");
-    const trailing = find(bar, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { disabled: boolean } }] } };
-    expect(trailing.props.children[0].props.disabled).toBe(true);
+    const askOf = (b: ReturnType<typeof rendered>) => (find(b, (p) => "trailing" in p).props.trailing as { props: { children: [{ props: { label: string; disabled: boolean; onAction: () => void } }] } }).props.children[0].props;
+    const ask = askOf(bar);
+    expect(ask.label).toBe("Ask About This Thread");
+    expect(ask.disabled).toBe(false);
+    const moves: unknown[] = [];
+    const stop = navigateEffect((e) => moves.push(e));
+    ask.onAction();
+    stop();
+    expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "ask", key: "new-topic:top_ws" } } }]);
+    expect(askTopicRoute("top_x")).toEqual({ section: "ask", key: "new-topic:top_x" });
+    expect(askOf(rendered(ThreadToolbar as never, { base: {}, route: { section: "topics", key: "root" }, bridge } as never)).disabled).toBe(true);
     expect(rendered(TopicsToolbar as never, { base: {}, route: {}, bridge } as never).props.subtitle).toBe("3 calls");
     setHead({ title: null, subtitle: null });
   });
@@ -139,5 +165,48 @@ describe("toolbars and thread rows", () => {
     const tree = rendered(ThreadRow, { bridge, item, call: item.call });
     (find(tree, (p) => typeof p.label === "string" && p.label.includes(item.call.title)).props.onAction as () => void)();
     expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+});
+
+describe("the Topics row context menu", () => {
+  it("offers Open, Rename… and Merge With…, each closing the menu before it acts", () => {
+    const [open, rename, merge, close] = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+    const items = topicMenu(open, { rename, merge }, close);
+    expect(items.map((i) => i.label)).toEqual(["Open", "Rename…", "Merge With…"]);
+    items.forEach((i) => i.onSelect());
+    expect([open, rename, merge].every((f) => f.mock.calls.length === 1)).toBe(true);
+    expect(close).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("small page helpers", () => {
+  it("closeOnPointer listens until stopped", () => {
+    const [add, remove, close] = [vi.fn(), vi.fn(), vi.fn()];
+    vi.stubGlobal("document", { addEventListener: add, removeEventListener: remove });
+    const stop = closeOnPointer(close);
+    expect(add).toHaveBeenCalledWith("pointerdown", close);
+    stop();
+    expect(remove).toHaveBeenCalledWith("pointerdown", close);
+    vi.unstubAllGlobals();
+  });
+  it("registers the Rename and Merge sheets, and claims a read key once", () => {
+    const register = vi.fn();
+    registerTopicSheets({ register } as never);
+    expect(register.mock.calls.map((c) => c[0])).toEqual(["topic-rename", "topic-merge"]);
+    const ref = { current: null as string | null };
+    expect([claim(ref, "a"), claim(ref, "a"), claim(ref, "b")]).toEqual([true, false, true]);
+  });
+  it("a Topics row opens its menu from the keyboard (Menu key, ⇧F10) at the row, and from the mouse where it was clicked", () => {
+    const onContext = vi.fn();
+    const row = find(rendered(TopicLine, { bridge: {} as never, topic: { id: "t", name: "T" } as never, stop: true, merge: null, last: "—", onContext }), (p) => typeof p.onKeyDown === "function");
+    const e = (key: string, shiftKey = false) => ({ key, shiftKey, preventDefault: vi.fn(), currentTarget: { getBoundingClientRect: () => ({ left: 10, bottom: 50 }) } });
+    (row.props.onKeyDown as (e: unknown) => void)(e("ContextMenu"));
+    expect(onContext).toHaveBeenLastCalledWith({ x: 34, y: 50 });
+    (row.props.onKeyDown as (e: unknown) => void)(e("F10", true));
+    expect(onContext).toHaveBeenCalledTimes(2);
+    (row.props.onKeyDown as (e: unknown) => void)(e("F10"));
+    expect(onContext).toHaveBeenCalledTimes(2);
+    (row.props.onContextMenu as (e: unknown) => void)({ clientX: 5, clientY: 6, preventDefault: vi.fn() });
+    expect(onContext).toHaveBeenLastCalledWith({ x: 5, y: 6 });
   });
 });

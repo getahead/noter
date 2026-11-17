@@ -59,5 +59,3 @@ export const movesOf = (groups: TopicThreadGroup[]) => ({
   calls: groups.filter((g) => g.items.length).length,
 });
 
-/** How many items a merge moves: the source thread's entries. */
-export const itemsOf = (groups: TopicThreadGroup[]): number => groups.reduce((n, g) => n + g.items.length, 0);

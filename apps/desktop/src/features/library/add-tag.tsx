@@ -10,12 +10,19 @@ export function AddTagPopover({ anchor, count, inUse, onAdd, onClose }: { anchor
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const commit = async (text: string) => {
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-commit-tag
     const c = checkTag(text);
     if ("error" in c) return setError(t(c.error));
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-commit-tag
     // the draft stays when the write fails, for an explicit retry
     if (await onAdd(c.tag)) onClose();
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-if-write-fails
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-error
     else setError(t("tags.failed"));
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-error
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-if-write-fails
   };
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-add-popover
   return (
     <Popover variant="add-tag" anchor={anchor} width={300} label={t("tags.add_to", { count })} onClose={onClose}>
       <div className="lb-pop">
@@ -27,4 +34,5 @@ export function AddTagPopover({ anchor, count, inUse, onAdd, onClose }: { anchor
       </div>
     </Popover>
   );
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-add-popover
 }

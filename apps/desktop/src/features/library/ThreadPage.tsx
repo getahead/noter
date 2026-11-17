@@ -19,6 +19,7 @@ import { useRead } from "./use-read";
 import "./library.css";
 
 // @cpt-component:cpt-noter-component-screen-library:p1
+// @cpt-dod:cpt-noter-dod-ui-library-search-topics-topics:p1
 /** Library › Topic thread (TH-R1, TH-R3): the topic's counts and its entries by month, newest first. */
 export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: string }) {
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-get-topic
@@ -35,10 +36,7 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   useEffect(() => {
     void bridge.act("topics_list", "topics_list", () => bridge.core.topicsList({}), { screen: "library-topics" }).then((r) => r.status === "ok" && setAll(r.data.topics));
   }, [bridge, data?.topic.rev]);
-  useEffect(() => {
-    sheets.register("topic-rename", RenameSheet as never);
-    sheets.register("topic-merge", MergeSheet as never);
-  }, [sheets]);
+  useRegisterTopicSheets(sheets);
   const actions = data && threadActions(sheets, bridge, data.topic, all, retry, setKeepFailed);
   const latest = useRef(actions);
   latest.current = actions;
@@ -47,12 +45,27 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
   return <ThreadView bridge={bridge} status={read.status} retry={retry} data={data} months={months} prefs={prefs} actions={actions ?? undefined} keepFailed={keepFailed} />;
 }
 
+/** The Rename and Merge sheets, on the host before a page opens them. */
+export function registerTopicSheets(sheets: Sheets): void {
+  sheets.register("topic-rename", RenameSheet as never);
+  sheets.register("topic-merge", MergeSheet as never);
+}
+export function useRegisterTopicSheets(sheets: Sheets | null) {
+  useEffect(() => void (sheets && registerTopicSheets(sheets)), [sheets]);
+}
+
 /** What the thread's buttons do: the sheets over the page, and Keep Separate at once. */
 export function threadActions(sheets: Sheets, bridge: Bridge, topic: TopicRow, all: TopicRow[], retry: () => void, onKeepFailed: (failed: boolean) => void = () => {}): ThreadActions {
   const merge = (target?: string) => sheets.open("topic-merge", { bridge, source: topic, target, known: all, onMerged: (kept: TopicRow) => (openTopic(bridge, kept.id), retry()), refresh: retry });
   return {
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-rename
     rename: () => sheets.open("topic-rename", { bridge, topic, known: all, onRenamed: retry, onMergeInstead: (other: TopicRow) => merge(other.id) }),
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-rename
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-clash-merge
+    // @cpt-begin:cpt-noter-state-ui-library-search-topics-view:p1:inst-merge
     merge: () => merge(topic.merge_suggestion?.id),
+    // @cpt-end:cpt-noter-state-ui-library-search-topics-view:p1:inst-merge
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
     keepSeparate: () => topic.merge_suggestion && void keepSeparate(bridge, topic.id, topic.merge_suggestion.id).then((ok) => (onKeepFailed(!ok), ok && retry())),
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-separate
@@ -106,6 +119,7 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
       )}
       <div data-region="TH-R3" role="region" aria-label={t("topics.timeline")} className="lb-thread" data-state={months.length ? "thread" : "thread-empty"}>
         {months.length ? (
+          // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-timeline
           months.map((m) => (
             <div key={m.label} className="lb-thmonth">
               <h2 className="lb-thmonth__h">{m.label}</h2>
@@ -116,10 +130,13 @@ export function ThreadView({ bridge, status, retry, data, months, prefs, actions
               </ul>
             </div>
           ))
+          // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-timeline
         ) : (
+          // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-empty-topic
           // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-empty-topic
           <EmptyState variant="large" icon="thread" title={t("topics.nothing_title")} body={t("topics.nothing_body")} />
           // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-empty-topic
+          // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-if-empty-topic
         )}
       </div>
     </>
