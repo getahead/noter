@@ -6,7 +6,7 @@ import { undoMode } from "../history/undo";
 import { find, rendered } from "../../ui/testing";
 import { deletePerson, mergePeople, updatePerson } from "./actions";
 import { EditPersonSheet, patchOf } from "./EditPersonSheet";
-import { MergePeopleSheet, mergeTargets } from "./MergePeopleSheet";
+import { MergePeopleSheet, mergeTargets, readPreview } from "./MergePeopleSheet";
 import { rowMenu } from "./PeoplePage";
 import { leave } from "./leave";
 import { confirmDelete } from "./sheets";
@@ -81,6 +81,26 @@ describe("cpt-noter-flow-ui-people-edit-merge", () => {
     const preset = renderToString(<MergePeopleSheet bridge={bridgeOf({})} source={person()} people={[person(), person({ id: "per_q", display_name: "Pasha Q." })]} target="per_q" close={() => {}} />);
     expect(preset).toContain("What moves to Pasha Q.");
     expect(preset).toContain("The voice profile");
+  });
+  it("Save sends the patch through the sheet; Merge sends the chosen pair; the preview read answers null on failure", async () => {
+    const b = bridgeOf(ok()) as { core: { personUpdate: ReturnType<typeof vi.fn>; peopleMerge: ReturnType<typeof vi.fn> } };
+    const close = vi.fn();
+    const edit = rendered(EditPersonSheet, { bridge: b as never, person: person(), close });
+    const def = (t: ReturnType<typeof rendered>) => (find(t, (p) => p.defaultButton !== undefined).props.defaultButton as { props: { onAction: () => Promise<void> } }).props.onAction;
+    await def(edit)();
+    expect(b.core.personUpdate).toHaveBeenCalledWith({ person_id: "per_p", rev: 3, patch: {} });
+    const merge = rendered(MergePeopleSheet, { bridge: b as never, source: person(), people: [person(), person({ id: "per_q" })], target: "per_q", close });
+    await def(merge)();
+    expect(b.core.peopleMerge).toHaveBeenCalledWith({ source: "per_p", target: "per_q" });
+    // a refused save keeps the sheet; typing, the alias box and the Keep choice take their handlers
+    const refused = rendered(EditPersonSheet, { bridge: bridgeOf({ status: "error", error: { code: "internal" } }), person: person(), close });
+    await def(refused)();
+    expect(close).toHaveBeenCalledTimes(2);
+    (find(edit, (p) => p.label === "Name").props.onChange as (v: string) => void)("Pavel R.");
+    (find(edit, (p) => p.label === "Name").props.onEnter as () => void)();
+    (find(merge, (p) => p["aria-label"] === "Keep").props.onChange as (e: unknown) => void)({ target: { value: "per_q" } });
+    expect(await readPreview(bridgeOf({ status: "ok", data: { calls: [] } }), "per_p")).toEqual({ calls: [] });
+    expect(await readPreview(bridgeOf({ status: "error", error: { code: "not_found" } }), "per_p")).toBeNull();
   });
   it("the list menu offers Merge 2 People only with exactly two chosen", () => {
     const on = { open: vi.fn(), close: vi.fn(), edit: vi.fn(), merge: vi.fn(), del: vi.fn() };

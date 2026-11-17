@@ -12,6 +12,12 @@ import { mergePeople } from "./actions";
 /** The people a merge can keep: everyone but You and the source. */
 export const mergeTargets = (people: readonly PersonRow[], sourceId: string): PersonRow[] => people.filter((p) => !p.is_you && p.id !== sourceId);
 
+/** The source's own page: what a merge moves. A failed read leaves the preview without calls and items. */
+export async function readPreview(bridge: Bridge, id: string): Promise<PersonPage | null> {
+  const r = await bridge.act("people:preview", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "people" });
+  return r.status === "ok" ? r.data : null;
+}
+
 export function MergePeopleSheet({ close, bridge, source, people, target: first }: { close: () => void; bridge: Bridge; source: PersonRow; people: readonly PersonRow[]; target?: string }) {
   const targets = mergeTargets(people, source.id);
   const [targetId, setTargetId] = useState(first && targets.some((p) => p.id === first) ? first : "");
@@ -21,7 +27,7 @@ export function MergePeopleSheet({ close, bridge, source, people, target: first 
   // @cpt-begin:cpt-noter-flow-ui-people-edit-merge:p1:inst-preview
   useEffect(() => {
     let current = true;
-    void bridge.act("people:preview", "person_get", () => bridge.core.personGet({ person_id: source.id }), { screen: "people" }).then((r) => current && r.status === "ok" && setPage(r.data));
+    void readPreview(bridge, source.id).then((r) => current && setPage(r));
     return () => void (current = false);
   }, [bridge, source.id]);
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-preview
