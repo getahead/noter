@@ -143,12 +143,7 @@ final class DialogsTests: NoterTestCase {
         let delete = app.descendants(matching: .button).matching(NSPredicate(format: "label CONTAINS 'Delete Profile' OR title CONTAINS 'Delete Profile'")).firstMatch
         expect(delete, "Anna K. has a voice profile to delete")
         delete.click()
-        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) {
-            let tree = XCTAttachment(string: app.debugDescription)
-            tree.lifetime = .keepAlways
-            add(tree)
-            print("PROFILE AX TREE\n\(app.debugDescription)")
-        }
+        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) { dumpTree("PROFILE AX TREE") }
         XCTAssertTrue(alert.staticTexts["Delete Anna K.'s voice profile?"].exists, "Delete Profile… shows no alert")
         app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
