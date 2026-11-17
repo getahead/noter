@@ -35,11 +35,11 @@ milestone: M3
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-ui-privacy-sources`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-ui-privacy-sources`
 
 ## 1. Feature Context
 
-- [ ] `p4` - `cpt-noter-feature-ui-privacy-sources`
+- [x] `p4` - `cpt-noter-feature-ui-privacy-sources`
 
 ### 1.1 Overview
 
@@ -288,6 +288,8 @@ The system **MUST** provide source add/details, supported updates, re-index, con
 **DESIGN versus prototype.** Prototype Privacy places Export beside the call filter above the table; the story says below. Follow the prototype. Its Add Folder source sheet offers Live and editable schedules, and its Scope is free text with **All files, Markdown and PDF**; the contract's folder is indexed/watched and scope is structured call types/people. Preserve form styling, but do not send fictional fields. The prototype has source, runtime, model and job examples but no dedicated indexing State-menu entry; the Add Source interaction supplies that visual state. DESIGN's 820-pt Settings frame differs from the renderer's 860-pt width; this feature reuses the Settings shell and records the discrepancy without changing it.
 
 **Contract and fake gaps.** Audit list/export accept time bounds and a call id (contract 2.11), and `audit_list` answers a `total` for the whole range and call; export formats are the contract's log formats, not the prototype's CSV. `source_add_folder` opens the picker as part of creation, with no read-only preflight returning a path/file count before confirmation; the prototype's picker-then-preview order cannot be reproduced without a contract change. `source_update` cannot change path or mode. No source reauthentication/Locate command, authentication URL or server-specific content scope exists; `source_reindex` must not be treated as a browser sign-in. The MCP picker also has no server-discovery command. These prevent full Locate/Sign In Again and source scope paths. The fake core filters the audit by call; source add stays indexing until scripted, and update/revoke effects are limited; use typed scenario overrides and real-core conformance. Draft storage_move returns a job id but no complete move contract; do not count it as frozen coverage or manufacture the final path.
+
+**Delivery (17 Nov 2026).** The storage flow (`cpt-noter-flow-ui-privacy-sources-storage`) is built on the fake core because `storage_move` is M4 (DECOMPOSITION discrepancy 10); its real-core proof comes in M4. **Locate** and **Sign In Again** have no core command, so the UI shows the reason and last sync but cannot repair the source.
 
 **Milestone notes.** Screen Share Test is M2 though its privacy story is M3; Updates is M0. Activity › Needs attention and maintenance jobs are M5 under `cpt-noter-feature-ui-activity`; M3 supports incoming source deep links and row fixes, not the later Activity page.
 
