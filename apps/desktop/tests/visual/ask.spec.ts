@@ -87,8 +87,9 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
     await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
     const now = await page.evaluate(() => Date.now());
     await page.keyboard.press("Enter");
-    // the fake core sends started 200 ms after the question and the first word at 400 ms: stop the clock between them
-    await page.clock.pauseAt(now + 300);
+    // the fake core sends started 200 ms after the question and the first word at 400 ms or later: stop the clock just before
+    // the first word, so the bridge's buffered render of started has run and no word has
+    await page.clock.pauseAt(now + 380);
     await expect(page.locator(".ak-turn .ak-status").first()).toContainText("·");
     await shot(page, "started-line", "wide");
   });
@@ -101,8 +102,9 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
       navigate({ section: "ask", key: "new-topic:tp_vis" });
     });
     await expect(page.locator(".ak-recent__item")).toHaveCount(2); // asked and stored
-    await page.getByRole("button", { name: "Scope" }).click();
-    await expect(page.getByRole("menuitemradio", { name: /^Topic: / })).toBeVisible();
+    const scope = page.locator('[data-region="AK-R1"]').getByRole("combobox", { name: /scope/i });
+    await expect(scope.locator("option", { hasText: /^Topic: / })).toHaveCount(1);
+    await expect(scope).toContainText("Topic: "); // the arrival selects it
     await shot(page, "topic-scope", "wide");
   });
 });
