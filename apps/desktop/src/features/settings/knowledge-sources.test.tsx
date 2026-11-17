@@ -10,7 +10,7 @@ import { SourcesView } from "./KnowledgeSourcesPane";
 import { AddFolderSheet } from "./SourceFormSheet";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
-const view = (rows: SourceRow[] | null, o: { failed?: boolean } = {}) => renderToString(<SourcesView rows={rows} failed={!!o.failed} mode="cloud_allowed" prefs={undefined} onRetry={() => {}} onAdd={() => {}} onReindex={() => {}} />);
+const view = (rows: SourceRow[] | null, o: { failed?: boolean } = {}) => renderToString(<SourcesView rows={rows} failed={!!o.failed} mode="cloud_allowed" prefs={undefined} onRetry={() => {}} onAdd={() => {}} onReindex={() => {}} onDetails={() => {}} />);
 
 describe("SourcesView", () => {
   it("loading, error and the first-use empty state", () => {
@@ -43,9 +43,12 @@ describe("SourcesView", () => {
   it("actions call back", () => {
     const onAdd = vi.fn();
     const onReindex = vi.fn();
-    const tree = rendered(SourcesView, { rows: [row()], failed: false, mode: "cloud_allowed" as const, prefs: undefined, onRetry: () => {}, onAdd, onReindex });
-    const action = (find(tree, (p) => p.tone === "ok").props.actions as { props: { onAction: () => void } }).props.onAction;
-    action();
+    const onDetails = vi.fn();
+    const tree = rendered(SourcesView, { rows: [row()], failed: false, mode: "cloud_allowed" as const, prefs: undefined, onRetry: () => {}, onAdd, onReindex, onDetails });
+    const buttons = (find(tree, (p) => p.tone === "ok").props.actions as { props: { children: { props: { onAction: () => void } }[] } }).props.children;
+    buttons[0]!.props.onAction();
+    buttons[1]!.props.onAction();
+    expect(onDetails).toHaveBeenCalledWith("s1");
     const foot = find(tree, (p) => !!p.foot).props.foot as { props: { children: { props: { onAction: () => void } }[] } };
     foot.props.children[1]!.props.onAction();
     expect(onReindex).toHaveBeenCalledWith("s1");

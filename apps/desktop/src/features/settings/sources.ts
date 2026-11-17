@@ -12,6 +12,9 @@ export interface SourceStatusView {
   subtitle: string;
   message?: string;
   progress?: { done: number; total: number | null };
+  progressText?: string;
+  /** The status name for data-state. */
+  state: string;
   /** Re-index and Remove stay off while the source is indexing; a Live source is never indexed. */
   working: boolean;
   /** Revoke Token only with a token. */
@@ -34,13 +37,13 @@ export function sourceStatus(row: SourceRow, mode: PrivacyMode, prefs: UiPrefs |
   const base = { subtitle: parts.join(" · "), working: s.type === "indexing", canRevoke: row.has_token && s.type !== "indexing", canRetry: s.type === "failed" && row.mode !== "live" };
   switch (s.type) {
     case "idle":
-      return { ...base, tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
+      return { ...base, state: "up-to-date", tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
     case "indexing":
-      return { ...base, tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total } };
+      return { ...base, state: "indexing", tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total }, progressText: s.total ? t(row.kind === "folder" ? "sources.indexing_files" : "sources.indexing_documents", { done: s.done, total: s.total }) : t("sources.indexing_unknown", { done: s.done }) };
     case "failed":
-      return { ...base, tone: "err", word: t("sources.failed"), icon: "error", message: t("sources.failed_note") };
+      return { ...base, state: "failed", tone: "err", word: t("sources.failed"), icon: "error", message: t("sources.failed_note") };
     case "sign_in_expired":
-      return { ...base, tone: "warn", word: t("sources.expired"), icon: "warning", message: t("sources.expired_note") };
+      return { ...base, state: "expired", tone: "warn", word: t("sources.expired"), icon: "warning", message: t("sources.expired_note") };
   }
 }
 // @cpt-end:cpt-noter-algo-ui-privacy-sources-status:p1:inst-actions
@@ -136,3 +139,45 @@ export const scheduleChoices = () => [
   { value: "daily", label: t("sources.schedule_daily") },
   { value: "weekly", label: t("sources.schedule_weekly") },
 ];
+
+export interface SourceDraft {
+  name: string;
+  schedule: string | null;
+  privacy: PrivacyClass;
+}
+
+export const draftOf = (r: SourceRow): SourceDraft => ({ name: r.name, schedule: r.schedule, privacy: r.privacy });
+export const draftChanged = (r: SourceRow, d: SourceDraft): boolean => d.name.trim() !== r.name || d.schedule !== r.schedule || d.privacy !== r.privacy;
+
+export type UpdateResult = SourceResult | { ok: false; conflict: true };
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
+/** Only supported fields go out (never path or mode); the returned row replaces the draft source only after success. */
+export async function updateSource(bridge: Bridge, row: SourceRow, d: SourceDraft): Promise<UpdateResult> {
+  const res = await bridge.act(`source:${row.id}`, "source_update", () => bridge.core.sourceUpdate({ source_id: row.id, rev: row.rev, name: d.name.trim(), schedule: d.schedule, privacy: d.privacy }));
+  if (res.status === "ok") return { ok: true, row: res.data };
+  return res.error.code === "conflict" ? { ok: false, conflict: true } : fail(res);
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-update
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke
+export async function revokeToken(bridge: Bridge, id: string): Promise<boolean> {
+  const res = await bridge.act(`source:${id}`, "source_revoke_token", () => bridge.core.sourceRevokeToken({ source_id: id }));
+  return res.status === "ok";
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove
+/** A source that is already gone counts as removed. */
+export async function removeSource(bridge: Bridge, id: string): Promise<boolean> {
+  const res = await bridge.act(`source:${id}`, "source_remove", () => bridge.core.sourceRemove({ source_id: id }));
+  return res.status === "ok" || res.error.code === "not_found";
+}
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove
+
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke-alert
+export const revokeAlert = (r: SourceRow) => ({ title: t("sources.revoke_title", { name: r.name }), message: t("sources.revoke_message"), cancel: t("dialogs.cancel"), confirm: t("sources.revoke"), destructive: true });
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-revoke-alert
+// @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert
+export const removeAlert = (r: SourceRow) => ({ title: t("sources.remove_title", { name: r.name }), message: t("sources.remove_message", { count: r.documents }), cancel: t("dialogs.cancel"), confirm: t("sources.remove"), destructive: true });
+// @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-remove-alert

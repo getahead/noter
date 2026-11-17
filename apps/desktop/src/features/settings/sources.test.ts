@@ -6,9 +6,11 @@ const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind
 
 describe("sourceStatus", () => {
   it("maps idle, indexing, failed and expired to word, icon and tone", () => {
-    expect(sourceStatus(row(), "cloud_allowed", undefined)).toMatchObject({ tone: "ok", word: "Up to date", icon: "checkCircle", working: false, canRetry: false });
+    expect(sourceStatus(row(), "cloud_allowed", undefined)).toMatchObject({ tone: "ok", state: "up-to-date", word: "Up to date", icon: "checkCircle", working: false, canRetry: false });
     const run = sourceStatus(row({ status: { type: "indexing", done: 2, total: null } }), "cloud_allowed", undefined);
-    expect(run).toMatchObject({ tone: "run", working: true, progress: { done: 2, total: null } });
+    expect(run).toMatchObject({ tone: "run", state: "indexing", working: true, progress: { done: 2, total: null }, progressText: "Indexing · 2 so far" });
+    expect(sourceStatus(row({ status: { type: "indexing", done: 9, total: 24 } }), "cloud_allowed", undefined).progressText).toBe("Indexing 9 of 24 files");
+    expect(sourceStatus(row({ kind: "mcp", status: { type: "indexing", done: 1, total: 4 } }), "cloud_allowed", undefined).progressText).toBe("Indexing 1 of 4 documents");
     expect(sourceStatus(row({ status: { type: "failed", code: "internal", at: 1 } }), "cloud_allowed", undefined)).toMatchObject({ tone: "err", word: "Failed", canRetry: true });
     expect(sourceStatus(row({ status: { type: "sign_in_expired" } }), "cloud_allowed", undefined)).toMatchObject({ tone: "warn", word: "Sign-in expired", canRetry: false });
   });
