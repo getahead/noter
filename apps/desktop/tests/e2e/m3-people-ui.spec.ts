@@ -30,6 +30,9 @@ const openPerson = async (page: Page, name: string | RegExp, world?: (w: World) 
   await page.keyboard.press("Enter");
   return steer;
 };
+// The fake core cannot do these two (contract lane): its people_list errors on a world with no calls, and a rename to a new
+// person adds no person. The real core is the arbiter of E2E coverage.
+const fake = process.env.NOTER_CORE !== "stdio";
 const noVoiceProfile = (w: World) => {
   W.idle(w);
   w.people.find((p) => p.id === "per_anna")!.voice_profile = false;
@@ -67,6 +70,7 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
   });
 
   test("UI — empty path: no people shows No people yet and Add Person creates one with person_create", async ({ page }) => {
+    test.skip(fake, "the fake core cannot serve this world; the real core runs it");
     await openPeople(page, (w) => {
       W.idle(w);
       // Before the first recorded call: the core refuses to drop a person a call, item or speaker still points at.
@@ -78,7 +82,7 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
     });
     await expect(page.getByRole("region", { name: "People" }).getByText("No people yet")).toBeVisible();
     await expect(page.getByText("People appear when you record calls or add them.")).toBeVisible();
-    await button(page, "Add Person").click();
+    await button(page, "Add Person").first().click();
     const form = page.getByRole("dialog", { name: "New person" });
     await expect(form.getByRole("textbox", { name: "Role" })).toBeDisabled();
     await form.getByRole("textbox", { name: "Name" }).fill("Anna K.");
@@ -106,6 +110,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
   });
 
   test("UI — empty path: search Zoya shows No people match “Zoya”, Clear Search brings Speaker 3 back, New Person “Zoya”… creates and names it without a voice profile", async ({ page }) => {
+    test.skip(fake, "the fake core cannot serve this world; the real core runs it");
     await openPeople(page);
     await page.getByRole("searchbox", { name: /Search/ }).fill("Zoya");
     await expect(page.getByText("No people match “Zoya”")).toBeVisible();
@@ -183,7 +188,9 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await page.getByRole("menuitem", { name: "Delete Person…" }).click();
     expect(alertText((await alerts(page))[0])).toContain("Delete Oleg M.?");
     await expect.poll(() => sent(page, "person_delete")).toHaveLength(0); // Cancel is the default answer
-    await answerAlerts(page, "confirm");
+    await answerAlerts(page, "confirm"); // the next request is answered Delete
+    await button(page, "More").click();
+    await page.getByRole("menuitem", { name: "Delete Person…" }).click();
     await expect.poll(async () => (await sent(page, "person_delete")).length).toBe(1);
     await expect(page.getByRole("heading", { name: "Oleg Morozov" })).toBeVisible();
     await expect(page.getByRole("alert")).toBeVisible();
