@@ -344,6 +344,13 @@ describe("startedFrom (a Remove button pressed by mouse or keyboard)", () => {
     expect(startedFrom(doc(body), "repo-remove")).toBe(true);
   });
 
+  it("leaves the press for the sheet or alert that follows (Remove, then Cancel by mouse)", () => {
+    const remove = { id: "repo-remove", focus: vi.fn() };
+    press(remove);
+    expect(startedFrom(doc(body), "repo-remove")).toBe(true);
+    expect(openerOf(doc(body))).toBe(remove);
+  });
+
   it("is false after an unrelated click, although focus is on the body then too", () => {
     press({ id: "somewhere-else" });
     expect(startedFrom(doc(body), "repo-remove")).toBe(false);
