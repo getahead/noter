@@ -21,6 +21,17 @@ import { useSignIn } from "./signin-store";
 
 const COMPONENT = "cpt-noter-component-screen-dialogs";
 const KEY_NAME: Record<AccountProvider, MsgKey> = { claude: "settings.accounts.key_claude", chatgpt: "settings.accounts.key_chatgpt" };
+const PROVIDER_TEXT: Record<AccountProvider, { account: MsgKey; site: MsgKey; plans: MsgKey; what: MsgKey; variant: string }> = {
+  claude: { account: "signin.account_claude", site: "signin.site_claude", plans: "signin.plans_claude", what: "signin.what_claude", variant: "sign-in-claude" },
+  chatgpt: { account: "signin.account_chatgpt", site: "signin.site_chatgpt", plans: "signin.plans_chatgpt", what: "signin.what_chatgpt", variant: "sign-in-chatgpt" },
+};
+const ERROR_TEXT: Record<string, { title: MsgKey; text: MsgKey }> = {
+  sign_in_cancelled: { title: "signin.err.sign_in_cancelled", text: "signin.err.sign_in_cancelled_text" },
+  sign_in_timed_out: { title: "signin.err.sign_in_timed_out", text: "signin.err.sign_in_timed_out_text" },
+  plan_not_eligible: { title: "signin.err.plan_not_eligible", text: "signin.err.plan_not_eligible_text" },
+  offline: { title: "signin.err.offline", text: "signin.err.offline_text" },
+  other: { title: "signin.err.other", text: "signin.err.other_text" },
+};
 const STEPS: MsgKey[] = ["signin.step_prepare", "signin.step_signin", "signin.step_check", "signin.step_use"];
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
@@ -65,15 +76,15 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
   const open = sheetOpen(s);
   useEffect(() => {
     if (!open) return;
-    const sheet = globalThis.document?.querySelector<HTMLElement>(`[data-variant="sign-in-${provider}"]`)?.closest<HTMLElement>(".np-sheet");
+    const sheet = [...(globalThis.document?.querySelectorAll<HTMLElement>(".f-sheet") ?? [])].find((e) => e.dataset.variant === PROVIDER_TEXT[provider].variant)?.closest<HTMLElement>(".np-sheet");
     if (sheet && !sheet.contains(globalThis.document.activeElement)) sheet.querySelector<HTMLElement>(FOCUSABLE)?.focus();
   }, [open, s.phase, provider]);
   if (!open) return null;
 
-  const account = t(`signin.account_${provider}`);
+  const account = t(PROVIDER_TEXT[provider].account);
   const tool = toolName(provider);
-  const site = t(`signin.site_${provider}`);
-  const names = { account, tool, site, provider: providerName(provider), plans: t(`signin.plans_${provider}`), key: t(KEY_NAME[provider]) };
+  const site = t(PROVIDER_TEXT[provider].site);
+  const names = { account, tool, site, provider: providerName(provider), plans: t(PROVIDER_TEXT[provider].plans), key: t(KEY_NAME[provider]) };
   const title = t("signin.title", { account });
   // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-if-cancel
   const cancel = () => void m.cancel(provider);
@@ -296,13 +307,13 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-if-error
     // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-error
     const code = s.code ?? "";
-    const known = ["sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "offline"].includes(code) ? code : "other";
+    const known = code in ERROR_TEXT ? code : "other";
     const plan = known === "plan_not_eligible";
     body = (
       <div className="np-sheet__body">
         <div className="st-banner" role="alert">
-          <strong>{t(`signin.err.${known}` as MsgKey, names)}</strong>
-          <div>{t(`signin.err.${known}_text` as MsgKey, names)}</div>
+          <strong>{t(ERROR_TEXT[known]!.title, names)}</strong>
+          <div>{t(ERROR_TEXT[known]!.text, names)}</div>
         </div>
       </div>
     );
@@ -326,8 +337,8 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
   // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-return-sign-in
   return (
     <Sheet title={title} width={520} onCancel={onEsc} onDefault={onDefault}>
-      <div className="f-sheet" data-component={COMPONENT} data-variant={`sign-in-${provider}`} data-state={s.phase.toLowerCase()}>
-        {head(s.phase === "BROWSER" ? t("signin.browser_title") : s.phase === "CHECK" ? t("signin.check_title") : s.phase === "USE" ? t("signin.use_title", names) : title, s.phase === "PREPARE" || s.phase === "INSTALLING" ? t(`signin.what_${provider}`) : s.phase === "BROWSER" ? t("signin.browser_sub", names) : undefined)}
+      <div className="f-sheet" data-component={COMPONENT} data-variant={PROVIDER_TEXT[provider].variant} data-state={s.phase.toLowerCase()}>
+        {head(s.phase === "BROWSER" ? t("signin.browser_title") : s.phase === "CHECK" ? t("signin.check_title") : s.phase === "USE" ? t("signin.use_title", names) : title, s.phase === "PREPARE" || s.phase === "INSTALLING" ? t(PROVIDER_TEXT[provider].what) : s.phase === "BROWSER" ? t("signin.browser_sub", names) : undefined)}
         {body}
         {footer}
       </div>
