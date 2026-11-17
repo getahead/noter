@@ -100,7 +100,7 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("happy path: a citation superscript moves focus to its row, ⇧Tab returns, and its title opens the Call page at the span", async ({ page }) => {
-    await openAsk(page);
+    await openAsk(page, { latency: 500, latencyFor: "call_get" });
     await ask(page, WEBSOCKET);
     const answer = answers(page).last();
     await expect(citationRows(answer).first()).toBeVisible();
@@ -117,7 +117,7 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
     await row.getByRole("link", { name: /.+/ }).first().click();
     await expect(page.locator('[data-region="PC-R1"]')).toBeVisible();
     await expect(page.getByRole("tab", { name: "Transcript" })).toHaveAttribute("aria-selected", "true");
-    expect((await sent(page, "transcript_span")).length).toBeGreaterThan(0);
+    await expect.poll(async () => (await sent(page, "transcript_span")).length).toBeGreaterThan(0);
   });
 
   test("happy path: the play button of a call citation plays its span in the playback bar", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
+import { useWindow } from "../../app/use-window";
 import { loadTags } from "../call-page/share-actions";
 import { apply, heldFilter, holdFilter } from "./filters";
 
@@ -29,13 +30,16 @@ export function tagMatches(text: string, tags: string[], limit = 8): string[] {
 }
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-suggest
 
-/** The tags in use, read once when the window opens; none when the read fails. */
+/** The tags in use, read after the window snapshot; none when the read fails. */
+// @cpt-algo:cpt-noter-algo-ui-library-search-topics-filters:p1
 export function useTagChoices(bridge: Bridge): string[] {
   const [tags, setTags] = useState<string[]>([]);
+  const ready = useWindow(bridge, (s) => s.app !== null);
   useEffect(() => {
+    if (!ready) return;
     let live = true;
     void loadTags(bridge).then((r) => live && setTags(r.status === "ok" ? r.data.tags.map((x) => x.tag) : []));
     return () => void (live = false);
-  }, [bridge]);
+  }, [bridge, ready]);
   return tags;
 }

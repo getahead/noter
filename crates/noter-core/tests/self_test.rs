@@ -66,10 +66,22 @@ impl NativeServices for Mac {
 }
 
 #[derive(Default)]
-struct Events(Mutex<Vec<&'static str>>);
+struct Events(Mutex<Vec<&'static str>>, Mutex<Option<SetupPause>>);
+
+struct SetupPause {
+    reached: Arc<tokio::sync::Notify>,
+    release: std::sync::mpsc::Receiver<()>,
+}
 
 impl EventEmitter for Events {
     fn emit(&self, event: &'static str, _: Value) {
+        if event == event_names::SETUP_CHANGED {
+            let pause = self.1.lock().unwrap().take();
+            if let Some(pause) = pause {
+                pause.reached.notify_one();
+                let _ = pause.release.recv();
+            }
+        }
         self.0.lock().unwrap().push(event);
     }
 }
@@ -529,9 +541,17 @@ async fn denied_by_a_self_test(p: &Probing) {
     );
 }
 
+// Callers clear recorded events before the recheck; its flag clears before publication ends.
 async fn until_probes(p: &Probing, n: usize) {
     for _ in 0..500 {
-        if probes(&p.run.engine) >= n && !noter_core::testing::system_audio_probing(&p.run.core) {
+        if probes(&p.run.engine) >= n
+            && !noter_core::testing::system_audio_probing(&p.run.core)
+            && p.events
+                .0
+                .lock()
+                .unwrap()
+                .contains(&event_names::SETUP_CHANGED)
+        {
             return;
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -596,6 +616,36 @@ async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
         .contains(&event_names::SETUP_CHANGED));
 }
 
+// cpt-noter-flow-core-first-run-permission: the probe flag clears before setup publication.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn until_probes_waits_for_the_recheck_completion_event() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    denied_by_a_self_test(&p).await;
+    p.events.0.lock().unwrap().clear();
+    let reached = Arc::new(tokio::sync::Notify::new());
+    let (release, wait) = std::sync::mpsc::channel();
+    *p.events.1.lock().unwrap() = Some(SetupPause {
+        reached: reached.clone(),
+        release: wait,
+    });
+    p.run.core.app_activated();
+    tokio::time::timeout(Duration::from_secs(5), reached.notified())
+        .await
+        .expect("the recheck never published setup:changed");
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
+
+    let mut completed = std::pin::pin!(until_probes(&p, 1));
+    let first_poll = std::future::poll_fn(|cx| {
+        std::task::Poll::Ready(std::future::Future::poll(completed.as_mut(), cx))
+    })
+    .await;
+    // Disconnecting also releases the worker when the assertion fails.
+    drop(release);
+    assert!(first_poll.is_pending(), "returned before setup:changed");
+    completed.await;
+}
+
 /// The native permission-change notice re-checks too.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn the_native_change_notice_rechecks_a_denied_system_audio_row() {
@@ -603,6 +653,7 @@ async fn the_native_change_notice_rechecks_a_denied_system_audio_row() {
     let p = open_probing(dir.path(), ScriptedEngine::new());
     denied_by_a_self_test(&p).await;
     p.run.engine.set_system_audio(PermissionState::Granted);
+    p.events.0.lock().unwrap().clear();
     (p.mac.changed.lock().unwrap().as_ref().unwrap())(EnvironmentReading::default());
     until_probes(&p, 1).await;
     assert_eq!(
@@ -735,6 +786,7 @@ async fn every_m0_write_leaves_one_change_row_per_record() {
     denied_by_a_self_test(&p).await;
     wrote("self_test_run", 1);
     p.run.engine.set_system_audio(PermissionState::Granted);
+    p.events.0.lock().unwrap().clear();
     core.app_activated();
     until_probes(&p, 1).await;
     wrote("system_audio_recheck", 1);

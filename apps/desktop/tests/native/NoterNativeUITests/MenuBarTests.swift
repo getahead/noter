@@ -221,8 +221,8 @@ final class MenuBarTests: NoterTestCase {
         XCTAssertTrue(main.waitForExistence(timeout: 5))
         XCTAssertTrue(waitUntil(5) { main.isHittable }, "Open Last Summary shows the hidden main window")
         XCTAssertTrue(waitUntil(5) { accessibilityTreeContains("Backend sync", in: main) }, "the selected call is the latest ready summary")
-        let summaryTab = app.buttons["Summary"]
-        let summaryPopup = app.descendants(matching: .any).matching(NSPredicate(format: "label == 'Call page view'")).firstMatch
+        let summaryTab = main.descendants(matching: .tab).matching(NSPredicate(format: "title == 'Summary'")).firstMatch
+        let summaryPopup = main.popUpButtons["Call page view"]
         XCTAssertTrue(waitUntil(5) {
             (summaryTab.exists && summaryTab.isSelected)
                 || (summaryPopup.exists && ((summaryPopup.value as? String) == "Summary" || summaryPopup.title == "Summary"))
