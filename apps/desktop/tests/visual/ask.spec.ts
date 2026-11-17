@@ -96,7 +96,7 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
       await page.clock.runFor(20);
       await expect(status.first()).toContainText("·", { timeout: 200 });
     }).toPass({ timeout: 20000 });
-    await expect(page.getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
+    await expect(page.locator(".ak-turn").last().getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
     await shot(page, "started-line", "wide");
   });
 
