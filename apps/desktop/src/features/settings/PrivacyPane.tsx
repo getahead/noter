@@ -32,6 +32,8 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
   const inForce = modeIndicator({ mode: privacy.mode, degraded, sensitiveCall: false });
   const due = audio.retention_next_run_deletes;
   const [sheet, setSheet] = useState(false);
+  // the Call info link opens Privacy on its call
+  const callId = useWindow(bridge, (s) => (s.nav?.type === "settings" ? (s.nav.call_id ?? null) : null));
   const rowError = useRowErrors(bridge);
   const calendar = rowState("calendar", useWindow(bridge, (s) => s.whole.setup?.permissions));
   return (
@@ -67,7 +69,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
       <Group title={t("settings.privacy.left_mac")} foot={<><span className="np-tb__spacer" />{/* @cpt-begin:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}
 <PushButton label={t("settings.privacy.share_test")} onAction={() => setSheet(true)} />
 {/* @cpt-end:cpt-noter-flow-ui-settings-share-test:p1:inst-open-share-test */}</>}>
-        <AuditLog bridge={bridge} />
+        <AuditLog bridge={bridge} callId={callId} />
       </Group>
       {sheet && <ShareTestSheet bridge={bridge} onClose={() => setSheet(false)} />}
     </>

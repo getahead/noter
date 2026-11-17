@@ -5,7 +5,7 @@ import type { AuditView } from "./audit";
 import { AuditLogView } from "./AuditLog";
 
 const row = (id: string, callId: string | null = null): AuditEntry => ({ id, kind: "run", llm_run_id: null, at: 1_700_000_000_000, call: callId ? { id: callId, title: "Planning", started_at: 0, call_type: "t" } : null, runtime: null, destination: "Claude", what: "full_transcript", bytes_out: 1800, redacted: true });
-const view = (o: Partial<AuditView> = {}): AuditView => ({ rows: [], cursor: null, status: "ready", failed: false, busy: false, exporting: false, exported: null, exportFailed: false, ...o });
+const view = (o: Partial<AuditView> = {}): AuditView => ({ rows: [], cursor: null, status: "ready", failed: false, busy: false, exporting: false, exported: null, exportFailed: false, total: null, ...o });
 const html = (v: AuditView | null, callId: string | null = null) => renderToString(<AuditLogView v={v} callId={callId} prefs={undefined} onLoad={() => {}} onExport={() => {}} />);
 
 describe("AuditLogView", () => {
@@ -37,8 +37,8 @@ describe("AuditLogView", () => {
     expect(out).toContain("Try Again");
     expect(out).not.toContain("Load More");
   });
-  it("export is off for one call and says why; shows result and failure", () => {
-    expect(html(view({ rows: [row("a", "1")] }), "1")).toContain("Export covers the whole log");
+  it("shows the core total while pages remain, and the export result and failure", () => {
+    expect(html(view({ rows: [row("a", "1")], cursor: "n", total: 41 }), "1")).toContain("1 of 41 entries so far");
     expect(html(view({ rows: [row("a")], exported: "/x.md" }))).toContain("Saved to /x.md");
     expect(html(view({ rows: [row("a")], exportFailed: true }))).toContain("could not be exported");
   });
