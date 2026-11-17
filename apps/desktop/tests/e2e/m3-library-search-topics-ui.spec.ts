@@ -25,7 +25,8 @@ function topicWorld(w: World): void {
   for (const [item, id] of [["itm_notif", "top_ws"], ["itm_reconnect_q", "top_ws"], ["itm_replay", "top_notif"]] as const) {
     w.items.find((i) => i.id === item)!.topic = topic(id);
   }
-  w.topics.find((t) => t.id === "top_ws")!.merge_suggestion = { id: "top_notif", name: "Notification service" };
+  // The core owns topics and their merge suggestions: harness.world_set refuses a changed `topics` slice. The Merge-suggested
+  // and No-topics tests wait for the fixture seed (techlead ask #7, Row 7) and fail on that state until it lands.
 }
 
 async function openMain(page: Page, key: string, heading: string, world: (w: World) => void = W.idle) {
@@ -176,7 +177,6 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
   test("UI — empty path: no topics shows Topics appear after a few calls…", async ({ page }) => {
     await openTopics(page, (w) => {
       W.idle(w);
-      w.topics = [];
       w.items.forEach((i) => { i.topic = null; });
     });
     await expect(page.getByText("Topics appear after a few calls, when decisions and questions come back to the same subject.")).toBeVisible();

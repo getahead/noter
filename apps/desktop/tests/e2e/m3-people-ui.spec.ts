@@ -69,9 +69,12 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
   test("UI — empty path: no people shows No people yet and Add Person creates one with person_create", async ({ page }) => {
     await openPeople(page, (w) => {
       W.idle(w);
+      // Before the first recorded call: the core refuses to drop a person a call, item or speaker still points at.
       w.people = w.people.filter((p) => p.is_you);
-      w.call_details.forEach((d) => { d.speakers = []; });
-      w.calls.forEach((c) => { c.unnamed_speakers = 0; });
+      w.calls = [];
+      w.call_details = [];
+      w.items = [];
+      Object.assign(w.today, { today: [], this_week: [], live_call: null, due_without_call: [], done_today: [], review_calls: [], unnamed_speakers: 0 });
     });
     await expect(page.getByText("No people yet")).toBeVisible();
     await expect(page.getByText("People appear when you record calls or add them.")).toBeVisible();
