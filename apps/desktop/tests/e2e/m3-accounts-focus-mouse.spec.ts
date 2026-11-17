@@ -32,7 +32,7 @@ test.describe("cpt-noter-seq-settings-replace-api-key — focus with the mouse",
   });
 });
 
-test.describe("cpt-noter-seq-call-page-hand-off-item — focus with the mouse", () => {
+test.describe("cpt-noter-flow-ui-settings-change-setting (repositories) — focus with the mouse", () => {
   test("happy path: Add Mapping closes on its default button and Cancel on Remove Mapping keeps focus on the button", async ({ page }) => {
     await watchAlerts(page);
     await open(page, "Repositories");

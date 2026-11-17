@@ -392,6 +392,14 @@ describe("focusAndReturn when the sheet's own work replaced the opener", () => {
     vi.unstubAllGlobals();
   });
 
+  it("falls back to the control with the opener's own id", () => {
+    const same = { focus: vi.fn(), isConnected: true };
+    vi.stubGlobal("document", { getElementById: (id: string) => (id === "repo-add" ? same : null) });
+    focusAndReturn(null, () => ({ id: "repo-add", focus: vi.fn(), isConnected: false } as never))();
+    expect(same.focus).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
   it("leaves a gone opener without a successor alone", () => {
     const gone = { focus: vi.fn(), isConnected: false, getAttribute: () => null };
     focusAndReturn(null, () => gone)();

@@ -44,8 +44,9 @@ export function focusAndReturn(first: FocusTarget | null | undefined, getActive:
     // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
     // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned
     // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
-    // an opener the sheet's own work replaced (Add… became Replace…) names the control that took its place
-    const successor = opener?.getAttribute?.("data-focus-successor");
+    // an opener the sheet's own work replaced names the control that took its place (Add… became Replace…), else
+    // a control with its own id does (the empty state's Add Mapping… became the table's)
+    const successor = opener?.getAttribute?.("data-focus-successor") ?? (opener as { id?: string } | null)?.id;
     const target = opener && opener.isConnected === false && successor ? (typeof document !== "undefined" ? document.getElementById(successor) : null) : opener;
     if (target && target.isConnected !== false) target.focus();
     // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-return-focus
