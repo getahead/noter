@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useBridge } from "../../app/bridge/context";
-import type { SearchResults } from "../../core/bindings";
+import type { Bridge } from "../../app/bridge/bridge";
+import type { CallFilter, SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -12,31 +13,26 @@ import { askRoute, groupByCall, sections, statusOf } from "./search-model";
 import "./library.css";
 
 const SECTION = { items: "search.section.items", transcripts: "search.section.transcripts", documents: "search.section.documents" } as const;
-type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: "OK"; results: SearchResults };
+export type Read = { status: "LOADING" } | { status: "READ_ERROR" } | { status: "OK"; results: SearchResults };
 
-// @cpt-state:cpt-noter-state-ui-library-search-topics-view:p1
-// @cpt-component:cpt-noter-component-screen-library:p1
-/** Library › Search results: one `search` read per words and filter, an answer for older ones is dropped, Try Again only on request. */
-export function SearchPage({ query }: { query: string }) {
-  const bridge = useBridge();
-  const [read, setRead] = useState<Read>({ status: "LOADING" });
-  const [again, setAgain] = useState(0);
-  const [open, setOpen] = useState<Set<string>>(new Set());
-  const filter = heldFilter().filter;
-  useEffect(() => {
-    let live = true;
-    setRead({ status: "LOADING" });
-    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
-    void bridge.act("search", "search", () => bridge.core.search({ query, filter, limit: null }), { screen: "library-search" }).then((r) => {
-      if (live) setRead(r.status === "ok" ? { status: "OK", results: r.data } : { status: "READ_ERROR" });
-    });
-    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
-    return () => void (live = false);
-  }, [bridge, query, again]);
+export interface SearchViewProps {
+  bridge: Bridge;
+  read: Read;
+  query: string;
+  filter: CallFilter;
+  /** The call groups whose hidden spans were revealed (More in This Call). */
+  open: ReadonlySet<string>;
+  onMore: (group: string) => void;
+  onRetry: () => void;
+  onClear: () => void;
+  onAsk: () => void;
+}
 
+/** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
+export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAsk }: SearchViewProps) {
   const body = () => {
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
-    if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => setAgain((n) => n + 1) }] }} />;
+    if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => onRetry() }] }} />;
     const r = read.results;
     const status = statusOf(r);
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
@@ -45,10 +41,10 @@ export function SearchPage({ query }: { query: string }) {
         {isFiltered(filter) && (
           <>
             <span className="np-dim">{t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}</span>
-            <PushButton label={t("filters.clear")} size="small" onAction={() => (holdFilter(apply(heldFilter(), { type: "clear" })), setAgain((n) => n + 1))} />
+            <PushButton label={t("filters.clear")} size="small" onAction={onClear} />
           </>
         )}
-        <PushButton label={t("search.ask_instead")} size="small" onAction={() => navigate(askRoute(query))} />
+        <PushButton label={t("search.ask_instead")} size="small" onAction={() => onAsk()} />
       </div>
     );
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
@@ -75,7 +71,7 @@ export function SearchPage({ query }: { query: string }) {
                   <SearchResultRow key={i} bridge={bridge} hit={h} />
                 ))}
                 {g.hidden.length > 0 && !open.has(`${s.key}:${g.callId}`) && (
-                  <li><button type="button" className="lb-fbtn" onClick={() => setOpen(new Set(open).add(`${s.key}:${g.callId}`))}>{t("search.more_in_call")}</button></li>
+                  <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call")}</button></li>
                 )}
               </ul>
             ))}
@@ -99,5 +95,39 @@ export function SearchPage({ query }: { query: string }) {
       <h2 className="lb-title" tabIndex={-1}>{t("search.title")}</h2>
       {body()}
     </div>
+  );
+}
+
+// @cpt-state:cpt-noter-state-ui-library-search-topics-view:p1
+// @cpt-component:cpt-noter-component-screen-library:p1
+/** Library › Search results: one `search` read per words and filter, an answer for older ones is dropped, Try Again only on request. */
+export function SearchPage({ query }: { query: string }) {
+  const bridge = useBridge();
+  const [read, setRead] = useState<Read>({ status: "LOADING" });
+  const [again, setAgain] = useState(0);
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const filter = heldFilter().filter;
+  useEffect(() => {
+    let live = true;
+    setRead({ status: "LOADING" });
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
+    void bridge.act("search", "search", () => bridge.core.search({ query, filter, limit: null }), { screen: "library-search" }).then((r) => {
+      if (live) setRead(r.status === "ok" ? { status: "OK", results: r.data } : { status: "READ_ERROR" });
+    });
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
+    return () => void (live = false);
+  }, [bridge, query, again]);
+  return (
+    <SearchView
+      bridge={bridge}
+      read={read}
+      query={query}
+      filter={filter}
+      open={open}
+      onMore={(g) => setOpen(new Set(open).add(g))}
+      onRetry={() => setAgain((n) => n + 1)}
+      onClear={() => (holdFilter(apply(heldFilter(), { type: "clear" })), setAgain((n) => n + 1))}
+      onAsk={() => navigate(askRoute(query))}
+    />
   );
 }
