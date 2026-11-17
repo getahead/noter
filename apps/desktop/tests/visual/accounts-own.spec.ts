@@ -1,5 +1,7 @@
 // The own-account rows and sheets (cpt-noter-component-ui-credential-row account-login, cpt-noter-component-screen-dialogs
-// sign-in) over the fake core: signed in, signed out by the provider, the sign-out sheet.
+// sign-in) over the fake core: signed in, signed out by the provider, the sign-in sheet at Prepare for each provider
+// and with the CLI missing, and the sign-out sheet. The waiting and Check steps move with the core's clock, so the
+// E2E covers them instead.
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -30,6 +32,24 @@ const states: { id: string; world: (w: World) => void; ready: (page: Page) => Pr
     world: (w) => (W.idle(w), (accountOf(w, "chatgpt").status = { type: "signed_out_by_provider", at: 1 })),
     ready: async (page) => void (await expect(row(page, "Your ChatGPT account")).toContainText("Signed out by ChatGPT")),
     target: (page) => row(page, "Your ChatGPT account"),
+  },
+  {
+    id: "prepare-claude",
+    world: (w) => W.idle(w),
+    ready: async (page) => {
+      await row(page, "Your Claude account").getByRole("button", { name: /Sign In/ }).click();
+      await expect(page.getByRole("dialog", { name: /Sign in with your Claude account/ })).toContainText(/Use This Account|Continue in Browser/);
+    },
+    target: (page) => page.getByRole("dialog"),
+  },
+  {
+    id: "prepare-chatgpt-cli-missing",
+    world: (w) => (W.idle(w), Object.assign(accountOf(w, "chatgpt").cli, { installed: false, path: null, version: null })),
+    ready: async (page) => {
+      await row(page, "Your ChatGPT account").getByRole("button", { name: /Sign In/ }).click();
+      await expect(page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ })).toContainText("isn’t installed");
+    },
+    target: (page) => page.getByRole("dialog"),
   },
   {
     id: "sign-out",

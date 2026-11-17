@@ -274,11 +274,4 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     expect(html).toContain("Signed in");
   });
 
-  it("keeps Sign In disabled until the sign-in sheet exists", async () => {
-    await ready();
-    const view = accounts().accounts.find((a) => a.provider === "claude")!;
-    const button = find(rendered(AccountRow, { bridge, view, keyConfigured: true }), (p) => p.label === "Sign In with Claude…");
-    expect(button.props.disabled).toBe(true);
-    expect(button.props.onAction).toBeUndefined();
-  });
 });

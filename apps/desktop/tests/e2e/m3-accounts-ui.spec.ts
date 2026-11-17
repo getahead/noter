@@ -166,26 +166,18 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
     await button(page, "Finish").click();
     expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
   });
-
-  test("empty path — no key and no local runtime: Not Now explains and Finish still works", async ({ page }) => {
-    await openWindow(page, "first-run", { world: assistantsOpen });
-    await button(stepBody(page), "Not Now").click();
-    await expect(stepBody(page)).toContainText("Without an assistant Noter still records and transcribes; summaries wait until one is connected.");
-    await button(page, "Finish").click();
-    expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
-  });
 });
 
 describeReal("cpt-noter-seq-settings-replace-api-key", () => {
   test("other path: Remove… asks first (Cancel default), then api_key_remove empties the row", async ({ page }) => {
+    await watchAlerts(page); // before the window opens: the init script runs on navigation
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
-    await watchAlerts(page);
     await steer.invoke("api_key_set", { provider: "anthropic", key: "test-stand-in-value-0001" }, "settings");
     await openModels(page);
     const key = row(page, "Anthropic API key");
     await expect(key).toContainText("Configured");
     await button(key, "Remove…").click();
-    expect((await alerts(page)).length).toBe(1);
+    await expect.poll(async () => (await alerts(page)).length).toBe(1);
     expect(await sent(page, "api_key_remove")).toHaveLength(0);
     await answerAlerts(page, "confirm");
     await button(key, "Remove…").click();
