@@ -84,13 +84,16 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
     await page.clock.install();
     await page.clock.resume();
     await ask(page, WIDTHS.wide);
+    // stop the page's clock, then advance it by hand: the fake core's started event and the bridge's buffered render are timers
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500);
     await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
-    const now = await page.evaluate(() => Date.now());
     await page.keyboard.press("Enter");
-    // the fake core sends started 200 ms after the question and the first word at 400 ms or later: stop the clock just before
-    // the first word, so the bridge's buffered render of started has run and no word has
-    await page.clock.pauseAt(now + 380);
-    await expect(page.locator(".ak-turn .ak-status").first()).toContainText("·");
+    const status = page.locator(".ak-turn .ak-status");
+    await expect(async () => {
+      await page.clock.runFor(20);
+      await expect(status.first()).toContainText("·", { timeout: 200 });
+    }).toPass({ timeout: 10000 });
+    await expect(page.getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
     await shot(page, "started-line", "wide");
   });
 
