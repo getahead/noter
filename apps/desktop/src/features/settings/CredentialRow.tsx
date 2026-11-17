@@ -13,7 +13,7 @@ import type { IconName } from "../../ui/icons";
 import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
 import { accountRowState, providerName, testResultText, toolName, usedByText, type AccountRowState } from "./account-rows";
-import { signOutAccount, testAccount, testKey } from "./accounts";
+import { signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
 import { SignOutSheet } from "./SignOutSheet";
 import { KEY_NAME, KEY_USE, keyRowState, reasonText, type KeyRowState } from "./keys";
@@ -134,6 +134,7 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
   const state = accountRowState(view);
   const [testLine, setTestLine] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  const signOutError = useWindow(bridge, (s) => s.commands[signOutKey(view.provider)]?.state) === "ERROR";
   const testing = useWindow(bridge, (s) => s.commands[testKey(view.provider)]?.state) === "WAITING";
   const status = view.status;
   const provider = providerName(view.provider);
@@ -147,6 +148,12 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
     setTestLine(null);
     const res = await testAccount(bridge, view.provider);
     setTestLine(res.status === "ok" ? testResultText(res.data) : t("settings.accounts.test_failed"));
+  };
+  // the row changes only with the core's answer; a refusal leaves it as it was and says so
+  const confirmSignOut = async (also: boolean) => {
+    setAsking(false);
+    setTestLine(null);
+    await signOutAccount(bridge, view.provider, also);
   };
   return (
     <div className="e-status st-cred" role="group" aria-label={t(a.title)} data-component={COMPONENT} data-variant="account-login" data-provider={view.provider} data-state={state}>
@@ -164,6 +171,7 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
           <span className="e-status__sub">{t(a.use)}</span>
         )}
         {testLine && <span className="st-cred__dots" role="status">{testLine}</span>}
+        {signOutError && <span className="st-row__err" role="alert">{t("settings.accounts.signout_failed")}</span>}
       </div>
       <div className="st-cred__actions">
         {state === "signed_in" ? (
@@ -172,7 +180,7 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
             <PushButton label={t("settings.accounts.sign_out")} size="small" onAction={() => setAsking(true)} />
           </>
         ) : (
-          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" disabled={state === "signing_in"} help={t("settings.accounts.later")} />
+          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" disabled help={t("settings.accounts.later")} />
         )}
       </div>
       {asking && (
@@ -182,7 +190,7 @@ export function AccountRow({ bridge, view, keyConfigured }: { bridge: Bridge; vi
           agents={view.agents}
           keyConfigured={keyConfigured}
           onCancel={() => setAsking(false)}
-          onConfirm={(also) => (setAsking(false), setTestLine(null), void signOutAccount(bridge, view.provider, also))}
+          onConfirm={(also) => void confirmSignOut(also)}
         />
         // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-signout
       )}

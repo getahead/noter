@@ -262,4 +262,23 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     expect(cancel).toHaveBeenCalled();
     expect(renderToString(<SignOutSheet provider="chatgpt" agents={[]} keyConfigured onConfirm={confirm} onCancel={cancel} />)).toContain("Codex stays signed in");
   });
+
+  it("a refused sign-out leaves the row signed in and shows a safe error", async () => {
+    await ready(signedIn);
+    fake.failNext("account_sign_out", "offline");
+    expect((await signOutAccount(bridge, "claude", false)).status).toBe("error");
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    expect(view.status.type).toBe("signed_in");
+    const html = renderToString(<AccountRow bridge={bridge} view={view} keyConfigured />);
+    expect(html).toContain("Couldn’t sign out. The account is unchanged.");
+    expect(html).toContain("Signed in");
+  });
+
+  it("keeps Sign In disabled until the sign-in sheet exists", async () => {
+    await ready();
+    const view = accounts().accounts.find((a) => a.provider === "claude")!;
+    const button = find(rendered(AccountRow, { bridge, view, keyConfigured: true }), (p) => p.label === "Sign In with Claude…");
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.onAction).toBeUndefined();
+  });
 });

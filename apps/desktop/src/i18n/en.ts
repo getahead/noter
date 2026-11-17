@@ -511,6 +511,7 @@ export const en = {
   "settings.accounts.signout_cli": "{tool} stays signed in for your own terminal use.",
   "settings.accounts.signout_also": "Also sign out of {tool} on this Mac",
   "settings.accounts.signout_confirm": "Sign Out",
+  "settings.accounts.signout_failed": "Couldn’t sign out. The account is unchanged.",
   "settings.accounts.tool_claude": "Claude Code",
   "settings.accounts.tool_chatgpt": "Codex",
   "settings.accounts.key_claude": "Anthropic API key",
