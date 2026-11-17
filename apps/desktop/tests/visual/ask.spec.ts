@@ -78,3 +78,31 @@ test.describe("cpt-noter-dod-ui-ask-citations Ask states at wide", () => {
     await shot(page, "error-banner", "wide");
   });
 });
+
+test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide", () => {
+  test("the started line: the runtime and mode above the answering turn", async ({ page }) => {
+    await page.clock.install();
+    await page.clock.resume();
+    await ask(page, WIDTHS.wide);
+    await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
+    const now = await page.evaluate(() => Date.now());
+    await page.keyboard.press("Enter");
+    // the fake core sends started 200 ms after the question and the first word at 400 ms: stop the clock between them
+    await page.clock.pauseAt(now + 300);
+    await expect(page.locator(".ak-turn .ak-status").first()).toContainText("·");
+    await shot(page, "started-line", "wide");
+  });
+
+  test("a topic route: the Topic: <name> option in the scope pop-up", async ({ page }) => {
+    await ask(page, WIDTHS.wide, { world: (w) => (W.idle(w), (w.app.setup.self_test = { type: "passed", at: 1 }), void (w.topics[0].id = "tp_vis")) });
+    await page.evaluate(async () => {
+      const module = "/src/features/shell/navigate.ts"; // served by the dev server: the app's own module instance
+      const { navigate } = (await import(/* @vite-ignore */ module)) as { navigate: (route: { section: string; key: string }) => void };
+      navigate({ section: "ask", key: "new-topic:tp_vis" });
+    });
+    await expect(page.locator(".ak-recent__item")).toHaveCount(2); // asked and stored
+    await page.getByRole("button", { name: "Scope" }).click();
+    await expect(page.getByRole("menuitemradio", { name: /^Topic: / })).toBeVisible();
+    await shot(page, "topic-scope", "wide");
+  });
+});
