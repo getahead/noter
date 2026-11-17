@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { PersonChip, SpeakerView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
-import { NewPersonForm } from "./NewPersonForm";
+import { keepInputFocus, NewPersonForm } from "./NewPersonForm";
 import { PersonPicker } from "./PersonPicker";
 import { SpeakerRenamePopover } from "./SpeakerRenamePopover";
 
@@ -190,6 +190,11 @@ describe("PersonPicker keys and choices", () => {
 });
 
 describe("NewPersonForm", () => {
+  it("a press on the footer keeps focus in the field, so Cancel works on the first click", () => {
+    const prevented = vi.fn();
+    keepInputFocus({ preventDefault: prevented });
+    expect(prevented).toHaveBeenCalledOnce();
+  });
   const form = (initial: string, over: Record<string, unknown> = {}) => {
     const calls = { confirm: vi.fn(), pick: vi.fn(), back: vi.fn() };
     const tree = rendered(NewPersonForm, {
