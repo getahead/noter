@@ -13,7 +13,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startFromRoute, startFromTopicRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
 import { setAskState, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
@@ -73,17 +73,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   // `new:<words>` (Ask Instead, a Library question) asks those words once per history entry; `new-topic:<id>` asks about that topic
   useEffect(() => {
-    // started from a timer the cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the
-    // asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing
-    let alive = true;
-    const h = setTimeout(() => {
-      startFromRoute(routeKey, (q) => ask(q));
-      void startFromTopicRoute(bridge, routeKey, ask, () => alive);
-    }, 0);
-    return () => {
-      alive = false;
-      clearTimeout(h);
-    };
+    return startRoute(bridge, routeKey, ask);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
   // ...and once it is stored the entry becomes the thread

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, topicOfRoute } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, startFromRoute, startFromTopicRoute, startRoute, topicOfRoute } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -254,5 +254,19 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     const good = make(ok({ topic: { name: "X" } })).bridge;
     expect(await startFromTopicRoute(good, "new-topic:tp_2", ask, () => false)).toBe(false);
     expect(await startFromTopicRoute(good, "new-topic:tp_2", ask)).toBe(true);
+  });
+  it("starts a routed ask from a timer the cleanup cancels", async () => {
+    vi.useFakeTimers();
+    const ask = vi.fn();
+    const { bridge } = make(ok({ topic: { name: "T" } }));
+    startRoute(bridge, "new:Hello", ask)(); // left at once: nothing is asked
+    await vi.runAllTimersAsync();
+    expect(ask).not.toHaveBeenCalled();
+    startRoute(bridge, "new:Hello", ask);
+    startRoute(bridge, "new-topic:tp_7", ask);
+    await vi.runAllTimersAsync();
+    expect(ask).toHaveBeenCalledWith("Hello");
+    expect(ask).toHaveBeenCalledWith("What was decided and what is still open about T?", { preset: "all", topic_id: "tp_7" });
+    vi.useRealTimers();
   });
 });

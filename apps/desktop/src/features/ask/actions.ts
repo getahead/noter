@@ -212,6 +212,19 @@ export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (que
   return true;
 }
 
+/** Start what a `new:` or `new-topic:` route asks, from a timer the returned cleanup cancels: a development double mount (effect, cleanup, effect) must not leave the asked-once guard set while the cleanup has dropped the stream, and a page left at once asks nothing. */
+export function startRoute(bridge: Bridge, key: string, ask: (question: string, scope?: AskScope) => void): () => void {
+  let alive = true;
+  const h = setTimeout(() => {
+    startFromRoute(key, ask);
+    void startFromTopicRoute(bridge, key, ask, () => alive);
+  }, 0);
+  return () => {
+    alive = false;
+    clearTimeout(h);
+  };
+}
+
 /** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
 export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
   if (!(key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
