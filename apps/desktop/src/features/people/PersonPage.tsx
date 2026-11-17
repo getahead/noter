@@ -13,7 +13,7 @@ import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
-import { afterVoiceChange } from "./focus-return";
+import { afterVoiceAlert, afterVoiceChange } from "./focus-return";
 import { holdPerson, setPersonNotice, setPersonStatus, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
 import "./people.css";
@@ -91,7 +91,7 @@ export function PersonPage({ id }: { id: string }) {
     // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
     onSetUpVoice={() => state.page && sheets.open("person-voice", { bridge, person: state.page.person, calls: state.page.calls.length })}
     // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
-    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice))} />;
+    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice).finally(() => afterVoiceAlert(document)))} />;
 }
 
 export interface PersonBodyProps {
