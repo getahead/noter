@@ -28,6 +28,7 @@ import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { navigateEffect } from "./navigate";
 import { searchRoute, searchWords } from "./sections";
+import { takeTag, useTagChoices } from "../library/tag-suggest";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
@@ -60,6 +61,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     );
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const tagChoices = useTagChoices(bridge);
   const [viewport, setViewport] = useState(() => globalThis.innerWidth ?? 1280);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrolls = useRef(createScrollMemory());
@@ -279,7 +281,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
           onBack={() => act({ type: "back" })}
           onForward={() => act({ type: "forward" })}
           onToggleSidebar={() => act({ type: "toggle-sidebar" })}
-          onSearch={setSearch}
+          tagChoices={tagChoices}
+          onSearch={(v) => setSearch(takeTag(v, tagChoices) ? "" : v)}
           onRunSearch={(q) => dispatch({ type: "move", move: { type: "push", route: searchRoute(q.trim()) } })}
           onOpenSearch={() => act({ type: "focus-search" })}
           onSearchBlur={() => setSearchOpen(false)}

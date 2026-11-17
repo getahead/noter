@@ -24,7 +24,7 @@ import { exportStore } from "./export-store";
 import { AddTagPopover } from "./add-tag";
 import { tagCalls, tagsKey } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
-import { heldFilter, holdFilter, isFiltered, reconcile, type FilterAction, type FilterState } from "./filters";
+import { heldFilter, holdFilter, isFiltered, reconcile, watchFilter, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
   edgeOf,
@@ -73,6 +73,15 @@ export function CallsPage() {
   });
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-export
   const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
+  useEffect(
+    () =>
+      watchFilter(() => {
+        const next = heldFilter();
+        setFstate(next);
+        void list.setFilter(next.filter);
+      }),
+    [list],
+  );
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
   const onFilter = (a: FilterAction) => {
     const { next, reread } = reconcile(fstate, a);

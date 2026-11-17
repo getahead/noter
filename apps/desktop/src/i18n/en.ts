@@ -1188,8 +1188,6 @@ export const en = {
   "tags.removed_n": { one: "Removed “{tag}” from {count} call", other: "Removed “{tag}” from {count} calls" },
   "library.add_tag": "Add Tag…",
   "export.scope_calls": { one: "{count} call", other: "{count} calls" },
-<<<<<<< HEAD
-=======
   "search.title": "Search results",
   "search.loading": "Searching your calls",
   "search.error": "Couldn’t search your calls",
