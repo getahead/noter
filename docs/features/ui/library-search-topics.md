@@ -34,11 +34,11 @@ milestone: M3
 
 <!-- /toc -->
 
-- [ ] `p4` - **ID**: `cpt-noter-featstatus-ui-library-search-topics`
+- [x] `p4` - **ID**: `cpt-noter-featstatus-ui-library-search-topics`
 
 ## 1. Feature Context
 
-- [ ] `p4` - `cpt-noter-feature-ui-library-search-topics`
+- [x] `p4` - `cpt-noter-feature-ui-library-search-topics`
 
 ### 1.1 Overview
 
@@ -277,6 +277,8 @@ The system **MUST** render topic counts, month groups, the inspector, rename col
 **DESIGN versus prototype.** DESIGN says typing switches to Search results; `lib.search` commits on Return. Follow the prototype's Return submission. DESIGN puts **Show How Noter Searched** in every result state; the prototype omits it on no matches, loading and failure. Follow those layouts. DESIGN's Narrow one-span rule and several keyboard behaviours have no matching rule in `40-d.css`; apply DESIGN where the prototype has no behaviour. The topic merge sheet adds a **Merge into** chooser; retain it. Prototype tag entry silently lowercases and truncates; use the contract's validation instead of silently losing input. The delete-alert wording difference is already owned by dialogs-host.
 
 **Contract and fake gaps.** There is no topic-delete command, so the empty-topic Delete Topic story cannot be completed on the frozen surface. `SearchExplain` lacks the exact stem list and meaning/language labels used by the prototype; display returned normalized query, counts, mode and actual filters without invented data. SearchHit has no direct speaker or audio-availability field; reuse transcript-span data lazily for the focused/played result and existing call state rather than issuing one read per row. Use TopicRow.last_seen for Last discussed; no language field is supplied for the topic chip. A search response has no cursor or total-more count: expand returned hits only, never invent “+4”. The default fake ignores search filters and returns simple substring hits without documents or weak matches; typed scenario overrides must cover those states. A topic rename to a name another topic has is refused with `invalid_input { field: "name", rule: "duplicate" }` on the real core and the fake (#903). These are owner/contract follow-ups, not new commands defined here.
+
+**Delivery (17 Nov 2026).** Recorded gaps, not delivered: the item kind on a search hit (`SearchHit` carries none) and `SearchResults.query_lang` for the cross-language caption (contract gaps); **Delete Topic** on the Nothing-left state; and three E2E stories that need harness support (No topics, Merge suggested, Keep Separate), whose spec is kept in `_team/ui/design/m3-library-gated-e2e.ts.txt` until the harness can drive them. Every other flow, algorithm, state and DoD is delivered and marked.
 
 **Milestone notes.** Tag commands are M2 but the Library tagging surface is M3. Ask is another M3 feature; export is the M2 outputs/dialogs path. No changes to milestone assignments are required.
 
