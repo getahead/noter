@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { AccountsView, AccountView } from "../../core/bindings";
-import { accountRowState, signOutCopy, testResultText, usedByText } from "./account-rows";
+import { accountRowState, signOutCopy, testResultText, usedByText, expiredNoteText, visibleTestLine } from "./account-rows";
 import { runtimeConnected } from "./keys";
 
 const view = (status: AccountView["status"], agents: AccountView["agents"] = []): AccountView => ({
@@ -60,5 +60,17 @@ describe("runtimeConnected for accounts", () => {
     const a = { version: 1, keys: [], local: { running: false } as AccountsView["local"], accounts: [view({ type: "signed_in", identity: { email: "a@b.c", plan: "Max" }, since: 1 })] } as AccountsView;
     expect(runtimeConnected("claude_account", a)).toBe(true);
     expect(runtimeConnected("chatgpt_account", a)).toBe(false);
+  });
+});
+
+describe("expiredNoteText and visibleTestLine", () => {
+  it("counts the paused agents, none: the plain note", () => {
+    expect(expiredNoteText("Claude", [])).toBe("Claude ended the session for this account. Agents on it are paused until you sign in again.");
+    expect(expiredNoteText("Claude", [{ id: "a", name: "A", badge: "agent" }])).toContain("1 agent paused");
+    expect(expiredNoteText("Claude", [{ id: "a", name: "A", badge: "agent" }, { id: "b", name: "B", badge: "agent" }])).toContain("2 agents paused");
+  });
+  it("shows a Test answer only on a signed-in row", () => {
+    expect(visibleTestLine("signed_in", "Works")).toBe("Works");
+    for (const s of ["expired", "not_signed_in", "signing_in"] as const) expect(visibleTestLine(s, "Works")).toBeNull();
   });
 });

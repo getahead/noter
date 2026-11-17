@@ -122,8 +122,8 @@ export function reduce(s: SignIn, e: SignInEvent): SignIn {
       // @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-done
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-clear
       return closed;
-    // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-done
-    // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-clear
+      // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-clear
+      // @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-done
   }
 }
 

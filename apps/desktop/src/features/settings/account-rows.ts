@@ -23,6 +23,13 @@ export const toolName = (p: AccountProvider) => t(key(p, "tool"));
 export const usedByText = (agents: AgentRef[]): string =>
   agents.length ? t("settings.accounts.used_by", { count: agents.length, names: agents.map((a) => a.name).join(", ") }) : t("settings.accounts.used_none");
 
+/** The expired note, with how many agents are paused (none yet: the plain note). */
+export const expiredNoteText = (provider: string, agents: AgentRef[]): string =>
+  agents.length ? t("settings.accounts.expired_note_agents", { provider, count: agents.length }) : t("settings.accounts.expired_note", { provider });
+
+/** A Test answer belongs to a signed-in account: any other row state shows none. */
+export const visibleTestLine = (state: AccountRowState, line: string | null): string | null => (state === "signed_in" ? line : null);
+
 // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-test
 /** The Test line: the latency only when the core says ok, otherwise the mapped error. */
 export function testResultText(r: AccountTestResult): string {

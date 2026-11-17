@@ -552,6 +552,7 @@ export const en = {
   "settings.accounts.signing_in": "Finishing in your browser…",
   "settings.accounts.expired": "Signed out by {provider}",
   "settings.accounts.expired_note": "{provider} ended the session for this account. Agents on it are paused until you sign in again.",
+  "settings.accounts.expired_note_agents": { one: "{provider} ended the session for this account. {count} agent paused until you sign in again.", other: "{provider} ended the session for this account. {count} agents paused until you sign in again." },
   "settings.accounts.through": "{plan} · through {tool}",
   "settings.accounts.used_none": "No agent uses it yet. Choose it in Agents, or for a task below.",
   "settings.accounts.used_by": { one: "Used by {count} agent: {names}", other: "Used by {count} agents: {names}" },
