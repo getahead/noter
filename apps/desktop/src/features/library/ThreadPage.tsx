@@ -19,6 +19,7 @@ import { useRead } from "./use-read";
 import "./library.css";
 
 // @cpt-component:cpt-noter-component-screen-library:p1
+// @cpt-dod:cpt-noter-dod-ui-library-search-topics-topics:p1
 /** Library › Topic thread (TH-R1, TH-R3): the topic's counts and its entries by month, newest first. */
 export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: string }) {
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-get-topic

@@ -228,7 +228,7 @@ Implement LC-R2, LS-R1 to LS-R7, LT-R1 to LT-R2 and TH-R1 to TH-R4 of the Librar
 
 ### Search and filter surfaces
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-library-search-topics-search`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-library-search-topics-search`
 
 The system **MUST** render the filter bar, result rows and all search states as the prototype, preserve navigation state, support multilingual highlights, weak matches, playback and evidence, and extend Calls with tag batches and export delegation.
 
@@ -246,7 +246,7 @@ The system **MUST** render the filter bar, result rows and all search states as 
 
 ### Topics and reversible identity changes
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-library-search-topics-topics`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-library-search-topics-topics`
 
 The system **MUST** render topic counts, month groups, the inspector, rename collision and merge preview, apply changes only after core success, and route each returned change to Undo. Unsupported deletion remains a named contract gap, not a local hide. `just gate` passes.
 

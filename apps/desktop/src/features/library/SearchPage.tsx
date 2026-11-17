@@ -165,6 +165,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
 
 // @cpt-state:cpt-noter-state-ui-library-search-topics-view:p1
 // @cpt-component:cpt-noter-component-screen-library:p1
+// @cpt-dod:cpt-noter-dod-ui-library-search-topics-search:p1
 /** Library › Search results: one `search` read per words and filter, an answer for older ones is dropped, Try Again only on request. */
 export function SearchPage({ query }: { query: string }) {
   const bridge = useBridge();
