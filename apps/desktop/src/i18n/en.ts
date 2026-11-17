@@ -670,6 +670,7 @@ export const en = {
   "speakers.scope.whole": "Whole call",
   "speakers.scope.line": "Only this line",
   "speakers.rename": "Rename",
+  "speakers.remove": "Remove {name}",
   "speakers.create_name": "Create and Name",
   "speakers.named": { one: "Named {from} as {to} · {count} line", other: "Named {from} as {to} · {count} lines" },
   "speakers.named_new": { one: "You added {to} and named {from} as {to} · {count} line", other: "You added {to} and named {from} as {to} · {count} lines" },

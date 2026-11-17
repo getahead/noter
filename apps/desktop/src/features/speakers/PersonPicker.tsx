@@ -22,6 +22,7 @@ import {
   matchPeople,
   type Entry,
 } from "./picker";
+import { PersonChip as SharedChip } from "../../ui/primitives/person-chip";
 import { usePeople } from "./people";
 import "./speakers.css";
 
@@ -46,6 +47,10 @@ export interface PersonPickerProps {
   disabled?: boolean;
   /** Esc with nothing to clear. */
   onClose?: () => void;
+  /** A multi-select holds people that exist (no New person form, You included); picking adds a chip and keeps the list open. */
+  multiple?: true;
+  selected?: readonly PersonChip[];
+  onChange?: (next: PersonChip[]) => void;
 }
 
 // @cpt-component:cpt-noter-component-ui-person-picker:p1
@@ -61,24 +66,35 @@ export function PersonPicker(p: PersonPickerProps) {
   useEffect(() => setQuery(p.value ?? ""), [p.value]);
 
   const cap = p.variant === "inline" ? CAP_INLINE : CAP_POPOVER;
-  const all = useMemo(
-    () => candidates(p.participants, p.speakers, people),
-    [p.participants, p.speakers, people],
-  );
+  const multi = p.multiple === true;
+  const chosen = p.selected ?? [];
+  const all = useMemo(() => {
+    const groups = candidates(p.participants, p.speakers, people, multi);
+    if (!multi) return groups;
+    const taken = new Set(chosen.map((c) => c.id));
+    return groups.map((g) => ({ ...g, entries: g.entries.filter((e) => !taken.has(e.id)) })).filter((g) => g.entries.length);
+  }, [p.participants, p.speakers, people, multi, chosen]);
   const groups = useMemo(() => matchPeople(query, all, cap), [query, all, cap]);
   const flat = groups.flatMap((g) => g.entries);
   const quoted = query.trim();
   const none = !!quoted && flat.length === 0;
-  const newIndex = flat.length;
-  const current = active ?? (quoted && flat.length ? 0 : none ? newIndex : -1);
+  const newIndex = multi ? -1 : flat.length;
+  const current = active ?? (quoted && flat.length ? 0 : none && !multi ? newIndex : -1);
 
+  // a multi-select adds the chip, clears the field and stays open for the next person
+  const add = (e: Entry) => {
+    p.onChange?.([...chosen, { id: e.id, display_name: e.display_name, short_name: e.short_name, initials: e.initials, is_you: e.is_you ?? false }]);
+    setQuery("");
+    setActive(null);
+  };
   const pick = (e: Entry) => {
+    if (multi) return add(e);
     setQuery(e.display_name);
     setOpen(false);
     setActive(null);
     p.onPick(existing(e), e.display_name);
   };
-  const openForm = () => setForm(quoted);
+  const openForm = () => !multi && setForm(quoted);
   const type = (v: string) => {
     setQuery(v);
     setOpen(true);
@@ -88,6 +104,10 @@ export function PersonPicker(p: PersonPickerProps) {
   // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-focus
   const key = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.nativeEvent.isComposing) return; // Return, Esc and arrows belong to the input method
+    if (multi && e.key === "Backspace" && !query && chosen.length) {
+      e.preventDefault();
+      return p.onChange?.(chosen.slice(0, -1));
+    }
     if (e.metaKey && e.key.toLowerCase() === "n") {
       e.preventDefault();
       openForm();
@@ -113,7 +133,7 @@ export function PersonPicker(p: PersonPickerProps) {
       const entry = flat[current];
       pick(entry);
       // @cpt-begin:cpt-noter-algo-ui-speakers-picker:p1:inst-return
-      p.onConfirm?.(existing(entry), entry.display_name, false);
+      if (!multi) p.onConfirm?.(existing(entry), entry.display_name, false);
       // @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-return
     } else if (e.key === "Escape" && query) {
       e.preventDefault(); // the first Esc clears, a second closes the host
@@ -171,6 +191,18 @@ export function PersonPicker(p: PersonPickerProps) {
       data-state={none ? "no-match" : query ? "typing" : "empty"}
       className={cx("cw-pp", p.variant === "inline" && "cw-pp--field")}
     >
+      {multi && chosen.length > 0 && (
+        <span className="cw-pp__chips">
+          {chosen.map((c) => (
+            <span key={c.id} className="cw-pp__chip">
+              <SharedChip variant={c.is_you ? "you" : "link"} initials={c.initials} name={c.is_you ? t("cw.speaker.you") : c.short_name} title={c.display_name} />
+              <button type="button" className="cw-pp__x" aria-label={t("speakers.remove", { name: c.short_name })} onClick={() => p.onChange?.(chosen.filter((x) => x.id !== c.id))}>
+                <Icon name="x" size={10} />
+              </button>
+            </span>
+          ))}
+        </span>
+      )}
       <span className="np-field">
         <input
           className="np-field__input"
@@ -243,7 +275,7 @@ export function PersonPicker(p: PersonPickerProps) {
               })}
             </div>
           ))}
-          {option(
+          {!multi && option(
             `${list}-${newIndex}`,
             current === newIndex,
             openForm,
