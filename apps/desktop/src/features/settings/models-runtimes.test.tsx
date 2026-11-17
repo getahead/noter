@@ -228,12 +228,14 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
 
   it("shows the expired row with its note and Sign In Again…", async () => {
     const props = await ready((w) => {
-      w.app.accounts.accounts.find((a) => a.provider === "chatgpt")!.status = { type: "signed_out_by_provider", at: 1 };
+      const a = w.app.accounts.accounts.find((x) => x.provider === "chatgpt")!;
+      a.status = { type: "signed_out_by_provider", at: 1 };
+      a.agents = [{ id: "agt_a", name: "A", badge: "agent" }, { id: "agt_b", name: "B", badge: "agent" }];
     });
     await loadAccounts(bridge);
     const html = renderToString(<ModelsRuntimesPane {...props} />);
     expect(html).toContain("Signed out by ChatGPT");
-    expect(html).toContain("Agents on it are paused until you sign in again.");
+    expect(html).toContain("2 agents paused until you sign in again.");
     expect(html).toContain(">Sign In Again…<");
   });
 
@@ -274,4 +276,13 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     expect(html).toContain("Signed in");
   });
 
+  it("says in the row when the CLI of a signed-out account is not installed", async () => {
+    await ready((w) => {
+      Object.assign(w.app.accounts.accounts.find((a) => a.provider === "chatgpt")!.cli, { installed: false, path: null });
+    });
+    await loadAccounts(bridge);
+    const html = renderToString(<ModelsRuntimesPane settings={bridge.store.getState().whole.settings!} bridge={bridge} />);
+    expect(html).toContain("Codex isn’t installed. Sign in will offer to install it.");
+    expect(html).toContain("Use your Claude Pro or Max plan through Claude Code");
+  });
 });

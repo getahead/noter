@@ -78,7 +78,10 @@ class Machines {
     const m = this.state[p];
     if (m.choice === "existing" && m.prepare?.existing) {
       const res = await useExistingAccount(this.bridge, p);
+      // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-version
+      // the answer is the whole accounts view; the bridge keeps the highest version, so the row refreshes without invented Check progress
       if (res.status === "ok") this.dispatch(p, { type: "usedExisting", identity: m.prepare.existing });
+      // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-version
       return;
     }
     const res = await startSignIn(this.bridge, p, m.confirmed);
@@ -115,5 +118,7 @@ export const signInMachines = (bridge: Bridge): Machines => {
 export function useSignIn(bridge: Bridge, provider: AccountProvider) {
   const m = signInMachines(bridge);
   const state = useSyncExternalStore(m.subscribe, () => m.state[provider], () => m.state[provider]);
+  // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-return
   return { state, machines: m };
+  // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-return
 }

@@ -59,6 +59,7 @@ export interface SheetHostProps {
   onUseKey?: () => void;
 }
 
+// @cpt-dod:cpt-noter-dod-ui-accounts-sign-in:p1
 /** The sheet of `provider` while its machine says it is on screen; null otherwise (a hidden session stays in the store). */
 export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHostProps) {
   const { state: s, machines: m } = useSignIn(bridge, provider);

@@ -145,7 +145,7 @@ Delivered in M2 (see Milestone notes). Steps 7, 8 and 9.1 call M3 commands: M2 b
 
 ### Test, select task runtimes and sign out
 
-- [ ] `p1` - **ID**: `cpt-noter-flow-ui-accounts-manage`
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-accounts-manage`
 
 Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes listed as not connected until M3; the other steps are M3 (see Milestone notes).
 
@@ -164,14 +164,14 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 3. [x] - `p1` - API: `settings_update` with runtimes section and revision through Settings; restore core values on failure - `inst-save-task`
 4. [x] - `p1` - User chooses Sign Out; alert names agents falling back to the matching key or pausing without one, and explains the CLI stays signed in unless **Also sign out of … on this Mac** is chosen - `inst-signout-alert`
 5. [x] - `p1` - User confirms; API: `account_sign_out` with provider and `also_in_cli`; accounts events determine the result - `inst-signout`
-6. [ ] - `p1` - On provider-ended state show the expired row and affected-agent count; Sign In Again reuses the sign-in flow; never silently bind agents to another account - `inst-expired`
-7. [ ] - `p1` - **RETURN** Models & Runtimes; per-agent editor and quick-fix UI are owned by Agents in M4 - `inst-return-manage`
+6. [x] - `p1` - On provider-ended state show the expired row and affected-agent count; Sign In Again reuses the sign-in flow; never silently bind agents to another account - `inst-expired`
+7. [x] - `p1` - **RETURN** Models & Runtimes; per-agent editor and quick-fix UI are owned by Agents in M4 - `inst-return-manage`
 
 ## 3. Processes / Business Logic (CDSL)
 
 ### Reconcile one sign-in session
 
-- [ ] `p1` - **ID**: `cpt-noter-algo-ui-accounts-session`
+- [x] `p1` - **ID**: `cpt-noter-algo-ui-accounts-session`
 
 **Input**: prepare/session responses, provider, matching progress, AccountsView and pending job id
 
@@ -182,16 +182,16 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 2. [x] - `p1` - Disable Continue for missing/unsupported CLI and unticked required personal-use confirmation; never infer eligibility from fixture plan names - `inst-guard`
 3. [x] - `p1` - Derive countdown from `expires_at`; no local countdown authorizes success or binds an agent - `inst-countdown`
 4. [x] - `p1` - Map waiting_for_browser to Sign in, signed_in/checking_plan/sending_test_request to Check, done plus confirmed signed-in accounts state to Use - `inst-map`
-5. [ ] - `p1` - Replace whole account state only at the highest version through the bridge; prepare/use-existing results refresh the account row without fabricating Check progress - `inst-version`
+5. [x] - `p1` - Replace whole account state only at the highest version through the bridge; prepare/use-existing results refresh the account row without fabricating Check progress - `inst-version`
 6. [x] - `p1` - Hide a sheet without stopping the core session; on window reload use accounts_get to recover signing-in status; cancel only on the explicit Cancel action - `inst-lifecycle`
 7. [x] - `p1` - Clear code, URL and secure drafts when no longer needed; no password, token, key or sign-in code enters logs, storage or analytics - `inst-clear`
-8. [ ] - `p1` - **RETURN** the active provider's view; retry is always user initiated - `inst-return`
+8. [x] - `p1` - **RETURN** the active provider's view; retry is always user initiated - `inst-return`
 
 ## 4. States (CDSL)
 
 ### Account and key surfaces
 
-- [ ] `p1` - **ID**: `cpt-noter-state-ui-accounts-credentials`
+- [x] `p1` - **ID**: `cpt-noter-state-ui-accounts-credentials`
 
 **States**: SIGNED_OUT, PREPARE, INSTALLING, BROWSER, BROWSER_HIDDEN, CHECK, USE, SIGNED_IN, EXPIRED, SIGNIN_ERROR, KEY_DRAFT, KEY_VERIFYING, KEY_INVALID, KEY_CONFIGURED, KEYCHAIN_LOCKED
 
@@ -200,16 +200,16 @@ Steps 2 and 3 (Runtime per task) are delivered in M2, with the account runtimes 
 The key transitions 11 to 14 are M2; the account transitions 1 to 10 are M3. The state is ticked in M3.
 
 **Transitions**:
-1. [ ] - `p1` - **FROM** SIGNED_OUT **TO** PREPARE **WHEN** Sign In is selected - `inst-prepare`
-2. [ ] - `p1` - **FROM** PREPARE **TO** INSTALLING **WHEN** Install is chosen; successful job and prepare return to PREPARE - `inst-install`
-3. [ ] - `p1` - **FROM** PREPARE **TO** BROWSER **WHEN** a guarded sign-in starts; use-existing success skips to CHECK or USE according to returned evidence - `inst-browser`
-4. [ ] - `p1` - **FROM** BROWSER **TO** BROWSER_HIDDEN **WHEN** Esc hides the sheet; Show returns to BROWSER - `inst-hide`
-5. [ ] - `p1` - **FROM** BROWSER **TO** CHECK **WHEN** the matching progress confirms browser sign-in - `inst-check`
-6. [ ] - `p1` - **FROM** CHECK **TO** USE **WHEN** checks complete and the account is confirmed signed in - `inst-use`
-7. [ ] - `p1` - **FROM** USE **TO** SIGNED_IN **WHEN** Done, Not Now or successful agent binding closes the sheet - `inst-done`
-8. [ ] - `p1` - **FROM** BROWSER **TO** SIGNIN_ERROR **WHEN** cancellation, timeout, ineligible plan or offline is reported; retry starts a new guarded session - `inst-error`
-9. [ ] - `p1` - **FROM** SIGNED_IN **TO** EXPIRED **WHEN** the provider ends the session; Sign In Again returns to PREPARE - `inst-expired`
-10. [ ] - `p1` - **FROM** SIGNED_IN **TO** SIGNED_OUT **WHEN** explicit sign-out succeeds - `inst-signout`
+1. [x] - `p1` - **FROM** SIGNED_OUT **TO** PREPARE **WHEN** Sign In is selected - `inst-prepare`
+2. [x] - `p1` - **FROM** PREPARE **TO** INSTALLING **WHEN** Install is chosen; successful job and prepare return to PREPARE - `inst-install`
+3. [x] - `p1` - **FROM** PREPARE **TO** BROWSER **WHEN** a guarded sign-in starts; use-existing success skips to CHECK or USE according to returned evidence - `inst-browser`
+4. [x] - `p1` - **FROM** BROWSER **TO** BROWSER_HIDDEN **WHEN** Esc hides the sheet; Show returns to BROWSER - `inst-hide`
+5. [x] - `p1` - **FROM** BROWSER **TO** CHECK **WHEN** the matching progress confirms browser sign-in - `inst-check`
+6. [x] - `p1` - **FROM** CHECK **TO** USE **WHEN** checks complete and the account is confirmed signed in - `inst-use`
+7. [x] - `p1` - **FROM** USE **TO** SIGNED_IN **WHEN** Done, Not Now or successful agent binding closes the sheet - `inst-done`
+8. [x] - `p1` - **FROM** BROWSER **TO** SIGNIN_ERROR **WHEN** cancellation, timeout, ineligible plan or offline is reported; retry starts a new guarded session - `inst-error`
+9. [x] - `p1` - **FROM** SIGNED_IN **TO** EXPIRED **WHEN** the provider ends the session; Sign In Again returns to PREPARE - `inst-expired`
+10. [x] - `p1` - **FROM** SIGNED_IN **TO** SIGNED_OUT **WHEN** explicit sign-out succeeds - `inst-signout`
 11. [x] - `p1` - **FROM** KEY_DRAFT **TO** KEY_VERIFYING **WHEN** a nonblank key is submitted once - `inst-key-verify`
 12. [x] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_INVALID **WHEN** the provider rejects it; corrected input returns to KEY_DRAFT - `inst-key-invalid`
 13. [x] - `p1` - **FROM** KEY_VERIFYING **TO** KEY_CONFIGURED **WHEN** api_key_set succeeds - `inst-key-configured`
@@ -235,7 +235,7 @@ The system **MUST** share row/field forms between Settings and Assistants, permi
 
 ### Independent account sessions and explicit binding
 
-- [ ] `p4` - **ID**: `cpt-noter-dod-ui-accounts-sign-in`
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-accounts-sign-in`
 
 The system **MUST** implement all four steps for each provider, correlation, install, existing-account reuse, error recovery, hidden-sheet continuation, explicit agent binding, tests, task runtime settings and sign-out without handling passwords or tokens. Unsupported contract details remain listed below. `just gate` passes.
 

@@ -12,7 +12,7 @@ import { InlineStatus } from "../../ui/feedback/inline-status";
 import type { IconName } from "../../ui/icons";
 import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
-import { accountRowState, providerName, testResultText, toolName, usedByText, type AccountRowState } from "./account-rows";
+import { accountRowState, expiredNoteText, providerName, testResultText, toolName, usedByText, visibleTestLine, type AccountRowState } from "./account-rows";
 import { signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
 import { AccountSignInSheet } from "./AccountSignInSheet";
@@ -138,6 +138,8 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
   const [asking, setAsking] = useState(false);
   const signOutError = useWindow(bridge, (s) => s.commands[signOutKey(view.provider)]?.state) === "ERROR";
   const { machines } = useSignIn(bridge, view.provider);
+  // a stale answer must not come back when the row signs in again
+  useEffect(() => void (state !== "signed_in" && setTestLine(null)), [state]);
   const testing = useWindow(bridge, (s) => s.commands[testKey(view.provider)]?.state) === "WAITING";
   const status = view.status;
   const provider = providerName(view.provider);
@@ -169,11 +171,16 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
             <span className="e-status__sub">{usedByText(view.agents)}</span>
           </>
         ) : status.type === "signed_out_by_provider" ? (
-          <span className="st-row__err">{t("settings.accounts.expired_note", { provider })}</span>
+          // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
+          <span className="st-row__err">{expiredNoteText(provider, view.agents)}</span>
+          // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
+        ) : state === "not_signed_in" && !view.cli.installed ? (
+          // the CLI the account signs in through is not on this Mac: the row says so before the sheet does
+          <span className="e-status__sub">{t("settings.accounts.cli_missing", { tool: toolName(view.provider) })}</span>
         ) : (
           <span className="e-status__sub">{t(a.use)}</span>
         )}
-        {testLine && <span className="st-cred__dots" role="status">{testLine}</span>}
+        {visibleTestLine(state, testLine) && <span className="st-cred__dots" role="status">{testLine}</span>}
         {signOutError && <span className="st-row__err" role="alert">{t("settings.accounts.signout_failed")}</span>}
       </div>
       <div className="st-cred__actions">

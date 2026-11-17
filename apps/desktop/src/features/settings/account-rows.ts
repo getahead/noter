@@ -11,7 +11,9 @@ const STATE: Record<AccountView["status"]["type"], AccountRowState> = {
   signed_in: "signed_in",
   signed_out_by_provider: "expired",
 };
+// @cpt-begin:cpt-noter-state-ui-accounts-credentials:p1:inst-expired
 export const accountRowState = (v: AccountView): AccountRowState => STATE[v.status.type];
+// @cpt-end:cpt-noter-state-ui-accounts-credentials:p1:inst-expired
 
 const key = (p: AccountProvider, what: "provider" | "tool" | "key"): MsgKey => `settings.accounts.${what}_${p}`;
 export const providerName = (p: AccountProvider) => t(key(p, "provider"));
@@ -20,6 +22,13 @@ export const toolName = (p: AccountProvider) => t(key(p, "tool"));
 /** **Used by 2 agents: Product manager, Architect** or the hint that no agent uses it yet. */
 export const usedByText = (agents: AgentRef[]): string =>
   agents.length ? t("settings.accounts.used_by", { count: agents.length, names: agents.map((a) => a.name).join(", ") }) : t("settings.accounts.used_none");
+
+/** The expired note, with how many agents are paused (none yet: the plain note). */
+export const expiredNoteText = (provider: string, agents: AgentRef[]): string =>
+  agents.length ? t("settings.accounts.expired_note_agents", { provider, count: agents.length }) : t("settings.accounts.expired_note", { provider });
+
+/** A Test answer belongs to a signed-in account: any other row state shows none. */
+export const visibleTestLine = (state: AccountRowState, line: string | null): string | null => (state === "signed_in" ? line : null);
 
 // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-test
 /** The Test line: the latency only when the core says ok, otherwise the mapped error. */

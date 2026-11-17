@@ -40,6 +40,7 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
   // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-remove-alert
   const local = accounts?.local;
   const localReady = !!local?.running;
+  // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-return-manage
   return (
     <>
       {keychainLocked && (
@@ -103,4 +104,5 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
       )}
     </>
   );
+  // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-return-manage
 }
