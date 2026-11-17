@@ -31,13 +31,17 @@ export async function loadThread(bridge: Bridge, id: string): Promise<AskAnswer[
 
 export function startAsk(bridge: Bridge, thread: string | null, question: string, scope: AskScope | undefined): void {
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-start
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-start-follow-up
   void bridge.subscribe("ask_start", { thread_id: thread, question, scope: scope ?? NEW_SCOPE });
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-start-follow-up
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-start
 }
 
 export function stopAsk(bridge: Bridge, turnId: string): void {
   // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-stop
+  // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-stop
   void bridge.act("ask:stop", "ask_stop", () => bridge.core.askStop({ turn_id: turnId }));
+  // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-stop
   // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-stop
 }
 
@@ -49,7 +53,9 @@ export interface ThreadSetters {
 
 /** Show thread `id` (or the empty composer for null) with its stored turns. */
 export async function openThread(bridge: Bridge, id: string | null, set: ThreadSetters, keepStream = false): Promise<void> {
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-return-follow-up
   set.setThread(id);
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-return-follow-up
   set.setTurns([]);
   set.setAsking(null);
   if (!keepStream) void bridge.unsubscribe("ask_start"); // a turn still answering is kept listened to, so Recent can learn it ended
@@ -62,7 +68,9 @@ export async function openThread(bridge: Bridge, id: string | null, set: ThreadS
 /** When a turn ends the core has stored its thread: keep the id (the next question is a follow-up) and refresh Recent; a stored answer replaces the live one, a failed or stopped partial stays on screen. */
 export async function settleTurn(bridge: Bridge, id: string, phase: TurnPhase | null, set: ThreadSetters & { refresh: () => Promise<void> }): Promise<void> {
   if (phase === null || phase === "streaming") return;
+  // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-return-question
   set.setThread(id);
+  // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-return-question
   void set.refresh();
   if (!isStored(phase)) return;
   const got = await loadThread(bridge, id);
@@ -72,8 +80,10 @@ export async function settleTurn(bridge: Bridge, id: string, phase: TurnPhase | 
   }
 }
 
+// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-compose
 /** The trimmed question to send, or null while the draft is empty or an answer is streaming. */
 export const questionOf = (draft: string, busy: boolean): string | null => (busy ? null : draft.trim() || null);
+// @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-compose
 
 /** The thread id a route key names (`thread:<id>`), if any. */
 export const threadOfRoute = (key: string): string | null => (key.startsWith("thread:") ? key.slice("thread:".length) || null : null);
@@ -84,8 +94,10 @@ export const isStored = (phase: TurnPhase | null): boolean => phase === "ready" 
 /** ⌘. while an answer streams. */
 export const isStopKey = (e: { key: string; metaKey: boolean }): boolean => e.metaKey && e.key === ".";
 
+// @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-scope
 /** The ask_start stream of the turn now being asked: the previous turn's data stays in the slice until the new subscription replaces it, and must not settle or render as the new answer. */
 export const currentStream = <T extends { turn_id: string }>(data: T | null, previousTurn: string | null): T | null => (data && data.turn_id !== previousTurn ? data : null);
+// @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-scope
 
 /** The turn a new question follows: the one whose data the stream slice holds now (or the one before it while that has not arrived). */
 export const afterTurn = (current: { turn_id: string } | null, previous: string | null): string | null => current?.turn_id ?? previous;
@@ -93,8 +105,10 @@ export const afterTurn = (current: { turn_id: string } | null, previous: string 
 export async function copyTurn(answer: Pick<AskAnswer, "answer_md" | "citations">, write: (text: string) => Promise<void>): Promise<"copied" | "failed"> {
   // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-copy
   try {
+    // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-clipboard
     await write(toMarkdown(answer));
     return "copied";
+    // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-clipboard
   } catch {
     return "failed";
   }
@@ -103,8 +117,10 @@ export async function copyTurn(answer: Pick<AskAnswer, "answer_md" | "citations"
 
 /** Delete a thread; true when the core removed it, so the list refreshes and an open thread closes. */
 export async function deleteThread(bridge: Bridge, id: string): Promise<boolean> {
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-deleted-thread
   const res = await bridge.act("ask:delete", "ask_thread_delete", () => bridge.core.askThreadDelete({ thread_id: id }));
   return res.status === "ok";
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-deleted-thread
 }
 
 /** Ask the core to play from `from_ms` (to `to_ms`, or the segment's end); its `playback:state` reports back. */
@@ -125,16 +141,22 @@ export async function removeThread(bridge: Bridge, id: string, openId: string | 
 
 /** Listen for ⌘. on `doc` and stop; returns the unlisten function. */
 export function bindStopKey(doc: Pick<Document, "addEventListener" | "removeEventListener">, stop: () => void): () => void {
+  // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-if-stop
   const onKey = (e: KeyboardEvent) => isStopKey(e) && (e.preventDefault(), stop());
   doc.addEventListener("keydown", onKey);
   return () => doc.removeEventListener("keydown", onKey);
+  // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-if-stop
 }
 
+// @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage
 /** Copy a question's text; a refused write is ignored (the menu closes either way). */
 export const copyText = (text: string, write: (s: string) => Promise<void>): Promise<void> => write(text).catch(() => {});
+// @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage
 
+// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
 /** Search by Keyword: the Library's search for the question's own words. */
 export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
+// @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-search
 
 /** A turn the user left while it was answering has ended: its id, once, so Recent refreshes to show it; null otherwise. */
 export function endedWhileAway(raw: { turn_id: string } | null, phase: TurnPhase | null, asking: string | null, handled: string | null): string | null {

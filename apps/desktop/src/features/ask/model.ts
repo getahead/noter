@@ -37,7 +37,9 @@ export function foldTurn(messages: readonly AskMsg[]): TurnView {
         // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-done
         break;
       case "failed":
+        // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-failed
         v.error = e.error;
+        // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-failed
         break;
       case "ended":
         v.ended = true;
@@ -45,7 +47,9 @@ export function foldTurn(messages: readonly AskMsg[]): TurnView {
     }
     // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-match
   }
+  // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-return
   return v;
+  // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-return
 }
 
 /** The turn's state of the Answer turn machine. */
@@ -57,10 +61,14 @@ export function phaseOf(v: TurnView): TurnPhase {
   if (v.answer?.stopped) return "stopped";
   if (v.answer) {
     // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-not-found
+    // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-not-found
     if (!v.answer.found || v.answer.citations.length === 0) return "not_found";
+    // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-if-not-found
     // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-not-found
     // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-weak
+    // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-done
     return v.answer.only_weak_evidence ? "weak" : "ready";
+    // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-done
     // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-weak
   }
   // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-ended
@@ -92,14 +100,20 @@ export function groupThreads(rows: readonly AskThreadRow[], now: number): { key:
 /** Up to three suggested first questions, one per recent person; none until the people directory has rows. */
 export const suggestionsOf = (people: readonly PersonRow[] | null | undefined, ask: (name: string) => string): string[] => (people ?? []).filter((p) => !p.is_you).slice(0, 3).map((p) => ask(p.display_name));
 
+// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready
 /** What the page announces once when a turn is ready; nothing for any other phase. */
 export function announcementOf(phase: TurnPhase | null, citations: number): "ask.ready_one" | "ask.ready_other" | "ask.ready_weak" | null {
+// @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready
   if (phase === "weak") return "ask.ready_weak";
   return phase === "ready" ? (citations === 1 ? "ask.ready_one" : "ask.ready_other") : null;
 }
 
+// @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-failed
 /** The error line of a failed turn: the runtime named when the core could not reach it, else the generic one. */
 export const errorKeyOf = (v: TurnView): "ask.error_runtime" | "ask.error" => (v.error?.code === "runtime_unavailable" ? "ask.error_runtime" : "ask.error");
+// @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-failed
 
+// @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-error
 /** The turn view of a question whose start failed: no text, the error, so the page shows the error state. */
 export const failedView = (code: string | null): TurnView => ({ text: "", citations: [], answer: null, error: { code: code ?? "internal", message: "", retryable: true } as CoreError, ended: false });
+// @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-error
