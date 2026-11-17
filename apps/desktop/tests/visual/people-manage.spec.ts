@@ -42,11 +42,20 @@ test.describe("cpt-noter-dod-ui-people-identity people management", () => {
     await expect(page.getByRole("dialog", { name: "New person" })).toBeVisible();
     await shot(page, "people-add-person");
   });
-  test("the row menu offers Open, Edit Details…, Merge 2 People… and Delete Person…", async ({ page }) => {
+  test("the row menu of one row offers Open, Edit Details…, Merge With… and Delete Person…", async ({ page }) => {
     await openPeople(page);
     await page.getByRole("table", { name: "People" }).getByRole("row", { name: /Anna K\./ }).click({ button: "right" });
-    await expect(page.getByRole("menuitem", { name: "Merge 2 People…" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Merge With…" })).toBeVisible();
     await shot(page, "people-row-menu");
+  });
+  test("the row menu of two rows offers Merge 2 People…", async ({ page }) => {
+    await openPeople(page);
+    const rows = page.getByRole("table", { name: "People" });
+    await rows.getByRole("row", { name: /Anna K\./ }).click();
+    await rows.getByRole("row", { name: /Dmitri S\./ }).click({ modifiers: ["Meta"] });
+    await rows.getByRole("row", { name: /Dmitri S\./ }).click({ button: "right" });
+    await expect(page.getByRole("menuitem", { name: "Merge 2 People…" })).toBeVisible();
+    await shot(page, "people-row-menu-two");
   });
   test("the person's ⋯ menu", async ({ page }) => {
     await openAnna(page);
