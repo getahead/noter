@@ -45,6 +45,10 @@ export const sectionOf = (key: SectionKey): Section => SECTIONS.find((s) => s.ke
 /** Return in the search field opens Library › Search results (its page arrives with M3). */
 export const searchRoute = (query: string): Route => ({ section: "library", key: ["search", query].join(":") });
 
+/** The words of a Search results route, or null for any other route: the toolbar field shows them on arrival and on Back. */
+export const searchWords = (route: Route): string | null =>
+  route.section === "library" && route.key.startsWith("search:") ? route.key.slice("search:".length) : null;
+
 /** Where a `nav:request` of the core lands in the main window, or null when another window shows it (Settings, first run). */
 export function navRoute(target: NavTarget): Route | null {
   switch (target.type) {
