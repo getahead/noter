@@ -90,6 +90,11 @@ describe("AddMcpSourceSheet", () => {
     expect(html).toContain("sign in once in the browser");
     expect(html).toContain("Schedule");
   });
+  it("offers the scope choice: all calls, or only some call types", () => {
+    const html = renderToString(<AddMcpSourceSheet bridge={bridge(null)} onClose={() => {}} />);
+    expect(html).toContain("All calls");
+    expect(html).toContain("Only some call types");
+  });
   it("an empty server is a field error and sends nothing", async () => {
     const b = bridge(null);
     const onClose = vi.fn();

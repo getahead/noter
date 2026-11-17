@@ -47,7 +47,7 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
         <label className="st-row__label" htmlFor="src-mcp-privacy">{t("sources.privacy")}</label>
         <PopupButton id="src-mcp-privacy" label={t("sources.privacy")} options={PRIVACY_CHOICES()} value={privacy} onAction={(v) => setPrivacy(v as PrivacyClass)} />
         <p className="np-dim">{privacy === "sensitive" ? t("sources.privacy_sensitive_note") : t("sources.privacy_normal_note")}</p>
-        <p className="np-dim">{t("sources.scope_all")}</p>
+        <ScopeFields bridge={bridge} types={types} people={people} value={scope} onChange={setScope} />
       </div>
       <SheetFooter defaultButton={<PushButton label={t("sources.add_source")} variant="primary" disabled={busy} onAction={() => void add()} />}>
         <PushButton label={t("dialogs.cancel")} onAction={onClose} />

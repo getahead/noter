@@ -179,4 +179,25 @@ describeReal("cpt-noter-seq-settings-add-knowledge-source", () => {
     await expect(row).toHaveCount(0);
     await expect(pane(page)).toContainText("No knowledge sources yet");
   });
+
+  test("other path: a source limited to a call type and a person sends that scope, and the settings window lists the people", async ({ page }) => {
+    const steer = await openWindow(page, "settings", {});
+    await steer.invoke("person_create", { display_name: "Anna Kuz" }, "main");
+    await steer.invoke("harness.mcp_server", { server: "notion", pages: [{ uri: "notion://a", title: "A", hash: "h", text: "# A\n\n## B\n\ntext\n" }] });
+    await page.reload();
+    await openPane(page, "Knowledge Sources");
+    await button(pane(page), /^Add MCP Server…$/).click();
+    const form = sheet(page, /MCP/);
+    await form.getByRole("textbox", { name: "Server" }).fill("notion");
+    await form.getByText("Only some call types").click();
+    await form.getByRole("group", { name: "Call types" }).locator("label").first().click();
+    await form.getByPlaceholder("Name…").fill("Anna");
+    await form.getByRole("option", { name: /Anna Kuz/ }).first().click();
+    await form.locator(".np-sheet__title").click(); // the picker keeps its list open after a pick; leaving it closes the list
+    await button(form, "Add Source").click();
+    const scope = ((await sent(page, "source_add_mcp"))[0] as { scope: { type: string; call_types: string[]; people: string[] } }).scope;
+    expect(scope.type).toBe("limited");
+    expect(scope.call_types).toHaveLength(1);
+    expect(scope.people).toHaveLength(1);
+  });
 });

@@ -398,7 +398,6 @@ export const en = {
   "sources.privacy_normal": "Normal", "sources.privacy_sensitive": "Sensitive",
   "sources.privacy_normal_note": "Follows the privacy mode you chose.",
   "sources.privacy_sensitive_note": "Only local models read this source.",
-  "sources.scope_all": "Scope: all calls",
   "sources.scope": "Scope", "sources.scope_all_calls": "All calls", "sources.scope_limited": "Only some call types", "sources.scope_types": "Call types", "sources.scope_people": "People",
   "sources.error_scope": "Choose at least one call type, or use all calls.",
   "sources.server": "Server", "sources.server_placeholder": "Server name",
