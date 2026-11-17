@@ -321,6 +321,9 @@ pub struct AskAnswer {
     pub sensitive_sources_skipped: u32,
     pub keyword_only: bool,
     pub only_weak_evidence: bool,
+    /// The user stopped this turn (`ask_stop`): `answer_md` and `citations` are what had arrived
+    /// (empty when the stop came before the first of them), and `found` is `false`.
+    pub stopped: bool,
     pub asked_at: TimestampMs,
 }
 

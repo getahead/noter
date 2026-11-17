@@ -96,6 +96,12 @@ pub fn hold_rebuild(core: &Core, on: bool) {
     }
 }
 
+/// `harness.ask_pace`: an Ask answer pauses `ms` after each delta and citation, so a test can
+/// stop it while it arrives. 0 (the default) streams without pauses.
+pub fn ask_pace(core: &Core, ms: u64) {
+    core.set_ask_pace(ms);
+}
+
 /// The next transcript commit "crashes" before it publishes (D-27: never in a release build).
 pub fn fail_transcript_after_commit_once(core: &Core) {
     core.transcript.fail_after_commit_once();

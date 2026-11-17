@@ -274,7 +274,26 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
     await pause(1800); // past the held answer (1500 ms)
     expect(types(got)).toEqual(["started", "failed"]);
     const turn = ok(await main.askThreadGet({ thread_id: handle.thread_id })).turns[0];
-    expect(turn.found).toBe(false);
+    expect(turn).toMatchObject({ found: false, stopped: true });
+  });
+
+  it("other — Stop while the answer arrives keeps the text and the citations that arrived, and the thread reopens as stopped", async () => {
+    open();
+    // The real core delivers an answer in one burst: the harness paces it so a stop can land inside.
+    if (s.target === "stdio") await control("ask_pace", { ms: 400 });
+    const got: AskMsg[] = [];
+    const handle = ok(await main.askStart({ thread_id: null, question: "What did we agree about the websocket notifications?", scope: scope() }, (m: AskMsg) => got.push(m)));
+    await until(() => got.find((m) => m.event.type === "citation"), "the first citation");
+    ok(await main.askStop({ turn_id: handle.turn_id }));
+    const end = await until(() => got.find((m) => m.event.type === "failed"), "the stop");
+    expect(end.event.type === "failed" && end.event.error.code).toBe("answer_stopped");
+    expect(types(got)).not.toContain("done");
+    const arrived = got.map((m) => (m.event.type === "delta" ? m.event.text : "")).join("");
+    expect(arrived.length).toBeGreaterThan(0);
+    const turn = ok(await main.askThreadGet({ thread_id: handle.thread_id })).turns[0];
+    expect(turn).toMatchObject({ found: false, stopped: true, answer_md: arrived });
+    expect(turn.citations.map((c) => c.n)).toEqual(got.flatMap((m) => (m.event.type === "citation" ? [m.event.citation.n] : [])));
+    expect(turn.citations.length).toBeGreaterThan(0);
   });
 
   it("other — deleting the thread mid-turn ends it once and its late answer recreates nothing", async () => {

@@ -1911,6 +1911,7 @@ pub fn world() -> FakeWorld {
                 sensitive_sources_skipped: 0,
                 keyword_only: false,
                 only_weak_evidence: false,
+                stopped: false,
                 asked_at: ts(NOW - DAY),
             }],
         }],

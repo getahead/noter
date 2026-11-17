@@ -1383,6 +1383,7 @@ fn answer(turn: &str, citations: Vec<Citation>, runtime: RuntimeChoice) -> AskAn
         sensitive_sources_skipped: 2,
         keyword_only: true,
         only_weak_evidence: false,
+        stopped: false,
         asked_at: TimestampMs(0),
     }
 }
@@ -1567,6 +1568,7 @@ fn follow_up_rechecks_the_current_privacy_of_cited_documents() {
         sensitive_sources_skipped: 0,
         keyword_only: true,
         only_weak_evidence: false,
+        stopped: false,
         asked_at: TimestampMs(OCT_1),
     };
     finish_turn(

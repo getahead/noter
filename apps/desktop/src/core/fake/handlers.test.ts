@@ -233,8 +233,8 @@ describe("fake core stream and record parity", () => {
     expect(partial.length).toBeGreaterThan(0);
     await fake.invoke("ask_stop", { turn_id: handle.turn_id });
     await vi.advanceTimersByTimeAsync(5_000);
-    const thread = await fake.invoke("ask_thread_get", { thread_id: handle.thread_id }) as { turns: Array<{ answer_md: string }> };
-    expect(thread.turns[0]?.answer_md).toBe(partial);
+    const thread = await fake.invoke("ask_thread_get", { thread_id: handle.thread_id }) as { turns: Array<{ answer_md: string; stopped: boolean; found: boolean }> };
+    expect(thread.turns[0]).toMatchObject({ answer_md: partial, stopped: true, found: false });
     expect(thread.turns[0]?.answer_md).not.toContain("notification service");
   });
 });
