@@ -68,4 +68,29 @@ final class DialogsTests: NoterTestCase {
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
         XCTAssertTrue(recordingLine(in: openMenu()).exists, "Return chose Cancel: the recording goes on")
     }
+
+    // M3 People (docs/features/ui/people.md): Delete Profile… asks with a native alert whose default is Cancel.
+    func test_cpt_noter_seq_dialogs_set_up_voice_profile__delete_the_profile() {
+        launch("idle")
+        app.typeKey("4", modifierFlags: .command)
+        let row = app.tables["People"].firstMatch.descendants(matching: .staticText)["Anna K."].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "⌘4 shows People with Anna K.")
+        row.click()
+        app.typeKey(.return, modifierFlags: [])
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "Anna K.'s page has its ⋯ menu")
+        more.click()
+        app.menuItems["Delete Profile…"].click()
+        XCTAssertTrue(alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5), "Delete Profile… shows no alert")
+        XCTAssertTrue(alert.staticTexts["Noter stops recognising this voice across calls. Labels already set stay."].exists)
+        app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
+        more.click()
+        XCTAssertTrue(app.menuItems["Delete Profile…"].waitForExistence(timeout: 5), "Cancel kept the profile")
+        app.menuItems["Delete Profile…"].click()
+        XCTAssertTrue(alert.buttons["Delete Profile"].waitForExistence(timeout: 5))
+        alert.buttons["Delete Profile"].click()
+        XCTAssertTrue(alert.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Set Up Voice Profile…"].waitForExistence(timeout: 5), "the profile is gone: Set Up Voice Profile… returns")
+    }
 }
