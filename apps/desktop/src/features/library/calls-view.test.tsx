@@ -191,6 +191,17 @@ describe("ContextMenu", () => {
   });
 });
 
+describe("CallsView context menu", () => {
+  it("opens the context menu with the selection's tags and Remove Tag", () => {
+    const rows = [{ ...call("a"), tags: ["release"] }, { ...call("b"), tags: ["release", "hotfix"] }];
+    const onRemoveTag = vi.fn();
+    const tree = rendered(CallsView, props({ state: state({ status: "READY", rows, total: 2 }), selected: new Set(["a", "b"]), menu: { x: 1, y: 2 }, onRemoveTag }));
+    const menu = find(tree, (_p, type) => type === ContextMenu);
+    expect(menu.props.tags).toEqual(["release", "hotfix"]);
+    expect(menu.props.onRemoveTag).toBe(onRemoveTag);
+  });
+});
+
 describe("CallsView with filters (cpt-noter-state-ui-library-search-topics-view)", () => {
   it("an empty read under a filter is FILTER_EMPTY with Clear, and the header counts matches", () => {
     const empty = renderToString(<CallsView {...props({ state: state({ status: "EMPTY", rows: [], total: 0 }), filtered: true })} />);

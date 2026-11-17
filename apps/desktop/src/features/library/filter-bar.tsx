@@ -69,6 +69,7 @@ export function FilterBar({ state, lists, onAction, bridge }: { state: FilterSta
   };
   const group = (g: Group, items: { value: string; label: string }[]) =>
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
+  const people = bridge ? <PeoplePicker bridge={bridge} lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} /> : group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })));
   const today = new Date().toISOString().slice(0, 10);
   const preset = datePreset(f);
   return (
@@ -87,7 +88,7 @@ export function FilterBar({ state, lists, onAction, bridge }: { state: FilterSta
       {open && (
         <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
           <div className="lb-pop">
-            {open === "people" && (bridge ? <PeoplePicker bridge={bridge} lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} /> : group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name }))))}
+            {open === "people" && people}
             {open === "type" && group("call_types", lists.types.map((c) => ({ value: c.id, label: c.label })))}
             {open === "tags" && (lists.tags.length ? group("tags", lists.tags.map((g) => ({ value: g.tag, label: g.tag }))) : <p>{t("filters.no_tags")}</p>)}
             {open === "language" && group("languages", LANGS.map((l) => ({ value: l, label: LANG_NAME[l]! })))}
