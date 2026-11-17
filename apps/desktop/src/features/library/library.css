@@ -233,3 +233,7 @@
 .lb-throw { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .lb-throw .pc-item__text { flex: 1 1 18em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-throw > :not(.pc-item__text) { flex: none; max-width: 100%; white-space: nowrap; }
+
+.lb-hit { display: grid; gap: 2px; padding: 6px 8px; list-style: none; max-width: 960px; }
+.lb-hit__title { font-weight: 600; }
+.lb-hit mark { background: var(--accent-fill); color: inherit; border-radius: 2px; }
