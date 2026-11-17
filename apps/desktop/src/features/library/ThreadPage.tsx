@@ -45,12 +45,12 @@ export function ThreadPage({ bridge, topicId }: { bridge: Bridge; topicId: strin
 }
 
 /** The Rename and Merge sheets, on the host before a page opens them. */
+export function registerTopicSheets(sheets: Sheets): void {
+  sheets.register("topic-rename", RenameSheet as never);
+  sheets.register("topic-merge", MergeSheet as never);
+}
 export function useRegisterTopicSheets(sheets: Sheets | null) {
-  useEffect(() => {
-    if (!sheets) return;
-    sheets.register("topic-rename", RenameSheet as never);
-    sheets.register("topic-merge", MergeSheet as never);
-  }, [sheets]);
+  useEffect(() => void (sheets && registerTopicSheets(sheets)), [sheets]);
 }
 
 /** What the thread's buttons do: the sheets over the page, and Keep Separate at once. */
