@@ -9,13 +9,14 @@ import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
 import { slots } from "../call-page/slots";
-import { topicMenu } from "./TopicsPage";
+import { closeOnPointer, topicMenu } from "./TopicsPage";
 import { ThreadRow } from "./ThreadRow";
 import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
 import { setTopicWords, topicWords } from "./topics-query";
 import { openTopic } from "./topic-nav";
-import { useRead } from "./use-read";
+import { claim, useRead } from "./use-read";
+import { registerTopicSheets } from "./ThreadPage";
 import "./register-topics";
 import { pageFor } from "../shell/pages";
 
@@ -164,5 +165,24 @@ describe("the Topics row context menu", () => {
     items.forEach((i) => i.onSelect());
     expect([open, rename, merge].every((f) => f.mock.calls.length === 1)).toBe(true);
     expect(close).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("small page helpers", () => {
+  it("closeOnPointer listens until stopped", () => {
+    const [add, remove, close] = [vi.fn(), vi.fn(), vi.fn()];
+    vi.stubGlobal("document", { addEventListener: add, removeEventListener: remove });
+    const stop = closeOnPointer(close);
+    expect(add).toHaveBeenCalledWith("pointerdown", close);
+    stop();
+    expect(remove).toHaveBeenCalledWith("pointerdown", close);
+    vi.unstubAllGlobals();
+  });
+  it("registers the Rename and Merge sheets, and claims a read key once", () => {
+    const register = vi.fn();
+    registerTopicSheets({ register } as never);
+    expect(register.mock.calls.map((c) => c[0])).toEqual(["topic-rename", "topic-merge"]);
+    const ref = { current: null as string | null };
+    expect([claim(ref, "a"), claim(ref, "a"), claim(ref, "b")]).toEqual([true, false, true]);
   });
 });

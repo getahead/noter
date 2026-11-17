@@ -46,12 +46,7 @@ export function TopicsPage({ bridge }: { bridge: Bridge }) {
   const sheets = useSheetIfAny();
   useRegisterTopicSheets(sheets);
   const [menu, setMenu] = useState<{ x: number; y: number; topic: TopicRow } | null>(null);
-  useEffect(() => {
-    if (!menu) return;
-    const close = () => setMenu(null);
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, [menu]);
+  useEffect(() => (menu ? closeOnPointer(() => setMenu(null)) : undefined), [menu]);
   const rowMenu = menu && sheets && (
     <div className="lb-ctx" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
       <Menu variant="context-menu" onClose={() => setMenu(null)} items={topicMenu(() => openTopic(bridge, menu.topic.id), threadActions(sheets, bridge, menu.topic, topics, retry), () => setMenu(null))} />
@@ -114,6 +109,12 @@ export function TopicsBody({ bridge, status, retry, topics, shown, names, words,
       {menu}
     </div>
   );
+}
+
+/** `close` runs on the next pointer press anywhere; returns the way to stop listening. */
+export function closeOnPointer(close: () => void): () => void {
+  document.addEventListener("pointerdown", close);
+  return () => document.removeEventListener("pointerdown", close);
 }
 
 /** The row's context menu: Open, Rename… and Merge With… (each closes the menu first). */
