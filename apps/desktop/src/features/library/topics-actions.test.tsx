@@ -4,7 +4,7 @@ import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { resetUndo } from "../history/undo";
-import { MergeSheet } from "./MergeSheet";
+import { MergeSheet, Moves } from "./MergeSheet";
 import { RenameSheet } from "./RenameSheet";
 import { ThreadView, threadActions } from "./ThreadPage";
 import { createSheets } from "../../ui/dialogs/sheets";
@@ -80,6 +80,14 @@ describe("rename and merge sheets (cpt-noter-state-ui-library-search-topics-view
     const tree = rendered(RenameSheet as never, props as never);
     (find(tree, (p) => p.label === "Cancel").props.onAction as () => void)();
     expect(close).toHaveBeenCalled();
+  });
+  it("Moves lists each item's kind and text with the counts, or says only an alias moves", () => {
+    const item = (id: string, kind: string, text: string) => ({ id, kind, text }) as never;
+    const h = renderToString(<Moves groups={[{ call: {} as never, items: [item("1", "decision", "Use websockets"), item("2", "risk", "Reconnect storms")] }]} />);
+    expect(h).toContain("What moves · 2 items from 1 call");
+    expect(h).toContain("Use websockets");
+    expect(h).toContain("Reconnect storms");
+    expect(renderToString(<Moves groups={[]} />)).toContain("Nothing moves");
   });
   it("MergeSheet excludes the source from the chooser and lists what moves", async () => {
     const [a, b] = await ready();

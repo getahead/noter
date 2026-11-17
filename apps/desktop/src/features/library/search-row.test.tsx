@@ -38,6 +38,15 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
     expect(act).toHaveBeenLastCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
     (find(tree, (p) => p.label === "Play this line").props.onAction as () => void)();
     expect(act).toHaveBeenCalledTimes(3);
+    const row2 = { focus: vi.fn() };
+    const rows = [{ focus: vi.fn() }, row2, { focus: vi.fn() }];
+    vi.stubGlobal("document", { querySelectorAll: () => rows });
+    const arrow = (key: string) => (row.props.onKeyDown as (e: unknown) => void)({ key, target: row2, currentTarget: row2, preventDefault: vi.fn() });
+    arrow("ArrowDown");
+    expect(rows[2]!.focus).toHaveBeenCalled();
+    arrow("ArrowUp");
+    expect(rows[0]!.focus).toHaveBeenCalled();
+    vi.unstubAllGlobals();
     // an item hit has nothing to play
     const none = rendered(SearchResultRow, { bridge: { act } as never, hit });
     expect(() => find(none, (p) => p.label === "Play this line")).toThrow();

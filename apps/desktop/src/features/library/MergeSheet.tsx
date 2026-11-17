@@ -47,7 +47,6 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
   }
   const into = choices.find((x) => x.id === keep)?.name ?? "";
   const title = t("topics.merge_title", { from: source.name, to: into });
-  const moves = movesOf(groups ?? []);
   return (
     <Sheet title={title} width={520} busy={busy} onCancel={close} onDefault={() => void run()}>
       <div className="np-sheet__head">
@@ -61,27 +60,33 @@ export function MergeSheet({ close, bridge, source, target, known, onMerged, ref
         </label>
         {groups === undefined && <p className="np-dim">{t("topics.merge_reading")}</p>}
         {groups === null && <InlineBanner banner={{ id: "merge-read-error", severity: "error", text: t("topics.merge_unknown") }} />}
-        {groups && (
-          <>
-            <p className="np-field__label">{t("topics.merge_moves", { items: t("topics.merge_items", { count: moves.rows.length }), calls: t("topics.calls", { count: moves.calls }) })}</p>
-            {moves.rows.length ? (
-              <ul className="lb-mergelist">
-                {moves.rows.map((item) => (
-                  <li key={item.id}>
-                    <span className="np-dim">{t(KIND_KEY[item.kind])}</span> {item.text}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p>{t("topics.merge_nothing")}</p>
-            )}
-          </>
-        )}
+        {groups && <Moves groups={groups} />}
         {failed && <InlineBanner banner={{ id: "merge-error", severity: "error", text: t("topics.merge_failed"), actions: [{ label: t("action.try_again"), onAction: () => void run() }] }} />}
       </div>
       <SheetFooter defaultButton={<PushButton label={t("topics.merge_confirm")} variant="primary" submit loading={busy} disabled={!keep || !groups} onAction={() => void run()} />}>
         <PushButton label={t("dialogs.cancel")} onAction={close} />
       </SheetFooter>
     </Sheet>
+  );
+}
+
+/** "What moves · N items from M calls" and each item's kind and text; an empty topic says only an alias moves. */
+export function Moves({ groups }: { groups: TopicThreadGroup[] }) {
+  const moves = movesOf(groups);
+  return (
+    <>
+      <p className="np-field__label">{t("topics.merge_moves", { items: t("topics.merge_items", { count: moves.rows.length }), calls: t("topics.calls", { count: moves.calls }) })}</p>
+      {moves.rows.length ? (
+        <ul className="lb-mergelist">
+          {moves.rows.map((item) => (
+            <li key={item.id}>
+              <span className="np-dim">{t(KIND_KEY[item.kind])}</span> {item.text}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>{t("topics.merge_nothing")}</p>
+      )}
+    </>
   );
 }
