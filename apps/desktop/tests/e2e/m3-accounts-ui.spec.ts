@@ -189,6 +189,20 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
     await button(page, "Finish").click();
     expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
   });
+
+  test("other path: Install Ollama… installs the local runtime through cli_install and the offer goes away", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: assistantsOpen });
+    await steer.invoke("harness.account_cli", { tool: "ollama", installed: false, install: { delay_ms: 300, version: "0.9.0" } }); // hides the local runtime until installed
+    await page.reload();
+    const install = button(stepBody(page), "Install Ollama…");
+    await expect(install).toBeVisible();
+    await install.click();
+    await expect.poll(async () => (await sent(page, "cli_install")).length).toBe(1);
+    expect((await sent(page, "cli_install"))[0]).toEqual({ tool: "ollama" });
+    await expect(install).toHaveCount(0); // the core's accounts view now has the runtime
+    const { calls } = (await steer.invoke("harness.account_cli_log", {})) as { calls: string[] };
+    expect(calls).toContain("install:Ollama");
+  });
 });
 
 describeReal("cpt-noter-seq-settings-replace-api-key", () => {
