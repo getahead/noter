@@ -2,7 +2,7 @@
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskScope, AskThreadRow, ScopePreset, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { setAskState } from "./ask-state";
+import { offerPreset, setAskState } from "./ask-state";
 import { navigate } from "../shell/navigate";
 import { searchRoute } from "../shell/sections";
 import type { Replay } from "../transcript/playback";
@@ -155,11 +155,11 @@ export function bindStopKey(doc: Pick<Document, "addEventListener" | "removeEven
 export const copyText = (text: string, write: (s: string) => Promise<void>): Promise<void> => write(text).catch(() => {});
 // @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-manage
 
-// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
 /** Open a cited document (at its chunk) in the app that holds it; the core reports an unreachable one. */
 export const openDocument = (bridge: Bridge, document_id: string, chunk_id: string) =>
   bridge.act("ask:open_document", "open_external", () => bridge.core.openExternal({ target: { type: "document", document_id, chunk_id } }));
 
+// @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-search
 /** Search by Keyword: the Library's search for the question's own words. */
 export const searchByKeyword = (question: string): void => navigate(searchRoute(question));
 // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-search
@@ -217,8 +217,10 @@ export async function startFromTopicRoute(bridge: Bridge, key: string, ask: (que
     if (alive()) onError();
     return false;
   }
+  const name = res.data.topic.name;
+  offerPreset({ id: `topic:${id}`, label: t("ask.scope_topic", { name }), scope: topicScope(id) }); // a topic beyond the core's short list still shows in the pop-up
   setAskState({ scopeId: `topic:${id}` }); // the toolbar pop-up shows the topic scope, and follow-ups keep it
-  ask(t("ask.topic_question", { name: res.data.topic.name }), topicScope(id));
+  ask(t("ask.topic_question", { name }), topicScope(id));
   return true;
 }
 

@@ -237,16 +237,16 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
         <div role="status" className="ak-live">{announce}</div>
         {routeError && <InlineBanner banner={{ id: "ask-topic-error", severity: "error", text: t("ask.topic_error") }} />}
         {empty && <h2 className="ak-first__h">{t("ask.first_heading")}</h2>}
-        {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
-        {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
         {turns.map((a) => (
           <article key={a.turn_id} className="ak-turn">
             <h3 className="ak-q">{a.question}</h3>
+            {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
+            {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
             <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question)} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
+            {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
+            {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
           </article>
         ))}
-        {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
-        {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
         {asking && turn && (
           <article className="ak-turn">
             <h3 className="ak-q">{asking}</h3>

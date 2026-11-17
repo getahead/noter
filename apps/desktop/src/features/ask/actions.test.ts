@@ -296,6 +296,7 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     const good = make(ok({ topic: { name: "T" } })).bridge;
     await startFromTopicRoute(good, "new-topic:tp_9", vi.fn());
     expect(askState().scopeId).toBe("topic:tp_9");
+    expect(askState().presets).toContainEqual({ id: "topic:tp_9", label: "Topic: T", scope: { preset: "topic:tp_9", topic_id: "tp_9" } });
     const listed = { id: "topic:tp_9", scope: { preset: "topic:tp_9", topic_id: "tp_9", people: [] } } as never;
     expect(scopeOf([listed], "topic:tp_9")).toEqual((listed as { scope: unknown }).scope);
     expect(scopeOf([], "topic:tp_9")).toEqual({ preset: "topic:tp_9", topic_id: "tp_9" }); // the follow-up's scope, not All calls
