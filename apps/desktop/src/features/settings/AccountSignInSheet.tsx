@@ -7,6 +7,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { AccountProvider, AccountView } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
+import { FOCUSABLE } from "../../app/a11y/focus";
 import { Icon } from "../../ui/icons";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { Link } from "../../ui/primitives/link";
@@ -60,7 +61,14 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, [waiting]);
-  if (!sheetOpen(s)) return null;
+  // a step that replaces the focused control would leave focus outside the sheet, where Esc is not heard
+  const open = sheetOpen(s);
+  useEffect(() => {
+    if (!open) return;
+    const sheet = globalThis.document?.querySelector<HTMLElement>(`[data-variant="sign-in-${provider}"]`)?.closest<HTMLElement>(".np-sheet");
+    if (sheet && !sheet.contains(globalThis.document.activeElement)) sheet.querySelector<HTMLElement>(FOCUSABLE)?.focus();
+  }, [open, s.phase, provider]);
+  if (!open) return null;
 
   const account = t(`signin.account_${provider}`);
   const tool = toolName(provider);
@@ -126,6 +134,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
               </div>
               <div className="np-dim">{t(missing ? "signin.cli_missing_note" : "signin.cli_unsupported_note", names)}</div>
             </div>
+            {missing && <PushButton label={t("signin.install", names)} size="small" onAction={() => void m.install(provider)} />}
           </div>
         ) : cli ? (
           <div className="f-check is-ok">
@@ -178,13 +187,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-install
     footer = (
       <SheetFooter
-        defaultButton={
-          missing || unsupported ? (
-            <PushButton label={t("signin.install", names)} variant="primary" disabled={unsupported || installing} loading={installing} onAction={() => void m.install(provider)} />
-          ) : (
-            <PushButton label={t(useExisting ? "signin.use_this" : "signin.continue")} variant="primary" disabled={!go} onAction={() => void m.proceed(provider)} />
-          )
-        }
+        defaultButton={<PushButton label={t(useExisting ? "signin.use_this" : "signin.continue")} variant="primary" disabled={!go} onAction={() => void m.proceed(provider)} />}
       >
         {cancelButton}
       </SheetFooter>

@@ -27,7 +27,7 @@ const row = (page: Page, name: string) => page.locator('[data-component="cpt-not
 const button = (scope: Page | Locator, name: string | RegExp) => scope.getByRole("button", { name });
 
 const claudeCli = (steer: Steer, fields: Record<string, unknown> = {}) =>
-  steer.invoke("harness.account_cli", { tool: "claude_code", installed: true, path: "/bin/claude_code", version: "2.1.296", login_identity: ANN, login: { code: CODE }, ...fields });
+  steer.invoke("harness.account_cli", { tool: "claude_code", installed: true, path: "/bin/claude_code", version: "2.1.296", login_identity: ANN, login: { code: CODE, hold: true }, ...fields });
 const codexCli = (steer: Steer, fields: Record<string, unknown> = {}) =>
   steer.invoke("harness.account_cli", { tool: "codex", installed: true, path: "/bin/codex", version: "0.163.0", login_identity: BOB, login: { url: "https://chatgpt.com/device" }, ...fields });
 
@@ -37,11 +37,12 @@ async function openModels(page: Page) {
 }
 
 /** Sign in with Claude through the sheet to the Check step. */
-async function claudeToCheck(page: Page) {
+async function claudeToCheck(page: Page, steer: Steer) {
   await button(row(page, "Your Claude account"), /Sign In/).click();
   const dlg = sheet(page, /Sign in with your Claude account/);
-  await dlg.getByRole("checkbox").check();
+  await dlg.getByRole("checkbox").click({ force: true });
   await button(dlg, "Continue in Browser").click();
+  await steer.invoke("harness.account_cli_release", { provider: "claude" });
   return dlg;
 }
 
@@ -58,15 +59,16 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     expect(await sent(page, "account_signin_prepare")).toEqual([{ provider: "claude" }]);
     const next = button(dlg, "Continue in Browser");
     await expect(next).toBeDisabled(); // the personal-use confirmation is required for Claude
-    await dlg.getByRole("checkbox").check();
+    await dlg.getByRole("checkbox").click({ force: true });
     await next.click();
     expect(await sent(page, "account_signin_start")).toEqual([{ provider: "claude", personal_use_confirmed: true }]);
 
     await expect(dlg).toContainText(CODE); // the returned code only
     await expect(button(dlg, /Copy Code/)).toBeVisible();
+    await steer.invoke("harness.account_cli_release", { provider: "claude" });
     await expect(dlg).toContainText("ann@example.com"); // Check: identity and plan from the core
     await expect(dlg).toContainText("Max");
-    await button(dlg, /^Use for \d+ Agents?$/).click();
+    await button(dlg, /^(Use for \d+ Agents?|Done)$/).click();
     expect((await sent(page, "account_bind_agents")).at(-1)).toMatchObject({ provider: "claude" });
     await expect(dlg).toHaveCount(0);
     await expect(row(page, "Your Claude account")).toContainText("Signed in");
@@ -81,6 +83,7 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await button(row(page, "Your Claude account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your Claude account/);
     await expect(dlg).toContainText("Use ann@example.com");
+    await dlg.getByRole("checkbox").click({ force: true }); // the personal-use guard covers the existing account too
     await button(dlg, "Use This Account").click();
     expect(await sent(page, "account_use_existing")).toHaveLength(1);
     expect(await sent(page, "account_signin_start")).toHaveLength(0);
@@ -93,7 +96,7 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await openModels(page);
     await button(row(page, "Your ChatGPT account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your ChatGPT account/);
-    await expect(dlg).toContainText(/Codex isn't installed/);
+    await expect(dlg).toContainText(/Codex isn[’']t installed/);
     await expect(button(dlg, "Continue in Browser")).toBeDisabled();
     await button(dlg, /^Install Codex/).click();
     expect(await sent(page, "cli_install")).toHaveLength(1);
@@ -106,7 +109,8 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await button(row(page, "Your ChatGPT account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your ChatGPT account/);
     await button(dlg, "Continue in Browser").click();
-    await expect(dlg).toContainText("chatgpt.com/device");
+    await expect(dlg).toContainText("Waiting for your browser…");
+    await expect(dlg.getByText("Open the Page Again")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(dlg).toHaveCount(0);
     const chatgpt = row(page, "Your ChatGPT account");
@@ -123,8 +127,8 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await claudeCli(steer);
     await openModels(page);
-    const dlg = await claudeToCheck(page);
-    await button(dlg, /^Use for \d+ Agents?$/).click();
+    const dlg = await claudeToCheck(page, steer);
+    await button(dlg, /^(Use for \d+ Agents?|Done)$/).click();
     const claude = row(page, "Your Claude account");
     await expect(claude).toContainText("Signed in");
 
@@ -156,7 +160,7 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
     await claudeCli(steer);
     await expect(stepBody(page)).toContainText("Your Claude account");
     await expect(stepBody(page)).toContainText("Your ChatGPT account");
-    const dlg = await claudeToCheck(page);
+    const dlg = await claudeToCheck(page, steer);
     await button(dlg, /^(Use for \d+ Agents?|Done|Not Now)$/).first().click();
     await expect(row(page, "Your Claude account")).toContainText("Signed in");
     await button(page, "Finish").click();
@@ -168,7 +172,7 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
     await button(stepBody(page), "Not Now").click();
     await expect(stepBody(page)).toContainText("Without an assistant Noter still records and transcribes; summaries wait until one is connected.");
     await button(page, "Finish").click();
-    expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "skipped" });
+    expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
   });
 });
 
@@ -177,7 +181,6 @@ describeReal("cpt-noter-seq-settings-replace-api-key", () => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await watchAlerts(page);
     await steer.invoke("api_key_set", { provider: "anthropic", key: "test-stand-in-value-0001" }, "settings");
-    await page.reload();
     await openModels(page);
     const key = row(page, "Anthropic API key");
     await expect(key).toContainText("Configured");

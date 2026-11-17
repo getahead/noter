@@ -20,7 +20,7 @@ import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { SelfTestPanel } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
 import { useAlert } from "../../ui/dialogs/host";
-import { installCli, installKey, removeKey } from "../settings/accounts";
+import { installCli, installKey, loadAccounts, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
 import { keyConfigured, removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
@@ -231,6 +231,8 @@ function AudioStorage({ wizard, w }: { wizard: Wizard; w: WizardState }) {
 export function Assistants({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
   const askAlert = useAlert();
   const accounts = useSelect(bridge.store, (s) => s.whole.accounts);
+  // the core finds the CLIs when asked: the account rows appear with its answer
+  useEffect(() => void loadAccounts(bridge), [bridge]);
   const installState = useSelect(bridge.store, (s) => s.commands[installKey("ollama")]?.state);
   const local = accounts?.local.running ?? false;
   // **Not Now** on the local runtime line: the offer folds, the explanation below stays until an assistant is connected
