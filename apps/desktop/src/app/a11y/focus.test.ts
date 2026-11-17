@@ -9,6 +9,7 @@ import {
   nextFocusable,
   notePress,
   openerOf,
+  startedFrom,
   unobscuredScrollTop,
 } from "./focus";
 
@@ -329,5 +330,28 @@ describe("press tracking on the document", () => {
     on.keydown!({});
     expect(mod.openerOf({ activeElement: body as never, body: body as never })).toBeNull();
     vi.unstubAllGlobals();
+  });
+});
+
+describe("startedFrom (a Remove button pressed by mouse or keyboard)", () => {
+  const body = {};
+  const doc = (active: unknown) => ({ activeElement: active as never, body: body as never });
+  const press = (target: unknown) => notePress({ closest: () => target } as unknown as EventTarget);
+
+  it("is true for the focused button, and for the pressed one when focus is on the body", () => {
+    expect(startedFrom(doc({ id: "repo-remove" }), "repo-remove")).toBe(true);
+    press({ id: "repo-remove" });
+    expect(startedFrom(doc(body), "repo-remove")).toBe(true);
+  });
+
+  it("is false after an unrelated click, although focus is on the body then too", () => {
+    press({ id: "somewhere-else" });
+    expect(startedFrom(doc(body), "repo-remove")).toBe(false);
+  });
+
+  it("forgets a press that opened nothing when a surface closes", () => {
+    press({ id: "repo-remove" });
+    focusAndReturn(null, () => null)();
+    expect(startedFrom(doc(body), "repo-remove")).toBe(false);
   });
 });

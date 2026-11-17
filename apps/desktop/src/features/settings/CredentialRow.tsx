@@ -2,7 +2,7 @@
 // account as its frame (the sign-in arrives in M3). The key itself is never shown or held.
 import { useEffect, useRef, useState } from "react";
 
-import { focusFirstAvailable } from "../../app/a11y/focus";
+import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { AccountProvider, AccountView, KeyView } from "../../core/bindings";
@@ -78,7 +78,7 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
         ) : (
           <>
             <PushButton label={t("settings.keys.replace")} size="small" disabled={busy} onAction={onReplace} />
-            <PushButton id={removeId} label={t("settings.keys.remove")} size="small" disabled={busy} onAction={() => { returnFocus.current = document.activeElement?.id === removeId; onRemove(); }} />
+            <PushButton id={removeId} label={t("settings.keys.remove")} size="small" disabled={busy} onAction={() => { returnFocus.current = startedFrom(document, removeId); onRemove(); }} />
           </>
         )}
       </div>
@@ -110,7 +110,7 @@ export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: 
       {stored ? (
         <div className="st-keyfield">
           <span className="st-cred__dots">{t("settings.keys.keychain")}</span>
-          <PushButton id={removeId} label={t("settings.keys.remove_short")} size="small" onAction={() => { returnFocus.current = document.activeElement?.id === removeId; onRemove(); }} />
+          <PushButton id={removeId} label={t("settings.keys.remove_short")} size="small" onAction={() => { returnFocus.current = startedFrom(document, removeId); onRemove(); }} />
         </div>
       ) : (
         <KeyField id={fieldId} label={t(KEY_NAME[view.provider])} placeholder={t(view.provider === "anthropic" ? "first_run.assistants.key_placeholder_anthropic" : "first_run.assistants.key_placeholder_codex")} draft={draft} verifiedText={t("settings.keys.keychain")} />

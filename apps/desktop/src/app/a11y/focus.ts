@@ -21,6 +21,10 @@ export function openerOf(doc: Pick<Document, "activeElement" | "body">): FocusTa
   return opener;
 }
 
+/** True when `id` is the focused element or the control the mouse pressed (used once): the Remove button that
+ *  started an action, by keyboard or by mouse. */
+export const startedFrom = (doc: Pick<Document, "activeElement" | "body">, id: string) => (openerOf(doc) as { id?: string } | null)?.id === id;
+
 /** Move focus into a transient surface and return it to the connected opener on cleanup. */
 // @cpt-state:cpt-noter-state-ui-accessibility-l10n-focus-return:p1
 export function focusAndReturn(first: FocusTarget | null | undefined, getActive: () => FocusTarget | null): () => void {
@@ -32,6 +36,7 @@ export function focusAndReturn(first: FocusTarget | null | undefined, getActive:
   // @cpt-end:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-page-overlay
   return () => {
     // @cpt-begin:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
+    pressed = null; // a press left over from before the surface opened is not the next opener
     if (state !== "IN_OVERLAY") return;
     // @cpt-end:cpt-noter-flow-ui-accessibility-l10n-keyboard:p1:inst-if-close
     // @cpt-begin:cpt-noter-state-ui-accessibility-l10n-focus-return:p1:inst-overlay-returned

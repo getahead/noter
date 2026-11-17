@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { focusFirstAvailable } from "../../app/a11y/focus";
+import { focusFirstAvailable, startedFrom } from "../../app/a11y/focus";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { HandoffTarget, RepoMapping } from "../../core/bindings";
@@ -46,7 +46,7 @@ export function RepositoriesPane({ bridge }: { bridge: Bridge }) {
   const remove = async () => {
     if (!mapping || active.current) return;
     const index = list?.mappings.findIndex((repo) => repo.id === mapping.id) ?? -1;
-    const restore = document.activeElement?.id === "repo-remove";
+    const restore = startedFrom(document, "repo-remove");
     active.current = true;
     setBusy(true);
     setError(null);
