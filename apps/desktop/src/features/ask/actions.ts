@@ -55,11 +55,12 @@ export async function openThread(bridge: Bridge, id: string | null, set: ThreadS
   else set.setThread(null); // deleted elsewhere: the empty composer
 }
 
-/** When the core has stored the turn, show the thread it stored; a failed or stopped turn stays on screen. */
+/** When a turn ends the core has stored its thread: keep the id (the next question is a follow-up) and refresh Recent; a stored answer replaces the live one, a failed or stopped partial stays on screen. */
 export async function settleTurn(bridge: Bridge, id: string, phase: TurnPhase | null, set: ThreadSetters & { refresh: () => Promise<void> }): Promise<void> {
-  if (!isStored(phase)) return;
+  if (phase === null || phase === "streaming") return;
   set.setThread(id);
   void set.refresh();
+  if (!isStored(phase)) return;
   const got = await loadThread(bridge, id);
   if (got) {
     set.setTurns(got);

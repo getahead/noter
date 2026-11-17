@@ -61,10 +61,21 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     await openThread(m.bridge, null, none);
     expect(none.setTurns).toHaveBeenCalledWith([]);
   });
-  it("settles a stored turn into its thread and leaves a failed one alone", async () => {
+  it("keeps the thread and refreshes Recent for a stopped or failed turn, leaving its partial on screen", async () => {
+    for (const phase of ["stopped", "error", "interrupted"] as const) {
+      const s = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };
+      await settleTurn(make(ok({ turns: [4] })).bridge, "a", phase, s);
+      expect(s.setThread).toHaveBeenCalledWith("a"); // the next question is a follow-up, not a new thread
+      expect(s.refresh).toHaveBeenCalled();
+      expect(s.setTurns).not.toHaveBeenCalled();
+      expect(s.setAsking).not.toHaveBeenCalled();
+    }
+    const live = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };
+    await settleTurn(make(ok({})).bridge, "a", "streaming", live);
+    expect(live.setThread).not.toHaveBeenCalled();
+  });
+  it("settles a stored turn into its thread", async () => {
     const s = { setThread: vi.fn(), setTurns: vi.fn(), setAsking: vi.fn(), refresh: vi.fn(async () => {}) };
-    await settleTurn(make(ok({ turns: [4] })).bridge, "a", "error", s);
-    expect(s.setThread).not.toHaveBeenCalled();
     await settleTurn(make(ok({ turns: [4] })).bridge, "a", "ready", s);
     expect(s.setTurns).toHaveBeenCalledWith([4]);
     expect(s.setAsking).toHaveBeenCalledWith(null);
