@@ -91,3 +91,11 @@ export function tokens(s: FilterState, look: Lookups): Token[] {
   return out;
 }
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-tokens
+
+// Back from a call's page remounts the page: the filter and words stay for this window (not an app restart).
+let held: FilterState = BLANK;
+export const heldFilter = (): FilterState => held;
+export const holdFilter = (s: FilterState): void => void (held = s);
+
+/** How many filter groups narrow the list. */
+export const activeCount = (s: FilterState): number => tokens(s, { person: (i) => i, type: (i) => i }).length;

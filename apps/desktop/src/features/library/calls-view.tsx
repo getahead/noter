@@ -2,6 +2,7 @@ import {
   useEffect,
   useMemo,
   type KeyboardEvent,
+  type ReactNode,
   type MouseEvent,
   type Ref,
 } from "react";
@@ -24,6 +25,11 @@ export const COLUMNS = {
 } as const satisfies Record<Column, string>;
 
 export interface CallsViewProps {
+  /** The filter bar, above the table. */
+  bar?: ReactNode;
+  /** Filters are set: an empty read is FILTER_EMPTY, not the first-use state. */
+  filtered?: boolean;
+  onClearFilters?: () => void;
   state: CallsState;
   selection: Selection;
   selected: ReadonlySet<string>;
@@ -69,6 +75,7 @@ export function CallsView(p: CallsViewProps) {
             p.prefs,
           )}
       </div>
+      {p.bar}
       {p.failed && (
         <InlineBanner
           banner={{
@@ -83,7 +90,7 @@ export function CallsView(p: CallsViewProps) {
         data-region="LC-R3"
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         // @cpt-begin:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
-        data-state={chosen.length > 1 ? "selected-several" : state.status.toLowerCase()}
+        data-state={chosen.length > 1 ? "selected-several" : state.status === "EMPTY" && p.filtered ? "filter-empty" : state.status.toLowerCase()}
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-several-listed
         // @cpt-end:cpt-noter-state-ui-library-calls-list:p1:inst-listed-several
         role="region"
@@ -124,6 +131,15 @@ function Body(p: CallsViewProps) {
     );
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-if-empty
   // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-empty
+  if (state.status === "EMPTY" && p.filtered)
+    return (
+      <EmptyState
+        variant="filtered"
+        title={t("filters.empty_title")}
+        actionLabel={t("filters.clear")}
+        onAction={p.onClearFilters}
+      />
+    );
   if (state.status === "EMPTY")
     return (
       <EmptyState

@@ -221,4 +221,13 @@ describe("createCallsList (cpt-noter-state-ui-library-calls-list)", () => {
     list.merge({ fresh: row("fresh") }, new Set());
     expect(list.get()).toMatchObject({ status: "ERROR", rows: [] });
   });
+
+  it("reads again with a new filter and drops the answer of the one before", async () => {
+    const { list, callsList } = setup(page([row("old")]), page([row("new")]));
+    const first = list.load();
+    await list.setFilter({ tags: ["release"] });
+    await first;
+    expect(callsList).toHaveBeenLastCalledWith({ filter: { tags: ["release"] }, sort: "newest", page: {} });
+    expect(list.get().rows.map((r) => r.id)).toEqual(["new"]);
+  });
 });

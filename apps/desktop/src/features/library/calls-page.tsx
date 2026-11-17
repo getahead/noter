@@ -19,6 +19,8 @@ import { useSheet } from "../../ui/dialogs/host";
 import { SelfTestSheet } from "../settings/SelfTestSheet";
 import { createCallsList, type CallsList, type CallsState } from "./calls-list";
 import { CallsView, COLUMNS } from "./calls-view";
+import { FilterBar, useLists } from "./filter-bar";
+import { apply, heldFilter, holdFilter, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
   edgeOf,
@@ -36,7 +38,7 @@ let memory: { state: CallsState; selection: Selection } | null = null;
 const SLOW_MS = 300;
 
 function useCallsList(bridge: Bridge): [CallsState, CallsList] {
-  const list = useMemo(() => createCallsList(bridge, memory?.state), [bridge]);
+  const list = useMemo(() => createCallsList(bridge, memory?.state, heldFilter().filter), [bridge]);
   const state = useSyncExternalStore(list.subscribe, list.get, list.get);
   useEffect(() => void list.load(), [list]);
   return [state, list];
@@ -55,6 +57,24 @@ export function CallsPage() {
   const [failed, setFailed] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
   const announce = useAnnounce(bridge);
+  const [fstate, setFstate] = useState<FilterState>(heldFilter);
+  const lists = useLists(bridge);
+  // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  const onFilter = (a: FilterAction) => {
+    const next = apply(fstate, a);
+    setFstate(next);
+    holdFilter(next);
+    if (next.filter !== fstate.filter) void list.setFilter(next.filter);
+  };
+  // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-query
+  const filtered = Object.keys(fstate.filter).some((k) => {
+    const v = fstate.filter[k as keyof typeof fstate.filter];
+    return Array.isArray(v) ? v.length > 0 : !!v;
+  });
+  useEffect(() => {
+    if (filtered && state.status === "LISTED")
+      void announce({ kind: "confirmation", text: t("filters.matches", { count: state.total ?? state.rows.length }), key: `m${state.total}` });
+  }, [filtered, state.total, state.status]);
   const sheets = useSheet();
   const records = useWindow(bridge, (s) => s.entities.call);
   const progress = useWindow(bridge, (s) => s.outputs);
@@ -206,6 +226,9 @@ export function CallsPage() {
 
   return (
     <CallsView
+      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} onRun={() => {}} />}
+      filtered={filtered}
+      onClearFilters={() => onFilter({ type: "clear" })}
       state={shown}
       selection={selection}
       selected={selected}
