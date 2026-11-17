@@ -43,6 +43,9 @@ export function threadSubtitle(topic: TopicRow, since: number | null, prefs?: Ui
   return parts.join(" · ");
 }
 
+/** A topic's counts for its chip: "6 calls · 3 decisions · 1 open question". */
+export const topicCounts = (x: TopicRow): string => [t("topics.calls", { count: x.calls }), t("topics.decisions", { count: x.decisions }), t("topics.open", { count: x.open_items })].join(" · ");
+
 /** The Last discussed cell: a short day, or a dash for a topic never seen. */
 export const lastSeen = (ms: number, prefs?: UiPrefs): string => (ms > 0 ? shortDay(ms, prefs) : "—");
 

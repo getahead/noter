@@ -1361,6 +1361,7 @@ export const en = {
   "search.best": "Best matches · keyword and meaning",
   "search.keyword_only": "Searching by keyword only while the index rebuilds",
   "search.keyword_progress": "Searching by keyword only while the index rebuilds · {percent}%",
+  "search.section.topic": "Topic",
   "search.section.items": "Items",
   "search.section.transcripts": "Transcripts",
   "search.section.documents": "Documents",
