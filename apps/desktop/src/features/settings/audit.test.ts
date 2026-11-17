@@ -41,7 +41,8 @@ describe("audit commands", () => {
   });
   it("reports an export only from a returned path", async () => {
     expect(await exportAudit(bridge({ status: "ok", data: { path: "/x", files: 1 } }), "markdown")).toEqual({ path: "/x", files: 1 });
-    expect(await exportAudit(bridge({ status: "error", error: { code: "cancelled" } }), "markdown")).toBeNull();
+    expect(await exportAudit(bridge({ status: "error", error: { code: "cancelled" } }), "markdown")).toBe("cancelled");
+    expect(await exportAudit(bridge({ status: "error", error: { code: "internal" } }), "markdown")).toBe("failed");
   });
 });
 
@@ -94,5 +95,8 @@ describe("audit store", () => {
     expect(s.view().exported).toBe("/x");
     const c = store([]); await c.s.export();
     expect(c.s.view().exported).toBeNull();
+    expect(c.s.view().exportFailed).toBe(false);
+    const f = store([], () => ({ status: "error", error: { code: "internal" } })); await f.s.export();
+    expect(f.s.view().exportFailed).toBe(true);
   });
 });

@@ -398,6 +398,7 @@ export const en = {
   "audit.more": "Load More",
   "audit.export": "Export…",
   "audit.export_all_only": "Export covers the whole log, not one call",
+  "audit.export_failed": "The log could not be exported.",
   "audit.exported": "Saved to {path}",
   "audit.total": { one: "{count} request · {size}", other: "{count} requests · {size}" },
   "audit.b": "{n} B", "audit.kb": "{n} KB", "audit.mb": "{n} MB",

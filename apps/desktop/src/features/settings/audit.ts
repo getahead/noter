@@ -74,10 +74,10 @@ export async function readAudit(bridge: Bridge, cursor: string | null): Promise<
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-export
 /** The export covers the whole log: the contract has no call filter, so a filtered view never exports under its label. */
-export async function exportAudit(bridge: Bridge, format: LogFormat): Promise<ExportResult | null> {
+export async function exportAudit(bridge: Bridge, format: LogFormat): Promise<ExportResult | "cancelled" | "failed"> {
   const res = await bridge.act("audit:export", "audit_export", () => bridge.core.auditExport({ format }));
   // @cpt-begin:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-save-result
-  return res.status === "ok" ? res.data : null;
+  return res.status === "ok" ? res.data : res.error.code === "cancelled" ? "cancelled" : "failed";
   // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-save-result
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-audit:p1:inst-export
@@ -91,11 +91,12 @@ export interface AuditView {
   busy: boolean;
   exporting: boolean;
   exported: string | null;
+  exportFailed: boolean;
 }
 
 /** The audit reads and export as a small store: one read or export at a time, and a read that finishes after `dispose` is dropped. */
 export function createAudit(bridge: Bridge, notify: (v: AuditView) => void) {
-  let v: AuditView = { rows: [], cursor: null, status: "loading", failed: false, busy: false, exporting: false, exported: null };
+  let v: AuditView = { rows: [], cursor: null, status: "loading", failed: false, busy: false, exporting: false, exported: null, exportFailed: false };
   let live = true;
   const set = (p: Partial<AuditView>) => live && notify((v = { ...v, ...p }));
   return {
@@ -111,9 +112,9 @@ export function createAudit(bridge: Bridge, notify: (v: AuditView) => void) {
     },
     async export() {
       if (v.exporting) return;
-      set({ exporting: true });
+      set({ exporting: true, exportFailed: false });
       const r = await exportAudit(bridge, "markdown");
-      set({ exporting: false, exported: r?.path ?? v.exported });
+      set({ exporting: false, exportFailed: r === "failed", exported: typeof r === "object" ? r.path : v.exported });
     },
   };
 }

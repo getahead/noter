@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
@@ -17,6 +18,11 @@ export function AuditLog({ bridge, callId = null }: { bridge: Bridge; callId?: s
     void s.load();
     return s.dispose;
   }, [bridge]);
+  if (!v) return <AuditLogView v={null} callId={callId} prefs={prefs} onLoad={() => {}} onExport={() => {}} />;
+  return <AuditLogView v={v} callId={callId} prefs={prefs} onLoad={() => void store.current?.load()} onExport={() => void store.current?.export()} />;
+}
+
+export function AuditLogView({ v, callId, prefs, onLoad, onExport }: { v: AuditView | null; callId: string | null; prefs: UiPrefs | undefined; onLoad: () => void; onExport: () => void }) {
   const shown = useMemo(() => forCall(v?.rows ?? [], callId), [v?.rows, callId]);
   const table = useMemo(() => auditRows(shown, prefs), [shown, prefs]);
   if (!v || v.status === "loading") return <p className="st-audit__loading" role="status">{t("audit.loading")}</p>;
@@ -35,11 +41,12 @@ export function AuditLog({ bridge, callId = null }: { bridge: Bridge; callId?: s
           </Table>
         )
       )}
-      {v.failed && <p className="hd__err" role="alert">{t("audit.error")} <PushButton label={t("action.try_again")} size="small" disabled={v.busy} onAction={() => void store.current?.load()} /></p>}
+      {v.failed && <p className="hd__err" role="alert">{t("audit.error")} <PushButton label={t("action.try_again")} size="small" disabled={v.busy} onAction={onLoad} /></p>}
       <div className="st-audit__foot" aria-live="polite">
         {table.length > 0 && t(complete ? "audit.total" : "audit.total_so_far", { count: requestCount(shown), size: formatBytes(totalBytes(shown)) })}
-        {!complete && !v.failed && <PushButton label={t("audit.more")} size="small" disabled={v.busy} onAction={() => void store.current?.load()} />}
-        <PushButton label={t("audit.export")} size="small" disabled={!!callId || v.exporting} help={callId ? t("audit.export_all_only") : undefined} onAction={() => void store.current?.export()} />
+        {!complete && !v.failed && <PushButton label={t("audit.more")} size="small" disabled={v.busy} onAction={onLoad} />}
+        <PushButton label={t("audit.export")} size="small" disabled={!!callId || v.exporting} help={callId ? t("audit.export_all_only") : undefined} onAction={onExport} />
+        {v.exportFailed && <span role="alert">{t("audit.export_failed")}</span>}
         {v.exported && <span>{t("audit.exported", { path: v.exported })}</span>}
       </div>
     </>
