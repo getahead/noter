@@ -5,8 +5,8 @@ import { expect, test, type Page } from "@playwright/test";
 import { openWindow } from "../e2e/support/app";
 import * as W from "../support/world-presets";
 
-async function openPerson(page: Page, name: RegExp) {
-  await page.setViewportSize({ width: 1440, height: 900 });
+async function openPerson(page: Page, name: RegExp, width = 1440) {
+  await page.setViewportSize({ width, height: width < 800 ? 1100 : 900 });
   await openWindow(page, "main", { world: W.idle });
   await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
   await page.keyboard.press("Meta+Digit4");
@@ -35,5 +35,27 @@ test.describe("cpt-noter-dod-ui-people-pages person page", () => {
     await page.getByRole("tab", { name: "Calls" }).click();
     await expect(page.locator('[data-region="PE-CALLS"]')).toBeVisible();
     await shot(page, "person-calls");
+  });
+  test("History with no changes says what appears there", async ({ page }) => {
+    await openPerson(page, /Lena Krüger/);
+    await page.getByRole("tab", { name: "History" }).click();
+    await expect(page.getByText("No changes yet")).toBeVisible();
+    await shot(page, "person-history-empty");
+  });
+  test("History lists the person's changes with the actor filters", async ({ page }) => {
+    await openPerson(page, /Anna Kuznetsova/);
+    await page.getByRole("tab", { name: "History" }).click();
+    await expect(page.locator('[data-region="PE-HISTORY"]')).toBeVisible();
+    await shot(page, "person-history");
+  });
+  test("Overview at Medium width is one column", async ({ page }) => {
+    await openPerson(page, /Anna Kuznetsova/, 1000);
+    await expect(page.getByText("Last calls")).toBeVisible();
+    await shot(page, "person-overview-medium");
+  });
+  test("Overview at Narrow width is one column", async ({ page }) => {
+    await openPerson(page, /Anna Kuznetsova/, 720);
+    await expect(page.getByText("Last calls")).toBeVisible();
+    await shot(page, "person-overview-narrow");
   });
 });

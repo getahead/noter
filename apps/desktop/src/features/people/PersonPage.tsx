@@ -119,11 +119,11 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-calls
 }
 
-function CallsTable({ bridge, calls, prefs, name }: { bridge: Bridge; calls: Page["calls"]; prefs: UiPrefs | undefined; name: string }) {
+function CallsTable({ bridge, calls, prefs, name, compact }: { bridge: Bridge; calls: Page["calls"]; prefs: UiPrefs | undefined; name: string; compact?: boolean }) {
   const [selected, setSelected] = useState<string | null>(null);
   const open = (id: string) => navigate(bridge, { type: "call_page", call_id: id, tab: "summary" });
   return (
-    <Table variant="sortable" label={t("person.calls_label", { name })} cls="lb-table" wrapCls="lb-tablewrap">
+    <Table variant="sortable" label={t("person.calls_label", { name })} cls={compact ? "lb-table pe-calls--compact" : "lb-table"} wrapCls="lb-tablewrap">
       <thead>
         <tr>
           <th scope="col" style={{ width: "120px" }}>{t("library.col.when")}</th>
@@ -196,7 +196,7 @@ export function Overview({ bridge, page, prefs, onShowAll }: { bridge: Bridge; p
           </dl>
         </Block>
         <Block region="PE-R6" title={t("person.last_calls")}>
-          <CallsTable bridge={bridge} calls={page.calls.slice(0, 5)} prefs={prefs} name={p.short_name} />
+          <CallsTable bridge={bridge} calls={page.calls.slice(0, 5)} prefs={prefs} name={p.short_name} compact />
           <button type="button" className="pe-showall" onClick={onShowAll}>{t("person.show_all")}</button>
         </Block>
       </div>

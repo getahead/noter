@@ -26,3 +26,7 @@
 .pe-identity { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
 .pe-sel { user-select: text; }
 .pe-showall { justify-self: start; border: 0; background: transparent; padding: 0; font: inherit; color: var(--accent-text); cursor: pointer; }
+/* Compact action rows are one flex line of fixed-size parts; in the narrower column they wrap instead of spilling into the next column. */
+.pe-block .it-row__line { flex-wrap: wrap; row-gap: 2px; }
+/* Last calls: When and Call only; the full table is the Calls view */
+.pe-calls--compact :is(th, td):nth-child(n + 3) { display: none; }
