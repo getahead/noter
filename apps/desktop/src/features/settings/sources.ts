@@ -113,9 +113,16 @@ export async function addMcp(bridge: Bridge, a: { server: string; mode: SourceMo
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-add-mcp
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-reindex
+const reindexing = new Set<string>(); // one request in flight per source: the row hides its actions only when the core's event arrives
 export async function reindexSource(bridge: Bridge, id: string): Promise<boolean> {
-  const res = await bridge.act(`source:${id}`, "source_reindex", () => bridge.core.sourceReindex({ source_id: id }));
-  return res.status === "ok";
+  if (reindexing.has(id)) return false;
+  reindexing.add(id);
+  try {
+    const res = await bridge.act(`source:${id}`, "source_reindex", () => bridge.core.sourceReindex({ source_id: id }));
+    return res.status === "ok";
+  } finally {
+    reindexing.delete(id);
+  }
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-manage:p1:inst-reindex
 

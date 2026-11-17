@@ -74,6 +74,13 @@ describe("source commands", () => {
     expect(await reindexSource(bridge({ status: "ok" }), "s1")).toBe(true);
     expect(await reindexSource(bridge({ status: "error" }), "s1")).toBe(false);
   });
+  it("sends one re-index per source while one is in flight", async () => {
+    const b = bridge({ status: "ok" }) as unknown as { act: ReturnType<typeof vi.fn> };
+    const [first, second] = await Promise.all([reindexSource(b as never, "s1"), reindexSource(b as never, "s1")]);
+    expect([first, second]).toEqual([true, false]);
+    expect(b.act).toHaveBeenCalledTimes(1);
+    expect(await reindexSource(b as never, "s1")).toBe(true); // free again once the first settled
+  });
 });
 
 describe("submitMcp", () => {
