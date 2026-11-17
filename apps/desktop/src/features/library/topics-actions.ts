@@ -1,8 +1,8 @@
 import type { Bridge } from "../../app/bridge/bridge";
-import type { TopicRow } from "../../core/bindings";
+import type { TopicRow, TopicThreadGroup } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
-import { clashOf } from "./topics-model";
+import { clashOf, movesOf } from "./topics-model";
 
 export type RenameOutcome =
   | { type: "renamed"; topic: TopicRow }
@@ -20,7 +20,7 @@ export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string,
   if (other) return { type: "clash", other };
   const res = await bridge.act("topic_rename", "topic_rename", () => bridge.core.topicRename({ topic_id: topic.id, rev: topic.rev, name: clean }), { screen: "library-topics", entity: "topic" });
   if (res.status === "ok") {
-    holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("topics.renamed", { name: res.data.topic.name }), refresh });
+    holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("topics.renamed", { from: topic.name, to: res.data.topic.name }), refresh });
     return { type: "renamed", topic: res.data.topic };
   }
   const d = res.error.detail;
@@ -47,6 +47,12 @@ export async function mergeTopic(bridge: Bridge, source: string, target: string,
   if (res.status !== "ok") return null;
   holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("topics.merged", { count: moved, name: res.data.topic.name }), refresh });
   return res.data.topic;
+}
+
+/** What the Merge button does: nothing (`undefined`) until a different kept topic is chosen and the read of what moves landed; then the merge, counting what moved. */
+export async function confirmMerge(bridge: Bridge, source: string, keep: string, groups: TopicThreadGroup[] | null | undefined, refresh: () => void): Promise<TopicRow | null | undefined> {
+  if (!keep || keep === source || !groups) return undefined;
+  return mergeTopic(bridge, source, keep, movesOf(groups).rows.length, refresh);
 }
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-topic:p1:inst-merge
 

@@ -9,6 +9,7 @@ import { ThreadView, ThreadPage } from "./ThreadPage";
 import { TopicLine, TopicsBody, TopicsPage } from "./TopicsPage";
 import { ThreadToolbar, TopicsToolbar } from "./TopicsToolbar";
 import { slots } from "../call-page/slots";
+import { topicMenu } from "./TopicsPage";
 import { ThreadRow } from "./ThreadRow";
 import { setHead } from "./topics-head";
 import { monthsOf } from "./topics-model";
@@ -152,5 +153,16 @@ describe("toolbars and thread rows", () => {
     const tree = rendered(ThreadRow, { bridge, item, call: item.call });
     (find(tree, (p) => typeof p.label === "string" && p.label.includes(item.call.title)).props.onAction as () => void)();
     expect(act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
+  });
+});
+
+describe("the Topics row context menu", () => {
+  it("offers Open, Rename… and Merge With…, each closing the menu before it acts", () => {
+    const [open, rename, merge, close] = [vi.fn(), vi.fn(), vi.fn(), vi.fn()];
+    const items = topicMenu(open, { rename, merge }, close);
+    expect(items.map((i) => i.label)).toEqual(["Open", "Rename…", "Merge With…"]);
+    items.forEach((i) => i.onSelect());
+    expect([open, rename, merge].every((f) => f.mock.calls.length === 1)).toBe(true);
+    expect(close).toHaveBeenCalledTimes(3);
   });
 });

@@ -1126,7 +1126,7 @@ export const en = {
   "topics.rename_stale": "This topic changed elsewhere. Rename again to save your name.",
   "topics.rename_failed": "Couldn’t rename the topic",
   "topics.merge_instead": "Merge Instead",
-  "topics.renamed": "Renamed topic to “{name}”",
+  "topics.renamed": "Renamed “{from}” to “{to}”",
   "topics.merge_with": "Merge With…",
   "topics.merge_title": "Merge “{from}” into “{to}”?",
   "topics.merge_explain": "The items move to “{to}”, and “{from}” becomes one of its names. You can undo this in History.",

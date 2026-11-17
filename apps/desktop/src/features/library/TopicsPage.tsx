@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { TopicRow, UiPrefs } from "../../core/bindings";
@@ -7,7 +7,10 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
 import { IconButton } from "../../ui/primitives/icon-button";
+import { Menu } from "../../ui/primitives/menu";
 import { Table } from "../../ui/primitives/table";
+import { useSheetIfAny } from "../../ui/dialogs/host";
+import { threadActions, useRegisterTopicSheets } from "./ThreadPage";
 import { filterTopics, lastSeen, mergeTopics } from "./topics-model";
 import { setTopicWords, useTopicWords } from "./topics-query";
 import { openTopic } from "./topic-nav";
@@ -40,7 +43,21 @@ export function TopicsPage({ bridge }: { bridge: Bridge }) {
   const shown = useMemo(() => filterTopics(topics, words), [topics, words]);
   const names = useMemo(() => new Map(topics.map((x) => [x.id, x.name])), [topics]);
 
-  return <TopicsBody bridge={bridge} status={read.status} retry={retry} topics={topics} shown={shown} names={names} words={words} prefs={prefs} />;
+  const sheets = useSheetIfAny();
+  useRegisterTopicSheets(sheets);
+  const [menu, setMenu] = useState<{ x: number; y: number; topic: TopicRow } | null>(null);
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    document.addEventListener("pointerdown", close);
+    return () => document.removeEventListener("pointerdown", close);
+  }, [menu]);
+  const rowMenu = menu && sheets && (
+    <div className="lb-ctx" style={{ left: menu.x, top: menu.y }} onPointerDown={(e) => e.stopPropagation()}>
+      <Menu variant="context-menu" onClose={() => setMenu(null)} items={topicMenu(() => openTopic(bridge, menu.topic.id), threadActions(sheets, bridge, menu.topic, topics, retry), () => setMenu(null))} />
+    </div>
+  );
+  return <TopicsBody bridge={bridge} status={read.status} retry={retry} topics={topics} shown={shown} names={names} words={words} prefs={prefs} onContext={(topic, e) => setMenu({ x: e.clientX, y: e.clientY, topic })} menu={rowMenu} />;
 }
 
 export interface TopicsBodyProps {
@@ -52,9 +69,12 @@ export interface TopicsBodyProps {
   names: ReadonlyMap<string, string>;
   words: string;
   prefs?: UiPrefs;
+  /** A right-click on a row, and the menu the page draws for it. */
+  onContext?: (topic: TopicRow, e: MouseEvent) => void;
+  menu?: ReactNode;
 }
 
-export function TopicsBody({ bridge, status, retry, topics, shown, names, words, prefs }: TopicsBodyProps) {
+export function TopicsBody({ bridge, status, retry, topics, shown, names, words, prefs, onContext, menu }: TopicsBodyProps) {
   if (status === "ERROR")
     return <InlineBanner banner={{ id: "topics-error", severity: "error", text: t("topics.error"), actions: [{ label: t("action.try_again"), onAction: retry }] }} />;
   if (status === "LOADING") return <div className="lb-loading" data-state="loading" aria-busy="true" aria-label={t("topics.loading")} />;
@@ -87,15 +107,26 @@ export function TopicsBody({ bridge, status, retry, topics, shown, names, words,
         </thead>
         <tbody>
           {shown.map((x, i) => (
-            <TopicLine key={x.id} bridge={bridge} topic={x} stop={i === 0} merge={x.merge_suggestion ? (names.get(x.merge_suggestion.id) ?? x.merge_suggestion.name) : null} last={lastSeen(x.last_seen, prefs)} />
+            <TopicLine key={x.id} bridge={bridge} topic={x} stop={i === 0} merge={x.merge_suggestion ? (names.get(x.merge_suggestion.id) ?? x.merge_suggestion.name) : null} last={lastSeen(x.last_seen, prefs)} onContext={onContext && ((e) => (e.preventDefault(), onContext(x, e)))} />
           ))}
         </tbody>
       </Table>
+      {menu}
     </div>
   );
 }
 
-export function TopicLine({ bridge, topic: x, stop, merge, last }: { bridge: Bridge; topic: TopicRow; stop: boolean; merge: string | null; last: string }) {
+/** The row's context menu: Open, Rename… and Merge With… (each closes the menu first). */
+export function topicMenu(open: () => void, actions: { rename: () => void; merge: () => void }, close: () => void) {
+  const run = (f: () => void) => () => (close(), f());
+  return [
+    { label: t("library.menu.open"), onSelect: run(open) },
+    { label: t("topics.rename"), onSelect: run(actions.rename) },
+    { label: t("topics.merge_with"), onSelect: run(actions.merge) },
+  ];
+}
+
+export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { bridge: Bridge; topic: TopicRow; stop: boolean; merge: string | null; last: string; onContext?: (e: MouseEvent) => void }) {
   const open = () => openTopic(bridge, x.id);
   return (
     <tr
@@ -106,6 +137,7 @@ export function TopicLine({ bridge, topic: x, stop, merge, last }: { bridge: Bri
       aria-label={x.name}
       tabIndex={stop ? 0 : -1}
       onClick={open}
+      onContextMenu={onContext}
       onKeyDown={(e) => e.key === "Enter" && !e.metaKey && (e.preventDefault(), open())}
     >
       <td>

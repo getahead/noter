@@ -116,6 +116,12 @@ export function MainToolbar(p: ToolbarProps) {
           <span
             className="np-toolbar__searchhost"
             onKeyDownCapture={(e) => {
+              // ↓ from the field walks into Search results
+              if (e.key === "ArrowDown" && !matches.length) {
+                const hit = globalThis.document?.querySelector<HTMLElement>(".lb-hit");
+                if (hit) (e.preventDefault(), hit.focus());
+                return;
+              }
               const k = listKey(e.key, active, matches.length);
               if (!k) return;
               e.preventDefault();

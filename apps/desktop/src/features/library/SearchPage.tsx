@@ -103,7 +103,16 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     );
   };
   return (
-    <div data-region="LS-R1" className="lb-search">
+    <div
+      data-region="LS-R1"
+      className="lb-search"
+      // focus lands on the title after a search: ↓ from there enters the first hit
+      onKeyDown={(e) => {
+        if (e.key !== "ArrowDown" || e.target !== e.currentTarget.querySelector("h2")) return;
+        const hit = e.currentTarget.querySelector<HTMLElement>(".lb-hit");
+        if (hit) (e.preventDefault(), hit.focus());
+      }}
+    >
       <h2 className="lb-title" tabIndex={-1}>{t("search.title")}</h2>
       {body()}
     </div>
