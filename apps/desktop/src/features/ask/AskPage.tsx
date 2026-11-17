@@ -3,11 +3,12 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { AskAnswer, AskThreadRow, ScopePreset } from "../../core/bindings";
+import type { AskAnswer, AskThreadRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { PushButton } from "../../ui/primitives/push-button";
 import { TextField } from "../../ui/primitives/text-field";
-import { loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { isStopKey, loadPresets, loadRows, openThread, questionOf, settleTurn, startAsk, stopAsk, threadOfRoute } from "./actions";
+import { setAskState, useAskState } from "./ask-state";
 import { foldTurn, groupThreads, paragraphs, phaseOf, type TurnPhase, type TurnView } from "./model";
 import "./ask.css";
 
@@ -18,8 +19,7 @@ const GROUP = { today: "ask.group.today", yesterday: "ask.group.yesterday", earl
 // @cpt-flow:cpt-noter-flow-ui-ask-question:p1
 export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKey?: string }) {
   const [rows, setRows] = useState<AskThreadRow[]>([]);
-  const [presets, setPresets] = useState<ScopePreset[]>([]);
-  const [scope, setScope] = useState(0);
+  const { presets, scopeId } = useAskState();
   const [thread, setThread] = useState<string | null>(null);
   const [turns, setTurns] = useState<AskAnswer[]>([]);
   const [draft, setDraft] = useState("");
@@ -34,7 +34,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
 
   useEffect(() => {
     void refresh();
-    void loadPresets(bridge).then((p) => p && setPresets(p));
+    void loadPresets(bridge).then((p) => p && setAskState({ presets: p }));
     // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
     return () => void bridge.unsubscribe("ask_start");
     // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-dispose
@@ -64,10 +64,17 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     if (!question) return;
     setAsking(question);
     setDraft("");
-    startAsk(bridge, thread, question, presets[scope]?.scope);
+    startAsk(bridge, thread, question, presets.find((p) => p.id === scopeId)?.scope);
   };
 
   const stop = () => data && stopAsk(bridge, data.turn_id);
+  useEffect(() => {
+    if (!busy) return;
+    const onKey = (e: KeyboardEvent) => isStopKey(e) && (e.preventDefault(), stop());
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, data?.turn_id]);
 
   return (
     <AskView
@@ -78,12 +85,9 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       asking={asking}
       turn={turn}
       phase={phase}
-      presets={presets}
-      scope={scope}
       draft={draft}
       busy={busy}
       onOpen={(id) => void open(id)}
-      onScope={setScope}
       onDraft={setDraft}
       onSend={send}
       onStop={stop}
@@ -103,12 +107,9 @@ export interface AskViewProps {
   asking: string | null;
   turn: TurnView | null;
   phase: TurnPhase | null;
-  presets: ScopePreset[];
-  scope: number;
   draft: string;
   busy: boolean;
   onOpen: (id: string) => void;
-  onScope: (i: number) => void;
   onDraft: (v: string) => void;
   onSend: () => void;
   onStop: () => void;
@@ -116,7 +117,7 @@ export interface AskViewProps {
 }
 
 /** The three regions of the page: recent questions, the thread and the composer. */
-export function AskView({ rows, loadError, thread, turns, asking, turn, phase, presets, scope, draft, busy, onOpen, onScope, onDraft, onSend, onStop, onRetry }: AskViewProps) {
+export function AskView({ rows, loadError, thread, turns, asking, turn, phase, draft, busy, onOpen, onDraft, onSend, onStop, onRetry }: AskViewProps) {
   const empty = turns.length === 0 && !asking;
   const groups = groupThreads(rows, Date.now());
   return (
@@ -151,15 +152,6 @@ export function AskView({ rows, loadError, thread, turns, asking, turn, phase, p
           </article>
         )}
         <div className={`ak-composer${empty ? " is-first" : ""}`} data-region="AK-R4">
-          {presets.length > 0 && (
-            <select aria-label={t("ask.scope")} value={scope} onChange={(e) => onScope(Number(e.target.value))}>
-              {presets.map((p, i) => (
-                <option key={p.id} value={i}>
-                  {p.label}
-                </option>
-              ))}
-            </select>
-          )}
           <TextField
             variant="multi"
             cls="ak-composer__field"
@@ -168,6 +160,7 @@ export function AskView({ rows, loadError, thread, turns, asking, turn, phase, p
             placeholder={t(empty ? "ask.composer_first" : "ask.composer_follow_up")}
             value={draft}
             onChange={onDraft}
+            onEnter={onSend}
           />
           {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={onSend} />}
         </div>

@@ -75,3 +75,6 @@ export const threadOfRoute = (key: string): string | null => (key.startsWith("th
 
 /** The core stored this turn: reload the thread. A failed or stopped turn keeps its partial on screen instead. */
 export const isStored = (phase: TurnPhase | null): boolean => phase === "ready" || phase === "weak" || phase === "not_found";
+
+/** ⌘. while an answer streams. */
+export const isStopKey = (e: { key: string; metaKey: boolean }): boolean => e.metaKey && e.key === ".";

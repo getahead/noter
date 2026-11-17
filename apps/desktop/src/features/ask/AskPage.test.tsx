@@ -46,13 +46,12 @@ describe("Answer (cpt-noter-state-ui-ask-turn)", () => {
 
 describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
   const noop = () => {};
-  const props = { rows: [], loadError: false, thread: null, turns: [], asking: null, turn: null, phase: null, presets: [], scope: 0, draft: "", busy: false, onOpen: noop, onScope: noop, onDraft: noop, onSend: noop, onStop: noop, onRetry: noop };
+  const props = { rows: [], loadError: false, thread: null, turns: [], asking: null, turn: null, phase: null, draft: "", busy: false, onOpen: noop, onScope: noop, onDraft: noop, onSend: noop, onStop: noop, onRetry: noop };
   const row = { id: "a", title: "What did Ann say?", updated_at: Date.now() } as never;
-  it("lists recent questions by day, marks the open one and offers the scope presets", () => {
-    const h = renderToString(<AskView {...props} rows={[row]} thread="a" presets={[{ id: "all", label: "Everything", scope: { preset: "all" } } as never]} />);
+  it("lists recent questions by day and marks the open one", () => {
+    const h = renderToString(<AskView {...props} rows={[row]} thread="a" />);
     expect(h).toContain("Today");
     expect(h).toContain('aria-current="true"');
-    expect(h).toContain("Everything");
   });
   it("names a load error and shows stored turns with the follow-up composer", () => {
     expect(renderToString(<AskView {...props} loadError />)).toContain("load your questions");

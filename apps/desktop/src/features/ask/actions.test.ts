@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import { isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
+import { isStopKey, isStored, openThread, questionOf, settleTurn, threadOfRoute, loadPresets, loadRows, loadThread, NEW_SCOPE, startAsk, stopAsk } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -69,5 +69,10 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(s.setTurns).toHaveBeenCalledWith([4]);
     expect(s.setAsking).toHaveBeenCalledWith(null);
     expect(s.refresh).toHaveBeenCalled();
+  });
+  it("stops on ⌘. only", () => {
+    expect(isStopKey({ key: ".", metaKey: true })).toBe(true);
+    expect(isStopKey({ key: ".", metaKey: false })).toBe(false);
+    expect(isStopKey({ key: "a", metaKey: true })).toBe(false);
   });
 });
