@@ -13,7 +13,8 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
     await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
     // the route Ask Instead pushes, through the shell's navigate seam
     await page.evaluate(async (q) => {
-      const { navigate } = (await import(/* @vite-ignore */ "/src/features/shell/navigate.ts")) as typeof import("../../src/features/shell/navigate");
+      const module = "/src/features/shell/navigate.ts"; // served by the dev server: the app's own module instance
+      const { navigate } = (await import(/* @vite-ignore */ module)) as { navigate: (route: { section: string; key: string }) => void };
       navigate({ section: "ask", key: `new:${encodeURIComponent(q)}` });
     }, QUESTION);
 
