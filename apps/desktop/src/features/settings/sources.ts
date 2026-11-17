@@ -91,3 +91,36 @@ export async function reindexSource(bridge: Bridge, id: string): Promise<boolean
 
 /** A missing server is a field error before anything is sent. */
 export const mcpServerError = (server: string): string | null => (server.trim() ? null : t("sources.error_server_required"));
+
+export interface McpDraft {
+  server: string;
+  mode: SourceMode;
+  schedule: string;
+  privacy: PrivacyClass;
+}
+
+/** Check, send and word the outcome: a message for the field/sheet, or null when the source was added. */
+export async function submitMcp(bridge: Bridge, d: McpDraft): Promise<string | null> {
+  const local = mcpServerError(d.server);
+  if (local) return local;
+  const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: ALL_CALLS });
+  if (r.ok) return null;
+  return r.field === "server" ? t("sources.error_server_duplicate") : t("sources.error_add");
+}
+
+export interface SourcesView {
+  rows: SourceRow[] | null;
+  failed: boolean;
+}
+
+/** The sources list: a failed read keeps the rows already shown. */
+export function createSources(bridge: Bridge, notify: (v: SourcesView) => void) {
+  let v: SourcesView = { rows: null, failed: false };
+  return {
+    view: () => v,
+    async load() {
+      const list = await readSources(bridge);
+      notify((v = { rows: list ? orderedSources(list) : v.rows, failed: !list }));
+    },
+  };
+}

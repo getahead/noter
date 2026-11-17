@@ -9,7 +9,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { PRIVACY_CHOICES } from "./SourceFormSheet";
-import { ALL_CALLS, addMcp, mcpServerError } from "./sources";
+import { submitMcp } from "./sources";
 
 const SCHEDULES = () => [
   { value: "hourly", label: t("sources.schedule_hourly") },
@@ -25,14 +25,12 @@ export function AddMcpSourceSheet({ bridge, onClose }: { bridge: Bridge; onClose
   const [error, setError] = useState<string | null>(null);
   const add = async () => {
     if (busy) return;
-    const local = mcpServerError(server);
-    if (local) return setError(local);
     setBusy(true);
     setError(null);
-    const r = await addMcp(bridge, { server: server.trim(), mode, schedule: mode === "indexed" ? schedule : null, privacy, scope: ALL_CALLS });
+    const message = await submitMcp(bridge, { server, mode, schedule, privacy });
     setBusy(false);
-    if (r.ok) onClose();
-    else setError(r.field === "server" ? t("sources.error_server_duplicate") : t("sources.error_add"));
+    if (message) setError(message);
+    else onClose();
   };
   return (
     <Sheet title={t("sources.add_mcp_title")} width={520} busy={busy} onCancel={onClose} onDefault={() => void add()}>

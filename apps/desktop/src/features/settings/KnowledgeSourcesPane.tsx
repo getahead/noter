@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
 import type { PrivacyMode, SourceRow, UiPrefs } from "../../core/bindings";
@@ -10,7 +10,7 @@ import { AddMcpSourceSheet } from "./AddMcpSourceSheet";
 import { Group } from "./form";
 import type { PaneProps } from "./pane-props";
 import { AddFolderSheet } from "./SourceFormSheet";
-import { orderedSources, readSources, reindexSource, sourceStatus } from "./sources";
+import { createSources, reindexSource, sourceStatus, type SourcesView as SourcesState } from "./sources";
 
 type Sheet = "folder" | "mcp" | null;
 
@@ -18,14 +18,11 @@ type Sheet = "folder" | "mcp" | null;
 export function KnowledgeSourcesPane({ bridge, settings }: PaneProps) {
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const changed = useWindow(bridge, (s) => s.entities.source);
-  const [rows, setRows] = useState<SourceRow[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [view, setView] = useState<SourcesState>({ rows: null, failed: false });
+  const { rows, failed } = view;
+  const store = useMemo(() => createSources(bridge, setView), [bridge]);
   const [sheet, setSheet] = useState<Sheet>(null);
-  const load = async () => {
-    const list = await readSources(bridge);
-    setFailed(!list);
-    if (list) setRows(orderedSources(list));
-  };
+  const load = () => store.load();
   // the core keeps rows current with entity:changed; the list is read again on each change
   useEffect(() => void load(), [bridge, changed]); // eslint-disable-line react-hooks/exhaustive-deps
   return (

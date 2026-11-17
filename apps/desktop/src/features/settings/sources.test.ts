@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { SourceRow } from "../../core/bindings";
-import { addFolder, addMcp, orderedSources, readSources, reindexSource, sourceStatus } from "./sources";
+import { addFolder, addMcp, createSources, orderedSources, readSources, reindexSource, sourceStatus, submitMcp } from "./sources";
 
 const row = (o: Partial<SourceRow> = {}): SourceRow => ({ id: "s1", rev: 1, kind: "folder", name: "Docs", location: "/d", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" }, status: { type: "idle" }, documents: 3, last_sync_at: null, has_token: false, ...o });
 
@@ -47,5 +47,40 @@ describe("source commands", () => {
   it("re-indexes", async () => {
     expect(await reindexSource(bridge({ status: "ok" }), "s1")).toBe(true);
     expect(await reindexSource(bridge({ status: "error" }), "s1")).toBe(false);
+  });
+});
+
+describe("submitMcp", () => {
+  const b = (res: unknown) => ({ act: vi.fn(async (_k: string, _c: string, f: () => unknown) => (void f(), res)), core: { sourceAddMcp: vi.fn() } }) as never;
+  const draft = { server: " wiki ", mode: "indexed" as const, schedule: "daily", privacy: "normal" as const };
+  it("a blank server is refused before anything is sent", async () => {
+    const bridge = b(null);
+    expect(await submitMcp(bridge, { ...draft, server: "  " })).toBe("Enter the server name.");
+    expect((bridge as unknown as { act: ReturnType<typeof vi.fn> }).act).not.toHaveBeenCalled();
+  });
+  it("success returns null; a live source sends no schedule", async () => {
+    const bridge = b({ status: "ok", data: row() });
+    expect(await submitMcp(bridge, { ...draft, mode: "live" })).toBeNull();
+    const call = (bridge as unknown as { core: { sourceAddMcp: ReturnType<typeof vi.fn> } }).core.sourceAddMcp.mock.calls[0]![0];
+    expect(call).toMatchObject({ server: "wiki", schedule: null });
+  });
+  it("a duplicate server and any other failure are worded", async () => {
+    expect(await submitMcp(b({ status: "error", error: { code: "invalid_input", detail: { type: "validation", field: "server", rule: "duplicate" } } }), draft)).toContain("already a source");
+    expect(await submitMcp(b({ status: "error", error: { code: "internal" } }), draft)).toContain("could not be added");
+  });
+});
+
+describe("createSources", () => {
+  const b = (...answers: unknown[]) => ({ act: vi.fn(async () => answers.shift()), core: { sourcesList: vi.fn() } }) as never;
+  it("starts empty-handed, then holds the rows; a failed read keeps them", async () => {
+    const seen: unknown[] = [];
+    const s = createSources(b({ status: "ok", data: { sources: [row()] } }, { status: "error" }), (v) => seen.push(v));
+    expect(s.view()).toEqual({ rows: null, failed: false });
+    await s.load();
+    expect(s.view().rows).toHaveLength(1);
+    await s.load();
+    expect(s.view()).toMatchObject({ failed: true });
+    expect(s.view().rows).toHaveLength(1);
+    expect(seen).toHaveLength(2);
   });
 });
