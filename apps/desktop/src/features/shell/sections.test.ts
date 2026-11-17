@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { GROUPS, SECTIONS, navRoute, searchRoute, sectionOf } from "./sections";
+import { GROUPS, SECTIONS, navRoute, searchRoute, searchWords, sectionOf } from "./sections";
 
 describe("sections", () => {
   it("lists the eight sections in the prototype's order and groups, ⌘1 to ⌘8", () => {
@@ -30,5 +30,15 @@ describe("sections", () => {
 
   it("opens the search results of the Library", () => {
     expect(searchRoute("zoom")).toEqual({ section: "library", key: "search:zoom" });
+  });
+});
+
+describe("searchWords (the toolbar field follows a search route)", () => {
+  it("reads the words back from a search route, colons included, and nothing from any other route", () => {
+    expect(searchWords(searchRoute("websocket уведомления"))).toBe("websocket уведомления");
+    expect(searchWords(searchRoute("VSTOR-9912: reconnect"))).toBe("VSTOR-9912: reconnect");
+    expect(searchWords(searchRoute(""))).toBe("");
+    expect(searchWords({ section: "library", key: "root" })).toBeNull();
+    expect(searchWords({ section: "ask", key: "search:x" })).toBeNull();
   });
 });

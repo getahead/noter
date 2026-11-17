@@ -27,7 +27,7 @@ import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, typ
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { navigateEffect } from "./navigate";
-import { searchRoute } from "./sections";
+import { searchRoute, searchWords } from "./sections";
 import { writing } from "../library/calls-model";
 import { Sidebar } from "./sidebar";
 import { ToolbarHost } from "./toolbar";
@@ -130,7 +130,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-api-banner
   // a dismissal the core refused answers false, so the slot shows the banner again (the failure shows as its own banner)
   const dismissBanner = useCallback(async (banner: BannerKind) => (await bridge.act("banner_dismiss", "banner_dismiss", () => bridge.core.bannerDismiss({ banner }), { screen: "main-window-shell", slice: "banners" })).status === "ok", [bridge]);
-  const navigate = useCallback((target: NavTarget) => run("window_navigate", () => bridge.core.windowNavigate({ target })), [bridge, run]);
+  const openTarget = useCallback((target: NavTarget) => run("window_navigate", () => bridge.core.windowNavigate({ target })), [bridge, run]);
 
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-api-banner
 
@@ -138,14 +138,14 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     (a: ShellAction) => {
       runShellAction(a, overlay, !!pageFor(currentRoute(shellRef.current.history).section, currentRoute(shellRef.current.history)).inspector, {
         dispatch,
-        openSettings: () => navigate({ type: "settings", pane: "general" }),
+        openSettings: () => openTarget({ type: "settings", pane: "general" }),
         focusSearch: () => {
           setSearchOpen(true);
           void setTimeout(() => document.getElementById("mw-search")?.focus());
         },
       });
     },
-    [overlay, navigate],
+    [overlay, openTarget],
   );
   // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
   useEffect(() => {
@@ -175,6 +175,8 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const flags = useRef<NavFlags>({ first: true, quiet: null });
   useEffect(() => navEffect(nav, flags.current, dispatch), [nav]);
   useEffect(() => navigateEffect(dispatch), []);
+  // A search opened from a page (Search by Keyword) or reached by Back shows its words in the field.
+  useEffect(() => void setSearch((typed) => searchWords(route) ?? typed), [routeId]); // eslint-disable-line react-hooks/exhaustive-deps
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-nav
 
@@ -204,11 +206,11 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   const footer = word ? t(MODE_MSG[mode.state].word) : live ? t("footer.recording", { name: live.title }) : t("footer.idle");
 
   const bannerActions: BannerActions = {
-    runSelfTest: () => navigate({ type: "first_run", step: "permissions" }),
-    finishSetup: () => navigate({ type: "first_run" }),
+    runSelfTest: () => openTarget({ type: "first_run", step: "permissions" }),
+    finishSetup: () => openTarget({ type: "first_run" }),
     // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-banner-action
     restartNow: () => run("update_install", () => bridge.core.updateInstall({})),
-    openCall: (id) => navigate({ type: "call_page", call_id: id, tab: "transcript" }),
+    openCall: (id) => openTarget({ type: "call_page", call_id: id, tab: "transcript" }),
     resumeRecording: async (id) => {
       const result = await bridge.act("capture_resume_interrupted", "capture_resume_interrupted", () => bridge.core.captureResumeInterrupted({ call_id: id }), { slice: "capture", screen: "main-window-shell" });
       if (result.status === "ok") await bridge.act("window_show_call", "window_show_call", () => bridge.core.windowShowCall({}), { screen: "main-window-shell" });
@@ -247,7 +249,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
             onSelect={(section) => act({ type: "section", section })}
             onShowCall={() => run("window_show_call", () => bridge.core.windowShowCall({}))}
             onToggle={() => act({ type: "toggle-sidebar" })}
-            onOpenPrivacy={() => navigate({ type: "settings", pane: "privacy" })}
+            onOpenPrivacy={() => openTarget({ type: "settings", pane: "privacy" })}
           />
           {overlay ? (
             <div className="np-sidebar-scrim" aria-hidden="true" onClick={() => dispatch({ type: "close-overlay" })} />
