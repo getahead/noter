@@ -4,9 +4,11 @@ import type { SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
-import { heldFilter } from "./filters";
+import { navigate } from "../shell/navigate";
+import { PushButton } from "../../ui/primitives/push-button";
+import { apply, heldFilter, holdFilter, isFiltered } from "./filters";
 import { SearchResultRow } from "./SearchResultRow";
-import { groupByCall, sections, statusOf } from "./search-model";
+import { askRoute, groupByCall, sections, statusOf } from "./search-model";
 import "./library.css";
 
 const SECTION = { items: "search.section.items", transcripts: "search.section.transcripts", documents: "search.section.documents" } as const;
@@ -37,13 +39,33 @@ export function SearchPage({ query }: { query: string }) {
     if (read.status === "READ_ERROR") return <InlineBanner banner={{ id: "search-error", severity: "error", text: t("search.error"), actions: [{ label: t("action.try_again"), onAction: () => setAgain((n) => n + 1) }] }} />;
     const r = read.results;
     const status = statusOf(r);
-    if (status === "NO_MATCHES") return <EmptyState variant="filtered" title={t("search.none", { query })} />;
+    // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
+    const widen = (
+      <div className="lb-actions">
+        {isFiltered(filter) && (
+          <>
+            <span className="np-dim">{t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}</span>
+            <PushButton label={t("filters.clear")} size="small" onAction={() => (holdFilter(apply(heldFilter(), { type: "clear" })), setAgain((n) => n + 1))} />
+          </>
+        )}
+        <PushButton label={t("search.ask_instead")} size="small" onAction={() => navigate(askRoute(query))} />
+      </div>
+    );
+    // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-if-ask
+    if (status === "NO_MATCHES")
+      return (
+        <>
+          <EmptyState variant="filtered" title={t("search.none", { query })} />
+          {widen}
+        </>
+      );
     const total = r.calls.length + r.items.length + r.documents.length;
     return (
       <>
         <p className="np-dim" role="status">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : t("search.keyword_only")}
         </p>
+        {status === "WEAK_ONLY" && widen}
         {sections(r).map((s) => (
           <section key={s.key} aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>

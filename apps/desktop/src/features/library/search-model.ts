@@ -1,3 +1,4 @@
+import type { Route } from "../shell/history";
 import type { SearchHit, SearchResults, TextRange } from "../../core/bindings";
 
 export interface Segment {
@@ -52,3 +53,8 @@ export function groupByCall(hits: SearchHit[], visible: number): { callId: strin
   return [...by].map(([callId, all]) => ({ callId, title: all[0]!.call?.title ?? "", shown: all.slice(0, visible), hidden: all.slice(visible) }));
 }
 // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-groups
+
+// @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-ask
+/** Ask Instead: a new Ask thread that submits the same words once. */
+export const askRoute = (words: string): Route => ({ section: "ask", key: ["new", encodeURIComponent(words)].join(":") });
+// @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-ask
