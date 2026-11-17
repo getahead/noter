@@ -52,6 +52,8 @@ export function phaseOf(v: TurnView): TurnPhase {
   // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-stopped
   if (v.error) return v.error.code === "answer_stopped" ? "stopped" : "error";
   // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-stopped
+  // a stopped turn is stored with its partial text and the citations that had arrived
+  if (v.answer?.stopped) return "stopped";
   if (v.answer) {
     // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-not-found
     if (!v.answer.found || v.answer.citations.length === 0) return "not_found";

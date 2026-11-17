@@ -46,3 +46,12 @@ describe("groupThreads", () => {
     expect(groups.map((g) => [g.key, g.rows.map((r) => r.id)])).toEqual([["today", ["t"]], ["yesterday", ["y"]], ["earlier", ["old"]]]);
   });
 });
+
+describe("a stored stopped turn", () => {
+  it("reads as stopped on reopen, not as not found, and keeps its partial text and citations", () => {
+    const v = foldTurn(msgs({ type: "done", answer: answer({ stopped: true, found: false, answer_md: "So far [1]", citations: [cite(1)] }) }));
+    expect(phaseOf(v)).toBe("stopped");
+    expect(v.text).toBe("So far [1]");
+    expect(v.citations).toHaveLength(1);
+  });
+});
