@@ -12,7 +12,7 @@ export interface SourceStatusView {
   subtitle: string;
   message?: string;
   progress?: { done: number; total: number | null };
-  /** Re-index and Remove stay off while the source is indexing. */
+  /** Re-index and Remove stay off while the source is indexing; a Live source is never indexed. */
   working: boolean;
   /** Revoke Token only with a token. */
   canRevoke: boolean;
@@ -31,10 +31,10 @@ export function sourceStatus(row: SourceRow, mode: PrivacyMode, prefs: UiPrefs |
   const parts = [t("sources.documents", { count: row.documents }), sync];
   if (row.privacy === "sensitive") parts.push(t("sources.sensitive_note"));
   if (row.mode === "live" && mode !== "cloud_allowed") parts.push(t("sources.live_paused"));
-  const base = { subtitle: parts.join(" · "), working: s.type === "indexing", canRevoke: row.has_token && s.type !== "indexing", canRetry: s.type === "failed" };
+  const base = { subtitle: parts.join(" · "), working: s.type === "indexing", canRevoke: row.has_token && s.type !== "indexing", canRetry: s.type === "failed" && row.mode !== "live" };
   switch (s.type) {
     case "idle":
-      return { ...base, tone: "ok", word: t("sources.up_to_date"), icon: "checkCircle" };
+      return { ...base, tone: "ok", word: t(row.mode === "live" ? "sources.live" : "sources.up_to_date"), icon: "checkCircle" };
     case "indexing":
       return { ...base, tone: "run", word: t("sources.running"), progress: { done: s.done, total: s.total } };
     case "failed":
@@ -60,11 +60,12 @@ export async function readSources(bridge: Bridge): Promise<SourceRow[] | null> {
 }
 // @cpt-end:cpt-noter-flow-ui-privacy-sources-add:p1:inst-list
 
-export type SourceResult = { ok: true; row: SourceRow } | { ok: false; field: string | null; code: string };
+export type SourceResult = { ok: true; row: SourceRow } | { ok: false; field: string | null; rule: string | null; code: string };
 
 const fail = (res: { error: { code: string; detail?: unknown } }): SourceResult => {
-  const d = res.error.detail as { type?: string; field?: string } | null | undefined;
-  return { ok: false, code: res.error.code, field: d?.type === "validation" ? (d.field ?? null) : null };
+  const d = res.error.detail as { type?: string; field?: string; rule?: string } | null | undefined;
+  const v = d?.type === "validation" ? d : null;
+  return { ok: false, code: res.error.code, field: v?.field ?? null, rule: v?.rule ?? null };
 };
 
 // @cpt-begin:cpt-noter-flow-ui-privacy-sources-add:p1:inst-add-folder
@@ -105,7 +106,8 @@ export async function submitMcp(bridge: Bridge, d: McpDraft): Promise<string | n
   if (local) return local;
   const r = await addMcp(bridge, { server: d.server.trim(), mode: d.mode, schedule: d.mode === "indexed" ? d.schedule : null, privacy: d.privacy, scope: ALL_CALLS });
   if (r.ok) return null;
-  return r.field === "server" ? t("sources.error_server_duplicate") : t("sources.error_add");
+  if (r.field === "server" && r.rule === "duplicate") return t("sources.error_server_duplicate");
+  return r.field === "server" && r.rule === "invalid_format" ? t("sources.error_server_unknown") : t("sources.error_add");
 }
 
 export interface SourcesView {

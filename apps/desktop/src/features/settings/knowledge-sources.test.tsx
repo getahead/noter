@@ -30,6 +30,11 @@ describe("SourcesView", () => {
     expect(html).toContain("Add MCP Server…");
     expect(html.match(/data-component="cpt-noter-component-ui-status-row"/g)).toHaveLength(3);
   });
+  it("a Live source has no Re-index", () => {
+    const html = view([row({ mode: "live", kind: "mcp" })]);
+    expect(html).not.toContain("Re-index");
+    expect(html).toContain("Live");
+  });
   it("a failed refresh keeps the rows", () => {
     const html = view([row()], { failed: true });
     expect(html).toContain("Docs");

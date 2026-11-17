@@ -404,6 +404,8 @@ export const en = {
   "sources.mode_live_note": "Nothing is copied. Lookups run after calls and in Ask, only in Cloud allowed, and each one is logged.",
   "sources.schedule": "Schedule", "sources.schedule_hourly": "Every hour", "sources.schedule_daily": "Every day", "sources.schedule_weekly": "Every week",
   "sources.error_server_required": "Enter the server name.",
+  "sources.error_server_unknown": "Noter does not know that server. Check the name.",
+  "sources.live": "Live",
   "sources.error_server_duplicate": "This server is already a source.",
   "sources.error_duplicate": "This folder is already a source.",
   "sources.error_add": "The source could not be added. Try again.",

@@ -48,7 +48,7 @@ export function SourcesView({ rows, failed, mode, prefs, onRetry, onAdd, onReind
         const v = sourceStatus(r, mode, prefs);
         return (
           <StatusRow key={r.id} variant="source" tone={v.tone} word={v.word} icon={v.icon} title={r.name} tag={sourceTag(r)} subtitle={v.subtitle} message={v.message} progress={v.progress}
-            actions={v.canRetry ? <PushButton label={t("sources.try_again")} size="small" onAction={() => onReindex(r.id)} /> : r.status.type === "idle" ? <PushButton label={t("sources.reindex")} size="small" onAction={() => onReindex(r.id)} /> : undefined} />
+            actions={v.canRetry ? <PushButton label={t("sources.try_again")} size="small" onAction={() => onReindex(r.id)} /> : r.status.type === "idle" && r.mode !== "live" ? <PushButton label={t("sources.reindex")} size="small" onAction={() => onReindex(r.id)} /> : undefined} />
         );
       })}
     </Group>

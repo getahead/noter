@@ -26,7 +26,7 @@ export function AddFolderSheet({ bridge, onClose }: { bridge: Bridge; onClose: (
     setBusy(false);
     if (r.ok) onClose();
     // a cancelled folder panel adds nothing and keeps the form
-    else if (r.code !== "cancelled") setError(r.field === "path" ? t("sources.error_duplicate") : t("sources.error_add"));
+    else if (r.code !== "cancelled") setError(r.field === "path" && r.rule === "duplicate" ? t("sources.error_duplicate") : t("sources.error_add"));
   };
   return (
     <Sheet title={t("sources.add_folder_title")} width={520} busy={busy} onCancel={onClose} onDefault={() => void add()}>

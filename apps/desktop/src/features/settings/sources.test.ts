@@ -12,6 +12,10 @@ describe("sourceStatus", () => {
     expect(sourceStatus(row({ status: { type: "failed", code: "internal", at: 1 } }), "cloud_allowed", undefined)).toMatchObject({ tone: "err", word: "Failed", canRetry: true });
     expect(sourceStatus(row({ status: { type: "sign_in_expired" } }), "cloud_allowed", undefined)).toMatchObject({ tone: "warn", word: "Sign-in expired", canRetry: false });
   });
+  it("a Live source reads Live and is never retried as an index", () => {
+    expect(sourceStatus(row({ mode: "live" }), "cloud_allowed", undefined).word).toBe("Live");
+    expect(sourceStatus(row({ mode: "live", status: { type: "failed", code: "internal", at: 1 } }), "cloud_allowed", undefined).canRetry).toBe(false);
+  });
   it("keeps the count and last sync from the core", () => {
     expect(sourceStatus(row(), "cloud_allowed", undefined).subtitle).toContain("3 documents");
     expect(sourceStatus(row(), "cloud_allowed", undefined).subtitle).toContain("Not synced yet");
@@ -41,8 +45,8 @@ describe("source commands", () => {
   it("adds a folder or reports a field error", async () => {
     expect(await addFolder(bridge({ status: "ok", data: row() }), "normal", { type: "all_calls" })).toMatchObject({ ok: true });
     const err = { status: "error", error: { code: "invalid_input", detail: { type: "validation", field: "server", rule: "duplicate" } } };
-    expect(await addMcp(bridge(err), { server: "x", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" } })).toEqual({ ok: false, code: "invalid_input", field: "server" });
-    expect(await addFolder(bridge({ status: "error", error: { code: "cancelled" } }), "normal", { type: "all_calls" })).toEqual({ ok: false, code: "cancelled", field: null });
+    expect(await addMcp(bridge(err), { server: "x", mode: "indexed", schedule: null, privacy: "normal", scope: { type: "all_calls" } })).toEqual({ ok: false, code: "invalid_input", field: "server", rule: "duplicate" });
+    expect(await addFolder(bridge({ status: "error", error: { code: "cancelled" } }), "normal", { type: "all_calls" })).toEqual({ ok: false, code: "cancelled", field: null, rule: null });
   });
   it("re-indexes", async () => {
     expect(await reindexSource(bridge({ status: "ok" }), "s1")).toBe(true);
@@ -66,6 +70,7 @@ describe("submitMcp", () => {
   });
   it("a duplicate server and any other failure are worded", async () => {
     expect(await submitMcp(b({ status: "error", error: { code: "invalid_input", detail: { type: "validation", field: "server", rule: "duplicate" } } }), draft)).toContain("already a source");
+    expect(await submitMcp(b({ status: "error", error: { code: "invalid_input", detail: { type: "validation", field: "server", rule: "invalid_format" } } }), draft)).toContain("does not know that server");
     expect(await submitMcp(b({ status: "error", error: { code: "internal" } }), draft)).toContain("could not be added");
   });
 });
