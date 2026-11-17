@@ -6568,7 +6568,7 @@ When several statuses apply, the cell shows one, in this order: **Couldn't write
 
 #### Component — Filter bar
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-filter-bar`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-filter-bar`
 
 ##### Why this component exists
 
@@ -6658,7 +6658,7 @@ The call list filters by person, date, call type, tag, language and “has open 
 
 #### Component — Search result row
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-search-result-row`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-search-result-row`
 
 ##### Why this component exists
 
@@ -7060,7 +7060,7 @@ In the call window, a click in a field makes the panel key without activating No
 
 #### Component — Topic chip
 
-- [ ] `p2` - **ID**: `cpt-noter-component-ui-topic-chip`
+- [x] `p2` - **ID**: `cpt-noter-component-ui-topic-chip`
 
 ##### Why this component exists
 
