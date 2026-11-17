@@ -5,13 +5,15 @@ import * as shared from "./shared";
 
 export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
+  /** What the user owes a person: the page's list, and the row's count. */
+  const owed = (world: Core.FakeCore["world"], p: Bindings.PersonRow) => (p.is_you ? [] : world.items.filter((i) => i.owner?.is_you && i.status === "open" && i.call.id && i.owed === "by_you"));
   return {
   // ── People ───────────────────────────────────────────────────────────
   people_list: (a, { world }) => {
-    const fold = (text: string) => text.normalize("NFKC").toLowerCase().replaceAll("ё", "е").replaceAll("ß", "ss");
-    const query = a.query ? fold(a.query.trim()) : "";
+    const fold = (text: string) => text.normalize("NFKC").toLowerCase().replaceAll("ё", "е").replaceAll("ß", "ss").split(/\s+/).filter(Boolean).join(" ");
+    const query = a.query ? fold(a.query) : "";
     return {
-      people: world.people.filter((p) => !query || [p.display_name, p.short_name, ...p.aliases].some((name) => fold(name).includes(query))),
+      people: world.people.filter((p) => !query || [p.display_name, p.short_name, ...p.aliases].some((name) => fold(name).includes(query))).map((p) => ({ ...p, you_owe: owed(world, p).length })),
       unnamed: world.transcripts.flatMap((t) =>
         t.speakers.flatMap((s) => (s.label.type === "unnamed" ? [{ call: shared.callRef(shared.call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, suggestion: s.suggestion }] : [])),
       ),
@@ -23,10 +25,10 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     const callIds = new Set(calls.map((call) => call.id));
     const topicIds = new Set(world.items.flatMap((item) => callIds.has(item.call.id) && item.topic ? [item.topic.id] : []));
     return {
-      person: p,
+      person: { ...p, you_owe: owed(world, p).length },
       calls,
       owns_open: world.items.filter((i) => i.owner?.id === p.id && i.status === "open"),
-      you_owe: p.is_you ? [] : world.items.filter((i) => i.owner?.is_you && i.status === "open" && i.call.id && i.owed === "by_you"),
+      you_owe: owed(world, p),
       open_questions: world.items.filter((i) => i.kind === "open_question" && i.status === "open" && calls.some((c) => c.id === i.call.id)),
       topics: world.topics.filter((topic) => topicIds.has(topic.id)),
       talk_share: world.settings.privacy.behaviour_metrics ? 0.31 : null,

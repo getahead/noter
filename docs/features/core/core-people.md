@@ -85,7 +85,7 @@ Naming itself uses the M2 transcript commands; replay and History use existing s
 - **Contract**: `crates/noter-protocol/src/model/people.rs`, `model/transcript.rs`, `contracts/ipc.manifest.json`
 - **Dependencies**: `cpt-noter-feature-core-speakers-audio`, `cpt-noter-feature-core-engine-offline`
 
-`PeopleList.unnamed` carries per-call speaker rows, not a stable cross-call cluster id or count. The story's grouped naming requires the M2 naming operation and its must-link evidence; this spec does not invent an identity from a similar display label. `PersonPatch.notes` exists but `PersonPage` does not return notes for editing; this is an upstream read-model gap.
+`PeopleList.unnamed` carries per-call speaker rows, not a stable cross-call cluster id or count. The story's grouped naming requires the M2 naming operation and its must-link evidence; this spec does not invent an identity from a similar display label. `PersonRow.notes` and `PersonRow.you_owe` (contract 2.10, #906) return the saved notes for editing and the count of the page's `you_owe`.
 
 ## 2. Actor Flows (CDSL)
 
