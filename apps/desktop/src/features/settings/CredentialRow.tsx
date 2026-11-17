@@ -158,10 +158,21 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
     focusIfLost(document, [testId]); // a mouse click does not focus the button
   };
   // the row changes only with the core's answer; a refusal leaves it as it was and says so
+  const signInId = view.provider === "claude" ? "account-signin-claude" : "account-signin-chatgpt";
+  const signedOutHere = useRef(false);
+  // the Sign Out… button is replaced by Sign In when the core confirms: focus goes to its replacement
+  useEffect(() => {
+    if (signedOutHere.current && state !== "signed_in") {
+      signedOutHere.current = false;
+      focusIfLost(document, [signInId]);
+    }
+  }, [signInId, state]);
   const confirmSignOut = async (also: boolean) => {
     setAsking(false);
     setTestLine(null);
-    await signOutAccount(bridge, view.provider, also);
+    signedOutHere.current = true;
+    const res = await signOutAccount(bridge, view.provider, also);
+    if (res.status !== "ok") signedOutHere.current = false;
   };
   return (
     <div className="e-status st-cred" role="group" aria-label={t(a.title)} data-component={COMPONENT} data-variant="account-login" data-provider={view.provider} data-state={state}>
@@ -200,7 +211,7 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
             <PushButton label={t("settings.accounts.cancel")} size="small" variant="quiet" onAction={() => void machines.cancel(view.provider)} />
           </>
         ) : (
-          <PushButton label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" onAction={() => void machines.open(view.provider)} />
+          <PushButton id={signInId} label={t(state === "expired" ? "settings.accounts.sign_in_again" : a.signin)} size="small" onAction={() => void machines.open(view.provider)} />
         )}
       </div>
       <AccountSignInSheet bridge={bridge} provider={view.provider} view={view} onUseKey={onUseKey} />
