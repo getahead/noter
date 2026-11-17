@@ -1054,6 +1054,7 @@ export const en = {
   "filters.open_items_toggle": "Has Open Items",
   "filters.label": "Filter calls",
   "filters.people": "People",
+  "filters.people_search": "Search people",
   "filters.type": "Type",
   "filters.tags": "Tags",
   "filters.language": "Language",

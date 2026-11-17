@@ -44,6 +44,22 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await expect(page.getByRole("dialog", { name: "People" })).toBeVisible();
       await shot(page, "filters-people-popup", width);
     });
+    test("People pop-up with two people ticked", async ({ page }) => {
+      await calls(page, px);
+      await page.getByRole("button", { name: /^People/ }).click();
+      const pop = page.getByRole("dialog", { name: "People" });
+      await pop.locator("label.np-check").nth(0).click();
+      await pop.locator("label.np-check").nth(1).click();
+      await expect(pop.getByRole("checkbox", { checked: true })).toHaveCount(2);
+      await shot(page, "filters-people-ticked", width);
+    });
+    test("Calls menu with Remove Tag", async ({ page }) => {
+      await calls(page, px);
+      await page.locator(ROW).first().click();
+      await page.locator(ROW).first().click({ button: "right" });
+      await expect(page.getByRole("menuitem", { name: "Add Tag…" })).toBeVisible();
+      await shot(page, "filters-remove-tag-menu", width);
+    });
     test("several selected and the Add Tag popover", async ({ page }) => {
       await calls(page, px);
       await page.locator(ROW).first().click();

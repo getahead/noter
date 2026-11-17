@@ -1,7 +1,6 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { FilterBar, PeoplePicker, lookups } from "./filter-bar";
-import { PersonPicker } from "../speakers/PersonPicker";
+import { FilterBar, PeopleList, lookups } from "./filter-bar";
 import { find, rendered } from "../../ui/testing";
 import { apply, BLANK } from "./filters";
 
@@ -19,17 +18,20 @@ describe("FilterBar (cpt-noter-component-ui-filter-bar)", () => {
     expect(html).toContain("Anna");
     expect(html).toContain("Clear Filters");
   });
-  it("the People filter is the multi-select picker: a chip added or dropped toggles that person", () => {
-    const l = { people: [{ id: "per_a", short_name: "Anna", display_name: "Anna K", initials: "AK", is_you: false }, { id: "per_b", short_name: "Bo", display_name: "Bo L", initials: "BL", is_you: false }], types: [], tags: [] } as never;
+  it("the People pop-up is headed People with a search field and a checkbox per person, sorted, without you", () => {
+    const row = (id: string, display_name: string, is_you = false) => ({ id, display_name, aliases: [], is_you });
+    const l = { people: [row("per_z", "Zoe"), row("per_me", "Me", true), row("per_a", "Anna")], types: [], tags: [] } as never;
     const onAction = vi.fn();
-    const tree = rendered(PeoplePicker, { bridge: {} as never, lists: l, held: ["per_a"], onAction });
-    const picker = find(tree, (p, type) => type === PersonPicker);
-    expect(picker.props.multiple).toBe(true);
-    expect((picker.props.selected as { id: string }[]).map((c) => c.id)).toEqual(["per_a"]);
-    (picker.props.onChange as (n: unknown[]) => void)([{ id: "per_a" }, { id: "per_b" }]);
-    expect(onAction).toHaveBeenLastCalledWith({ type: "toggle", group: "people", value: "per_b" });
-    (picker.props.onChange as (n: unknown[]) => void)([]);
-    expect(onAction).toHaveBeenLastCalledWith({ type: "toggle", group: "people", value: "per_a" });
+    const h = renderToString(<PeopleList lists={l} held={["per_a"]} onAction={onAction} />);
+    expect(h).toContain("<strong>People</strong>");
+    expect(h).toContain("Search people");
+    expect(h.indexOf("Anna")).toBeGreaterThan(-1);
+    expect(h.indexOf("Anna")).toBeLessThan(h.indexOf("Zoe"));
+    expect(h).not.toContain("Me<");
+    const tree = rendered(PeopleList, { lists: l, held: ["per_a"], onAction });
+    const box = find(tree, (p) => p.label === "Zoe");
+    (box.props.onAction as () => void)();
+    expect(onAction).toHaveBeenCalledWith({ type: "toggle", group: "people", value: "per_z" });
   });
   it("falls back to the id for an unknown person or type", () => {
     expect(lookups(lists).person("x")).toBe("x");

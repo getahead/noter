@@ -6,7 +6,7 @@ import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Icon } from "../../ui/icons";
-import { PersonPicker } from "../speakers/PersonPicker";
+import { SearchField } from "../../ui/primitives/search-field";
 import { datePreset, tokens, type FilterAction, type FilterState, type Group, type Lookups } from "./filters";
 
 export interface Lists {
@@ -50,7 +50,7 @@ const LANGS = ["en", "ru", "de"];
 
 // @cpt-component:cpt-noter-component-ui-filter-bar:p1
 /** The filter bar: pop-ups and tokens over one filter state; Clear keeps the typed words. */
-export function FilterBar({ state, lists, onAction, bridge }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void; bridge?: Bridge }) {
+export function FilterBar({ state, lists, onAction }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void }) {
   const [open, setOpen] = useState<Menu>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toks = tokens(state, lookups(lists));
@@ -69,7 +69,7 @@ export function FilterBar({ state, lists, onAction, bridge }: { state: FilterSta
   };
   const group = (g: Group, items: { value: string; label: string }[]) =>
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
-  const people = bridge ? <PeoplePicker bridge={bridge} lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} /> : group("people", lists.people.map((p) => ({ value: p.id, label: p.display_name })));
+  const people = <PeopleList lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} />;
   const today = new Date().toISOString().slice(0, 10);
   const preset = datePreset(f);
   return (
@@ -108,24 +108,18 @@ export function FilterBar({ state, lists, onAction, bridge }: { state: FilterSta
   );
 }
 
-/** The People filter: the shared picker in its multi-select form; each chip added or dropped toggles that person. */
-export function PeoplePicker({ bridge, lists, held, onAction }: { bridge: Bridge; lists: Lists; held: string[]; onAction: (a: FilterAction) => void }) {
-  const selected = held.flatMap((id) => lists.people.filter((p) => p.id === id).map(({ id, display_name, short_name, initials, is_you }) => ({ id, display_name, short_name, initials, is_you })));
+/** The People filter (DESIGN: a menu headed People, a search field, one checkbox per person sorted by locale; you are not listed). */
+export function PeopleList({ lists, held, onAction }: { lists: Lists; held: string[]; onAction: (a: FilterAction) => void }) {
+  const [query, setQuery] = useState("");
+  const q = query.trim().toLowerCase();
+  const people = lists.people.filter((p) => !p.is_you && (!q || [p.display_name, ...p.aliases].some((n) => n.toLowerCase().includes(q)))).sort((a, b) => a.display_name.localeCompare(b.display_name));
   return (
-    <PersonPicker
-      bridge={bridge}
-      variant="popover"
-      multiple
-      participants={[]}
-      speakers={[]}
-      people={lists.people}
-      confirmLabel={t("filters.people")}
-      onPick={() => {}}
-      selected={selected}
-      onChange={(next) => {
-        const ids = new Set(next.map((c) => c.id));
-        for (const id of new Set([...held, ...ids])) if (held.includes(id) !== ids.has(id)) onAction({ type: "toggle", group: "people", value: id });
-      }}
-    />
+    <>
+      <strong>{t("filters.people")}</strong>
+      <SearchField placeholder={t("filters.people_search")} value={query} onChange={setQuery} />
+      {people.map((p) => (
+        <Checkbox key={p.id} label={p.display_name} checked={held.includes(p.id)} onAction={() => onAction({ type: "toggle", group: "people", value: p.id })} />
+      ))}
+    </>
   );
 }
