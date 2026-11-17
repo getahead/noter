@@ -61,7 +61,8 @@ export function apply(s: FilterState, a: FilterAction): FilterState {
     case "words":
       return { ...s, words: a.words };
     case "date":
-      if (a.preset === "custom") return { ...s, filter: { ...f, from: a.from, to: a.to } };
+      // a range typed backwards is the same range the other way round; the core refuses from > to
+      if (a.preset === "custom") return { ...s, filter: { ...f, from: a.from <= a.to ? a.from : a.to, to: a.from <= a.to ? a.to : a.from } };
       return { ...s, filter: { ...f, from: a.preset === "any" ? null : shiftDay(a.today, a.preset === "7d" ? -6 : -29), to: a.preset === "any" ? null : a.today } };
     // @cpt-begin:cpt-noter-algo-ui-library-search-topics-filters:p1:inst-remove
     case "remove":
@@ -97,8 +98,6 @@ let held: FilterState = BLANK;
 export const heldFilter = (): FilterState => held;
 export const holdFilter = (s: FilterState): void => void (held = s);
 
-/** How many filter groups narrow the list. */
-export const activeCount = (s: FilterState): number => tokens(s, { person: (i) => i, type: (i) => i }).length;
 
 /** Whether any filter group narrows the list. */
 export const isFiltered = (f: CallFilter): boolean => Object.values(f).some((v) => (Array.isArray(v) ? v.length > 0 : !!v));
