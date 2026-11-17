@@ -15,7 +15,7 @@ import { runExport } from "./share-actions";
 import { scopeLine, scopeOf, type ShareOrigin } from "./share-logic";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-share:p1
-export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKept, onExported }: SheetProps & { bridge: Bridge; callId: string; scopeLabel: string; scope: ShareScope | null; audioKept: boolean; onExported: (path: string) => void }) {
+export function ExportSheet({ close, bridge, callId, scopeLabel, scope, audioKept, onExported }: SheetProps & { bridge: Bridge; callId: string | string[]; scopeLabel: string; scope: ShareScope | null; audioKept: boolean; onExported: (path: string) => void }) {
   const [on, setOn] = useState({ summary_and_items: true, transcript: false, audio: false });
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -58,4 +58,11 @@ export function useExport(bridge: Bridge, callId: string, audioKept: boolean, on
   const sheets = useSheetIfAny();
   useEffect(() => sheets?.register("export", ExportSheet as never), [sheets]);
   return (origin: ShareOrigin) => sheets?.open("export", { bridge, callId, scopeLabel: scopeLine(origin), scope: origin.type === "toolbar" ? null : scopeOf(origin, false), audioKept, onExported });
+}
+
+/** Export… for the calls selected in the Library: one sheet, only those ids, no scope (audio is not offered for a set). */
+export function useExportCalls(bridge: Bridge, onExported: (path: string) => void) {
+  const sheets = useSheetIfAny();
+  useEffect(() => sheets?.register("export", ExportSheet as never), [sheets]);
+  return (ids: string[]) => sheets?.open("export", { bridge, callId: ids, scopeLabel: t("export.scope_calls", { count: ids.length }), scope: null, audioKept: false, onExported });
 }
