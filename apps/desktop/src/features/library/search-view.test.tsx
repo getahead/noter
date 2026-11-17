@@ -82,6 +82,16 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
     press("ArrowDown", title);
     expect(focus).toHaveBeenCalled();
   });
+  it("ends every result state with Show How Noter Searched; Search All Languages only with a Language filter", () => {
+    expect(html(props(results({ items: [hit("strong")] })))).toContain("Show How Noter Searched");
+    const weak = results({ items: [hit("weak")], only_weak: true });
+    expect(html(props(weak))).not.toContain("Search All Languages");
+    const p = props(weak, { filter: { languages: ["de"] } as never, onAllLanguages: vi.fn() });
+    expect(html(p)).toContain("Search All Languages");
+    const banner = find(rendered(SearchView, p), (x) => (x.banner as { id?: string } | undefined)?.id === "search-weak-only").props.banner as { actions: { label: string; onAction: () => void }[] };
+    banner.actions.find((a) => a.label === "Search All Languages")!.onAction();
+    expect(p.onAllLanguages).toHaveBeenCalled();
+  });
   it("shows the keyword-only line while the index rebuilds", () => {
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: 0.4 }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds · 40%");
     expect(html(props(results({ mode: { type: "keyword_only", rebuild_progress: null }, items: [hit("strong")] })))).toContain("Searching by keyword only while the index rebuilds");
