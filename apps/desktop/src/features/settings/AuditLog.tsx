@@ -51,7 +51,7 @@ export function AuditLogView({ v, callId, prefs, onLoad, onExport, onAllCalls }:
       <div className="st-audit__foot" aria-live="polite">
         {table.length > 0 && (complete ? t("audit.total", { count: requestCount(shown), size: formatBytes(totalBytes(shown)) }) : v.total != null ? t("audit.shown_of", { shown: shown.length, total: v.total }) : t("audit.total_so_far", { count: requestCount(shown), size: formatBytes(totalBytes(shown)) }))}
         {!complete && !v.failed && <PushButton label={t("audit.more")} size="small" disabled={v.busy} onAction={onLoad} />}
-        <PushButton label={t("audit.export")} size="small" disabled={v.exporting} onAction={onExport} />
+        <PushButton label={t("audit.export")} size="small" disabled={v.exporting || (!!callId && table.length === 0)} onAction={onExport} />
         {v.exportFailed && <span role="alert">{t("audit.export_failed")}</span>}
         {v.exported && <span>{t("audit.exported", { path: v.exported })}</span>}
       </div>

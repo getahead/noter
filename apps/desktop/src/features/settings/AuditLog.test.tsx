@@ -56,4 +56,10 @@ describe("AuditLogView", () => {
     (find(tree, (p) => p.label === "All calls").props.onAction as () => void)();
     expect(onAllCalls).toHaveBeenCalled();
   });
+  it("Export is off when a call has no rows, and on once it has some", () => {
+    const off = /<button[^>]*disabled[^>]*>(<span>)?Export…/;
+    expect(html(view(), "1")).toMatch(off);
+    expect(html(view({ rows: [row("a", "1")] }), "1")).not.toMatch(off);
+    expect(html(view())).not.toMatch(off); // the whole log keeps its Export
+  });
 });
