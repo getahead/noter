@@ -165,6 +165,8 @@ fn person_row(p: &P, open: u32) -> PersonRow {
         voice_profile: p.voice,
         last_call_at: Some(ts(NOW)),
         open_items: open,
+        you_owe: 0,
+        notes: None,
     }
 }
 

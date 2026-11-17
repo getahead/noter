@@ -21,6 +21,10 @@ pub struct PersonRow {
     pub voice_profile: bool,
     pub last_call_at: Option<TimestampMs>,
     pub open_items: u32,
+    /// The user's own open action items from calls this person was on ("You owe"); 0 for You.
+    pub you_owe: u32,
+    /// The user's notes about them.
+    pub notes: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

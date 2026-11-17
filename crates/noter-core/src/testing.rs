@@ -87,9 +87,9 @@ pub fn jobs_tick(core: &Core) {
 
 /// `harness.hold_rebuild`: `on` puts the indexes keyword-only at the rebuild's start (nothing
 /// else rebuilds in the harness); the release checks and rebuilds them as an open does.
-pub fn hold_rebuild(core: &Core, on: bool) {
+pub fn hold_rebuild(core: &Core, on: bool, progress: f32) {
     if on {
-        core.index.rebuilding(0.0);
+        core.index.rebuilding(progress);
     } else {
         core.check_index();
         core.start_rebuild();

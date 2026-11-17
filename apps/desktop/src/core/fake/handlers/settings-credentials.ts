@@ -142,6 +142,8 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
   account_signin_prepare: (a, { world }) => {
     const acc = world.app.accounts.accounts.find((x) => x.provider === a.provider);
     if (!acc) throw coreError("not_found");
+    if (!acc.cli.installed) throw coreError("cli_missing", "the tool is not installed");
+    if (!acc.cli.supported) throw coreError("cli_version_unsupported", "the tool's version is not supported");
     return { provider: a.provider, cli: acc.cli, existing: acc.cli.installed && a.provider === "claude" ? { email: "you@example.com", plan: "Max" } : null, needs_personal_use_confirmation: a.provider === "claude" };
   },
   cli_install: (a, { world, fake, emit, publish }) => {
@@ -156,6 +158,7 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
         emit("jobs:progress", { run: { ...row, progress: p, status: p === 1 ? "succeeded" : "running", finished_at: p === 1 ? shared.now() : null } });
         if (p === 1) {
           Object.assign(cli, { installed: true, path: `/opt/homebrew/bin/${a.tool}`, version: "1.0.0", supported: true });
+          if (a.tool === "ollama") world.app.accounts.local.running = true;
           publish("accounts:changed");
         }
       }),

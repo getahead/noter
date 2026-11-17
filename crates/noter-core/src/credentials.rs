@@ -62,13 +62,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-prepare-return
         Ok(SignInPrepare {
             provider,
-            cli: CliInfo {
-                tool,
-                installed: true,
-                path: status.path,
-                version: status.version,
-                supported: true,
-            },
+            cli: status.info(tool),
             existing: status.identity,
             needs_personal_use_confirmation: provider == AccountProvider::Claude,
         })
@@ -108,8 +102,7 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-run
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-complete
-        let availability = self.llm.refresh().await;
-        self.accounts.observe(Some(availability));
+        self.refresh_accounts().await;
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-prepare:p1:inst-install-complete
         Ok(())
     }

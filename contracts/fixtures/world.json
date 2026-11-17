@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.9",
+    "contract_version": "2.10",
     "copilot": {
       "agents": [
         {
@@ -2201,12 +2201,14 @@
       "initials": "Y",
       "is_you": true,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 1,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "Team lead, frontend",
       "short_name": "You",
-      "voice_profile": false
+      "voice_profile": false,
+      "you_owe": 0
     },
     {
       "aliases": [],
@@ -2216,12 +2218,14 @@
       "initials": "AK",
       "is_you": false,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 2,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "Frontend developer",
       "short_name": "Anna K.",
-      "voice_profile": true
+      "voice_profile": true,
+      "you_owe": 0
     },
     {
       "aliases": [],
@@ -2231,12 +2235,14 @@
       "initials": "PR",
       "is_you": false,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 2,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "Product manager",
       "short_name": "Pavel",
-      "voice_profile": false
+      "voice_profile": false,
+      "you_owe": 0
     },
     {
       "aliases": [],
@@ -2246,12 +2252,14 @@
       "initials": "DS",
       "is_you": false,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 2,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "Backend lead",
       "short_name": "Dmitri S.",
-      "voice_profile": true
+      "voice_profile": true,
+      "you_owe": 0
     },
     {
       "aliases": [],
@@ -2261,12 +2269,14 @@
       "initials": "OM",
       "is_you": false,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 2,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "QA engineer",
       "short_name": "Oleg M.",
-      "voice_profile": false
+      "voice_profile": false,
+      "you_owe": 0
     },
     {
       "aliases": [],
@@ -2276,12 +2286,14 @@
       "initials": "LK",
       "is_you": false,
       "last_call_at": 1792137600000,
+      "notes": null,
       "open_items": 2,
       "org": "Virtuozzo",
       "rev": 1,
       "role": "Designer",
       "short_name": "Lena K.",
-      "voice_profile": false
+      "voice_profile": false,
+      "you_owe": 0
     }
   ],
   "performance": {

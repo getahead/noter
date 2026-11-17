@@ -2504,6 +2504,10 @@ export type PersonRow = {
 	voice_profile: boolean,
 	last_call_at: TimestampMs | null,
 	open_items: number,
+	/**  The user's own open action items from calls this person was on ("You owe"); 0 for You. */
+	you_owe: number,
+	/**  The user's notes about them. */
+	notes: string | null,
 };
 
 export type PersonUpdateArgs = {
@@ -3628,7 +3632,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.9";
+export const CONTRACT_VERSION = "2.10";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

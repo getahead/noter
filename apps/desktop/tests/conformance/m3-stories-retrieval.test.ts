@@ -89,6 +89,9 @@ describe("cpt-noter-seq-library-search-calls", () => {
     const held = await search("websocket");
     expect(held.mode).toEqual({ type: "keyword_only", rebuild_progress: 0 });
     expect([held.calls.length > 0, held.explain.semantic_hits]).toEqual([true, 0]);
+    // A story can hold the rebuild part-way (**Index rebuilding… 64%**).
+    await control("hold_rebuild", { on: true, progress: 0.64 });
+    expect((await search("websocket")).mode).toMatchObject({ type: "keyword_only", rebuild_progress: expect.closeTo(0.64, 5) });
     // One-letter words are no search terms, and the scripted engine embeds this string exactly as
     // the item "Rotate the staging Jira token": its vectors come from a 32-bit hash of the text.
     const meaning = "d r p q q h p";

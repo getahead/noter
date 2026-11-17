@@ -112,6 +112,9 @@ struct State {
     verifying: HashSet<KeyProvider>,
     /// The runtimes as last observed.
     availability: Vec<Availability>,
+    /// The account CLIs as their own port last reported them; a tool it does not report is
+    /// shown as its runtime found it.
+    tools: HashMap<CliTool, CliInfo>,
     view: AccountsView,
 }
 
@@ -163,6 +166,7 @@ impl Accounts {
                 saved,
                 verifying: HashSet::new(),
                 availability: Vec::new(),
+                tools: HashMap::new(),
                 view,
             }),
         };
@@ -175,6 +179,11 @@ impl Accounts {
 
     pub(crate) fn view(&self) -> AccountsView {
         lock(&self.state).view.clone()
+    }
+
+    /// What the account CLIs' port reports now; the next `observe` shows it.
+    pub(crate) fn set_tools(&self, tools: HashMap<CliTool, CliInfo>) {
+        lock(&self.state).tools = tools;
     }
 
     // @cpt-algo:cpt-noter-algo-core-credentials-privacy-availability:p1
@@ -206,7 +215,7 @@ impl Accounts {
         .map(|(provider, tool, runtime)| AccountView {
             provider,
             status: account_status(&state, provider),
-            cli: cli_info(tool, find(runtime)),
+            cli: (state.tools.get(&tool).cloned()).unwrap_or_else(|| cli_info(tool, find(runtime))),
             // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-bindings
             // Agents arrive with `core-agents` (M4): until then no agent runs on an account.
             agents: Vec::new(),

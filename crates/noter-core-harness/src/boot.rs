@@ -442,6 +442,7 @@ impl Harness {
         let llm = Adapters::scripted(&scripted);
         let secrets = Arc::new(MemorySecrets::default());
         let account_cli = ScriptedAccountCli::new();
+        scripted.follow(&account_cli);
         let now = clock.clone();
         let mcp = Arc::new(ScriptedMcp::new(Arc::new(move || now.now())));
         let panel = Arc::new(ScriptedPanel {
@@ -1252,13 +1253,15 @@ impl Controls for Harness {
                     self.llm.answer_next(line).map_err(usage)?;
                     Ok(json!({}))
                 }
-                // `{ on }`: while on, search and Ask run keyword-only at rebuild progress 0; off,
-                // the indexes are checked and rebuilt as at open, then hybrid.
+                // `{ on, progress? }`: while on, search and Ask run keyword-only at rebuild
+                // `progress` (0 to 1; 0 when unset); off, the indexes are checked and rebuilt as
+                // at open, then hybrid.
                 "hold_rebuild" => {
                     let on = args["on"].as_bool().ok_or_else(|| {
                         CoreError::new(ErrorCode::InvalidInput, "harness.hold_rebuild needs { on }")
                     })?;
-                    noter_core::testing::hold_rebuild(&self.core, on);
+                    let progress = args["progress"].as_f64().unwrap_or(0.0).clamp(0.0, 1.0);
+                    noter_core::testing::hold_rebuild(&self.core, on, progress as f32);
                     Ok(json!({}))
                 }
                 // `{ ms }`: an Ask answer pauses `ms` after each delta and citation (0 = none), so

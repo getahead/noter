@@ -2,12 +2,13 @@
 //! ChatGPT accounts. The CLIs own the sign-in; the core owns the session (a task that outlives
 //! the sheet), the checks, the binding and the sign-out. Only identity, plan and times are kept.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
 use noter_db::ChangeMeta;
 use noter_jobs::BoxFuture;
-use noter_llm::{tool_of, Failure, LoginOutcome};
+use noter_llm::{tool_of, CliStatus, Failure, LoginOutcome};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
@@ -101,48 +102,57 @@ impl Core {
     /// whether its sign-in is still there.
     pub(crate) async fn refresh_accounts(&self) -> AccountsView {
         let availability = self.llm.refresh().await;
-        self.detect_ended().await;
+        let cli = &self.deps.account_cli;
+        let mut tools = HashMap::new();
+        for provider in ACCOUNTS {
+            let tool = tool_of(provider);
+            if !cli.reports(tool) {
+                continue;
+            }
+            // Read before the probe: a probe that started against one sign-in never ends another.
+            let connection = self.accounts.connection(provider);
+            let status = cli.status(tool).await;
+            tools.insert(tool, status.info(tool));
+            if let Some(connection) = connection {
+                self.detect_ended(provider, &connection, &status);
+            }
+        }
+        self.accounts.set_tools(tools);
         self.accounts.observe(Some(availability))
     }
 
-    async fn detect_ended(&self) {
-        for provider in ACCOUNTS {
-            let Some(connection) = self.accounts.connection(provider) else {
-                continue;
-            };
-            let status = self.deps.account_cli.status(tool_of(provider)).await;
-            // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
-            // @cpt-begin:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
-            if status.installed
-                && status.auth_known
-                && status.identity.is_none()
-                && connection.ended_at.is_none()
-            {
-                let mut meta = self.account_meta(
-                    format!("The {provider:?} sign-in was ended by the provider"),
-                    "provider_ended",
-                );
-                meta.undoable = false;
-                let at = self.deps.clock.now();
-                // A write that fails leaves the account looking signed in until the next read.
-                let _ = self
-                    .accounts
-                    .ended(meta, provider, &connection.identity, at);
-            } else if status.installed
-                && status.auth_known
-                && status.identity.as_ref() == Some(&connection.identity)
-                && connection.ended_at.is_some()
-            {
-                let mut meta = self.account_meta(
-                    format!("The {provider:?} sign-in is active again"),
-                    "provider_session_recovered",
-                );
-                meta.undoable = false;
-                let _ = self.accounts.revived(meta, provider, &connection.identity);
-            }
-            // @cpt-end:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
-            // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
+    fn detect_ended(&self, provider: AccountProvider, connection: &Connection, status: &CliStatus) {
+        // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
+        // @cpt-begin:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
+        if status.installed
+            && status.auth_known
+            && status.identity.is_none()
+            && connection.ended_at.is_none()
+        {
+            let mut meta = self.account_meta(
+                format!("The {provider:?} sign-in was ended by the provider"),
+                "provider_ended",
+            );
+            meta.undoable = false;
+            let at = self.deps.clock.now();
+            // A write that fails leaves the account looking signed in until the next read.
+            let _ = self
+                .accounts
+                .ended(meta, provider, &connection.identity, at);
+        } else if status.installed
+            && status.auth_known
+            && status.identity.as_ref() == Some(&connection.identity)
+            && connection.ended_at.is_some()
+        {
+            let mut meta = self.account_meta(
+                format!("The {provider:?} sign-in is active again"),
+                "provider_session_recovered",
+            );
+            meta.undoable = false;
+            let _ = self.accounts.revived(meta, provider, &connection.identity);
         }
+        // @cpt-end:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-provider-ended
+        // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-ended
     }
 
     /// A change the user did not type: the provider ended a session.

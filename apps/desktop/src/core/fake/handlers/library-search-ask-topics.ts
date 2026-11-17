@@ -132,7 +132,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       run.citations.push(cite);
       fake.push(sub, { event: { type: "citation", citation: cite } });
     });
-    later(400 + words.length * 60 + 100, () => {
+    later(400 + words.length * 60 + 300, () => {
       const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
       save(answer);
       fake.push(sub, { event: { type: "done", answer } });
@@ -180,10 +180,11 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   topic_rename: (a, { world, emit }) => {
     const t = shared.topic(world, a.topic_id);
-    shared.checkRev(t.rev, a.rev);
     if (!a.name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "name", rule: "required" });
     const same = (name: string) => name.trim().toLowerCase() === a.name.trim().toLowerCase();
     if (world.topics.some((o) => o.id !== t.id && same(o.name))) throw coreError("invalid_input", "name", { type: "validation", field: "name", rule: "duplicate" });
+    // The name is validated before the revision is looked at, as the real core does.
+    shared.checkRev(t.rev, a.rev);
     const before = t.name;
     t.aliases = [...new Set([...t.aliases, before])];
     t.name = a.name;
