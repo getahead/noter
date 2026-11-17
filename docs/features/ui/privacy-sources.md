@@ -68,7 +68,7 @@ Fill the Settings Privacy audit frame, Knowledge Sources pane and source sheets/
 - **Design elements**: `cpt-noter-component-ui-status-row`; uses `cpt-noter-component-screen-settings`, `cpt-noter-component-screen-dialogs` and the existing mode indicator
 - **Stories (M3)**: `cpt-noter-seq-settings-check-privacy`, `cpt-noter-seq-settings-add-knowledge-source`
 - **Frozen commands delivered (M3)**: `audit_list`, `audit_export`, `sources_list`, `source_add_folder`, `source_add_mcp`, `source_update`, `source_reindex`, `source_remove`, `source_revoke_token`
-- **Draft command in M3**: `storage_move`; it is listed in milestones but is not a frozen command for the E2E denominator
+- **M4 command built on the fake core in M3**: `storage_move` (DECOMPOSITION discrepancy 10); it is not a frozen M3 command for the E2E denominator
 - **Earlier commands reused**: `settings_get`, `permission_request`, `share_test_run` (M2), `open_external`, `update_install`; Settings owns their flows
 - **Events**: `entity:changed` for sources; `jobs:progress` for accepted work; `settings:changed`, `privacy:changed`
 - **Data**: core-owned `cpt-noter-dbtable-audit-log`, `cpt-noter-dbtable-sources`; no UI tables

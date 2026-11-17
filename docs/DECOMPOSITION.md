@@ -93,6 +93,7 @@ Every state in a screen's or component's States table must match a prototype sta
 7. `cpt-noter-seq-call-screen-name-speaker` (M2) uses the person picker and the New person form, whose commands `people_list` and `person_create` are M3. M2 builds them against the fake core.
 8. `cpt-noter-seq-first-run-complete-setup` (Empty — Self-test skipped) ends on Today's setup banner; Today is M2. In M0 and M1 the same banner shows in the main window's banner slot MW-R5, as the shell's States table allows.
 9. `accounts_get` and `api_key_set` are M2 (owner decision of 18 Oct; `docs/DECOMPOSITION-core.md` § 1, discrepancy 1), so the M2 post-call runtime can be configured from the app, while `cpt-noter-feature-ui-accounts` and its stories are M3. The feature is built in two stages and no ID moves. The owner approved this staging on 18 Oct as an exception to the rule in `.cf-studio/config/AGENTS.md` that keeps each FEATURE inside one milestone: splitting it would add a 31st feature for two commands and change every coverage count, while the backend stages `cpt-noter-feature-core-credentials-privacy` the same way. In M2 it delivers the key part against the real core: `cpt-noter-flow-ui-accounts-key` and `cpt-noter-dod-ui-accounts-keys`, that is the API-key rows of Settings › Models & Runtimes and of first-run step 6, the key sheet, and the states Key rejected, Key being verified, Keychain locked and No key and no local runtime. It also delivers **Runtime per task** (steps 2 and 3 of `cpt-noter-flow-ui-accounts-manage`, through `settings_update`, delivered in M0), where the account runtimes stay listed as not connected until M3. Within the key flow, **Remove…** (`api_key_remove`) and **Install Ollama…** (`cli_install`) are M3 commands: M2 builds them against the fake core. The own-account rows, the sign-in sheet, Test and sign-out stay M3. The stories stay M3 in milestones.toml, so the E2E story bar counts them from M3. In M2 the real-core E2E covers the key paths of `cpt-noter-seq-settings-replace-api-key` (happy path, Key rejected, Keychain locked) and of `cpt-noter-seq-first-run-connect-assistant` (happy path, API key rejected), and these tests already name those stories.
+10. `storage_move` is M4 (coordinator decision of 17 Nov, after the owner's M3 bump), while `cpt-noter-feature-ui-privacy-sources` is M3. M3 builds `cpt-noter-flow-ui-privacy-sources-storage` (General › Storage location) against the fake core with the command marked M4; its E2E proof against the real core comes in M4. It is not in the M3 command denominator, and the `cpt-noter-feature-ui-privacy-sources` box may be ticked once everything else of the feature runs on the real core.
 
 **DESIGN.md versus the prototype (prototype followed).**
 
@@ -1618,7 +1619,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - `source_reindex`
   - `source_remove`
   - `source_revoke_token`
-  - `storage_move` (draft)
+  - `storage_move` (M4, discrepancy 10; fake core in M3)
 
 - **Sequences**:
 
