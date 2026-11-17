@@ -145,10 +145,17 @@ final class DialogsTests: NoterTestCase {
         let row = any("Anna K.")
         expect(row, "⌘4 shows People with Anna K.")
         row.doubleClick()
-        let delete = any("Delete Profile…")
+        // a button, not the first element whose label mentions it: clicking a container's centre would miss the button
+        let delete = app.descendants(matching: .button).matching(NSPredicate(format: "label CONTAINS 'Delete Profile' OR title CONTAINS 'Delete Profile'")).firstMatch
         expect(delete, "Anna K. has a voice profile to delete")
         delete.click()
-        XCTAssertTrue(alert.staticTexts.matching(NSPredicate(format: "label CONTAINS 'voice profile'")).firstMatch.waitForExistence(timeout: 5), "Delete Profile… shows no alert")
+        if !alert.staticTexts["Delete Anna K.'s voice profile?"].waitForExistence(timeout: 5) {
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.lifetime = .keepAlways
+            add(tree)
+            print("PROFILE AX TREE\n\(app.debugDescription)")
+        }
+        XCTAssertTrue(alert.staticTexts["Delete Anna K.'s voice profile?"].exists, "Delete Profile… shows no alert")
         app.typeKey(.return, modifierFlags: []) // Return by habit chooses Cancel
         XCTAssertTrue(alert.waitForNonExistence(timeout: 5), "Return closes the alert")
         XCTAssertTrue(delete.exists, "Cancel keeps the profile")
