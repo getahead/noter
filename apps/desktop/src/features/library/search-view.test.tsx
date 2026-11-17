@@ -117,3 +117,12 @@ describe("results page head", () => {
     expect(html(props(results({ items: [hit("strong")] }), { bar: <nav>BAR</nav> }))).toContain("<nav>BAR</nav>");
   });
 });
+
+describe("playback in the results", () => {
+  it("hands the window's playback to each transcript row", () => {
+    const seg = { ...(hit("strong") as object), target: { type: "segment", span: { call_id: "c1", t0_ms: 0, t1_ms: 5, channel: null } } } as never;
+    const playback = { playing: true, call_id: "c1", position_ms: 1 } as never;
+    expect(html(props(results({ calls: [seg] }), { playback }))).toContain('aria-label="Pause"');
+    expect(html(props(results({ calls: [seg] })))).toContain('aria-label="Play this line"');
+  });
+});

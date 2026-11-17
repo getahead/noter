@@ -2,8 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "../../ui/primitives/link";
 import { Popover } from "../../ui/primitives/popover";
 import { useBridge } from "../../app/bridge/context";
+import { useWindow } from "../../app/use-window";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallFilter, SearchResults } from "../../core/bindings";
+import type { CallFilter, PlaybackState, SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -40,10 +41,12 @@ export interface SearchViewProps {
   onAsk: () => void;
   /** The filter bar (LS-R1), above the info line. */
   bar?: ReactNode;
+  /** The window's playback state, for each row's Play / Pause. */
+  playback?: PlaybackState | null;
 }
 
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
-export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar }: SearchViewProps) {
+export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
   const [how, setHow] = useState(false);
   const howAt = useRef<HTMLSpanElement>(null);
   const body = () => {
@@ -108,7 +111,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             {groupByCall(s.strong, 3).map((g) => (
               <ul key={g.callId} className="lb-items">
                 {(open.has(`${s.key}:${g.callId}`) ? [...g.shown, ...g.hidden] : g.shown).map((h, i) => (
-                  <SearchResultRow key={i} bridge={bridge} hit={h} />
+                  <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
                 ))}
                 {g.hidden.length > 0 && !open.has(`${s.key}:${g.callId}`) && (
                   <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call", { count: g.hidden.length })}</button></li>
@@ -120,7 +123,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
                 {status !== "WEAK_ONLY" && <h4 className="lb-thmonth__h">{t("search.weaker")}</h4>}
                 <ul className="lb-items">
                   {s.weak.map((h, i) => (
-                    <SearchResultRow key={i} bridge={bridge} hit={h} />
+                    <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
                   ))}
                 </ul>
               </>
@@ -175,6 +178,7 @@ export function SearchPage({ query }: { query: string }) {
   const [fstate, setFstate] = useState(heldFilter);
   const filter = fstate.filter;
   const lists = useLists(bridge);
+  const playback = useWindow(bridge, (s) => s.whole.playback);
   // the bar changes the held filter; a changed filter reads the search again
   const onFilter = (a: FilterAction) => {
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-reconcile
@@ -206,6 +210,7 @@ export function SearchPage({ query }: { query: string }) {
       open={open}
       onMore={(g) => setOpen(new Set(open).add(g))}
       onRetry={() => setAgain((n) => n + 1)}
+      playback={playback}
       bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
       onClear={() => onFilter({ type: "clear" })}
       onAllLanguages={() => {
