@@ -92,6 +92,15 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     expect(await sent(page, "search")).toHaveLength(2);
   });
 
+  test("UI — the search route (Return in the toolbar field, or Ask's Search by Keyword) fills the field with its words and runs search with them", async ({ page }) => {
+    // Both entries push route search:<question> (shell/sections.ts searchRoute); Ask's own button is covered in the Ask spec.
+    const question = "drawer timeout";
+    await openCalls(page);
+    await search(page, question);
+    await expect(searchField(page)).toHaveValue(question);
+    expect((await sent(page, "search")).at(-1)).toMatchObject({ query: question });
+  });
+
   test("UI — Back restores the query after opening a span", async ({ page }) => {
     await openCalls(page);
     await search(page, "drawer redesign");
