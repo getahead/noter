@@ -138,6 +138,8 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
   const [asking, setAsking] = useState(false);
   const signOutError = useWindow(bridge, (s) => s.commands[signOutKey(view.provider)]?.state) === "ERROR";
   const { machines } = useSignIn(bridge, view.provider);
+  // a Test answer belongs to a signed-in account: it goes when the row turns expired or signed out
+  useEffect(() => void (state !== "signed_in" && setTestLine(null)), [state]);
   const testing = useWindow(bridge, (s) => s.commands[testKey(view.provider)]?.state) === "WAITING";
   const status = view.status;
   const provider = providerName(view.provider);
@@ -172,6 +174,9 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
           // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
           <span className="st-row__err">{t("settings.accounts.expired_note", { provider })}</span>
           // @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-expired
+        ) : state === "not_signed_in" && !view.cli.installed ? (
+          // the CLI the account signs in through is not on this Mac: the row says so before the sheet does
+          <span className="e-status__sub">{t("settings.accounts.cli_missing", { tool: toolName(view.provider) })}</span>
         ) : (
           <span className="e-status__sub">{t(a.use)}</span>
         )}
