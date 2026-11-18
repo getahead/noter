@@ -44,7 +44,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     return { call: c, change_id: shared.logChange(fake, world, { entity: { kind: "call", id: c.id, label: c.title }, field: "title", before, after: c.title, summary: "Changed call info" }) };
   },
   // @cpt-flow:cpt-noter-flow-core-items-today-tags:p1
-  call_tags_set: (a, { world }) => {
+  call_tags_set: (a, { world, emit }) => {
     for (const t of a.add) if (t.length < 1 || t.length > 32) throw coreError("invalid_input", "tag length", { type: "validation", field: "add", rule: t.length ? "too_long" : "too_short" });
     const remove = new Set(a.remove.map((tag) => tag.trim().toLowerCase()));
     if (a.add.some((tag) => remove.has(tag.trim().toLowerCase()))) throw coreError("invalid_input", "tag in add and remove", { type: "validation", field: "add", rule: "duplicate" });
@@ -54,6 +54,10 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     const [change_id] = calls.map((c) => {
       const before = JSON.stringify(c.tags);
       c.tags = [...new Set([...c.tags.filter((t) => !a.remove.includes(t)), ...a.add])];
+      if (JSON.stringify(c.tags) !== before) { // as the core: a changed call gets a new rev and an entity:changed, an unchanged one neither
+        c.rev += 1;
+        emit("entity:changed", { type: "call", call: c });
+      }
       return shared.logChange(fake, world, { entity: { kind: "call", id: c.id, label: c.title }, field: "tags", before, after: JSON.stringify(c.tags), summary: "Changed tags", batch_id });
     });
     return { calls, change_id, batch_id };
@@ -77,8 +81,9 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
   call_types_list: (_a, { world }) => world.call_types,
   search: (a, { world }) => {
     const q = a.query.toLowerCase();
-    const segs = world.transcripts.flatMap((t) => t.segments).filter((s) => s.text.toLowerCase().includes(q));
-    const items = world.items.filter((i) => i.text.toLowerCase().includes(q));
+    const terms = shared.searchTerms(a.query);
+    const segs = world.transcripts.flatMap((t) => t.segments).filter((s) => shared.matchesTerms(s.text, terms));
+    const items = world.items.filter((i) => shared.matchesTerms(i.text, terms));
     const callOf = (id: string) => shared.callRef(shared.call(world, id));
     return {
       query: a.query,
@@ -96,12 +101,12 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       })),
       items: items.map((i) => ({ target: { type: "item", item_id: i.id }, title: i.text, snippet: i.text, highlights: [], lang: i.lang, strength: "strong", call: i.call, provenance: { type: "past_call", call: i.call, span: i.spans[0] }, cross_language: false })),
       documents: [],
-      topics: world.topics.filter((t) => t.name.toLowerCase().includes(q)),
+      topics: world.topics.filter((t) => shared.matchesTerms(t.name, terms)),
       only_weak: false,
       explain: { keyword_hits: segs.length + items.length, semantic_hits: 0, normalized_query: q, filters_applied: 0 },
     };
   },
-  ask_scope_presets: (_a, { world }) => world.scope_presets,
+  ask_scope_presets: (_a, { world }) => ({ ...world.scope_presets, presets: world.scope_presets.presets.map((p) => ({ ...p, scope: { ...p.scope, preset: p.id } })) }), // the core names each preset in its scope
   ask_start: (a, { world, fake, send }) => {
     if (!a.question.trim()) throw coreError("invalid_input", "question", { type: "validation", field: "question", rule: "required" });
     const sub = newId("sub");
@@ -123,6 +128,19 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       else world.ask_threads.unshift({ id: thread, title: a.question, scope: a.scope, turns: [answer] });
     };
     later(200, () => fake.push(sub, { event: { type: "started", runtime: "claude_api_key", mode: world.app.privacy.effective } }));
+    // Nothing in scope matches a word of the question: the core runs no model and answers "not found" (no citations).
+    const terms = shared.searchTerms(a.question);
+    const inScope = world.transcripts.filter((t) => !a.scope.call_id || t.call_id === a.scope.call_id).flatMap((t) => t.segments);
+    if (!inScope.some((s) => shared.matchesTerms(s.text, terms))) {
+      later(400, () => {
+        const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: "I could not find this in your calls.", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
+        save(answer);
+        fake.push(sub, { event: { type: "done", answer } });
+        fake.closeChannel(sub);
+        runs.delete(turn);
+      });
+      return { thread_id: thread, turn_id: turn, subscription_id: sub };
+    }
     words.forEach((w, i) => later(400 + i * 60, () => {
       const text = (i ? " " : "") + w;
       run.text += text;

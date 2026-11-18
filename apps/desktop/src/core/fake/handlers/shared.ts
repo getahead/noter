@@ -214,7 +214,11 @@ export function replayChanges(world: World, rows: ChangeRow[], value: "before" |
       fake.push("transcript_subscribe", { event: { type: "segments_updated", segments: [fixed] } }); // the stream carries the restored words
     }
     const tagged = r.entity.kind === "call" && r.field === "tags" ? world.calls.find((c) => c.id === r.entity.id) : undefined;
-    if (tagged) tagged.tags = JSON.parse(r[value] ?? "[]");
+    if (tagged) {
+      tagged.tags = JSON.parse(r[value] ?? "[]");
+      tagged.rev += 1; // as the core's undo of a tags change: a new rev and an entity:changed
+      emit("entity:changed", { type: "call", call: tagged });
+    }
     const item = r.entity.kind === "item" && r.field ? world.items.find((i) => i.id === r.entity.id) : undefined;
     if (item) bump(Object.assign(item, r.field === "status" && r[value]?.startsWith("{")
       ? JSON.parse(r[value]!) : { [r.field === "review_state" ? "review" : r.field as string]: r[value] }));
@@ -487,3 +491,11 @@ export function scriptCall(e: World["live_script"][number]): string | undefined 
   if ("speakers" in e) return e.speakers[0]?.call_id;
   return undefined;
 }
+
+/** The query's words as the core's keyword path sees them: folded (ё/е, ß/ss, case), one-letter words dropped. shortcut: no stemming, upgrade when a story needs a word's other forms. */
+export const searchTerms = (query: string): string[] => [...new Set(query.toLowerCase().replace(/ё/g, "е").replace(/ß/g, "ss").split(/[^\p{L}\p{N}]+/u).filter((w) => w.length > 1))];
+/** Any term at a word start, as the core's FTS query ORs them. */
+export const matchesTerms = (text: string, terms: string[]): boolean => {
+  const words = text.toLowerCase().replace(/ё/g, "е").replace(/ß/g, "ss").split(/[^\p{L}\p{N}]+/u);
+  return terms.some((t) => words.some((w) => w.startsWith(t)));
+};
