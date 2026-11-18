@@ -260,7 +260,7 @@ The system **MUST** support create, edit, previewed merge, confirmed deletion an
 ## 6. Acceptance Criteria
 
 - [x] People prototype states `default`, `empty`, `no-match`, `named`, `new-person` and Person states `default`, `voice-off`, `no-calls`, `no-history`, `merged`, `edit` match screenshots, including all overlays
-- [ ] Tab order follows DESIGN; row arrows and Return work; merge is enabled only for two selected people or one distinct chosen target
+- [x] Tab order follows DESIGN; row arrows and Return work; merge is enabled only for two selected people or one distinct chosen target
 - [x] Identity never exposes behaviour metrics while off, including after cached reads or setting changes
 - [x] Wide uses the prototype's two columns, collapsed at its 1250-px rule; German labels wrap and action labels never truncate
 - [x] Mutations use core responses and change ids; no local array mutation substitutes for persistence or Undo
