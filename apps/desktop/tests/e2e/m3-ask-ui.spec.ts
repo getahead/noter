@@ -59,6 +59,8 @@ async function seedThread(page: Page, steer: Steer): Promise<void> {
 
 async function openAsk(page: Page, opts: Parameters<typeof openWindow>[2] & { seed?: boolean } = {}) {
   const { seed = true, ...plan } = opts;
+  // Wide (content >= 1100 pt): the stories read the 260 pt Recent pane, which Medium and Narrow replace with the toolbar's pop-up
+  await page.setViewportSize({ width: 1400, height: 800 });
   const steer = await openWindow(page, "main", { fixedClock: true, world: (w) => W.idle(w), ...plan });
   if (REAL && seed) await seedThread(page, steer);
   // The shortcut is dropped until the window has mounted its handlers: press again until Ask shows.
@@ -304,7 +306,7 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
 
   test("Medium and Narrow: Recent lives in the toolbar pop-up and opens a thread; the 260 pt pane is gone", async ({ page }) => {
     await openAsk(page);
-    await expect(recent(page)).toBeVisible(); // Wide (the default window)
+    await expect(recent(page)).toBeVisible(); // Wide: openAsk pins it
     await page.setViewportSize({ width: 1000, height: 800 });
     await expect(recent(page)).toBeHidden();
     const pop = toolbar(page).getByRole("combobox", { name: /recent/i });
