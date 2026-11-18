@@ -9,7 +9,6 @@ import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
-const isFake = process.env.NOTER_CORE !== "stdio";
 const ROW = '[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]';
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 
@@ -72,11 +71,10 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await page.keyboard.press("Enter");
     expect(await sent(page, "call_tags_set")).toEqual([expect.objectContaining({ add: ["release"] })]);
     await expect(page.getByText("Tagged 2 calls “release”")).toBeVisible();
-    // The fake's call_tags_set emits no entity:changed, so its rows never refresh (a contract-lane gap); the real core's do.
-    if (!isFake) await expect(rows.filter({ hasText: "release" })).toHaveCount(2);
+    await expect(rows.filter({ hasText: "release" })).toHaveCount(2);
 
     await button(page, "Undo").click();
     expect(await sent(page, "change_undo")).toHaveLength(1);
-    if (!isFake) await expect(rows.filter({ hasText: "release" })).toHaveCount(0);
+    await expect(rows.filter({ hasText: "release" })).toHaveCount(0);
   });
 });

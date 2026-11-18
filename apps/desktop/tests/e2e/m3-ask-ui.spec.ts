@@ -2,7 +2,7 @@
 // `cpt-noter-seq-ask-follow-up-and-copy`. Commands: ask_start, ask_stop, ask_threads_list, ask_thread_get, ask_thread_delete,
 // ask_scope_presets (+ transcript_span, audio_play, calls_delete through the steering client). Written before the screen exists
 // (tests first): they fail until the Ask feature lands and its PR carries them. The real core answers from its scripted runtime
-// (`harness.llm_next`, skill "ask-answer"); states the fake cannot produce (not found, unreachable runtime, a deleted
+// (`harness.llm_next`, skill "ask-answer"); states the fake cannot produce (unreachable runtime, a deleted
 // cited call) run on the real core only, like the conformance of the stories (tests/conformance/m3-stories-retrieval).
 // Markup follows the prototype (`screen('ask')`, `.ak-*`): AK-R1 toolbar, AK-R2 recent questions, AK-R3 thread, AK-R4 composer.
 import type { Locator, Page } from "@playwright/test";
@@ -26,6 +26,7 @@ const citationRows = (answer: Locator) => answer.locator('[data-component="cpt-n
 
 const WEBSOCKET = "What did we agree with backend about the websocket notifications, and what is open?";
 const FOLLOW_UP = "Who owns the acceptance criteria for the reconnect?";
+const NOT_FOUND_QUESTION = "Zzqx quuxplan frobnicate"; // no word of it is in any call: both cores answer not found without a model run
 const THREAD_QUESTION = "What did we decide about drawer notifications?"; // fixture thread ask_notif, answered today
 
 const THREAD_ANSWER = "Drawer events go through the notification service [1].";
@@ -149,10 +150,8 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("empty path — Not found in your calls: the sentence, Search by Keyword, and the Library search for the same words", async ({ page }) => {
-    if (!REAL) return; // the fake core cannot produce this state
-    const steer = await openAsk(page);
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
-    const question = "What did we decide about the OpenStack upgrade?";
+    await openAsk(page);
+    const question = NOT_FOUND_QUESTION;
     await ask(page, question);
     await expect(thread(page)).toContainText("I could not find this in your calls.");
     await expect(thread(page).getByRole("button", { name: /^Thumbs/ })).toHaveCount(0);
@@ -163,17 +162,14 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("empty path — Not found with a narrowed scope: Widen Scope asks the same question again with All calls · all sources", async ({ page }) => {
-    if (!REAL) return; // the fake core cannot produce this state
-    const steer = await openAsk(page);
+    await openAsk(page);
     const scopeSelect = toolbar(page).getByRole("combobox", { name: /scope/i });
     const narrowed = await scopeSelect.locator("option").evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).find((v) => v !== "all"));
     expect(narrowed, "the core offers a narrower scope than All calls").toBeTruthy();
     await scopeSelect.selectOption(narrowed as string);
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
-    const question = "What did we decide about the OpenStack upgrade?";
+    const question = NOT_FOUND_QUESTION;
     await ask(page, question);
     await expect(thread(page)).toContainText("I could not find this in your calls.");
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
     await button(thread(page), "Widen Scope").click();
     await expect(scopeSelect).toContainText("All calls · all sources");
     await expect.poll(async () => (await sent(page, "ask_start")).length).toBe(2);
@@ -183,14 +179,12 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   });
 
   test("empty path — a routed question asked under a narrowed scope keeps Widen Scope once its route settles into the thread", async ({ page }) => {
-    if (!REAL) return; // the fake core cannot produce this state
-    const steer = await openAsk(page);
+    await openAsk(page);
     const scopeSelect = toolbar(page).getByRole("combobox", { name: /scope/i });
     const narrowed = await scopeSelect.locator("option").evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).find((v) => v !== "all"));
     expect(narrowed, "the core offers a narrower scope than All calls").toBeTruthy();
     await scopeSelect.selectOption(narrowed as string);
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: "", citations: [], found: false } });
-    const question = "What did we decide about the OpenStack upgrade?";
+    const question = NOT_FOUND_QUESTION;
     // the route Ask Instead pushes, through the shell's navigate seam: asked once, then its entry becomes thread:<id>
     await page.evaluate(async (q) => {
       const module = "/src/features/shell/navigate.ts"; // served by the dev server: the app's own module instance
