@@ -115,7 +115,7 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
               <div className="fr-model__bar">
                 <Progress value={pct} state={state} label={b.name} />
                 <span className="np-tnum fr-model__pct">
-                  {state === "finished" ? <Msg id="first_run.models.ready" /> : state === "failed" ? <Msg id="first_run.models.check_failed" /> : <Msg id="first_run.models.percent" args={{ value: pct }} />}
+                  {state === "finished" ? <Msg id="first_run.models.ready" /> : state === "failed" ? <Msg id={b.state === "checksum_failed" ? "first_run.models.check_failed" : "first_run.models.download_failed"} /> : <Msg id="first_run.models.percent" args={{ value: pct }} />}
                 </span>
                 {/* @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-checksum */}
                 {state === "failed" && <PushButton label={t("action.try_again")} size="small" onAction={() => void wizard.download("retry")} />}

@@ -81,6 +81,11 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     expect(failed).toContain("Check failed");
     expect(failed).toContain("Try Again");
     expect(failed).toContain('data-state="failed"');
+    // A download that failed for any other reason is not a failed check (owner, v0.23.0).
+    const broken = await screen((w) => (W.firstRun(w, { modelsReady: false }), at("models")(w), (w.app.setup.models.bundles[0]!.state = "failed")));
+    expect(broken).toContain("Download failed");
+    expect(broken).not.toContain("Check failed");
+    expect(broken).toContain("Try Again");
   });
 
   it("shows Resume once the downloads are paused and Ready on a finished bundle", async () => {
