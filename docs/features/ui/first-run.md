@@ -253,7 +253,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 3. [x] - `p1` - **FROM** CURRENT **TO** SKIPPED **WHEN** the user clicks **Skip for Now** - `inst-current-skipped`
 4. [x] - `p1` - **FROM** CURRENT **TO** RUNNING_IN_BACKGROUND **WHEN** the user leaves **Models** while downloads continue - `inst-current-running`
 5. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every bundle is in - `inst-running-done`
-6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check - `inst-running-error`
+6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check or its download fails (going offline is not an error) - `inst-running-error`
 7. [x] - `p1` - **FROM** SKIPPED **TO** CURRENT **WHEN** the user clicks it - `inst-skipped-current`
 8. [x] - `p1` - **FROM** ERROR **TO** CURRENT **WHEN** the user clicks it - `inst-error-current`
 
@@ -314,7 +314,7 @@ The system **MUST** render the first-run window FR-R1 to FR-R3 and its six steps
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-models`
 
-The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** with **Try Again**, and the background ring in the stepper.
+The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** or **Download failed** with **Try Again**, and the background ring in the stepper.
 
 **Implements**:
 - `cpt-noter-flow-ui-first-run-download-models`
