@@ -1,5 +1,71 @@
 # Changelog
 
+## [0.23.0](https://github.com/getahead/noter/compare/v0.22.16...v0.23.0) (2026-11-18)
+
+
+### Features
+
+* **contract:** mark a stopped Ask turn in the stored answer ([#899](https://github.com/getahead/noter/issues/899)) ([da7df3f](https://github.com/getahead/noter/commit/da7df3f8570cb854bcd4b875b947b4893a692f98))
+* **contract:** person rows carry notes and the you-owe count ([#906](https://github.com/getahead/noter/issues/906)) ([cca9c64](https://github.com/getahead/noter/commit/cca9c6498a4bb4f7b685722a2488f2216bea684a))
+* **contract:** the audit log filters by call and counts its range ([#911](https://github.com/getahead/noter/issues/911)) ([3fbd5fa](https://github.com/getahead/noter/commit/3fbd5faaddbfb519b7ae2a74545f2d464caf1af9))
+* **contract:** the Settings window may read the people list ([#918](https://github.com/getahead/noter/issues/918)) ([d36d5b6](https://github.com/getahead/noter/commit/d36d5b6a107c64bf35b3be281d522bd9e5fb576b))
+* **ui:** account rows with Test and Sign Out ([#894](https://github.com/getahead/noter/issues/894)) ([ac2705b](https://github.com/getahead/noter/commit/ac2705bd8299d5f3dc051c9baa7082fb8aa59d03))
+* **ui:** add the Knowledge Sources pane with Add Folder and Add MCP Server ([#904](https://github.com/getahead/noter/issues/904)) ([e49d780](https://github.com/getahead/noter/commit/e49d780c8b167c1ac380c8d185530b64358abbe5))
+* **ui:** add the people list with search, selection and unnamed speakers ([#896](https://github.com/getahead/noter/issues/896)) ([adc3b39](https://github.com/getahead/noter/commit/adc3b3923cb71873bd5d63fefca28fe9c6232c41))
+* **ui:** add the person page with overview, calls and history ([#908](https://github.com/getahead/noter/issues/908)) ([1d54d4a](https://github.com/getahead/noter/commit/1d54d4a1c65ebec42ab8fb965586b70bfb224baf))
+* **ui:** add the shared status row ([#898](https://github.com/getahead/noter/issues/898)) ([30bb651](https://github.com/getahead/noter/commit/30bb651d56ed0df4de50391b659c6cb09fc9b5f2))
+* **ui:** add, edit, merge and delete a person ([#915](https://github.com/getahead/noter/issues/915)) ([8181d1e](https://github.com/getahead/noter/commit/8181d1e2cd4be91cf248904c008f8f5872c7a255))
+* **ui:** ask — cited answers, sources, copy with citations, playback, recent-row menu (slice 2) ([#914](https://github.com/getahead/noter/issues/914)) ([9943d66](https://github.com/getahead/noter/commit/9943d66642cbd4c45d91ee853478c88390d457fa))
+* **ui:** ask — new-topic:&lt;id&gt; route (Ask About This Thread) ([#936](https://github.com/getahead/noter/issues/936)) ([bfd9422](https://github.com/getahead/noter/commit/bfd942243123037eef08b37d0202de240ec33bf6))
+* **ui:** ask — start the question a new:&lt;words&gt; route carries ([#923](https://github.com/getahead/noter/issues/923)) ([8fe4700](https://github.com/getahead/noter/commit/8fe47005bcd26d3393e702ee682d93a8fc98e419))
+* **ui:** ask — started line, widen scope, gap recovery, topic scope option (2.23) ([#953](https://github.com/getahead/noter/issues/953)) ([e58e574](https://github.com/getahead/noter/commit/e58e5747c862ac78071ad23c9da79766b6687249))
+* **ui:** ask page — recent questions, composer, streamed answer, stop (slice 1) ([#895](https://github.com/getahead/noter/issues/895)) ([7a3ef18](https://github.com/getahead/noter/commit/7a3ef1862027b4b1fd7032e12ab17682f43fbd14))
+* **ui:** cdsl markers and ticks, CLI-missing note, stale Test line (2.25 slice 3) ([#929](https://github.com/getahead/noter/issues/929)) ([4d1175b](https://github.com/getahead/noter/commit/4d1175b2ee4ff7139be65ddaa4650e794340f4e4))
+* **ui:** export the selected Calls with Export… and ⌘E ([#912](https://github.com/getahead/noter/issues/912)) ([1af82f8](https://github.com/getahead/noter/commit/1af82f8be7eb11958b23a7df7968b48c6dc3cf91))
+* **ui:** filter the privacy audit by call and show the core's total ([#913](https://github.com/getahead/noter/issues/913)) ([4757f7d](https://github.com/getahead/noter/commit/4757f7d2e9a2d90c3c966f99c022367f028f4d60))
+* **ui:** let a page move the main window to a route the core has no target for ([#905](https://github.com/getahead/noter/issues/905)) ([f869d9f](https://github.com/getahead/noter/commit/f869d9fa343c1b7f7759a3fcee3724ecfe26ba16))
+* **ui:** library filter bar, filtered Calls and batch tags ([#902](https://github.com/getahead/noter/issues/902)) ([b118b61](https://github.com/getahead/noter/commit/b118b61a2a202a342c152b0a78c0d26f741625a9))
+* **ui:** library search results, # tag suggestions and TopicChip (2.22) ([#922](https://github.com/getahead/noter/issues/922)) ([3a502ea](https://github.com/getahead/noter/commit/3a502ea037d52e03f18d62cd4c2d549cbc7a8911))
+* **ui:** library search results, topics e2e, ask about a topic, cdsl markers and dod ticks (library 2.22) ([#941](https://github.com/getahead/noter/issues/941)) ([65188f9](https://github.com/getahead/noter/commit/65188f9bd75a0bf9acc0b7c880790f044b2d2439))
+* **ui:** name unnamed speakers from People ([#930](https://github.com/getahead/noter/issues/930)) ([6bf0ef1](https://github.com/getahead/noter/commit/6bf0ef1caa1204c814be15dd3709cea51bd78683))
+* **ui:** people pop-up search list, remove tag in the calls menu (library 2.22) ([#938](https://github.com/getahead/noter/issues/938)) ([b09a836](https://github.com/getahead/noter/commit/b09a836984a1f799553cc4e3f60fbbe4bd301026))
+* **ui:** rename, merge and keep separate topics (library 2.22, slice 2) ([#926](https://github.com/getahead/noter/issues/926)) ([6fbefdc](https://github.com/getahead/noter/commit/6fbefdcf92f59a69944b267459c854078713869e))
+* **ui:** share the person chip and let the person picker choose several people ([#909](https://github.com/getahead/noter/issues/909)) ([a01155e](https://github.com/getahead/noter/commit/a01155ee6589d515a97dffa0bc4b23db9baf9639))
+* **ui:** show what left this Mac in Settings Privacy ([#893](https://github.com/getahead/noter/issues/893)) ([4605031](https://github.com/getahead/noter/commit/4605031a11b3e3bd96dfb43190fca7230694a33f))
+* **ui:** sign-in sheet and session machine for own accounts (2.25 slice 2) ([#924](https://github.com/getahead/noter/issues/924)) ([944dbfc](https://github.com/getahead/noter/commit/944dbfc307dee43e3b6d8054cf7d56673e382419))
+* **ui:** source details, update, revoke, remove, scope, and the privacy E2E stories ([#921](https://github.com/getahead/noter/issues/921)) ([a4c0829](https://github.com/getahead/noter/commit/a4c0829f28a1950ad8652589bdd99aab9631ac35))
+* **ui:** topic suggestion row in search results, focusable thread rows (library 2.22) ([#935](https://github.com/getahead/noter/issues/935)) ([3187a49](https://github.com/getahead/noter/commit/3187a499af34be5f8cfe4387ae6c0dec9233700f))
+* **ui:** topics list and topic thread (library 2.22, slice 1) ([#897](https://github.com/getahead/noter/issues/897)) ([0dcdc81](https://github.com/getahead/noter/commit/0dcdc8182fa99174b902ade147ec4e1184435468))
+* **ui:** voice profile on the person page, naming follow-ups ([#947](https://github.com/getahead/noter/issues/947)) ([2b1722c](https://github.com/getahead/noter/commit/2b1722cbda392aaf499e24c8d312dc6011639e68))
+
+
+### Bug fixes
+
+* **core:** refuse a topic rename to a name another topic has ([#903](https://github.com/getahead/noter/issues/903)) ([1b22103](https://github.com/getahead/noter/commit/1b22103caa5e45568352d78a882802a66793b042))
+* **core:** the account row reports the CLI its sign-in uses ([#900](https://github.com/getahead/noter/issues/900)) ([e268174](https://github.com/getahead/noter/commit/e268174f429a85f7f920c714ed37f18a6fddc00c))
+* **core:** wait for the model download job to stop before refresh_models in its test ([#891](https://github.com/getahead/noter/issues/891)) ([e744272](https://github.com/getahead/noter/commit/e744272f864a18766bedfc9b5918a82c2f0f2ad1))
+* **deps:** Bump the npm-minor group across 1 directory with 4 updates ([#871](https://github.com/getahead/noter/issues/871)) ([1ac1b76](https://github.com/getahead/noter/commit/1ac1b76ea98a49f94adc1aad06d65cdff100ab12))
+* **desktop:** send native menu contexts in order ([#887](https://github.com/getahead/noter/issues/887)) ([ddd69e1](https://github.com/getahead/noter/commit/ddd69e19ef5872503ce2cf77d1c95b7f68ecb404))
+* **engine-client:** a restart inside 1 ms still reports an engine_restart gap ([#883](https://github.com/getahead/noter/issues/883)) ([8ed1556](https://github.com/getahead/noter/commit/8ed15566ea015ca4194e45f5cc6e6c2b4a87e01b))
+* **llm:** read the Claude sign-in from the CLI for own-account runs ([#889](https://github.com/getahead/noter/issues/889)) ([10c9f2e](https://github.com/getahead/noter/commit/10c9f2e3ba96185f2e903eadde3a973631bada74))
+* synchronize completion and desktop navigation ([#966](https://github.com/getahead/noter/issues/966)) ([07d6dbe](https://github.com/getahead/noter/commit/07d6dbedc76077f5dad64fa27364b573e078d6ba)), closes [#917](https://github.com/getahead/noter/issues/917) [#919](https://github.com/getahead/noter/issues/919) [#928](https://github.com/getahead/noter/issues/928) [#939](https://github.com/getahead/noter/issues/939) [#945](https://github.com/getahead/noter/issues/945) [#955](https://github.com/getahead/noter/issues/955)
+* **ui:** ask — recent in the toolbar below wide, focus hand-offs, citation speaker (2.23 qa) ([#969](https://github.com/getahead/noter/issues/969)) ([788f170](https://github.com/getahead/noter/commit/788f17050a283d8ec20e92ccbf8c4e90327428c4))
+* **ui:** ask — toolbar title no longer squeezed at Medium ([#927](https://github.com/getahead/noter/issues/927)) ([43f5b32](https://github.com/getahead/noter/commit/43f5b323086cfdcb074c32c402b023d26e69183b))
+* **ui:** esc closes a popover from anywhere and returns focus to its anchor (library 2.22) ([#971](https://github.com/getahead/noter/issues/971)) ([c53d8d2](https://github.com/getahead/noter/commit/c53d8d2e07694223806130f14552abc9d8a03684))
+* **ui:** export is off while a call has no audit rows ([#925](https://github.com/getahead/noter/issues/925)) ([b8dc9f4](https://github.com/getahead/noter/commit/b8dc9f4189974c7a05574806b4ba0aec278cddc6))
+* **ui:** focus is lost only on the body or region, failed naming reload forgets focus, merged render without profiles ([#967](https://github.com/getahead/noter/issues/967)) ([fb4aa22](https://github.com/getahead/noter/commit/fb4aa22e88c2d782f041c0dfc753ef51849a4033))
+* **ui:** keep focus on the opener when a sheet or form closes after a mouse click ([#951](https://github.com/getahead/noter/issues/951)) ([109e9d5](https://github.com/getahead/noter/commit/109e9d518a3d25d3c3ef49c6b16c2bdc89d6e984))
+* **ui:** one re-index in flight per source, and visual specs for all six status row variants ([#950](https://github.com/getahead/noter/issues/950)) ([a2b9e12](https://github.com/getahead/noter/commit/a2b9e12c30d26beb468b655a5bb1ff39613d4b9b))
+* **ui:** people ac2: first-click cancel, focus returns to the opener with the mouse ([#964](https://github.com/getahead/noter/issues/964)) ([eb2ad6b](https://github.com/getahead/noter/commit/eb2ad6b83409f43e3eb7ccbccdfa8354f2a477c1))
+* **ui:** restore focus after a Remove started by a mouse click ([#944](https://github.com/getahead/noter/issues/944)) ([8c99dd5](https://github.com/getahead/noter/commit/8c99dd582a74649227a901987f552b367a919f6b))
+* **ui:** return focus to the control the mouse pressed when a sheet closes ([#943](https://github.com/getahead/noter/issues/943)) ([b75362e](https://github.com/getahead/noter/commit/b75362ec99a2b407caaed67be5deef5ace1e6440))
+* **ui:** return focus to the row's sign in button after a confirmed sign out ([#957](https://github.com/getahead/noter/issues/957)) ([73dd47f](https://github.com/getahead/noter/commit/73dd47f16bf5a727e634ecc92735dc0518e0e23c))
+* **ui:** storage Change says it is available in a later version, and small scope notes ([#931](https://github.com/getahead/noter/issues/931)) ([b9d1633](https://github.com/getahead/noter/commit/b9d1633936bf1c51d381517864aff0c12878da6c))
+* **ui:** the toolbar search field shows the words of the search route it lands on ([#916](https://github.com/getahead/noter/issues/916)) ([790b5c7](https://github.com/getahead/noter/commit/790b5c7463ec61700d7cb276cc00a09df02f8c5b))
+* **ui:** toolbar button focus rings, export menu order, no-matches announced, esc on show how returns focus (library 2.22) ([#960](https://github.com/getahead/noter/issues/960)) ([233fa5e](https://github.com/getahead/noter/commit/233fa5eec29fc8d6b715bafccf96a5025c4395c9))
+* **ui:** topic rename, merge and keep separate polish (library 2.22) ([#932](https://github.com/getahead/noter/issues/932)) ([7b2c26d](https://github.com/getahead/noter/commit/7b2c26dc0d96de30b01efdc024c4d6e1a4535e9b))
+* **ui:** turn off system text assists on search fields so the first Esc clears the text ([#875](https://github.com/getahead/noter/issues/875)) ([ca64c3d](https://github.com/getahead/noter/commit/ca64c3de1f4f292fc8f0c87611d509df6d6665d4))
+
 ## [0.22.16](https://github.com/getahead/noter/compare/v0.22.15...v0.22.16) (2026-11-16)
 
 
