@@ -464,6 +464,26 @@ impl Core {
 
     /// `announce`: send `setup:changed` even when nothing changed (a re-check ended).
     pub(crate) fn refresh_setup_with(&self, announce: bool) {
+        let (incomplete, has) = loop {
+            let (next, incomplete) = self.setup_candidate();
+            if let Some(has) = self.publish_setup_candidate(next, announce) {
+                break (incomplete, has);
+            }
+        };
+        if incomplete != has {
+            let mut states = self.app().degraded.states.clone();
+            states.retain(|s| *s != DegradedState::SetupIncomplete);
+            if incomplete {
+                states.push(DegradedState::SetupIncomplete);
+            }
+            self.set_degraded(states);
+        }
+    }
+
+    fn setup_candidate(&self) -> (SetupStatus, bool) {
+        // Read the generation before gathering any dependent state. A concurrent refresh
+        // may publish while native permissions or downloads are being read.
+        let version = self.app().setup.version;
         let (stored, offer, call_display) = {
             let s = lock(&self.first_run);
             let mut stored = s.stored.clone();
@@ -480,9 +500,8 @@ impl Core {
             .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
         let permissions = self.permission_rows(&stored);
         let models = lock(&self.downloads).status();
-        let mut app = self.app();
         let next = SetupStatus {
-            version: app.setup.version,
+            version,
             complete,
             steps: stored.steps,
             models,
@@ -492,25 +511,27 @@ impl Core {
             detection_enabled,
         };
         // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-build-setup
+        (next, incomplete)
+    }
+
+    fn publish_setup_candidate(&self, next: SetupStatus, announce: bool) -> Option<bool> {
+        let mut app = self.app();
+        // Stamp only a snapshot gathered against the current generation. Otherwise an
+        // older bundle/permission snapshot could acquire a newer version than Ready.
+        if next.version != app.setup.version {
+            return None;
+        }
         if announce || next != app.setup {
             app.setup = next;
             self.publish(event_names::SETUP_CHANGED, &mut app.setup);
         }
-        let has = app
-            .degraded
-            .states
-            .contains(&DegradedState::SetupIncomplete);
-        drop(app);
-        if incomplete != has {
-            let mut states = self.app().degraded.states.clone();
-            states.retain(|s| *s != DegradedState::SetupIncomplete);
-            if incomplete {
-                states.push(DegradedState::SetupIncomplete);
-            }
-            self.set_degraded(states);
-        }
-        // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-emit-changes
+        Some(
+            app.degraded
+                .states
+                .contains(&DegradedState::SetupIncomplete),
+        )
     }
+    // @cpt-end:cpt-noter-algo-core-first-run-status:p1:inst-emit-changes
 
     /// Sets the self-test state as `harness.world_set` seeds it (feature `harness`).
     /// shortcut: in memory only, not stored under `setup`; store it if a harness restart needs it.
@@ -772,5 +793,50 @@ impl Core {
     pub(crate) fn take_pending_update(&self) -> bool {
         let mut first_run = lock(&self.first_run);
         std::mem::take(&mut first_run.install_pending)
+    }
+}
+
+#[cfg(test)]
+mod setup_publication_tests {
+    use super::*;
+    use crate::{CoreDeps, EventEmitter, SystemClock};
+
+    struct Quiet;
+    impl EventEmitter for Quiet {
+        fn emit(&self, _: &'static str, _: serde_json::Value) {}
+    }
+
+    #[test]
+    fn stale_setup_snapshot_cannot_overwrite_completed_models() {
+        let dir = tempfile::tempdir().unwrap();
+        let core = Core::open(
+            dir.path(),
+            CoreDeps::new(Arc::new(SystemClock), Arc::new(Quiet)),
+        )
+        .unwrap();
+        let models_dir = dir.path().join("models-regression");
+        let specs = vec![BundleSpec {
+            name: "bge-m3".into(),
+            files: vec![],
+            required_for_capture: false,
+        }];
+        *lock(&core.downloads) = crate::models::Downloads::load(specs.clone(), models_dir.clone());
+        // A setup command has gathered the old download state but not published it.
+        let (stale, _) = core.setup_candidate();
+        assert_eq!(stale.models.bundles[0].state, BundleState::Pending);
+        std::fs::create_dir_all(models_dir.join("bge-m3")).unwrap();
+        *lock(&core.downloads) = crate::models::Downloads::load(specs, models_dir);
+        // The download task completes and publishes before that command gets the app lock.
+        core.refresh_setup();
+        let completed = core.app().setup.clone();
+        assert_eq!(completed.models.bundles[0].state, BundleState::Ready);
+        assert!(core.publish_setup_candidate(stale.clone(), false).is_none());
+        assert!(core.publish_setup_candidate(stale, true).is_none());
+        core.refresh_setup();
+        assert_eq!(core.app().setup, completed);
+        core.refresh_setup_with(true);
+        let announced = core.app().setup.clone();
+        assert!(announced.version > completed.version);
+        assert_eq!(announced.models, completed.models);
     }
 }

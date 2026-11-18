@@ -10,7 +10,7 @@ import type { Page } from "@playwright/test";
 import type { OutputRoute, SegmentView, SpeakerRef } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, openWindow, wheelUpTo, type Steer } from "./support/app";
+import { calls, openWindow, type Steer } from "./support/app";
 import { navigate, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 
@@ -24,6 +24,12 @@ const jump = (page: Page, text: RegExp | string = /^Jump to Live/) => page.getBy
 const bar = (page: Page) => page.locator('[data-region="CS-R2b"], [data-region="PC-R6"]');
 
 const ANNA_LINE = "drawer redesign до пятницы"; // seg_live_002, spk_anna, 00:19:58
+/** Once wheel-detached, use the transcript's Home key to reach Anna without kinetic scrolling. */
+async function homeToAnna(page: Page) {
+  await rowWith(page, "Test line number 55").focus();
+  await page.keyboard.press("Home");
+  await expect(rowWith(page, ANNA_LINE)).toBeInViewport();
+}
 const REASON = {
   speakers: "Replay is off while recording on speakers: the call would hear it. Use headphones, or replay after the call.",
   unknown: "Noter can't tell whether this output is headphones. Mark it as headphones in Settings › Audio & Transcription to replay while recording.",
@@ -294,7 +300,10 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await expect(rowWith(page, "Test line number 59")).toBeInViewport();
     await expect(jump(page)).toHaveCount(0); // following
 
-    await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
+    await log(page).locator(".cw-tv__scroll").hover();
+    await page.mouse.wheel(0, -1);
+    await expect(log(page)).toHaveAttribute("data-state", "detached");
+    await homeToAnna(page);
     const at = (await rowWith(page, ANNA_LINE).boundingBox())!.y;
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible(); // plural rules
@@ -340,7 +349,7 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     // A second native scroll notification at the same pixel must not resume following (#1006).
     await scroller.dispatchEvent("scroll");
     await expect(log(page)).toHaveAttribute("data-state", "detached");
-    await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
+    await homeToAnna(page);
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible();
     await page.keyboard.press("Meta+KeyJ");
