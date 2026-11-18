@@ -83,6 +83,24 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     await expect(how).toBeFocused();
   });
 
+  test("UI — Tab, then Esc, from the Show How Noter Searched popover puts focus back on its link", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "notification service");
+    const how = page.getByRole("link", { name: "Show How Noter Searched" });
+    await how.click();
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toBeVisible();
+    // what the shell's window-level Esc shortcut would see (a listener on document, added after the popover's, runs just before the window's): a key nobody consumed would close the inspector or the sidebar overlay too
+    await page.evaluate(() => {
+      (window as unknown as { unhandledEsc: number }).unhandledEsc = 0;
+      document.addEventListener("keydown", (e) => e.key === "Escape" && !e.defaultPrevented && ((window as unknown as { unhandledEsc: number }).unhandledEsc += 1));
+    });
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "How Noter searched" })).toHaveCount(0);
+    await expect(how).toBeFocused();
+    expect(await page.evaluate(() => (window as unknown as { unhandledEsc: number }).unhandledEsc)).toBe(0);
+  });
+
   test("UI — empty path: no matches for “Lizenzprüfung im Installer” offers Try fewer words, Clear Filters and Ask Instead, which asks the same words in a new thread", async ({ page }) => {
     await openCalls(page);
     await button(page, /^Type/).click();
