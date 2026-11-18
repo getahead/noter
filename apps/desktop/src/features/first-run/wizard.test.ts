@@ -45,6 +45,9 @@ describe("model bundles (cpt-noter-flow-ui-first-run-download-models)", () => {
   it("writes sizes in gigabytes with one decimal, and the whole download as About N GB", () => {
     expect(gigabytes(2100)).toBe("2.1 GB");
     expect(gigabytes(1400)).toBe("1.4 GB");
+    // wespeaker is 21 MB: never "0 GB" for a bundle that has bytes (owner, v0.23.0)
+    expect(gigabytes(21)).toBe("0.1 GB");
+    expect(gigabytes(0)).toBe("0 GB");
     expect(wholeGigabytes(2048)).toBe("2 GB");
     expect(wholeGigabytes(100)).toBe("1 GB");
   });

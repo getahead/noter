@@ -171,6 +171,7 @@ export const en = {
   "first_run.models.resume": "Resume",
   "first_run.models.ready": "Ready",
   "first_run.models.check_failed": "Check failed",
+  "first_run.models.download_failed": "Download failed",
   "first_run.models.done": "Models downloaded",
   "first_run.models.size": "{size} GB",
   "first_run.models.percent": "{value} %",
