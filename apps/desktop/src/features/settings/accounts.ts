@@ -81,10 +81,10 @@ export function cancelSignIn(bridge: Bridge, sessionId: string) {
   // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-cancel
 }
 
-/** `account_use_existing`: reuse the CLI's own sign-in; the answer is the whole accounts view. */
-export function useExistingAccount(bridge: Bridge, provider: AccountProvider) {
+/** `account_use_existing`: reuse the CLI's own sign-in with the personal-use box; the answer is the whole accounts view. */
+export function useExistingAccount(bridge: Bridge, provider: AccountProvider, personalUseConfirmed: boolean) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-use-existing
-  return bridge.act(`${signInKey(provider)}:existing`, "account_use_existing", () => bridge.core.accountUseExisting({ provider }), { slice: "accounts" });
+  return bridge.act(`${signInKey(provider)}:existing`, "account_use_existing", () => bridge.core.accountUseExisting({ provider, personal_use_confirmed: personalUseConfirmed }), { slice: "accounts" });
   // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-use-existing
 }
 

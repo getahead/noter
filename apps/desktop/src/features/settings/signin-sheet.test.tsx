@@ -113,8 +113,29 @@ describe("AccountSignInSheet", () => {
     m().dispatch("claude", { type: "confirm", on: true });
     await m().proceed("claude");
     expect(seen.map(([c]) => c)).toContain("account_use_existing");
+    expect(seen.find(([c]) => c === "account_use_existing")?.[1]).toEqual({ provider: "claude", personal_use_confirmed: true }); // #1000: the ticked box goes with the request
     expect(seen.map(([c]) => c)).not.toContain("account_signin_start");
     expect(m().state.claude.phase).toBe("USE");
+  });
+
+  it("#1000: a refused Use This Account shows the error, never a silent no-op", async () => {
+    const { fake } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "confirm", on: true });
+    fake.failNext("account_use_existing", "personal_use_not_confirmed");
+    await m().proceed("claude");
+    expect(m().state.claude.phase).toBe("SIGNIN_ERROR");
+    expect(html("claude")).toContain("Something went wrong");
+  });
+
+  it("a failed install shows the error instead of staying on Prepare", async () => {
+    const { fake } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepareFailed", code: "cli_missing" });
+    fake.failNext("cli_install", "offline");
+    await m().install("claude");
+    expect(m().state.claude.phase).toBe("SIGNIN_ERROR");
+    expect(m().state.claude.code).toBe("offline");
   });
 
   it("says a missing CLI can be installed and returns to Prepare after the install job", async () => {
