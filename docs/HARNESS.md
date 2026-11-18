@@ -148,7 +148,7 @@ On a pull request each job runs only if the change can affect what it checks (ow
 | `e2e-coverage`, `e2e-report` | everything `e2e-core` and `e2e-ui` read, `docs/DESIGN.md` (its stories set the bar), and every run of `macos` (its XCUITest results count) |
 | `visual` | the UI app, `apps/desktop/tests/visual/**` (specs, fixtures, baselines), the test helpers it imports (`tests/support`, `tests/e2e/support`, `playwright.config.ts`), `contracts/**` |
 | `docs` (`cfs validate`) | source files (their `@cpt-*` markers), `docs/**`, `.cf-studio/**`, Markdown |
-| `macos` | the Rust crates, the UI app (the XCUITests drive the built app, and the Tauri host compiles in `src/i18n/en.ts`), `apps/desktop/src-tauri/**`, `apps/desktop/tests/native/**`, `engine/**` |
+| `macos` | the Rust crates, the UI the XCUITests can see (`ui-native`: the boot path, `core`, `i18n` (the Tauri host compiles in `src/i18n/en.ts`), shared `ui` and `styles`, the shell, call window, record prompt, Settings and setup; the code, not the CSS or unit tests, of the pages they drive: Today, Calls, People, the call page, items, handoff, speakers, transcript, notifications, History's undo; every page's `register` file; the app's build config and `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`), `apps/desktop/src-tauri/**`, `apps/desktop/tests/native/**`, `engine/**`. UI the XCUITests cannot see (the Ask page, those pages' CSS, unit tests) skips the scarce `macos-15` runner and is judged on `main`'s XCUITest results |
 
 So, for example:
 
@@ -157,7 +157,7 @@ So, for example:
 | screenshot baselines | `visual` |
 | a screenshot spec | `visual`, `lint-ui`, `arch`, `docs` |
 | a UI flow spec (`tests/e2e/*.spec.ts`) | `e2e-core`, `e2e-ui`, `e2e-coverage`, `lint-ui`, `arch`, `docs` |
-| UI code (`apps/desktop/src/**`) | `lint-ui`, `arch`, `unit-ui`, `e2e-ui`, `e2e-coverage`, `visual`, `docs`, `macos` |
+| UI code (`apps/desktop/src/**`) | `lint-ui`, `arch`, `unit-ui`, `e2e-ui`, `e2e-coverage`, `visual`, `docs`, and `macos` when the XCUITests can see it (`ui-native`) |
 | Rust crates | `lint-rust`, `arch`, `unit-rust`, `e2e-core`, `e2e-coverage`, `docs`, `macos` |
 | the generated contract (`contracts/`, `bindings.ts`) | both sides (`unit-rust`, `unit-ui`, `e2e-core`, `e2e-ui`, `e2e-coverage`), plus `contract` and `visual` |
 | the Tauri host, the native tests or the engine | `macos`, `e2e-coverage`, `arch`, `docs` |

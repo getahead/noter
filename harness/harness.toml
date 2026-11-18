@@ -164,6 +164,25 @@ ui = [
   "apps/desktop/src/**", "apps/desktop/index.html", "apps/desktop/vite.config.ts", "apps/desktop/tsconfig*.json",
   "apps/desktop/package.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
 ]
+# The UI the XCUITests (apps/desktop/tests/native) can see. Whole trees: the boot path, shared UI and styles, the
+# shell and native menus (the host embeds i18n/en.ts and shell/menu-model.json), and the windows whose geometry the tests
+# measure (call window, record prompt, Settings, setup). Code only: the pages they drive through the accessibility
+# tree, native alerts and menu items (Today at launch, Calls, People, the call page and its items, handoff, speakers,
+# transcript, the notifications banner, and History's undo they import). Every page's register file runs at boot.
+# Not seen: the Ask page, those pages' CSS and unit tests (`except`); a PR without macos takes main's XCUITest results.
+ui-native = [
+  "apps/desktop/src/main.tsx", "apps/desktop/src/app/**", "apps/desktop/src/core/**", "apps/desktop/src/i18n/**",
+  "apps/desktop/src/ui/**", "apps/desktop/src/styles/**", "apps/desktop/src/features/shell/**",
+  "apps/desktop/src/features/call-window/**", "apps/desktop/src/features/record-prompt/**",
+  "apps/desktop/src/features/settings/**", "apps/desktop/src/features/first-run/**", "apps/desktop/src/features/*/register*",
+  "apps/desktop/src/features/today/**/*.ts*", "apps/desktop/src/features/library/**/*.ts*",
+  "apps/desktop/src/features/people/**/*.ts*", "apps/desktop/src/features/call-page/**/*.ts*",
+  "apps/desktop/src/features/items/**/*.ts*", "apps/desktop/src/features/handoff/**/*.ts*",
+  "apps/desktop/src/features/speakers/**/*.ts*", "apps/desktop/src/features/transcript/**/*.ts*",
+  "apps/desktop/src/features/notifications/**/*.ts*", "apps/desktop/src/features/history/**/*.ts*",
+  "apps/desktop/index.html", "apps/desktop/vite.config.ts", "apps/desktop/tsconfig*.json",
+  "apps/desktop/package.json", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml",
+]
 # The rest of what `tsc -p apps/desktop/tsconfig.json` reads (tests and configs).
 ui-types = ["apps/desktop/tests/**/*.ts", "apps/desktop/tests/**/*.tsx", "apps/desktop/*.config.ts"]
 ui-unit = ["apps/desktop/vitest.unit.config.ts", "apps/desktop/tests/support/**"]
@@ -202,6 +221,7 @@ js-source = [
 # An area is excluded from a file that also matches one of these.
 [ci.except]
 docs = ["CHANGELOG.md"]   # written by release-please, checked by no job
+ui-native = ["**/*.test.ts", "**/*.test.tsx"]   # unit tests are not in the app bundle
 
 # The UI flows (Playwright, apps/desktop/tests/e2e) a pull request re-runs: the specs of the features
 # it touches. A changed spec runs itself; a code file in no feature below (shared UI, src/core, the
@@ -269,8 +289,8 @@ e2e-report = ["rust", "ui", "protocol", "e2e-suites", "stories"]   # posts e2e-c
 # reaches them only through the regenerated contracts/** and bindings.ts, which `contract` enforces.
 visual = ["ui", "visual", "contracts"]
 docs = ["code", "docs"]
-# The XCUITests drive the built app: the UI bundle, the Tauri host (it embeds src/i18n/en.ts) and the core.
-macos = ["rust", "ui", "tauri", "native", "engine"]
+# The XCUITests drive the built app: the UI they can see, the Tauri host (it embeds src/i18n/en.ts) and the core.
+macos = ["rust", "ui-native", "tauri", "native", "engine"]
 flaky-register = []   # main and the nightly only (its own `if`); never selected for a pull request
 
 [ci.jobs.hygiene]
