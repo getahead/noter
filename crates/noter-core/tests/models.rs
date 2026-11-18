@@ -56,6 +56,8 @@ struct Bundles {
     specs: Vec<BundleSpec>,
     /// Per file (`<bundle>/<path>`): fail with `Offline` after this many bytes on the next fetch.
     drop_after: Mutex<HashMap<String, usize>>,
+    /// Per file (`<bundle>/<path>`): the next fetch fails with this at once.
+    fail_with: Mutex<HashMap<String, FetchError>>,
     /// Every fetch, as (`<bundle>/<path>`, from_byte).
     fetches: Mutex<Vec<(String, u64)>>,
     /// When no hold offset is set, every fetch waits at its start while this is set.
@@ -132,6 +134,9 @@ impl ModelSource for Bundles {
             // `https://<host>/<bundle>/<path>` → `<bundle>/<path>`
             let key = file.url.splitn(4, '/').nth(3).unwrap().to_string();
             self.fetches.lock().unwrap().push((key.clone(), from_byte));
+            if let Some(e) = self.fail_with.lock().unwrap().remove(&key) {
+                return Err(e);
+            }
             let hold_after = *self.hold_after.lock().unwrap();
             if hold_after.is_none() {
                 while self.hold.load(std::sync::atomic::Ordering::SeqCst) {
@@ -978,6 +983,114 @@ async fn a_bundle_file_outside_the_bundle_folder_fails_without_a_request() {
     .await;
     assert!(s.source.fetches.lock().unwrap().is_empty());
     assert!(!dir.path().join("models/escape.bin").exists());
+}
+
+/// The `models` lines of the private log.
+fn model_log(dir: &Path) -> Vec<Value> {
+    std::fs::read_to_string(dir.join("logs/noter.log"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str::<Value>(l).unwrap())
+        .filter(|l| l["module"] == "models")
+        .collect()
+}
+
+/// The owner's v0.23.0 (18 Nov): an ad-hoc build cannot write its App Group container, so the
+/// first file of the first bundle could not be created. That is no lack of space: the bundle
+/// fails as `internal` (never `disk_full`, which the UI shows as a disk banner), and the log says
+/// which bundle and why.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_models_folder_that_cannot_be_written_fails_as_internal_and_is_logged() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = tempfile::tempdir().unwrap();
+    let models = dir.path().join("models");
+    std::fs::create_dir(&models).unwrap();
+    std::fs::set_permissions(&models, std::fs::Permissions::from_mode(0o500)).unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let failed = until(&s.core, "failed", |st| {
+        state(st, "whisper-turbo") == BundleState::Failed
+    })
+    .await;
+    wait_for_model_run_to_stop(&s.core).await;
+    std::fs::set_permissions(&models, std::fs::Permissions::from_mode(0o700)).unwrap();
+    assert_eq!(failed.models.error, Some(ErrorCode::Internal));
+    assert!(s.source.fetches.lock().unwrap().is_empty());
+    let log = model_log(dir.path());
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert_eq!(log[0]["level"], "error");
+    assert_eq!(log[0]["code"], "write_failed");
+    assert_eq!(log[0]["id"], "whisper-turbo");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn an_http_error_fails_the_bundle_and_logs_its_status() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    s.source
+        .fail_with
+        .lock()
+        .unwrap()
+        .insert("whisper-turbo/model.bin".into(), FetchError::Http(404));
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let failed = until(&s.core, "failed", |st| {
+        state(st, "whisper-turbo") == BundleState::Failed
+    })
+    .await;
+    wait_for_model_run_to_stop(&s.core).await;
+    assert_eq!(failed.models.error, Some(ErrorCode::Internal));
+    let log = model_log(dir.path());
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert_eq!(log[0]["code"], "http");
+    assert_eq!(log[0]["count"], 404);
+    assert_eq!(log[0]["id"], "whisper-turbo");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_fetch_that_breaks_fails_the_bundle_and_is_logged() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    s.source.fail_with.lock().unwrap().insert(
+        "whisper-turbo/model.bin".into(),
+        FetchError::Io("206 does not cover byte 0".into()),
+    );
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let failed = until(&s.core, "failed", |st| {
+        state(st, "whisper-turbo") == BundleState::Failed
+    })
+    .await;
+    wait_for_model_run_to_stop(&s.core).await;
+    assert_eq!(failed.models.error, Some(ErrorCode::Internal));
+    assert_eq!(model_log(dir.path())[0]["code"], "fetch_failed");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_checksum_mismatch_and_a_refused_url_are_logged() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), three_files(Some("dir/b.bin")), 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    until(&s.core, "checksum_failed", |st| {
+        state(st, "whisper-turbo") == BundleState::ChecksumFailed
+    })
+    .await;
+    wait_for_model_run_to_stop(&s.core).await;
+    let log = model_log(dir.path());
+    assert_eq!(log.len(), 1, "{log:?}");
+    assert_eq!(log[0]["code"], "checksum_failed");
+    assert_eq!(log[0]["id"], "whisper-turbo");
+
+    let dir = tempfile::tempdir().unwrap();
+    let bytes = vec![3u8; 100];
+    let source = Bundles::default().with("odd", &bytes, "models.example.com", &bytes, false);
+    let s = open(dir.path(), source, 90_000);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    until(&s.core, "failed", |st| {
+        state(st, "odd") == BundleState::Failed
+    })
+    .await;
+    wait_for_model_run_to_stop(&s.core).await;
+    assert_eq!(model_log(dir.path())[0]["code"], "not_allowed");
 }
 
 fn model_runs(core: &Core) -> Vec<JobRunRow> {
