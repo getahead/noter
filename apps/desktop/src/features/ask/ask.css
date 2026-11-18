@@ -39,7 +39,7 @@
 [data-width="wide"] .ak-recent-pop { display: none; }
 [data-width="medium"] .ak-recent, [data-width="narrow"] .ak-recent { display: none; }
 /* The toolbar's Recent pop-up is a compact "Recent ▾": its width follows the choices (thread titles), so it is capped to fit beside the scope and the search field. */
-.ak-recent-pop { max-width: 104px; }
+.ak-recent-pop { min-width: 92px; max-width: 104px; }
 .ak-recent-pop select { width: 100%; text-overflow: ellipsis; }
-/* a citation's speaker chip keeps a gap from the timecode that follows it */
-.ak-cite [data-component="cpt-noter-component-ui-person-chip"] { margin-inline-end: 8px; }
+/* a citation's speaker chip keeps a gap from the timecode before it */
+.ak-cite [data-component="cpt-noter-component-ui-person-chip"] { margin-inline: 8px 4px; }

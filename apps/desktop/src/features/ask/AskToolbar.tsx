@@ -26,7 +26,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
   // Medium and Narrow: the Recent pane's place (the pane and this pop-up swap by the window's width class, in ask.css)
   const recentPop = <PopupButton variant="toolbar" cls="ak-recent-pop" label={t("ask.recent")} options={recentChoices(recent, t("ask.recent_short"))} value="" onAction={(id) => id && requestOpen(id)} />;
   // Narrow: the scope moves into the » menu first (the mode indicator stays)
-  const scopeActions = base.narrow ? presets.map((p) => ({ label: `${t("ask.scope")}: ${p.id === "all" ? t("ask.scope_all") : p.label}`, onAction: () => setAskState({ scopeId: p.id }) })) : [];
+  const scopeActions = base.narrow ? presets.map((p) => ({ label: `${t("ask.scope")}: ${p.id === "all" ? t("ask.scope_all") : p.label}`, checked: p.id === scopeId, onAction: () => setAskState({ scopeId: p.id }) })) : [];
   const scope =
     presets.length > 0 && !base.narrow ? (
       <PopupButton variant="toolbar" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
