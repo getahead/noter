@@ -93,7 +93,9 @@ export function stepperItems(current: WizardStep, status: Pick<SetupStatus, "ste
     if (i < at) {
       if (step === "models") {
         state = stepperItemNext(state, "leave_models");
-        if (bundles.some((b) => b.state === "checksum_failed")) state = stepperItemNext(state, "bundle_failed");
+        // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-download-failed
+        if (bundles.some((b) => b.state === "checksum_failed" || b.state === "failed")) state = stepperItemNext(state, "bundle_failed");
+        // @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-download-failed
         else if (bundles.length > 0 && bundles.every((b) => b.state === "ready")) state = stepperItemNext(state, "all_bundles_in");
       } else {
         const skipped = status.steps.some((r) => r.step === step && r.state === "skipped");

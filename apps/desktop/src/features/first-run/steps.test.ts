@@ -82,6 +82,11 @@ describe("stepperItems", () => {
     expect(states("permissions", status(["ready", "checksum_failed"]))[1]).toBe("ERROR");
   });
 
+  it("marks Models error as well when a download failed for another reason (#998)", () => {
+    expect(states("permissions", status(["ready", "failed"]))[1]).toBe("ERROR");
+    expect(states("permissions", status(["ready", "paused"]))[1]).not.toBe("ERROR");
+  });
+
   it("keeps Models current while the user is on it, whatever the downloads do", () => {
     expect(states("models", status(["checksum_failed"]))[1]).toBe("CURRENT");
   });

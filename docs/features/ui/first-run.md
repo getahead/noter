@@ -144,6 +144,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Error — No connection: **Waiting for a connection — downloads resume automatically**
 - Error — Not enough disk space: error banner **Needs 2.1 GB, 1.4 GB free** with **Try Again**
 - Error — Download failed its check: **Check failed** and **Try Again** on the bundle row, progress stopped; **Models** shows the error glyph once the user moves on
+- Error — Download failed (the server answers with an error, or a folder cannot be written; going offline is No connection): **Download failed** and **Try Again** on the bundle row, progress stopped; **Models** shows the error glyph once the user moves on
 - Error — Speech model not downloaded yet: the self-test shows **Waiting for the speech model · 62 %** and runs by itself once the model is in
 
 **Steps**:
@@ -154,6 +155,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
    - [x] - `p1` - **CASE** offline: the line **Waiting for a connection — downloads resume automatically**; nothing to do - `inst-case-offline`
    - [x] - `p1` - **CASE** disk short (`disk_full`): the error banner in FR-R2 **Needs 2.1 GB, 1.4 GB free** · **Try Again** (`models_download` again) - `inst-case-disk`
    - [x] - `p1` - **CASE** a bundle failed its check (`checksum_failed`): **Check failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-checksum`
+   - [x] - `p1` - **CASE** a bundle's download failed for another reason (`failed`): **Download failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-download-failed`
 5. [x] - `p1` - User clicks **Continue** at any time; the stepper shows the background ring on **Models** with **Downloading in the background · 64 %** - `inst-continue-bg`
 6. [x] - `p1` - UI: when every bundle is in, announce **Models downloaded** politely once - `inst-announce-done`
 7. [x] - `p1` - **RETURN** the models downloading or ready, with setup going on - `inst-return-models`
@@ -251,7 +253,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 3. [x] - `p1` - **FROM** CURRENT **TO** SKIPPED **WHEN** the user clicks **Skip for Now** - `inst-current-skipped`
 4. [x] - `p1` - **FROM** CURRENT **TO** RUNNING_IN_BACKGROUND **WHEN** the user leaves **Models** while downloads continue - `inst-current-running`
 5. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every bundle is in - `inst-running-done`
-6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check - `inst-running-error`
+6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check or its download fails (going offline is not an error) - `inst-running-error`
 7. [x] - `p1` - **FROM** SKIPPED **TO** CURRENT **WHEN** the user clicks it - `inst-skipped-current`
 8. [x] - `p1` - **FROM** ERROR **TO** CURRENT **WHEN** the user clicks it - `inst-error-current`
 
@@ -312,7 +314,7 @@ The system **MUST** render the first-run window FR-R1 to FR-R3 and its six steps
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-models`
 
-The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** with **Try Again**, and the background ring in the stepper.
+The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** or **Download failed** with **Try Again**, and the background ring in the stepper.
 
 **Implements**:
 - `cpt-noter-flow-ui-first-run-download-models`
