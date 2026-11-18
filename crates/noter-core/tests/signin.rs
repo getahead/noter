@@ -176,7 +176,14 @@ fn start(provider: AccountProvider, confirmed: bool) -> SignInStartArgs {
 }
 
 fn pair(provider: AccountProvider) -> AccountProviderArgs {
-    AccountProviderArgs { provider }
+    reuse(provider, None)
+}
+
+fn reuse(provider: AccountProvider, ticked: Option<bool>) -> AccountProviderArgs {
+    AccountProviderArgs {
+        provider,
+        personal_use_confirmed: ticked,
+    }
 }
 
 fn sign_out(provider: AccountProvider, also_in_cli: bool) -> SignOutArgs {
@@ -469,13 +476,13 @@ async fn use_existing_runs_the_same_checks_and_claude_needs_a_recorded_confirmat
     );
     let err = w
         .core
-        .account_use_existing(&settings(), pair(CLAUDE))
+        .account_use_existing(&settings(), reuse(CLAUDE, None))
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::PersonalUseNotConfirmed);
     let err = w
         .core
-        .account_use_existing(&settings(), pair(CHATGPT))
+        .account_use_existing(&settings(), reuse(CHATGPT, None))
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::PlanNotEligible);
@@ -486,7 +493,7 @@ async fn use_existing_runs_the_same_checks_and_claude_needs_a_recorded_confirmat
     );
     let ok = w
         .core
-        .account_use_existing(&settings(), pair(CHATGPT))
+        .account_use_existing(&settings(), reuse(CHATGPT, None))
         .await
         .unwrap();
     assert!(is_signed_in(&ok, CHATGPT));
@@ -502,10 +509,34 @@ async fn use_existing_runs_the_same_checks_and_claude_needs_a_recorded_confirmat
         .unwrap();
     let err = w
         .core
-        .account_use_existing(&settings(), pair(CHATGPT))
+        .account_use_existing(&settings(), reuse(CHATGPT, None))
         .await
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::AccountSignedOut);
+}
+
+// #1000: Claude Code already signed in, first sign-in in Noter, the box ticked in the sheet.
+#[tokio::test(start_paused = true)]
+async fn the_box_ticked_in_the_request_lets_a_first_reuse_of_claude_through() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296",
+            "identity":{"email":"ann@example.com","plan":"Max"}}"#,
+    );
+    let err = w
+        .core
+        .account_use_existing(&settings(), reuse(CLAUDE, Some(false)))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::PersonalUseNotConfirmed);
+    let ok = w
+        .core
+        .account_use_existing(&settings(), reuse(CLAUDE, Some(true)))
+        .await
+        .unwrap();
+    assert!(is_signed_in(&ok, CLAUDE));
 }
 
 #[tokio::test(start_paused = true)]
@@ -538,7 +569,7 @@ async fn a_confirmed_sign_in_lets_a_later_reuse_of_claude_through() {
     );
     let back = w
         .core
-        .account_use_existing(&settings(), pair(CLAUDE))
+        .account_use_existing(&settings(), reuse(CLAUDE, None))
         .await
         .unwrap();
     assert!(is_signed_in(&back, CLAUDE));

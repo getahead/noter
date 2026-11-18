@@ -1068,7 +1068,8 @@ impl CoreApi for Core {
         ctx: &CommandCtx,
         args: AccountProviderArgs,
     ) -> Result<AccountsView, CoreError> {
-        self.use_existing(ctx, args.provider).await
+        let confirmed = args.personal_use_confirmed.unwrap_or(false);
+        self.use_existing(ctx, args.provider, confirmed).await
     }
 
     // @cpt-flow:cpt-noter-flow-core-credentials-privacy-bind-signout:p1

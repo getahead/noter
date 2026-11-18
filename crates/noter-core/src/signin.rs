@@ -446,6 +446,7 @@ impl Core {
         &self,
         ctx: &CommandCtx,
         provider: AccountProvider,
+        ticked: bool,
     ) -> Result<AccountsView, CoreError> {
         self.ready()?;
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-signin:p1:inst-signin-existing
@@ -453,9 +454,10 @@ impl Core {
         let identity = prepared.existing.ok_or_else(|| {
             CoreError::new(ErrorCode::AccountSignedOut, "the tool is not signed in")
         })?;
-        // 1.4 gap: `account_use_existing` has no confirmation field, so Claude reuse needs one
-        // recorded by an earlier `account_signin_start`.
+        // Claude reuse needs the box ticked in this request (2.13) or one recorded by an earlier
+        // `account_signin_start`.
         let confirmed = provider != AccountProvider::Claude
+            || ticked
             || self
                 .accounts
                 .connection(provider)

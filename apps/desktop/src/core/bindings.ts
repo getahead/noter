@@ -27,6 +27,12 @@ export type AccountProvider =
 
 export type AccountProviderArgs = {
 	provider: AccountProvider,
+	/**
+	 *  Read only by `account_use_existing` (contract 2.13): the personal-use box ticked in the
+	 *  sheet, which Claude reuse needs unless an earlier `account_signin_start` recorded it.
+	 *  Absent means not ticked; the other commands ignore it.
+	 */
+	personal_use_confirmed?: boolean | null,
 };
 
 export type AccountStatus = { type: "not_signed_in" } | { type: "signing_in"; session_id: SignInSessionId } | { type: "signed_in"; identity: AccountIdentity; since: TimestampMs } | 
@@ -3638,7 +3644,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.12";
+export const CONTRACT_VERSION = "2.13";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
