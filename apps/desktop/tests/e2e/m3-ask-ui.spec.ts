@@ -206,8 +206,9 @@ test.describe("cpt-noter-seq-ask-cited-answer", () => {
   test("a cited named speaker shows as a person chip on the citation row", async ({ page }) => {
     if (!REAL) return; // the fake's cited call carries no speaker
     const steer = await openAsk(page);
-    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: THREAD_ANSWER, citations: [{ n: 1, segment_ids: ["seg_1"], chunk_ids: [], quote: "scripted quote" }], found: true } });
-    await ask(page, WEBSOCKET);
+    // seg_live_005 is Dmitri Sokolov, a named speaker of the fixture world; the question is the one the conformance suite retrieves it with
+    await steer.invoke("harness.llm_next", { skill: "ask-answer", output: { answer_md: THREAD_ANSWER, citations: [{ n: 1, segment_ids: ["seg_live_005"], chunk_ids: [], quote: "scripted quote" }], found: true } });
+    await ask(page, "websocket уведомления");
     const row = citationRows(answers(page).last()).first();
     await expect(row).toBeVisible();
     await expect(row.locator('[data-component="cpt-noter-component-ui-person-chip"]')).toBeVisible(); // the core fills Citation.speaker for a named speaker

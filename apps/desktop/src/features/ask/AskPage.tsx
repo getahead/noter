@@ -296,7 +296,8 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             onEnter={onSend}
           />
           {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
-          {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={onSend} />}
+          {/* keyed, so Stop and Ask are two buttons: the one that had focus goes away and the composer takes it */}
+          {busy ? <PushButton key="stop" label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton key="send" label={t("ask.send")} variant="primary" onAction={onSend} />}
         </div>
         {empty && suggestions.length > 0 && (
           <div className="ak-suggest">
