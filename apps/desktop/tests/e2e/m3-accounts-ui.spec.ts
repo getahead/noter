@@ -85,8 +85,10 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await expect(dlg).toContainText("Use ann@example.com");
     await dlg.getByRole("checkbox").click({ force: true }); // the personal-use guard covers the existing account too
     await button(dlg, "Use This Account").click();
-    expect(await sent(page, "account_use_existing")).toHaveLength(1);
+    // #1000: the ticked box goes with the request, and the core's answer moves the sheet on to Use
+    expect(await sent(page, "account_use_existing")).toEqual([{ provider: "claude", personal_use_confirmed: true }]);
     expect(await sent(page, "account_signin_start")).toHaveLength(0);
+    await expect(dlg).toContainText("Connected to your Claude account");
     await expect(dlg).toContainText("ann@example.com");
   });
 

@@ -71,16 +71,17 @@ class Machines {
   }
   async install(p: AccountProvider) {
     const res = await installCli(this.bridge, TOOL[p]);
-    if (res.status === "ok") this.dispatch(p, { type: "installStarted", runId: res.data.job_run_id });
+    this.dispatch(p, res.status === "ok" ? { type: "installStarted", runId: res.data.job_run_id } : { type: "prepareFailed", code: res.error.code });
   }
   /** Continue in Browser (a fresh guarded session) or Use This Account, by the choice of the sheet. */
   async proceed(p: AccountProvider) {
     const m = this.state[p];
     if (m.choice === "existing" && m.prepare?.existing) {
-      const res = await useExistingAccount(this.bridge, p);
+      const res = await useExistingAccount(this.bridge, p, m.confirmed);
       // @cpt-begin:cpt-noter-algo-ui-accounts-session:p1:inst-version
       // the answer is the whole accounts view; the bridge keeps the highest version, so the row refreshes without invented Check progress
-      if (res.status === "ok") this.dispatch(p, { type: "usedExisting", identity: m.prepare.existing });
+      // a refusal shows on the sheet, never a silent no-op (#1000)
+      this.dispatch(p, res.status === "ok" ? { type: "usedExisting", identity: m.prepare.existing } : { type: "prepareFailed", code: res.error.code });
       // @cpt-end:cpt-noter-algo-ui-accounts-session:p1:inst-version
       return;
     }
