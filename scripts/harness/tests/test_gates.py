@@ -794,20 +794,20 @@ class CiChangesTests(unittest.TestCase):
         unknown = [f for f in known if not common.matches_any(f, CFG["ci"]["everything"]) and ci_changes.classify(f, CFG["ci"])[0] is None]
         self.assertEqual(unknown, [])
 
-    # The XCUITests drive the built app, UI bundle included: UI code runs macos too.
+    # The XCUITests drive the built app: UI code they can see runs macos too (harness.toml `ui-native`).
     UI_ONLY = {"lint-ui", "arch", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "docs", "macos"}
     BACKEND_ONLY = {"lint-rust", "arch", "unit-rust", "e2e-core", "e2e-coverage", "e2e-report", "docs", "macos"}
 
     def test_frontend_only_change_runs_the_ui_side(self):
         # The real-core run is skipped; e2e-coverage judges main's real-core logs (ci.yml).
-        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"]), self.UI_ONLY)
+        self.assertEqual(self.run_jobs(["apps/desktop/src/app/App.tsx"]), self.UI_ONLY)
 
     def test_backend_only_change_runs_the_rust_side(self):
         # The fake world is TypeScript and never counted: a Rust change cannot change its runs or the pixels.
         self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs"]), self.BACKEND_ONLY)
 
     def test_both_sides_run_both_halves(self):
-        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs", "apps/desktop/src/App.tsx"]),
+        self.assertEqual(self.run_jobs(["crates/noter-core/src/lib.rs", "apps/desktop/src/app/App.tsx"]),
                          self.UI_ONLY | self.BACKEND_ONLY)
 
     def test_protocol_change_touches_both_sides(self):
@@ -833,7 +833,7 @@ class CiChangesTests(unittest.TestCase):
     def test_contract_runs_for_the_protocol_and_the_generated_files(self):
         for f in ["crates/noter-protocol/src/lib.rs", "contracts/ipc.manifest.json", "apps/desktop/src/core/bindings.ts"]:
             self.assertIn("contract", self.run_jobs([f]), f)
-        self.assertNotIn("contract", self.run_jobs(["apps/desktop/src/App.tsx"]))
+        self.assertNotIn("contract", self.run_jobs(["apps/desktop/src/app/App.tsx"]))
 
     def test_docs_change_runs_only_docs_and_trace(self):
         self.assertEqual(self.run_jobs(["docs/PRD.md"]), {"arch", "docs"})
@@ -845,6 +845,10 @@ class CiChangesTests(unittest.TestCase):
         self.assertIn("macos", jobs)
         self.assertNotIn("visual", jobs)
         self.assertNotIn("lint-ui", jobs)
+
+    def test_a_dependency_change_runs_macos(self):
+        for f in ["package.json", "apps/desktop/package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"]:
+            self.assertIn("macos", self.run_jobs([f]), f)
 
     def test_harness_and_unknown_files_run_everything(self):
         every = set(CFG["ci"]["jobs"]["ci"])
@@ -865,7 +869,7 @@ class CiChangesTests(unittest.TestCase):
         self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"]), set(), "CI does not run for another workflow")
 
     def test_codeql_analyses_the_changed_languages(self):
-        self.assertEqual(self.run_jobs(["apps/desktop/src/App.tsx"], "codeql"), {"javascript-typescript"})
+        self.assertEqual(self.run_jobs(["apps/desktop/src/app/App.tsx"], "codeql"), {"javascript-typescript"})
         self.assertEqual(self.run_jobs(["engine/Sources/x.swift", "docs/PRD.md"], "codeql"), set())
         self.assertEqual(self.run_jobs([".github/workflows/nightly.yml"], "codeql"), {"actions"})
 
@@ -901,8 +905,16 @@ class CiChangesTests(unittest.TestCase):
          {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
         (["apps/desktop/src-tauri/src/main.rs"], {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
         (["engine/Sources/NoterEngineKit/WhisperTranscriber.swift"], {"macos", "e2e-coverage", "e2e-report", "arch", "docs"}),
-        (["apps/desktop/src/App.tsx"], UI_ONLY),
+        (["apps/desktop/src/app/App.tsx"], UI_ONLY),
         (["apps/desktop/src/styles/app.css"], {"lint-ui", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "macos"}),
+        # UI the XCUITests cannot see: no macOS runner; e2e-coverage takes main's XCUITest results.
+        (["apps/desktop/src/features/library/library.css"], {"lint-ui", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual"}),
+        (["apps/desktop/src/features/ask/AskPage.tsx"], UI_ONLY - {"macos"}),
+        (["apps/desktop/src/features/library/calls-page.test.tsx"], UI_ONLY - {"macos"}),
+        # UI they drive, and the dependencies the app is built from.
+        (["apps/desktop/src/features/library/calls-page.tsx"], UI_ONLY),
+        (["apps/desktop/src/features/ask/register.tsx"], UI_ONLY),
+        (["apps/desktop/src/features/settings/settings.css"], {"lint-ui", "unit-ui", "e2e-ui", "e2e-coverage", "e2e-report", "visual", "macos"}),
         (["crates/noter-core/src/lib.rs"], BACKEND_ONLY),
         (["scripts/models/manifest.json"], BACKEND_ONLY - {"arch", "docs"}),
         (["apps/desktop/tests/e2e/m1-floating-panel.spec.ts"],
@@ -937,7 +949,7 @@ class CiChangesTests(unittest.TestCase):
 
     def test_verdict_over_partial_runs(self):
         # A frontend-only plan: the skipped backend half passes, a backend half that ran and failed does not.
-        p = ci_changes.plan(["apps/desktop/src/App.tsx"], CFG, "ci")
+        p = ci_changes.plan(["apps/desktop/src/app/App.tsx"], CFG, "ci")
         ok, skipped = {"result": "success"}, {"result": "skipped"}
         needs = {"changes": ok, **{j: ok if run else skipped for j, run in p.jobs.items()}}
         self.assertEqual(ci_changes.verdict(needs, json.dumps(p.jobs)), [])
