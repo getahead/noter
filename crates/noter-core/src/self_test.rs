@@ -64,6 +64,7 @@ fn silent(arrived: &[AudioChannel]) -> SelfTestFailure {
     }
 }
 
+// @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-map-events
 fn reason(
     passed: bool,
     failure: Option<EngineErrorCode>,
@@ -77,6 +78,9 @@ fn reason(
         return Err(SelfTestFailure::OwnSoundsLeak);
     }
     Err(match failure {
+        Some(EngineErrorCode::ZeroBuffers) if arrived.contains(&AudioChannel::Sys) => {
+            silent(arrived)
+        }
         Some(EngineErrorCode::ZeroBuffers) => SelfTestFailure::ZeroBuffers,
         Some(EngineErrorCode::ModelMissing | EngineErrorCode::ModelLoadFailed) => {
             SelfTestFailure::ModelMissing
@@ -88,6 +92,8 @@ fn reason(
         _ => silent(arrived),
     })
 }
+
+// @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-map-events
 
 impl Core {
     fn self_test_hub(&self) -> Arc<StreamHub<SelfTestMsg>> {

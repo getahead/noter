@@ -294,15 +294,22 @@ pub fn detection(offer_to_record: bool, self_test: &SelfTestState) -> (bool, boo
     // @cpt-end:cpt-noter-algo-core-first-run-detection-rule:p1:inst-detect-off
 }
 
-/// System Audio Recording cannot be queried: a passed self-test means granted, only zeros
-/// means off; otherwise the short engine test's inference (F1), if any.
+/// System Audio Recording cannot be queried: hearing it means granted, even if the microphone
+/// stayed silent; system-audio zeros mean off, otherwise use the short test's inference (F1).
+// @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
 pub(crate) fn system_audio(stored: &Stored) -> PermissionState {
     // The newest finding wins: a probe or prompt after the self-test, until the next self-test.
     if let Some(heard) = stored.system_audio {
         return heard;
     }
     match &stored.self_test {
-        SelfTestState::Passed { .. } => PermissionState::Granted,
+        SelfTestState::Passed { .. }
+        | SelfTestState::Failed {
+            reason:
+                SelfTestFailure::OneStreamSilent {
+                    channel: AudioChannel::Mic,
+                },
+        } => PermissionState::Granted,
         SelfTestState::Failed {
             reason: SelfTestFailure::ZeroBuffers,
         } => PermissionState::Denied,

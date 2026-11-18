@@ -420,6 +420,9 @@ impl Core {
 
     pub(crate) fn call_ended(&self, call_id: &CallId, reason: StreamEndReason) {
         let _finalize = lock(&self.transcript.finalize);
+        if lock(&self.transcript.state).discarded.contains(call_id) {
+            return;
+        }
         if reason != StreamEndReason::Discarded {
             // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-flush
             self.flush_locked(call_id);

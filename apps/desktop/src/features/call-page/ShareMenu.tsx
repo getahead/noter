@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import type { SectionKind } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
 import { IconButton } from "../../ui/primitives/icon-button";

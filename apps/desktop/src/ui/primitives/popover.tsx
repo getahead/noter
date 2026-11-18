@@ -3,6 +3,9 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { base, zoomFactor } from "./attrs";
 import { focusInside } from "./sheet";
+import { closeOnEscape, dismissPopover } from "./popover-escape";
+
+export { closeOnEscape } from "./popover-escape";
 
 type Rect = { left: number; right: number; top: number; bottom: number };
 type Size = { width: number; height: number };
@@ -34,17 +37,6 @@ export function closeOnOutside(popover: { current: HTMLElement | null }, anchor:
   };
   document.addEventListener("pointerdown", outside);
   return () => document.removeEventListener("pointerdown", outside);
-}
-
-/** Calls `onClose` on Escape anywhere while the popover is open (Tab may have moved focus out of it) and consumes the key, so only the popover closes; returns the remover. */
-export function closeOnEscape(onClose: () => void) {
-  const key = (e: KeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented) return;
-    e.preventDefault(); // consumed: the shell's window-level Esc must not also close the inspector or a sidebar overlay
-    onClose();
-  };
-  document.addEventListener("keydown", key);
-  return () => document.removeEventListener("keydown", key);
 }
 
 export interface PopoverProps {
@@ -84,7 +76,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
     return () => returnFocus(anchor, restore);
   }, [placed]); // once per opening
   useEffect(() => closeOnOutside(ref, anchor, onClose), [anchor, onClose]);
-  useEffect(() => closeOnEscape(onClose), [onClose]);
+  useEffect(() => ref.current ? closeOnEscape(onClose, ref.current) : undefined, [onClose]);
   return (
     <div
       ref={ref}
@@ -95,7 +87,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
       tabIndex={-1}
       // .np-pop is hidden until placed, as in the prototype
       style={{ width, ...(place && { position: "fixed", ...place, visibility: "visible" }) }}
-      onKeyDown={(e) => e.key === "Escape" && !e.defaultPrevented && (e.stopPropagation(), onClose())}
+      onKeyDown={dismissPopover}
     >
       {children}
     </div>

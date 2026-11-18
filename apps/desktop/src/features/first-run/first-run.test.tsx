@@ -39,6 +39,7 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     expect(html).toContain('data-component="cpt-noter-component-screen-first-run" data-variant="step-1" data-state="welcome"');
     for (const r of ["FR-R1", "FR-R2", "FR-R3"]) expect(html).toContain(`data-region="${r}"`);
     expect(html).toContain("Set up Noter");
+    expect(html).toContain("macOS · Core Audio process tap");
     expect(html).toContain('aria-label="Setup steps"');
     expect(html).toContain("Everything here runs on this Mac.");
     expect(html).toContain("Welcome to Noter");

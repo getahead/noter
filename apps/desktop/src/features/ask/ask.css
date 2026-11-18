@@ -31,9 +31,12 @@
 .ak-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .ak-recent__list { list-style: none; margin: 0; padding: 0; }
 .ak-recent__li { margin: 0; }
-/* Medium: the title never gives way (it was squeezed to "A."); the search field takes the squeeze instead. */
+/* Keep the title and search usable; long scope values give up room first. */
 [data-region="AK-R1"] .np-toolbar__titles { flex: none; }
-[data-region="AK-R1"] .np-toolbar__search { min-width: 0; }
+[data-region="AK-R1"] .np-toolbar__searchhost { min-width: 180px; }
+[data-region="AK-R1"] .np-mode { min-width: 0; }
+.ak-scope-pop { flex: 0 1 180px; min-width: 64px; }
+.ak-scope-pop select { width: 100%; text-overflow: ellipsis; }
 
 /* Size behaviour (DESIGN › Ask): Medium and Narrow collapse Recent into the toolbar's Recent pop-up; Wide keeps the 260 pt pane. */
 [data-width="wide"] .ak-recent-pop { display: none; }

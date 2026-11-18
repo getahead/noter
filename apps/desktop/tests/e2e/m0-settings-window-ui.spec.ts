@@ -3,7 +3,7 @@
 // card-key modifier set. The Hotkeys story paths are in m0-settings-hotkeys-ui.spec.ts.
 import type { Page } from "@playwright/test";
 
-import { calls, openWindow, type CorePlan } from "./support/app";
+import { openWindow, type CorePlan } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 

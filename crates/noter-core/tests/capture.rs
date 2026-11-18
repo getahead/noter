@@ -1722,6 +1722,89 @@ async fn while_hidden_for_presenting_the_call_seems_ended_for_ten_minutes() {
 
 // --- Nothing heard, discard ----------------------------------------------------------
 
+#[tokio::test(start_paused = true)]
+async fn discard_waits_for_the_engine_final_audio_writes_before_removing_the_folder() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    let call_audio = r._dir.path().join("audio").join(call_id.as_str());
+    std::fs::create_dir_all(&call_audio).unwrap();
+    let stops = r.stops();
+    let mut discard = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_discard(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(stops + 1, |c| matches!(c, EngineCommand::Stop { .. }))
+        .await;
+    // Stop was acknowledged, but the engine still owns its final audio/timeline writes.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut discard)
+            .await
+            .is_err()
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 1);
+    std::fs::write(call_audio.join("mic.m4a"), b"final audio after Stop ACK").unwrap();
+    std::fs::write(call_audio.join("timeline.json"), b"final timeline").unwrap();
+    r.session_stopped(&call_id);
+    assert_eq!(discard.await.unwrap().unwrap().phase, CapturePhase::Idle);
+    assert!(
+        !call_audio.exists(),
+        "the engine's final writes were discarded too"
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retry() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    let call_audio = r._dir.path().join("audio").join(call_id.as_str());
+    std::fs::create_dir_all(&call_audio).unwrap();
+    let args = CallIdArgs {
+        call_id: call_id.clone(),
+    };
+    let error = r
+        .core
+        .capture_discard(&main_window(), args.clone())
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::EngineUnavailable);
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 1);
+    assert!(call_audio.exists());
+    let retry = r
+        .core
+        .capture_discard(&main_window(), args.clone())
+        .await
+        .unwrap_err();
+    assert_eq!(retry.code, ErrorCode::EngineUnavailable);
+    assert!(
+        call_audio.exists(),
+        "retry still waits for the in-flight writer"
+    );
+    // A late flush completes before the explicit retry; deletion may now finish safely.
+    std::fs::write(call_audio.join("mic.m4a"), b"late audio").unwrap();
+    r.session_stopped(&call_id);
+    r.pass(1).await;
+    assert_eq!(
+        r.core
+            .capture_discard(&main_window(), args)
+            .await
+            .unwrap()
+            .phase,
+        CapturePhase::Idle
+    );
+    assert!(!call_audio.exists());
+}
+
 fn segment(call_id: &CallId) -> EngineEvent {
     EngineEvent::Segment {
         segment: noter_protocol::engine::EngineSegment {

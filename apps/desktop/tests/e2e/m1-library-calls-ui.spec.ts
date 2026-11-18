@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { hold } from "../visual/hold";
-import { calls, openWindow, steerFor } from "./support/app";
+import { openWindow, steerFor } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import {

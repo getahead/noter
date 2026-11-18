@@ -40,6 +40,10 @@ test.describe("cpt-noter-dod-ui-primitives-controls primitives page", () => {
     const rows = page.locator('[data-gallery="status-row"] .e-status');
     await expect(rows).toHaveCount(9);
     expect(await rows.evaluateAll((r) => r.map((e) => e.getAttribute("data-variant")))).toEqual(["source", "runtime", "model", "job", "evidence", "evidence", "share-test", "share-test", "source"]);
+    const job = rows.nth(3);
+    await expect(job).toContainText("Off");
+    await expect(job.getByRole("switch")).not.toBeChecked();
+    await expect(job.getByRole("button")).toHaveText(["Run Now"]);
     const wide = rows.nth(0), narrow = rows.nth(8);
     const [wideMain, wideActions] = [await wide.locator(".e-status__main").boundingBox(), await wide.locator(".e-status__actions").boundingBox()];
     const [narrowMain, narrowActions] = [await narrow.locator(".e-status__main").boundingBox(), await narrow.locator(".e-status__actions").boundingBox()];

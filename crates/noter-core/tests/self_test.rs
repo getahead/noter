@@ -16,7 +16,7 @@ use noter_core::{
 use noter_db::rusqlite::Connection;
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
-use noter_protocol::engine::{EngineCommand, EngineErrorCode};
+use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -348,6 +348,47 @@ async fn only_zeros_and_one_silent_stream_fail_with_their_reasons() {
         })
     );
     assert!(!status(&r).await.detection_enabled);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_silent_microphone_does_not_mark_proven_system_audio_denied() {
+    for failure in [
+        EngineErrorCode::ZeroBuffers,
+        EngineErrorCode::DeviceUnavailable,
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let engine = ScriptedEngine::new();
+        engine.hold_next_self_test();
+        let r = open(dir.path(), engine, PermissionState::Granted, None);
+        let inject = r.engine.clone();
+        let emitter = tokio::spawn(async move {
+            tokio::time::timeout(Duration::from_secs(5), async {
+                while !inject.inject(EngineEvent::SelfTestStream {
+                    channel: AudioChannel::Sys,
+                }) {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            })
+            .await
+            .expect("the engine never started the held self-test");
+            assert!(inject.inject(EngineEvent::SelfTestResult {
+                passed: false,
+                failure: Some(failure),
+                own_sounds_leak: false,
+            }));
+        });
+        let (_, events) = run_to_end(&r, false).await;
+        emitter.await.unwrap();
+        assert_eq!(
+            failed(&events),
+            Some(SelfTestFailure::OneStreamSilent {
+                channel: AudioChannel::Mic
+            })
+        );
+        let setup = status(&r).await;
+        assert_eq!(system_audio_row(&setup), PermissionState::Granted);
+        assert!(!setup.detection_enabled);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

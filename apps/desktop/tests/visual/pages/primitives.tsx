@@ -396,7 +396,7 @@ function Gallery() {
           <StatusRow variant="source" tone="ok" icon="check" word="Up to date" title="Notion" tag="Indexed" subtitle="2 documents · Last sync 9:41" actions={<PushButton label="Re-index" size="small" />} />
           <StatusRow variant="runtime" tone="ok" icon="check" word="Ready" title="Local speech" subtitle="Runs on this Mac" actions={<PushButton label="Details" size="small" />} />
           <StatusRow variant="model" tone="run" word="Downloading" title="Large speech model" progress={{ done: 680, total: 1000 }} progressText="Downloading 680 of 1,000 MB" />
-          <StatusRow variant="job" tone="off" icon="pause" word="Paused" title="Nightly summaries" subtitle="Last run 02:14 · 12 calls" toggle={<Toggle ariaLabel="Nightly summaries" on={false} size="small" />} actions={<><PushButton label="Resume" size="small" /><PushButton label="Run Now" size="small" /></>} />
+          <StatusRow variant="job" tone="off" word="Off" title="Nightly summaries" subtitle="Last run 02:14 · 12 calls" toggle={<Toggle ariaLabel="Nightly summaries" on={false} size="small" />} actions={<PushButton label="Run Now" size="small" />} />
           <StatusRow variant="evidence" tone="ok" icon="check" word="Detected" title="Jira (acli)" subtitle="acli 1.3.2" />
           <StatusRow variant="evidence" tone="warn" icon="warning" word="Not configured" title="Bitbucket (bkt)" subtitle="Not configured · install bkt" actions={<PushButton label="Check Again" size="small" />} />
           <StatusRow variant="share-test" tone="ok" icon="check" word="Hidden" title="Call window" />

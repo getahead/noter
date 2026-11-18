@@ -337,6 +337,9 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await scroller.hover();
     await page.mouse.wheel(0, -1);
     await expect(log(page)).toHaveAttribute("data-state", "detached");
+    // A second native scroll notification at the same pixel must not resume following (#1006).
+    await scroller.dispatchEvent("scroll");
+    await expect(log(page)).toHaveAttribute("data-state", "detached");
     await wheelUpTo(log(page), rowWith(page, ANNA_LINE));
     await steer.push("transcript_subscribe", confirmed(line(100, { id: "seg_n1" })));
     await expect(jump(page, "Jump to Live · 1 new line")).toBeVisible();

@@ -21,7 +21,6 @@ import type {
   OutputSection,
   PersonRow,
   Rev,
-  SectionKind,
   SourceRow,
   SpeakerLabel,
   SpeakerView,
@@ -30,7 +29,7 @@ import type {
   TodayView,
   UpcomingCall,
 } from "../../bindings";
-import { coreError, type FakeCore, type Handlers, type HandlerCtx, type World } from "../fake-core";
+import { coreError, type FakeCore, type HandlerCtx, type World } from "../fake-core";
 
 export const nextId = (fake: FakeCore, prefix: string) => `${prefix}_fake_${++fake.handlerState.counter}`;
 export const now = (): TimestampMs => Date.now();

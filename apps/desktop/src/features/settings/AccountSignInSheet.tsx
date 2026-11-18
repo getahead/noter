@@ -30,6 +30,7 @@ const ERROR_TEXT: Record<string, { title: MsgKey; text: MsgKey }> = {
   sign_in_timed_out: { title: "signin.err.sign_in_timed_out", text: "signin.err.sign_in_timed_out_text" },
   plan_not_eligible: { title: "signin.err.plan_not_eligible", text: "signin.err.plan_not_eligible_text" },
   offline: { title: "signin.err.offline", text: "signin.err.offline_text" },
+  personal_use_not_confirmed: { title: "signin.err.personal_use_not_confirmed", text: "signin.err.personal_use_not_confirmed_text" },
   other: { title: "signin.err.other", text: "signin.err.other_text" },
 };
 const STEPS: MsgKey[] = ["signin.step_prepare", "signin.step_signin", "signin.step_check", "signin.step_use"];

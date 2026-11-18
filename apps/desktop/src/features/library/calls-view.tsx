@@ -66,7 +66,7 @@ const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
 
 /** Library › Calls as the prototype draws it: LC-R1 (title and counts) and LC-R3 (table, empty state, skeleton or error). */
 export function CallsView(p: CallsViewProps) {
-  const { state, selection } = p;
+  const { state } = p;
   const chosen = selectedRows(state.rows, p.selected);
   return (
     <>

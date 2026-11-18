@@ -22,7 +22,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
   it("NO_MATCHES keeps the query, Ask Instead, and Clear Filters only when filters are set", () => {
     const none = props(results(), { filter: {} });
     expect(html(none)).toContain("No matches for “websocket”");
-    expect(html(none)).toMatch(/<p class="np-sr" role="status">No matches for “websocket”<\/p>/); // announced, not only drawn
+    expect(html(none)).not.toContain('role="status"'); // the persistent window live region announces it
     expect(html(none)).toContain("Ask Instead");
     expect(html(none)).toContain("Try fewer words");
     expect(html(none)).not.toContain("Clear Filters");

@@ -54,6 +54,18 @@ const states: { id: string; world: (w: World) => void; ready?: (page: Page) => P
       await expect(win(page).getByRole("button", { name: "Try Again" })).toBeVisible();
     },
   },
+  ...(["checksum_failed", "failed"] as const).map((failure) => ({
+    id: `${failure}-after-models`,
+    world: (w: World) => {
+      downloading(w);
+      at("permissions")(w);
+      w.app.setup.models.bundles.forEach((b, i) => Object.assign(b, { state: i === 0 ? failure : "downloading", done_mb: 0 }));
+    },
+    ready: async (page: Page) => {
+      await expect(page.getByRole("list", { name: "Setup steps" }).getByRole("listitem").filter({ hasText: "Models" })).toHaveAttribute("data-state", "error");
+      await expect(page.locator('[data-region="FR-R2"]')).toContainText("Microphone");
+    },
+  })),
   { id: "speech-wait", world: (w) => (downloading(w), at("permissions")(w), granted(w), partway(w)) },
   { id: "perm-not-asked", world: (w) => (W.firstRun(w), at("permissions")(w)) },
   { id: "mic-denied", world: (w) => (W.firstRun(w), at("permissions")(w), W.permission(w, "microphone", "denied")) },

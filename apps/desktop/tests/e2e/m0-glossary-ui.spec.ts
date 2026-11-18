@@ -2,7 +2,7 @@
 // the page adds a term with `glossary_upsert` and removes it with `glossary_remove`; the core's list is what the table shows.
 import type { Page } from "@playwright/test";
 
-import { calls, openWindow } from "./support/app";
+import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 

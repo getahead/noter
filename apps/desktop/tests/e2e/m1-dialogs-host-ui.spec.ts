@@ -18,7 +18,7 @@ import {
   answerAlerts,
   watchAlerts,
 } from "./support/native-alert";
-import { calls, openWindow } from "./support/app";
+import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 

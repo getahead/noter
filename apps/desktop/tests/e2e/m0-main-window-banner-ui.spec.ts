@@ -1,6 +1,6 @@
 // M0 — Main window shell › app banners (docs/features/ui/main-window-shell.md, flow app-state): a dismissible banner in MW-R5
 // is closed with `banner_dismiss`, and the core's set no longer carries it.
-import { calls, openWindow } from "./support/app";
+import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 

@@ -89,8 +89,15 @@ class Machines {
     if (res.status === "ok") this.dispatch(p, { type: "started", session: res.data });
     else this.dispatch(p, { type: "prepareFailed", code: res.error.code });
   }
-  /** Try Again / Open the Page Again: always the user's choice, always a fresh guarded session through the browser. */
+  /** Retry preparation failures at Prepare; only a failed browser session starts another browser session. */
+  // @cpt-flow:cpt-noter-flow-ui-accounts-sign-in:p1
   async retry(p: AccountProvider) {
+    const m = this.state[p];
+    if (!m.sessionId || m.code === "personal_use_not_confirmed") {
+      if (m.code === "personal_use_not_confirmed") this.dispatch(p, { type: "confirm", on: false });
+      await this.open(p);
+      return;
+    }
     this.dispatch(p, { type: "choose", choice: "other" });
     await this.proceed(p);
   }

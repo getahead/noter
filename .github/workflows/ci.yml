@@ -181,6 +181,7 @@ jobs:
     needs: changes
     if: fromJSON(needs.changes.outputs.jobs)['e2e-core']
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -214,6 +215,7 @@ jobs:
     needs: changes
     if: fromJSON(needs.changes.outputs.jobs)['e2e-ui']
     runs-on: ubuntu-24.04
+    timeout-minutes: 45
     env:
       # When e2e-core does not run, this job carries the real-core UI flows of the touched features.
       REAL_FLOWS: ${{ !fromJSON(needs.changes.outputs.jobs)['e2e-core'] && needs.changes.outputs.e2e_specs != '' && needs.changes.outputs.core_harness == 'true' }}

@@ -19,14 +19,14 @@ interface ModeMsg {
   icon: IconName;
 }
 
-export const MODE_MSG: Record<ModeState, ModeMsg> = {
+export const MODE_MSG = {
   CLOUD: { word: "mode.cloud", voice: "mode.voice.cloud", text: "mode.text.cloud", icon: "cloud" },
   CLOUD_REDACTED: { word: "mode.cloud_redacted", voice: "mode.voice.cloud_redacted", text: "mode.text.cloud_redacted", icon: "cloudLock" },
   LOCAL_ONLY: { word: "mode.local_only", voice: "mode.voice.local_only", text: "mode.text.local_only", icon: "laptop" },
   SENSITIVE_LOCAL: { word: "mode.sensitive_local", voice: "mode.voice.sensitive_local", text: "mode.text.sensitive_local", icon: "lock" },
   SWITCHED_TO_LOCAL: { word: "mode.switched_to_local", voice: "mode.voice.switched_to_local", text: "mode.text.switched_to_local", icon: "warning" },
   NO_ASSISTANT: { word: "mode.no_assistant", voice: "mode.voice.no_assistant", text: "mode.text.no_assistant", icon: "warning" },
-};
+} as const satisfies Record<ModeState, ModeMsg>;
 
 export interface ModeIndicatorProps {
   view: ModeView;

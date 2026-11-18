@@ -986,7 +986,9 @@ impl Core {
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let heard_nothing = matches!(state.notice, Some(CaptureNotice::NothingHeard { .. }));
-        if !(live(&state, &args.call_id) && heard_nothing) {
+        let retry =
+            state.phase == CapturePhase::Failed && state.call_id.as_ref() == Some(&args.call_id);
+        if !((live(&state, &args.call_id) || retry) && heard_nothing) {
             return Err(CoreError::new(
                 ErrorCode::NoticeExpired,
                 "the nothing-heard notice is not shown",
@@ -996,7 +998,34 @@ impl Core {
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         let call_id = args.call_id;
         self.set_capture(|c| c.phase = CapturePhase::Stopping);
+        // Discard wins over the engine's normal transcript finalization and its late events.
+        self.capture_event(CaptureEvent::Stopped {
+            call_id: call_id.clone(),
+            reason: StreamEndReason::Discarded,
+        });
+        let mut events = self.engine.events();
         let _ = self.engine.stop_session().await;
+        // Stop ACK precedes the final file flush; retain the capture lock so it cannot queue post-call work.
+        if self.engine.state() == noter_engine_client::EngineState::Ready
+            && self.engine.session() != noter_engine_client::EngineSession::Stopped
+        {
+            let confirmed = tokio::time::timeout(ENGINE_WAIT, async {
+                loop {
+                    match events.recv().await {
+                        Ok(line) if matches!(line.event, EngineEvent::SessionStopped { call_id: ref stopped, .. } if stopped == &call_id) => return true,
+                        Ok(_) | Err(RecvError::Lagged(_)) => {}
+                        Err(RecvError::Closed) => return false,
+                    }
+                }
+            }).await.unwrap_or(false);
+            if !confirmed {
+                self.set_capture(|c| c.phase = CapturePhase::Failed);
+                return Err(CoreError::new(
+                    ErrorCode::EngineUnavailable,
+                    "the engine did not finish stopping; the recording was not discarded",
+                ));
+            }
+        }
         let meta = self.change_meta(ctx, "Discarded recording".into(), "capture_discard");
         let id = call_id.as_str().to_string();
         self.store().delete("call", "calls", vec![id], meta)?;
@@ -1007,10 +1036,6 @@ impl Core {
                 })));
             }
         }
-        self.capture_event(CaptureEvent::Stopped {
-            call_id: call_id.clone(),
-            reason: StreamEndReason::Discarded,
-        });
         self.drop_sources_of(&call_id);
         self.clear_engine_states();
         *session = session.restart(0);

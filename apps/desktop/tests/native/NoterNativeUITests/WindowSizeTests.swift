@@ -116,6 +116,21 @@ final class WindowSizeTests: NoterTestCase {
         add(screenshot)
     }
 
+    // @cpt-flow:cpt-noter-flow-ui-first-run-complete-setup:p1
+    func test_cpt_noter_seq_first_run_complete_setup__fresh_launch_opens_setup_automatically() {
+        launch(fixture: "none")
+        let wizard = window(around: "Setup steps")
+        XCTAssertTrue(wizard.waitForExistence(timeout: 10), "an incomplete first launch opens setup without a menu action")
+        XCTAssertTrue(accessibilityTreeContains("Welcome to Noter", in: wizard), "fresh setup opens at Welcome")
+    }
+
+    // @cpt-dod:cpt-noter-dod-ui-first-run-window:p1
+    func test_cpt_noter_seq_first_run_complete_setup__completed_launch_keeps_setup_closed() {
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        XCTAssertFalse(window(around: "Setup steps").waitForExistence(timeout: 3), "a completed installation does not reopen setup")
+    }
+
     func test_cpt_noter_seq_first_run_complete_setup__window_opens_at_760_by_560() {
         launch(fixture: "none")
         let menu = openMenu()

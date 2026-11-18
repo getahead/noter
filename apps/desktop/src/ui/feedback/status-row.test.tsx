@@ -6,7 +6,7 @@ import { StatusRow } from "./status-row";
 
 describe("StatusRow", () => {
   it("puts the job's toggle before the status", () => {
-    const html = renderToString(<StatusRow variant="job" tone="off" word="Paused" title="Nightly" toggle={<input type="checkbox" role="switch" />} />);
+    const html = renderToString(<StatusRow variant="job" tone="off" word="Off" title="Nightly" toggle={<input type="checkbox" role="switch" />} />);
     expect(html.indexOf("e-status__toggle")).toBeGreaterThan(-1);
     expect(html.indexOf("e-status__toggle")).toBeLessThan(html.indexOf("e-status__icon"));
   });

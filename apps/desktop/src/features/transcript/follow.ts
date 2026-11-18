@@ -26,7 +26,8 @@ export function onScroll(f: Follow, p: ScrollPos, prevTop: number, row: number, 
   const up = p.scrollTop < prevTop && !atEnd(p, 0); // a log shortened by a correction clamps up to the very end: not the user
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-if-end
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-following
-  if (!up && atEnd(p, row)) return f.following ? f : { following: true, base: confirmed };
+  // A duplicate scroll event after detaching is not the user scrolling back down.
+  if (!up && atEnd(p, row) && (f.following || p.scrollTop > prevTop || atEnd(p, 0))) return f.following ? f : { following: true, base: confirmed };
   // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-following
   // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-if-end
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-detached

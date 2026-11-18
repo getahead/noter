@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { Bridge } from "../../app/bridge/bridge";
 import { useAnnounce } from "../../app/a11y/announce";
 import { useWindow } from "../../app/use-window";
 import type { PrivacyMode, SourceRow, UiPrefs } from "../../core/bindings";
