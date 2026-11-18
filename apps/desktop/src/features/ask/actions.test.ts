@@ -353,7 +353,7 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(keepRowFocus(doc(body), [rowId("x")])).toEqual([rowId("x")]); // that row is not there yet
     expect(keepRowFocus(doc(body), [COMPOSER_ID])).toBeNull();
     expect(el.focus).toHaveBeenCalledOnce();
-    expect(focusComposer(doc({ matches: () => true }))).toBe(false); // a control has focus
+    expect(focusComposer(doc({ matches: () => false }))).toBe(false); // a control (not the page region) has focus
   });
   it("opens a cited speaker's person page", () => {
     expect(personRoute("p_1")).toEqual({ section: "people", key: "person:p_1" });
