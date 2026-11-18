@@ -103,6 +103,7 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 - No connection: `offline` (retryable); the bundle stays `paused` with its partial file.
 - A checksum mismatch: the bundle becomes `checksum_failed`, the partial file is deleted, `checksum_failed` is reported; **Retry** downloads again.
 - Not enough disk for the remaining size: `disk_full` with `detail.needed_mb`.
+- A file that cannot be written while downloading: the bundle becomes `failed`, with `disk_full` only when the disk is full and `internal` otherwise (a folder macOS will not let the app write, such as an App Group container an ad-hoc build is not entitled to). Every bundle failure writes one `models` line to the local log: the bundle, a code (`write_failed`, `disk_full`, `http` with the status, `fetch_failed`, `checksum_failed`, `not_allowed`) and no path or URL.
 
 **Steps**:
 1. [x] - `p1` - API: `models_download { action: start }` from the First run or Settings window - `inst-download-call`

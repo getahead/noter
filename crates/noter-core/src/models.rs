@@ -24,6 +24,8 @@ use crate::first_run::{BoxFuture, BundleFile, BundleSpec, ChunkSink, FetchError,
 use crate::{lock, Core};
 
 const MB: u64 = 1024 * 1024;
+/// `ENOSPC` on macOS and Linux (`io::ErrorKind::StorageFull` needs Rust 1.83; the MSRV is 1.80).
+const ENOSPC: i32 = 28;
 /// Free space kept beyond the remaining download.
 const MARGIN_MB: u32 = 500;
 /// Progress goes out at most twice a second.
@@ -538,7 +540,13 @@ impl Core {
             .iter()
             .any(|f| !allowed_download_url(&f.url) || !inside_bundle(&f.path))
         {
-            return Outcome::Stop(BundleState::Failed, ErrorCode::Internal);
+            return self.failed(
+                spec,
+                "not_allowed",
+                None,
+                BundleState::Failed,
+                ErrorCode::Internal,
+            );
         }
         let partial = partial_path(dir, &spec.name);
         let mut done = dir_len(&partial);
@@ -561,13 +569,14 @@ impl Core {
                         std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
                         options.open(&part)
                     });
-                let Ok(mut out) = opened else {
+                let mut out = match opened {
+                    Ok(out) => out,
                     // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
-                    return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+                    Err(e) => return self.write_failed(spec, &e),
                     // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-failed
                 };
                 let from = out.metadata().map_or(0, |m| m.len());
-                let mut write_failed = false;
+                let mut write_failed = None;
                 let mut cut_by_pause = false;
                 let mut last = Instant::now();
                 let name = spec.name.clone();
@@ -577,8 +586,8 @@ impl Core {
                             cut_by_pause = true;
                             return false;
                         }
-                        if out.write_all(bytes).is_err() {
-                            write_failed = true;
+                        if let Err(e) = out.write_all(bytes) {
+                            write_failed = Some(e);
                             return false;
                         }
                         done += bytes.len() as u64;
@@ -592,8 +601,8 @@ impl Core {
                     self.deps.models.fetch(file, from, sink).await
                 };
                 // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-try-download
-                if write_failed {
-                    return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+                if let Some(e) = write_failed {
+                    return self.write_failed(spec, &e);
                 }
                 match fetched {
                     // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
@@ -601,7 +610,24 @@ impl Core {
                     Err(FetchError::Offline) => return Outcome::Offline(done),
                     // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-pause
                     // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-catch-offline
-                    Err(_) => return Outcome::Stop(BundleState::Failed, ErrorCode::Internal),
+                    Err(FetchError::Http(status)) => {
+                        return self.failed(
+                            spec,
+                            "http",
+                            Some(status),
+                            BundleState::Failed,
+                            ErrorCode::Internal,
+                        )
+                    }
+                    Err(FetchError::Io(_)) => {
+                        return self.failed(
+                            spec,
+                            "fetch_failed",
+                            None,
+                            BundleState::Failed,
+                            ErrorCode::Internal,
+                        )
+                    }
                     Ok(()) if pause.load(Ordering::SeqCst) => return Outcome::Paused(done),
                     Ok(()) if cut_by_pause => done = dir_len(&partial),
                     Ok(()) => break,
@@ -615,23 +641,62 @@ impl Core {
             if sha256_hex(&part).ok().as_deref() != Some(file.sha256.as_str()) {
                 // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
                 let _ = std::fs::remove_file(&part);
-                return Outcome::Stop(BundleState::ChecksumFailed, ErrorCode::ChecksumFailed);
+                return self.failed(
+                    spec,
+                    "checksum_failed",
+                    None,
+                    BundleState::ChecksumFailed,
+                    ErrorCode::ChecksumFailed,
+                );
                 // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-checksum
             }
             // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-verify
-            if std::fs::rename(&part, &verified).is_err() {
-                return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+            if let Err(e) = std::fs::rename(&part, &verified) {
+                return self.write_failed(spec, &e);
             }
         }
         // @cpt-begin:cpt-noter-algo-core-first-run-download-task:p1:inst-move-ready
         // @cpt-begin:cpt-noter-state-core-first-run-bundle:p1:inst-st-ready
         // Every file verified: the folder moves into place at once.
-        if std::fs::rename(&partial, dir.join(&spec.name)).is_err() {
-            return Outcome::Stop(BundleState::Failed, ErrorCode::DiskFull);
+        if let Err(e) = std::fs::rename(&partial, dir.join(&spec.name)) {
+            return self.write_failed(spec, &e);
         }
         Outcome::Ready
         // @cpt-end:cpt-noter-state-core-first-run-bundle:p1:inst-st-ready
         // @cpt-end:cpt-noter-algo-core-first-run-download-task:p1:inst-move-ready
+    }
+}
+
+impl Core {
+    fn write_failed(&self, spec: &BundleSpec, e: &std::io::Error) -> Outcome {
+        let (code, error) = write_error(e);
+        self.failed(spec, code, None, BundleState::Failed, error)
+    }
+
+    /// Ends the bundle with `state` and `error`, and logs why (`code`, an HTTP status as `count`).
+    fn failed(
+        &self,
+        spec: &BundleSpec,
+        code: &str,
+        status: Option<u16>,
+        state: BundleState,
+        error: ErrorCode,
+    ) -> Outcome {
+        self.log(crate::object(serde_json::json!({
+            "level": "error", "module": "models", "code": code, "id": spec.name, "count": status,
+        })));
+        Outcome::Stop(state, error)
+    }
+}
+
+/// A file of a bundle could not be written: `disk_full` only when the disk is full (the UI
+/// shows the disk banner for it); anything else, such as a folder macOS will not let the app
+/// write, is `internal`.
+fn write_error(e: &std::io::Error) -> (&'static str, ErrorCode) {
+    if e.raw_os_error() == Some(ENOSPC) {
+        ("disk_full", ErrorCode::DiskFull)
+    } else {
+        ("write_failed", ErrorCode::Internal)
     }
 }
 
@@ -724,7 +789,17 @@ impl ModelSource for PinnedModels {
 
 #[cfg(test)]
 mod sha256_tests {
-    use super::sha256_hex;
+    use super::{sha256_hex, write_error};
+    use noter_protocol::ErrorCode;
+
+    #[test]
+    fn only_a_full_disk_is_disk_full() {
+        let full = std::io::Error::from_raw_os_error(super::ENOSPC);
+        assert_eq!(write_error(&full), ("disk_full", ErrorCode::DiskFull));
+        // What an ad-hoc build gets from an App Group container it is not entitled to.
+        let denied = std::io::Error::from_raw_os_error(1);
+        assert_eq!(write_error(&denied), ("write_failed", ErrorCode::Internal));
+    }
 
     #[test]
     fn hashes_a_file_in_chunks_like_the_reference_digest() {
