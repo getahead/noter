@@ -240,11 +240,11 @@ The system **MUST** render the cited-answer variants with original-language quot
 
 ## 6. Acceptance Criteria
 
-- [x] `default`, `first`, `answering`, `not-found`, `unreachable`, `local`, `sensitive`, `keyword-only`, `weak`, `deleted`, stopped and copied states match the prototype's structure and tokens
+- [x] `default`, `first`, `answering`, `not-found`, `unreachable`, `local`, `sensitive`, `keyword-only`, `weak`, `deleted`, stopped and copied states match the prototype's structure and tokens (QA could not reach the local, sensitive, keyword-only and weak states on the real core, so those are unverified)
 - [x] A follow-up uses the same core thread id; citation numbers restart per answer and never change during a turn
 - [x] Copy writes only the chosen answer and its citations; Copied lasts 2 s after success
 - [ ] At Wide the recent pane is 260 pt and thread at most 860 pt; Medium/Narrow use Recent in the toolbar, with scope overflowing before the mode indicator
-- [x] Streaming is silent to VoiceOver; completion is announced once, with weakness included; quotes carry their own language
+- [x] Streaming is silent to VoiceOver; completion is announced once, with weakness included; quotes carry their own language (the weak-variant announcement and quotes in their own language could not be produced on the real core, so those parts are unverified)
 
 ## 7. Additional Context
 
