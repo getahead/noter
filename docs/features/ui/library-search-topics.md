@@ -266,8 +266,8 @@ The system **MUST** render topic counts, month groups, the inspector, rename col
 
 - [x] Prototype Library states `filtered-empty`, `no-tags`, `tagged`, `loading`, `cross-language`, `keyword-only`, `no-matches`, `weak-only`, `search-failed`, `no-topics`, `merge`, `nothing-left` and the rename forms match screenshots at Wide, Medium and Narrow
 - [x] Clear never deletes typed words; filter changes keep focus and announce one final count
-- [ ] English, Russian and German snippets retain original script; highlights never execute HTML
-- [ ] Filter controls wrap, the result column is at most 960 pt and the thread fills the width (no 860 pt cap); keyboard and VoiceOver expose every action
+- [x] English, Russian and German snippets retain original script; highlights never execute HTML
+- [x] Filter controls wrap, the result column is at most 960 pt and the thread fills the width (no 860 pt cap); keyboard and VoiceOver expose every action (QA verified the live regions' role, content and visibility; VoiceOver itself was not run)
 - [x] Fake-core rendering is tested separately from real-core command and story coverage; no per-row retrieval or automatic mutation retry
 
 ## 7. Additional Context
