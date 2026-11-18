@@ -1223,7 +1223,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `cli_install` | Settings and credentials. Install Claude Code, Codex or Ollama (progress on `jobs:progress`). `CliInstallArgs → JobAccepted`. Windows: MSF. | frozen |
 | Command | `account_signin_start` | Settings and credentials. Step 2 (Sign in): the CLI opens the browser; progress on `signin:progress`. `SignInStartArgs → SignInSession`. Windows: MSF. | frozen |
 | Command | `account_signin_cancel` | Settings and credentials. `SignInSessionArgs → AccountsView`. Windows: MSF. | frozen |
-| Command | `account_use_existing` | Settings and credentials. Use This Account: bind the sign-in the CLI already has on this Mac. `AccountProviderArgs → AccountsView`. Windows: MSF. | frozen |
+| Command | `account_use_existing` | Settings and credentials. Use This Account: bind the sign-in the CLI already has on this Mac. `AccountProviderArgs → AccountsView` (since 2.13 it reads the optional `personal_use_confirmed`, required true for Claude unless an earlier `account_signin_start` recorded it). Windows: MSF. | frozen |
 | Command | `account_bind_agents` | Settings and credentials. Step 4 (Use): switch agents to the account, with Undo. `AccountBindArgs → AccountBindResult`. Windows: MSF. | frozen |
 | Command | `account_test` | Settings and credentials. `AccountProviderArgs → AccountTestResult`. Windows: SFM. | frozen |
 | Command | `account_sign_out` | Settings and credentials. Sign out in Noter (agents fall back to the API key or pause); optionally in the CLI too. `SignOutArgs → AccountsView`. Windows: SFM. | frozen |

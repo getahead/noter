@@ -125,6 +125,11 @@ pub struct KeyProviderArgs {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct AccountProviderArgs {
     pub provider: AccountProvider,
+    /// Read only by `account_use_existing` (contract 2.13): the personal-use box ticked in the
+    /// sheet, which Claude reuse needs unless an earlier `account_signin_start` recorded it.
+    /// Absent means not ticked; the other commands ignore it.
+    #[serde(default)]
+    pub personal_use_confirmed: Option<bool>,
 }
 
 /// Step 1 of the sign-in sheet: Prepare.

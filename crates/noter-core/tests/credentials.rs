@@ -537,7 +537,10 @@ async fn storage_move_does_not_ship() {
 // ── account_signin_prepare ────────────────────────────────────
 
 fn provider(p: AccountProvider) -> AccountProviderArgs {
-    AccountProviderArgs { provider: p }
+    AccountProviderArgs {
+        provider: p,
+        personal_use_confirmed: None,
+    }
 }
 
 #[tokio::test]
