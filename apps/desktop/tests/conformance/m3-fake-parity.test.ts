@@ -1,13 +1,17 @@
 // Fake-core parity (UI M3): four behaviours the fake once got wrong, each proven against both cores —
 // people_merge keeps the voice profile, call_tags_set emits entity:changed, search matches per word,
-// ask_start answers "not found" when nothing in scope matches.
+// ask_start answers "not found" when nothing in scope matches; Claude reuse needs the personal-use box (#1000).
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { AskMsg, AskScope, Core } from "../../src/core/bindings";
-import { exercised } from "../support/core";
-import { ok, until } from "../support/results";
+import { exercised, isFake } from "../support/core";
+import { ok, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
 import { PAST_CALL } from "../support/world-presets";
+import { wire } from "./history-support";
 
 let s: Scenario;
 let main: Core;
@@ -81,5 +85,34 @@ describe("ask_scope_presets names each preset in its scope", () => {
     const { presets } = ok(await main.askScopePresets({}));
     expect(presets.length).toBeGreaterThan(0);
     for (const p of presets) expect(p.scope.preset).toBe(p.id);
+  });
+});
+
+describe("account_use_existing of Claude needs the personal-use box", () => {
+  it("cpt-noter-seq-settings-sign-in-account (Claude Code already signed in): refused unticked, signed in ticked, the confirmation kept until sign-out", async () => {
+    const command = process.env.NOTER_CORE_CMD;
+    const dir = mkdtempSync(join(tmpdir(), "noter-use-existing-"));
+    try {
+      if (!isFake) {
+        // one scripted answer per test request of a reuse
+        writeFileSync(join(dir, "llm.jsonl"), '{"on": "ask-answer"}\n{"on": "ask-answer"}\n');
+        process.env.NOTER_CORE_CMD = `${command} --llm-script ${join(dir, "llm.jsonl")}`;
+      }
+      open();
+      if (!isFake) await wire(s).invoke("main", "harness.account_cli", { tool: "claude_code", installed: true, path: "/bin/claude", version: "2.1.296", identity: { email: "ann@example.com", plan: "Max" } });
+      const settings = s.core("settings");
+      const status = (v: { accounts: Array<{ provider: string; status: { type: string } }> }) => v.accounts.find((a) => a.provider === "claude")?.status.type;
+      expect(ok(await settings.accountSigninPrepare({ provider: "claude" })).existing).toBeTruthy();
+      expect(refused(await settings.accountUseExisting({ provider: "claude" })).code).toBe("personal_use_not_confirmed");
+      expect(status(ok(await settings.accountUseExisting({ provider: "claude", personal_use_confirmed: true })))).toBe("signed_in");
+      // the ticked reuse is recorded: a later reuse without the box goes through
+      expect(status(ok(await settings.accountUseExisting({ provider: "claude" })))).toBe("signed_in");
+      // signing out in Noter forgets it
+      ok(await settings.accountSignOut({ provider: "claude", also_in_cli: false }));
+      expect(refused(await settings.accountUseExisting({ provider: "claude" })).code).toBe("personal_use_not_confirmed");
+    } finally {
+      process.env.NOTER_CORE_CMD = command;
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

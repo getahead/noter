@@ -5,6 +5,8 @@ import * as shared from "./shared";
 
 export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
+  // providers whose personal-use confirmation is recorded, as the core keeps it on the connection until sign-out
+  const confirmed = new Set<Bindings.AccountProvider>();
   return {
   // ── Settings and credentials ─────────────────────────────────────────
   settings_get: (_a, { world }) => world.settings,
@@ -169,6 +171,7 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     if (a.provider === "claude" && !a.personal_use_confirmed) throw coreError("personal_use_not_confirmed");
     const acc = world.app.accounts.accounts.find((x) => x.provider === a.provider);
     if (!acc?.cli.installed) throw coreError("cli_missing");
+    if (a.personal_use_confirmed) confirmed.add(a.provider);
     const id = newId("sis");
     const identity = { email: "you@example.com", plan: a.provider === "claude" ? "Max" : "Plus" };
     const steps = ["waiting_for_browser", "signed_in", "checking_plan", "sending_test_request", "done"] as const;
@@ -198,6 +201,8 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     const acc = world.app.accounts.accounts.find((x) => x.provider === a.provider);
     if (!acc) throw coreError("not_found");
     if (!acc.cli.installed) throw coreError("cli_missing");
+    if (a.personal_use_confirmed) confirmed.add(a.provider);
+    if (a.provider === "claude" && !confirmed.has("claude")) throw coreError("personal_use_not_confirmed");
     acc.status = { type: "signed_in", identity: { email: "you@example.com", plan: a.provider === "claude" ? "Max" : "Plus" }, since: shared.now() };
     publish("accounts:changed");
     return world.app.accounts;
@@ -226,6 +231,7 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     if (!acc) throw coreError("not_found");
     acc.status = { type: "not_signed_in" };
     acc.agents = [];
+    confirmed.delete(a.provider);
     publish("accounts:changed");
     return world.app.accounts;
   },
