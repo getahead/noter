@@ -117,7 +117,8 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
   test("Narrow: the » menu holds New Question and the scope choices", async ({ page }) => {
     await ask(page, WIDTHS.narrow);
     await page.locator("#mw-overflow").click();
-    await expect(page.getByRole("menuitem", { name: /^Scope: / }).first()).toBeVisible();
+    // the scope choices are checkable items; the current one (All calls · all sources) is checked
+    await expect(page.getByRole("menuitemcheckbox", { name: /^Scope: All calls/ })).toHaveAttribute("aria-checked", "true");
     await shot(page, "overflow-menu", "narrow");
   });
 });
