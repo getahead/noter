@@ -13,8 +13,8 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
-import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, isNarrowed, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute } from "./actions";
-import { setPresets, useAskState } from "./ask-state";
+import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, isNarrowed, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute, afterDelete, COMPOSER_ID, nextOpenRequest, keepRowFocus, focusComposer, focusNewQuestion } from "./actions";
+import { setPresets, setRecent, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
 import { runtimeLabel } from "../call-page/outputs-logic";
 import { announcementOf, errorKeyOf, failedView, foldTurn, groupThreads, phaseOf, suggestionsOf, type TurnPhase, type TurnView } from "./model";
@@ -28,7 +28,7 @@ const GROUP = { today: "ask.group.today", last_week: "ask.group.last_week", earl
 // @cpt-flow:cpt-noter-flow-ui-ask-question:p1
 export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKey?: string }) {
   const [rows, setRows] = useState<AskThreadRow[]>([]);
-  const { presets, scopeId, fresh } = useAskState();
+  const { presets, scopeId, fresh, openRequest } = useAskState();
   const [thread, setThread] = useState<string | null>(null);
   const [turns, setTurns] = useState<AskAnswer[]>([]);
   const [draft, setDraft] = useState("");
@@ -42,6 +42,21 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     const r = await loadRows(bridge);
     if (r) setRows(r);
   }, [bridge]);
+
+  // the toolbar's Recent pop-up (Medium and Narrow) shows the same rows and asks this page to open one
+  useEffect(() => setRecent(rows), [rows]);
+  const requested = useRef(openRequest.n);
+  useEffect(() => {
+    const next = nextOpenRequest(openRequest, requested.current);
+    requested.current = next.seen;
+    if (next.open) void open(next.open);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+  // a deleted row had focus: its successor takes it once the list is read again
+  const afterRowDelete = useRef<string[] | null>(null);
+  useEffect(() => {
+    afterRowDelete.current = keepRowFocus(document, afterRowDelete.current);
+  }, [rows]);
 
   useEffect(() => {
     void refresh();
@@ -65,7 +80,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   useEffect(() => {
     // New Question (button or ⌘N): the empty composer; not on arrival
     if (firstRender.current) firstRender.current = false;
-    else void open(null);
+    else void open(null).then(() => focusNewQuestion(document)); // a new question starts with focus in AK-R4
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fresh]);
 
@@ -92,6 +107,12 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const phase = turn ? phaseOf(turn) : null;
   // a failed turn leaves its route entry askable again
   useEffect(() => releaseFailedRoute(routeKey, phase), [routeKey, phase]);
+  // Stop, Widen Scope and Try Again replace the button that had focus: the composer takes it (never from a control that has it)
+  const settledOnce = useRef(false);
+  useEffect(() => {
+    if (settledOnce.current) focusComposer(document);
+    settledOnce.current = true;
+  }, [asking, phase]);
   const busy = asking !== null && (phase === null || phase === "streaming") && !stream?.error;
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-stream
 
@@ -163,7 +184,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       busy={busy}
       onOpen={(id) => void open(id)}
       onCopyQuestion={(q) => void copyText(q, (s) => navigator.clipboard.writeText(s))}
-      onDelete={(id) => void removeThread(bridge, id, thread, { open: (to) => void open(to), refresh: () => void refresh() })}
+      onDelete={(id) => {
+        afterRowDelete.current = afterDelete(rows, id);
+        void removeThread(bridge, id, thread, { open: (to) => void open(to), refresh: () => void refresh() });
+      }}
       onDraft={setDraft}
       onSend={send}
       onPlay={(span) => void replay.play(span)}
@@ -262,6 +286,7 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
           {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
           <TextField
             variant="multi"
+            id={COMPOSER_ID}
             cls="ak-composer__field"
             rows={empty ? 3 : 2}
             ariaLabel={t(empty ? "ask.composer_first" : "ask.composer_follow_up")}
@@ -271,7 +296,8 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             onEnter={onSend}
           />
           {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
-          {busy ? <PushButton label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton label={t("ask.send")} variant="primary" onAction={onSend} />}
+          {/* keyed, so Stop and Ask are two buttons: the one that had focus goes away and the composer takes it */}
+          {busy ? <PushButton key="stop" label={t("ask.stop")} kbd="⌘." onAction={onStop} /> : <PushButton key="send" label={t("ask.send")} variant="primary" onAction={onSend} />}
         </div>
         {empty && suggestions.length > 0 && (
           <div className="ak-suggest">

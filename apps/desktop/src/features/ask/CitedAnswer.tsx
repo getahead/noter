@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Citation, TimeSpan } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { PersonChip } from "../../ui/primitives/person-chip";
 import { PushButton } from "../../ui/primitives/push-button";
 import { ProvenanceChip } from "../items/ProvenanceChip";
 import { openSpan, spanTime } from "../items/evidence";
-import { copyTurn, openDocument } from "./actions";
+import { copyTurn, openDocument, openPerson } from "./actions";
 import { blocks, type Inline } from "./markdown";
 
 const COPIED_MS = 2000;
@@ -97,6 +98,7 @@ export function CitationRow({ bridge, c, focused, onPlay, register, back }: { br
       {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-deleted */}
       {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-deleted */}
       {!c.deleted && span && <ProvenanceChip bridge={bridge} span={span} />}
+      {c.speaker && <PersonChip variant="link" initials={c.speaker.initials} name={c.speaker.short_name} title={c.speaker.display_name} label={t("ask.open_person", { name: c.speaker.display_name })} onAction={() => c.speaker && openPerson(c.speaker.id)} />}
       {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-evidence */}
       {p.type === "past_call" &&
         (c.deleted ? (

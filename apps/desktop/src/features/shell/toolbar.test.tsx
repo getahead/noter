@@ -139,6 +139,13 @@ describe("MainToolbar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(actions[0]!.onAction).toHaveBeenCalledOnce();
   });
+
+  it("marks the » menu item of an action that is the current choice", () => {
+    const choice = [{ label: "Scope: All", onAction: vi.fn(), checked: true }, { label: "Scope: Mine", onAction: vi.fn(), checked: false }];
+    const html = renderToString(rendered(OverflowMenu, { actions: choice, anchor: null as never, onClose: vi.fn() }));
+    expect(html).toContain('role="menuitemcheckbox"');
+    expect(html).toContain('aria-checked="true"');
+  });
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });

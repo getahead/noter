@@ -113,4 +113,13 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
     await expect(scope).toContainText("Topic: "); // the arrival selects it
     await shot(page, "topic-scope", "wide");
   });
+
+  test("Narrow: the » menu holds New Question and the scope choices", async ({ page }) => {
+    await ask(page, WIDTHS.narrow);
+    await page.locator("#mw-overflow").click();
+    // the scope choices are checkable items; the current one (All calls · all sources) is checked
+    await expect(page.getByRole("menuitemcheckbox", { name: "Scope: All calls · all sources", exact: true })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("menuitemcheckbox", { name: "Scope: All calls, no documents", exact: true })).toHaveAttribute("aria-checked", "false");
+    await shot(page, "overflow-menu", "narrow");
+  });
 });

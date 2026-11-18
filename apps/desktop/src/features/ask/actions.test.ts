@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { askState, setAskState } from "./ask-state";
 import type { Bridge } from "../../app/bridge/bridge";
-import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, startFromTopicRoute, startRoute, topicOfRoute, scopeOf, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, releaseFailedRoute, recoverGap, widenScope, startFromRoute, isNarrowed } from "./actions";
+import { afterTurn, bindStopKey, copyText, copyTurn, currentStream, deleteThread, isStopKey, isStored, loadPresets, loadRows, loadThread, NEW_SCOPE, openThread, playAudio, questionOf, endedWhileAway, removeThread, openDocument, startFromTopicRoute, startRoute, topicOfRoute, scopeOf, replayOf, searchByKeyword, settleTurn, startAsk, stopAudio, stopAsk, threadOfRoute, questionOfRoute, settleRoute, releaseFailedRoute, recoverGap, widenScope, startFromRoute, isNarrowed, afterDelete, recentChoices, COMPOSER_ID, rowId, nextOpenRequest, keepRowFocus, focusComposer, personRoute, openPerson } from "./actions";
 
 // act runs the call and wraps its result the way the bridge does
 const make = (result: unknown) => {
@@ -329,5 +329,34 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(isNarrowed(undefined)).toBe(false);
     expect(isNarrowed(NEW_SCOPE)).toBe(false);
     expect(isNarrowed({ preset: "topic:tp_1", topic_id: "tp_1" })).toBe(true);
+  });
+  it("hands focus to the next recent row, else the previous, else the composer, once a row is deleted", () => {
+    const rows = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(afterDelete(rows, "b")).toEqual([rowId("c"), rowId("a"), COMPOSER_ID]);
+    expect(afterDelete(rows, "c")).toEqual([rowId("b"), COMPOSER_ID]);
+    expect(afterDelete([{ id: "a" }], "a")).toEqual([COMPOSER_ID]);
+  });
+  it("offers the recent questions as the toolbar pop-up's choices under a Recent title", () => {
+    const rows = [{ id: "a", title: "First" }, { id: "b", title: "Second" }];
+    expect(recentChoices(rows as never, "Recent questions")).toEqual([{ value: "", label: "Recent questions" }, { value: "a", label: "First" }, { value: "b", label: "Second" }]);
+  });
+  it("acts on an open request from the toolbar once, and on a later one again", () => {
+    expect(nextOpenRequest({ id: "a", n: 1 }, 1)).toEqual({ open: null, seen: 1 });
+    expect(nextOpenRequest({ id: "a", n: 2 }, 1)).toEqual({ open: "a", seen: 2 });
+    expect(nextOpenRequest({ id: null, n: 3 }, 2)).toEqual({ open: null, seen: 3 });
+  });
+  it("holds the row-focus hand-off until focus can be given, and never takes it from a control", () => {
+    const el = { focus: vi.fn(), hasAttribute: () => false };
+    const body = {};
+    const doc = (active: unknown) => ({ activeElement: active, body, getElementById: (id: string) => (id === COMPOSER_ID ? el : null) }) as never;
+    expect(keepRowFocus(doc(body), null)).toBeNull();
+    expect(keepRowFocus(doc(body), [rowId("x")])).toEqual([rowId("x")]); // that row is not there yet
+    expect(keepRowFocus(doc(body), [COMPOSER_ID])).toBeNull();
+    expect(el.focus).toHaveBeenCalledOnce();
+    expect(focusComposer(doc({ matches: () => false }))).toBe(false); // a control (not the page region) has focus
+  });
+  it("opens a cited speaker's person page", () => {
+    expect(personRoute("p_1")).toEqual({ section: "people", key: "person:p_1" });
+    expect(() => openPerson("p_1")).not.toThrow(); // no main window here: nothing happens
   });
 });

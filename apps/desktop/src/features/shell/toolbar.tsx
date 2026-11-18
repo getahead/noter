@@ -56,6 +56,7 @@ export function OverflowMenu({ actions, anchor, onClose }: { actions: NonNullabl
       <Menu
         items={actions.map((a) => ({
           label: a.label,
+          checked: a.checked,
           onSelect: () => {
             onClose();
             a.onAction();

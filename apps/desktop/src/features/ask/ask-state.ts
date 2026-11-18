@@ -1,17 +1,21 @@
 // The scope the toolbar's pop-up chooses and the page asks with: both read this one store (the toolbar is a sibling of the page).
 import { useSyncExternalStore } from "react";
 
-import type { ScopePreset } from "../../core/bindings";
+import type { AskThreadRow, ScopePreset } from "../../core/bindings";
 
 export interface AskState {
   presets: ScopePreset[];
   /** The chosen preset's id. */
   scopeId: string;
+  /** The recent questions the page read, for the toolbar's Recent pop-up (below Wide it takes the pane's place). */
+  recent: AskThreadRow[];
+  /** The toolbar's Recent pop-up asks the page to open a thread; `n` makes each request new. */
+  openRequest: { id: string | null; n: number };
   /** Counts New Question requests (the toolbar button, ⌘N); the page opens the empty composer when it changes. */
   fresh: number;
 }
 
-let state: AskState = { presets: [], scopeId: "all", fresh: 0 };
+let state: AskState = { presets: [], scopeId: "all", fresh: 0, recent: [], openRequest: { id: null, n: 0 } };
 // Presets the page added itself (a topic the core's short list does not offer): they survive a reload of the list.
 let extra: ScopePreset[] = [];
 const listeners = new Set<() => void>();
@@ -24,6 +28,9 @@ export function offerPreset(preset: ScopePreset): void {
   extra = [...extra, preset];
   setAskState({ presets: [...state.presets, preset] });
 }
+
+export const setRecent = (rows: AskThreadRow[]): void => setAskState({ recent: rows });
+export const requestOpen = (id: string | null): void => setAskState({ openRequest: { id, n: state.openRequest.n + 1 } });
 
 export const askState = (): AskState => state;
 export function setAskState(patch: Partial<AskState>): void {

@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import type { AskThreadRow } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { rowId } from "./actions";
 import { Menu } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 
@@ -13,6 +14,7 @@ export function RecentRow({ row, selected, onOpen, onCopy, onDelete }: { row: As
     <li className="ak-recent__li">
       <button
         type="button"
+        id={rowId(row.id)}
         className={`ak-recent__item${selected ? " is-sel" : ""}`}
         aria-current={selected}
         title={row.title}

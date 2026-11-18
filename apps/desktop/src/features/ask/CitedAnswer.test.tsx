@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Citation } from "../../core/bindings";
+import { PersonChip } from "../../ui/primitives/person-chip";
 import { CitationRow, CitedAnswer } from "./CitedAnswer";
 
 const bridge = { act: () => new Promise(() => {}), core: {} } as unknown as Bridge;
@@ -66,5 +67,22 @@ describe("CitedAnswer (cpt-noter-dod-ui-ask-citations)", () => {
     const link = find(CitationRow({ bridge, c: live, focused: false, register: () => {}, back: () => {} }));
     link?.onClick?.({ preventDefault: () => {} });
     expect(openExternal).toHaveBeenCalledWith({ target: { type: "document", document_id: "d", chunk_id: "k" } });
+  });
+  it("shows the speaker of a citation as a person chip that opens their page, and none when the core names nobody", () => {
+    const speaker = { id: "p_1", display_name: "Dmitri Sokolov", short_name: "Dmitri S.", initials: "DS", is_you: false };
+    const named = call(1, { speaker } as never);
+    const h = html("See [1]", [named]);
+    expect(h).toContain('data-component="cpt-noter-component-ui-person-chip"');
+    expect(h).toContain("Dmitri S.");
+    expect(html("See [1]", [call(1, { speaker: null } as never)])).not.toContain("cpt-noter-component-ui-person-chip");
+    const find = (n: unknown): { onAction?: (a: unknown) => void } | null => {
+      const e = n as { type?: unknown; props?: { children?: unknown; onAction?: (a: unknown) => void } } | null;
+      if (!e || typeof e !== "object") return null;
+      if (e.props?.onAction && e.type === PersonChip) return e.props as never;
+      return [e.props?.children].flat(9).map(find).find(Boolean) ?? null;
+    };
+    const chip = find(CitationRow({ bridge: {} as never, c: named, focused: false, register: () => {}, back: () => {} }));
+    expect(chip).not.toBeNull();
+    expect(() => chip?.onAction?.(null)).not.toThrow();
   });
 });

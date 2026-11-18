@@ -25,7 +25,7 @@ export interface PageDef {
   /** Page banners normally follow the app slot; an opted-in component combines both in one slot. */
   banners?: ComponentType<PageBannerProps> & { includesAppBanners?: boolean };
   /** The page's own toolbar actions; at Narrow all but the primary one overflow into » from the trailing side. */
-  actions?: Array<{ label: string; onAction: () => void; primary?: boolean }>;
+  actions?: Array<{ label: string; onAction: () => void; primary?: boolean; /** The » menu marks the action that is the current choice (a scope or a sort). */ checked?: boolean }>;
   /** The page has no search field (the prototype's `search: false`). */
   search?: false;
 }
