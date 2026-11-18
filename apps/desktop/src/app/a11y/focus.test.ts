@@ -291,12 +291,15 @@ describe("installUnobscure", () => {
   });
 });
 
-describe("focusIfLost (the page region WebKit focuses on a click is no control)", () => {
+describe("focusIfLost (only the body or the page region is lost focus)", () => {
   const target = { hasAttribute: () => false, focus: vi.fn() };
   const doc = (active: unknown) => ({ activeElement: active as never, body: {} as never, getElementById: () => target as never });
-  it("takes focus from a page region but never from a control", () => {
-    expect(focusIfLost(doc({ matches: () => false }), ["x"])).toBe(true);
-    expect(focusIfLost(doc({ matches: () => true }), ["x"])).toBe(false);
+  const region = { matches: (s: string) => s.includes('[role="main"]') };
+  const row = { matches: () => false }; // a focusable row, option or tabindex element: someone is on it
+  it("takes focus from the page region, never from a control or a focusable row", () => {
+    expect(focusIfLost(doc(region), ["x"])).toBe(true);
+    expect(focusIfLost(doc(row), ["x"])).toBe(false);
+    expect(focusIfLost(doc({ matches: (s: string) => s.startsWith("button") }), ["x"])).toBe(false);
   });
 });
 
@@ -312,13 +315,16 @@ describe("openerOf (WebKit does not focus a button on click)", () => {
   });
 
   it("a page region that took focus is no opener: the pressed button is, a focused control still wins", () => {
-    const region = { focus: vi.fn(), matches: () => false };
+    // WebKit focuses an ancestor of the clicked button: the page region, or a tabindex -1 section, row or aside
+    const ancestor = { focus: vi.fn(), contains: (n: unknown) => n === button };
     press(button);
-    expect(openerOf({ activeElement: region as never, body: body as never })).toBe(button);
-    const control = { focus: vi.fn(), matches: () => true };
+    expect(openerOf({ activeElement: ancestor as never, body: body as never })).toBe(button);
+    const row = { focus: vi.fn(), contains: () => false }; // a focusable row or option the user is on, not around the press
     press(button);
-    expect(openerOf({ activeElement: control as never, body: body as never })).toBe(control);
-    expect(openerOf({ activeElement: region as never, body: body as never })).toBe(region); // no press: what had focus
+    expect(openerOf({ activeElement: row as never, body: body as never })).toBe(row);
+    press(button);
+    expect(openerOf({ activeElement: button as never, body: body as never })).toBe(button);
+    expect(openerOf({ activeElement: ancestor as never, body: body as never })).toBe(ancestor); // no press left: what had focus
   });
 
   it("falls back to the button the mouse pressed when focus is on the body", () => {

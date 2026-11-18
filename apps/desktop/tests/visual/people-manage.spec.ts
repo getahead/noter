@@ -83,7 +83,11 @@ test.describe("cpt-noter-dod-ui-people-identity people management", () => {
     await shot(page, "person-merge-sheet");
   });
   test("after a merge the target's page shows the Merged strip with Undo", async ({ page }) => {
-    await openAnna(page);
+    // neither person has a voice profile: the fake's people_merge does not move one, the real core does
+    await openPeople(page, (w) => (W.idle(w), w.people.forEach((p) => (p.voice_profile = false))));
+    await page.getByRole("table", { name: "People" }).getByRole("row", { name: /Anna K\./ }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.locator('[data-region="PE"]')).toBeVisible();
     await page.getByRole("button", { name: "More" }).click();
     await page.getByRole("menuitem", { name: "Merge With…" }).click();
     const sheet = page.getByRole("dialog", { name: /^Merge .* with another entry$/ });

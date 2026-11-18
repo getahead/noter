@@ -6,15 +6,16 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { openWindow } from "./support/app";
 import { expect, test } from "./support/fixtures";
-import { answerAlerts, watchAlerts } from "./support/native-alert";
+import { alerts, answerAlerts, watchAlerts } from "./support/native-alert";
 
 const button = (page: Page, name: string | RegExp) => page.getByRole("button", { name });
 async function openPeople(page: Page, world: (w: World) => void = W.idle) {
-  await openWindow(page, "main", { world });
+  const steer = await openWindow(page, "main", { world });
   await expect(async () => {
     await page.keyboard.press("Meta+Digit4");
     await expect(page.getByRole("heading", { name: "People", level: 1 })).toBeVisible({ timeout: 1000 });
   }).toPass();
+  return steer;
 }
 const noVoiceProfile = (w: World) => {
   W.idle(w);
@@ -79,5 +80,21 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile — focus with the mou
     await answerAlerts(page, "confirm");
     await button(page, "Delete Profile…").click();
     await expect(button(page, "Set Up Voice Profile…")).toBeFocused();
+  });
+
+  test("UI — other path: Cancel on the Delete Profile alert, and a confirmed delete that fails, leave focus on Delete Profile…", async ({ page }) => {
+    await watchAlerts(page);
+    const steer = await openPeople(page);
+    await page.getByRole("table", { name: /People/ }).getByRole("row", { name: /Anna K\./ }).click();
+    await page.keyboard.press("Enter");
+    await expect(button(page, "Delete Profile…")).toBeVisible();
+    await button(page, "Delete Profile…").click(); // the alert answers Cancel
+    await expect.poll(() => alerts(page)).toHaveLength(1);
+    await expect(button(page, "Delete Profile…")).toBeFocused();
+    await steer.failNext("voice_profile_delete", "internal");
+    await answerAlerts(page, "confirm");
+    await button(page, "Delete Profile…").click();
+    await expect(page.getByText("Couldn’t delete the voice profile. It was not changed.")).toBeVisible();
+    await expect(button(page, "Delete Profile…")).toBeFocused();
   });
 });
