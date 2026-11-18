@@ -12,18 +12,77 @@ public protocol Player: AnyObject, Sendable {
     func stop()
 }
 
-/// shortcut: not exercised by the CI tests (no output device there); the M1 week-one runbook
-/// plays a span on the Mac.
+/// shortcut: device playback is exercised by the Mac runbook; control-path tests use fake audio and timers.
+// @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-position
 public final class FilePlayer: Player, @unchecked Sendable {
-    private let lock = NSLock()
-    private var engine: AVAudioEngine?
-    private var timer: DispatchSourceTimer?
-    private var finish: (() -> Void)?
+    struct Audio {
+        let endMs: Int
+        let head: () -> Int
+        let stop: () -> Void
+    }
 
-    public init() {}
+    private let prepare: ([URL], Int, Int?) throws -> Audio?
+    private let schedule: (@escaping @Sendable () -> Void) -> () -> Void
+    // Progress and completion are serialized with replacement; a callback may itself stop playback.
+    private let lock = NSRecursiveLock()
+    private var audio: Audio?
+    private var cancel: (() -> Void)?
+    private var finish: (() -> Void)?
+    private var generation: UUID?
+
+    public convenience init() { self.init(prepare: Self.prepareAudio, schedule: Self.scheduleTimer) }
+
+    init(
+        prepare: @escaping ([URL], Int, Int?) throws -> Audio?,
+        schedule: @escaping (@escaping @Sendable () -> Void) -> () -> Void
+    ) {
+        self.prepare = prepare
+        self.schedule = schedule
+    }
 
     public func play(_ files: [URL], fromMs: Int, toMs: Int?, position: @escaping @Sendable (Int, Bool) -> Void) throws {
-        stop()
+        try lock.withLock {
+            stop()
+            guard let audio = try prepare(files, fromMs, toMs) else { position(fromMs, false); return }
+            let generation = UUID()
+            self.generation = generation
+            self.audio = audio
+            finish = { position(audio.head(), false) }
+            let cancel = schedule { [weak self] in
+                let at = audio.head()
+                self?.tick(generation, at: at, endMs: audio.endMs, position: position)
+            }
+            if self.generation == generation { self.cancel = cancel } else { cancel() }
+        }
+    }
+
+    private func tick(_ generation: UUID, at: Int, endMs: Int, position: (Int, Bool) -> Void) {
+        lock.withLock {
+            guard self.generation == generation else { return }
+            if at >= endMs { stop() } else { position(at, true) }
+        }
+    }
+
+    public func stop() {
+        let audio = lock.withLock {
+            let (audio, cancel, finish) = (self.audio, self.cancel, self.finish)
+            (self.audio, self.cancel, self.finish, generation) = (nil, nil, nil, nil)
+            cancel?()
+            finish?()
+            return audio
+        }
+        audio?.stop()
+    }
+
+    private static func scheduleTimer(_ tick: @escaping @Sendable () -> Void) -> () -> Void {
+        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "ai.noter.engine.replay"))
+        timer.schedule(deadline: .now() + 0.25, repeating: 0.25)
+        timer.setEventHandler(handler: tick)
+        timer.resume()
+        return { timer.cancel() }
+    }
+
+    private static func prepareAudio(_ files: [URL], _ fromMs: Int, _ toMs: Int?) throws -> Audio? {
         let engine = AVAudioEngine()
         var nodes: [AVAudioPlayerNode] = []
         var endMs = fromMs
@@ -41,37 +100,15 @@ public final class FilePlayer: Player, @unchecked Sendable {
             endMs = max(endMs, Int(Double(last) * 1000 / rate))
         }
         guard let lead = nodes.first else {
-            position(fromMs, false)
-            return
+            return nil
         }
         try engine.start()
         nodes.forEach { $0.play() }
-        // @cpt-begin:cpt-noter-flow-core-engine-capture-replay:p1:inst-position
         func head() -> Int {
             guard let now = lead.lastRenderTime, let t = lead.playerTime(forNodeTime: now) else { return fromMs }
             return min(endMs, fromMs + Int(Double(t.sampleTime) * 1000 / t.sampleRate))
         }
-        let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "ai.noter.engine.replay"))
-        lock.withLock {
-            (self.engine, self.timer) = (engine, timer)
-            finish = { position(head(), false) }
-        }
-        timer.schedule(deadline: .now() + 0.25, repeating: 0.25)
-        timer.setEventHandler { [weak self] in
-            let at = head()
-            if at >= endMs { self?.stop() } else { position(at, true) }
-        }
-        timer.resume()
-        // @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-position
-    }
-
-    public func stop() {
-        let (engine, timer, finish) = lock.withLock {
-            defer { (self.engine, self.timer, self.finish) = (nil, nil, nil) }
-            return (self.engine, self.timer, self.finish)
-        }
-        timer?.cancel()
-        finish?()
-        engine?.stop()
+        return Audio(endMs: endMs, head: head, stop: { engine.stop() })
     }
 }
+// @cpt-end:cpt-noter-flow-core-engine-capture-replay:p1:inst-position

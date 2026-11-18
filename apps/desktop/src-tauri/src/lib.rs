@@ -83,6 +83,9 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 api.prevent_close();
                 let _ = window.hide();
                 surfaces::main_window_will_hide(window.app_handle());
+                if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
+                    surfaces.save_frames();
+                }
             }
             WindowEvent::Destroyed => {
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
@@ -95,6 +98,13 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 }
             }
             // The user moved or resized the call window: its frame is saved (inst-frame).
+            WindowEvent::Moved(_) | WindowEvent::Resized(_)
+                if window.label() == WindowLabel::Main.as_str() =>
+            {
+                if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
+                    surfaces.main_window_changed(window);
+                }
+            }
             WindowEvent::Moved(_) | WindowEvent::Resized(_)
                 if window.label() == WindowLabel::CallScreen.as_str() =>
             {
@@ -153,6 +163,7 @@ pub fn run() {
                 let context_command = matches!(
                     event.id().as_ref(),
                     "menu.export"
+                        | "menu.select_all"
                         | "menu.delete"
                         | "menu.copy_for_slack"
                         | "menu.copy_for_jira"
@@ -185,6 +196,7 @@ pub fn run() {
                 .unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
+            surfaces.restore_main_window();
             let menu_context_app = app.handle().clone();
             app.listen(surfaces::APP_MENU_CONTEXT, move |event| {
                 surfaces::update_app_menu_context(&menu_context_app, event.payload());

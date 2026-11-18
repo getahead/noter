@@ -114,6 +114,8 @@ pub(crate) struct Session {
     pub(crate) failed_at: Option<i64>,
     /// When the last stop was asked for, and by whom (its change row names the surface).
     stop: Option<(i64, CommandCtx)>,
+    /// The engine retained its session after rejecting finalization; Stop must retry it.
+    pub(crate) stop_rejected: bool,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
     pub(crate) app: Option<(String, String)>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
@@ -769,17 +771,32 @@ impl Core {
         if state.call_id.as_ref() != Some(&args.call_id) || state.phase == CapturePhase::Idle {
             return Err(not_recording());
         }
-        if matches!(state.phase, CapturePhase::Stopped | CapturePhase::Stopping) {
+        if state.phase == CapturePhase::Stopped {
             return Ok(state);
+        }
+        if state.phase == CapturePhase::Stopping {
+            // The engine may have finalized while the call's final database write failed.
+            // Retry that write only after confirmation; an in-flight engine still owns its files.
+            if self.engine.session() == noter_engine_client::EngineSession::Stopped {
+                self.finish_stop(&mut session, &args.call_id)?;
+            }
+            return Ok(self.capture_now());
         }
         if let Some(pause) = &state.pause {
             let (t0, t1) = (session.offset(pause.since.0), session.offset(now));
             self.insert_gap(&args.call_id, t0, t1, GapReason::Paused)?;
             session.away_ms += now - pause.since.0;
         }
-        session.stop = Some((ended.unwrap_or(now), ctx.clone()));
+        if !session.stop_rejected {
+            session.stop = Some((ended.unwrap_or(now), ctx.clone()));
+        }
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopping
-        let recorded = session.recorded(now, None);
+        let stopped_at = session.stop.as_ref().map_or(now, |(at, _)| *at);
+        let recorded = if session.stop_rejected {
+            state.recorded_ms
+        } else {
+            session.recorded(now, None)
+        };
         self.set_capture(|c| {
             c.phase = CapturePhase::Stopping;
             c.pause = None;
@@ -789,15 +806,27 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // A failed engine runs no session: the call ends at the last audio at once.
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
-        if state.phase != CapturePhase::Failed {
+        if state.phase != CapturePhase::Failed || session.stop_rejected {
             drop(session);
-            if self.engine.stop_session().await.is_ok()
-                && self.engine.session() != noter_engine_client::EngineSession::Stopped
-            {
-                self.phase_leaves(CapturePhase::Stopping).await;
+            match self.engine.stop_session().await {
+                Err(error @ noter_engine_client::CommandError::Engine { .. }) => {
+                    session = self.capture.lock().await;
+                    // An explicit rejection leaves the engine owning its ring and timeline.
+                    // Preserve the original end time and do not publish/schedule a completed call.
+                    session.stop_rejected = true;
+                    session.failed_at = Some(stopped_at);
+                    self.set_capture(|c| c.phase = CapturePhase::Failed);
+                    return Err(error.into());
+                }
+                Ok(()) if self.engine.session() != noter_engine_client::EngineSession::Stopped => {
+                    self.phase_leaves(CapturePhase::Stopping).await;
+                }
+                // Preserve recovery when the engine crashed or cannot answer.
+                Ok(()) | Err(noter_engine_client::CommandError::Unavailable) => {}
             }
             session = self.capture.lock().await;
         }
+        session.stop_rejected = false;
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // Without the engine's answer in time the call still ends, at the stop.

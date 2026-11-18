@@ -78,7 +78,7 @@ function arm() {
 // @cpt-state:cpt-noter-state-ui-history-undo-strip:p1
 export function holdUndo(h: HoldUndo) {
   refresh = h.refresh;
-  last = h;
+  last = { ...h, mode: h.mode ?? "undo" };
   // @cpt-begin:cpt-noter-state-ui-history-undo-strip:p1:inst-show
   set({ target: h.target, message: h.message, context: h.context, mode: h.mode ?? "undo", phase: "VISIBLE" });
   // @cpt-end:cpt-noter-state-ui-history-undo-strip:p1:inst-show

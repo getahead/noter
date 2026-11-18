@@ -29,6 +29,7 @@
   "bundle": {
     "active": true,
     "macOS": {
+      "minimumSystemVersion": "14.4",
       "entitlements": "Noter.entitlements",
       "files": {
         "MacOS/noter-engine": "../../../engine/.build/release/noter-engine"

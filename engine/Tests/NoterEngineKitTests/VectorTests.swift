@@ -32,6 +32,46 @@ final class FakeText: TextModel, @unchecked Sendable {
     }
 }
 
+/// Holds archive inference so enrollment can contend for the same cached model.
+private final class GatedSpeaker: SpeakerModel, @unchecked Sendable {
+    let entered = DispatchSemaphore(value: 0)
+    let release = DispatchSemaphore(value: 0)
+    let second = DispatchSemaphore(value: 0)
+    private let lock = NSLock()
+    private var active = 0
+    private var calls = 0
+    private var maximum = 0
+    let failFirst: Bool
+
+    init(failFirst: Bool) { self.failFirst = failFirst }
+    var maxActive: Int { lock.withLock { maximum } }
+
+    private func inference() throws -> [Float] {
+        let first = lock.withLock {
+            active += 1
+            calls += 1
+            maximum = max(maximum, active)
+            return calls == 1
+        }
+        defer { lock.withLock { active -= 1 } }
+        if first {
+            entered.signal()
+            release.wait()
+            if failFirst { throw OfflineFailure(code: .internal) }
+        } else {
+            second.signal()
+        }
+        return [Float](repeating: 0.25, count: Vectors.speakerDims)
+    }
+
+    func embed(_ samples: [Float]) throws -> [Float] { try inference() }
+    func embed(window: [Float], speaking: [Bool]) throws -> [Float] { try inference() }
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        let vector = try inference()
+        return speakers.map { _ in vector }
+    }
+}
+
 final class VectorTests: XCTestCase {
     private var container: URL!
     private var session: URL { container.appendingPathComponent("audio/call_1") }
@@ -98,6 +138,54 @@ final class VectorTests: XCTestCase {
             XCTAssertThrowsError(try work.speaker(r, session: session, out: out)) {
                 XCTAssertEqual(($0 as? OfflineFailure)?.code, .badCommand)
             }
+        }
+    }
+
+    func testArchiveAndEnrollmentSerializeTheSharedSpeakerIncludingFailureAndReuse() throws {
+        try storeCall(in: session, seconds: 3, mic: [], sys: [(0.5, 2.5)])
+        for failFirst in [false, true] {
+            let model = GatedSpeaker(failFirst: failFirst)
+            let loadsLock = NSLock()
+            var loads = 0
+            let work = LocalOfflineWork(
+                decoder: { FakeDecoder() }, speaker: { loadsLock.withLock { loads += 1 }; return model },
+                clustering: { Clustering(segmentation: PitchSegmentation(), plda: identityPLDA()) })
+            let archived = DispatchSemaphore(value: 0)
+            let enrolled = DispatchSemaphore(value: 0)
+            let enrolling = DispatchSemaphore(value: 0)
+            let archiveURL = session.appendingPathComponent("serialized-archive.json")
+            let out = container.appendingPathComponent("engine-io/serialized-speaker.f32")
+            let pass = OfflinePass(
+                callId: "call_1", sessionDir: "audio/call_1", resultPath: "audio/call_1/serialized-archive.json",
+                constraintsPath: nil, backend: "whisper_large_v3")
+            DispatchQueue.global().async {
+                do {
+                    try work.archive(pass, session: self.session, result: archiveURL, constraints: .none, yieldIfNeeded: {}) { _ in }
+                    XCTAssertFalse(failFirst)
+                } catch {
+                    XCTAssertTrue(failFirst)
+                    XCTAssertEqual((error as? OfflineFailure)?.code, .internal)
+                }
+                archived.signal()
+            }
+            XCTAssertEqual(model.entered.wait(timeout: .now() + 5), .success)
+            let request = request([Span(t0Ms: 500, t1Ms: 1_500)])
+            DispatchQueue.global().async {
+                enrolling.signal()
+                do { try work.speaker(request, session: self.session, out: out) }
+                catch { XCTFail("enrollment failed: \(error)") }
+                enrolled.signal()
+            }
+            XCTAssertEqual(enrolling.wait(timeout: .now() + 5), .success)
+            XCTAssertEqual(model.second.wait(timeout: .now() + 0.25), .timedOut, "enrollment waits for the shared archive inference")
+            model.release.signal()
+            XCTAssertEqual(archived.wait(timeout: .now() + 5), .success)
+            XCTAssertEqual(enrolled.wait(timeout: .now() + 5), .success)
+            XCTAssertEqual(model.maxActive, 1)
+            XCTAssertEqual(try floats(out).count, Vectors.speakerDims)
+            work.releaseArchive()
+            try work.speaker(request, session: session, out: out)
+            XCTAssertEqual(loadsLock.withLock { loads }, 1, "archive release preserves the reusable speaker instance")
         }
     }
 

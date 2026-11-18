@@ -365,7 +365,9 @@ final class CaptureSession: @unchecked Sendable {
         lock.withLock {
             guard pausedAt == nil else { return }
             pausedAt = (callMs, now())
-            try? save()
+            do { try save() } catch {
+                writer.emit(.error(cmdId: nil, code: .internal, message: "could not save capture timeline: \(error)"))
+            }
         }
         asr.cut()
     }
@@ -377,7 +379,9 @@ final class CaptureSession: @unchecked Sendable {
             timeline.gaps.append(.init(t0Ms: paused.callMs, t1Ms: at, reason: "paused"))
             (spanStart, spanSamples, pausedAt) = (at, [.mic: 0, .sys: 0], nil)
             nextLevels = at + 100
-            try? save()
+            do { try save() } catch {
+                writer.emit(.error(cmdId: nil, code: .internal, message: "could not save capture timeline: \(error)"))
+            }
         }
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-pause-streams
@@ -392,7 +396,9 @@ final class CaptureSession: @unchecked Sendable {
             let to = from + max(0, Int(change.backAtMs - change.lostAtMs))
             if to > from { timeline.gaps.append(.init(t0Ms: from, t1Ms: to, reason: "device_changed")) }
             (spanStart, spanSamples, nextLevels) = (to, [.mic: 0, .sys: 0], to + 100)
-            try? save()
+            do { try save() } catch {
+                writer.emit(.error(cmdId: nil, code: .internal, message: "could not save capture timeline: \(error)"))
+            }
             return .deviceChanged(callId: callId, deviceName: change.name, gapFromMs: from, gapToMs: to)
         }
         event.map(writer.emit)
@@ -401,10 +407,12 @@ final class CaptureSession: @unchecked Sendable {
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
 
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-stop
-    /// Clear before a new session can reuse the mapping, while finalization runs behind it.
-    func stopCapture() {
-        lock.withLock {
+    /// Commit the complete timeline before clearing recovery or admitting a successor.
+    /// A failed write leaves this session and its ring available for another Stop.
+    func stopCapture() throws {
+        try lock.withLock {
             live = false
+            try save()
             ring.clear()
         }
     }
@@ -420,7 +428,7 @@ final class CaptureSession: @unchecked Sendable {
             }
             encoders.values.forEach { $0.finish() }
             encoders = [:]
-            try? save()
+            // stopCapture committed the final timeline before detaching this session.
             let paths = [Channel.mic, .sys].map { channel -> String? in
                 let parts = (0..<timeline.parts)
                     .map { dir.appendingPathComponent("\(channel.rawValue).\($0).aac") }

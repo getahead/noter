@@ -9,6 +9,9 @@ import {
   type MouseEvent,
 } from "react";
 import { useAnnounce } from "../../app/a11y/announce";
+import { isModalOpen, isTyping } from "../../app/a11y/keys";
+import { updateNativeMenuContext } from "../../core/native-menu";
+import { moveFocus } from "../../ui/primitives/roving";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
@@ -41,6 +44,35 @@ let memory: { state: CallsState; selection: Selection } | null = null;
 
 const SLOW_MS = 300;
 
+// @cpt-flow:cpt-noter-flow-ui-library-calls-browse:p1
+export function moveCallsSelection(e: KeyboardEvent<HTMLElement>, select: (next: Selection) => void): boolean {
+  if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey || !moveFocus(e, "[data-lib-row]", false)) return false;
+  const id = (document.activeElement as HTMLElement | null)?.dataset.libRow;
+  if (id) select({ ids: [id], anchor: id });
+  return true;
+}
+
+// @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
+export function watchCallsMenuContext(): () => void {
+  let focused = true;
+  const update = () => void updateNativeMenuContext({ selectAllCalls: focused && !isModalOpen() && !isTyping(document.activeElement) && !!document.activeElement?.closest('[data-lib-row], [data-region="LC-R3"] table') });
+  const onFocus = () => { focused = true; update(); };
+  const onBlur = () => { focused = false; update(); };
+  const observer = typeof MutationObserver === "undefined" ? null : new MutationObserver(update);
+  update();
+  window.addEventListener("focus", onFocus);
+  window.addEventListener("blur", onBlur);
+  document.addEventListener?.("focusin", update);
+  if (document.body) observer?.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["aria-modal"] });
+  return () => {
+    window.removeEventListener("focus", onFocus);
+    window.removeEventListener("blur", onBlur);
+    document.removeEventListener?.("focusin", update);
+    observer?.disconnect();
+    void updateNativeMenuContext({ selectAllCalls: false });
+  };
+}
+
 function useCallsList(bridge: Bridge): [CallsState, CallsList] {
   const list = useMemo(() => createCallsList(bridge, memory?.state, heldFilter().filter), [bridge]);
   const state = useSyncExternalStore(list.subscribe, list.get, list.get);
@@ -52,6 +84,7 @@ function useCallsList(bridge: Bridge): [CallsState, CallsList] {
 // @cpt-component:cpt-noter-component-screen-library:p1
 /** Library › Calls: the list's state and the commands behind LC-R1 and LC-R3. */
 export function CallsPage() {
+  useEffect(watchCallsMenuContext, []);
   const bridge = useBridge();
   const [state, list] = useCallsList(bridge);
   const [selection, setSelection] = useState<Selection>(
@@ -219,7 +252,9 @@ export function CallsPage() {
   // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-api-sort
 
   // @cpt-begin:cpt-noter-flow-ui-library-calls-delete:p1:inst-user-delete
-  const onKeyDown = (e: KeyboardEvent) => {
+  const onKeyDown = (e: KeyboardEvent<HTMLElement>) => {
+    if (e.defaultPrevented || isTyping(e.target) || isModalOpen()) return;
+    if (moveCallsSelection(e, setSelection)) return;
     // @cpt-begin:cpt-noter-flow-ui-dialogs-host-delete-call:p1:inst-user-delete
     if (e.metaKey && e.key === "Backspace" && chosen.length)
       return (e.preventDefault(), void remove(chosen));

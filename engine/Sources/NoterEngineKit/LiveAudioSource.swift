@@ -15,6 +15,85 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         public let description: String
     }
 
+    /// Capture intent survives a failed aggregate rebuild; explicit Stop ends that intent.
+    struct DeviceRecovery {
+        private(set) var running = false
+        private(set) var available = false
+        private(set) var microphoneUID: String?
+        private var lostAtMs: Int64?
+
+        mutating func started(microphoneUID: String?) {
+            running = true
+            available = true
+            self.microphoneUID = microphoneUID
+            lostAtMs = nil
+        }
+
+        mutating func stopped() {
+            running = false
+            available = false
+            microphoneUID = nil
+            lostAtMs = nil
+        }
+
+        mutating func rebuild(
+            microphoneUID: String?, atMs: Int64, close: () -> Void, open: (Int64) throws -> Void
+        ) throws {
+            guard running, !available || microphoneUID != self.microphoneUID else { return }
+            let lost = lostAtMs ?? atMs
+            lostAtMs = lost
+            available = false
+            self.microphoneUID = nil
+            close()
+            do {
+                try open(lost)
+                available = true
+                self.microphoneUID = microphoneUID
+                lostAtMs = nil
+            } catch {
+                close() // dispose an aggregate or IO proc created before the failure
+                throw error
+            }
+        }
+    }
+
+    /// Enqueue the device fact ahead of IO chunks scheduled by `open`.
+    static func startDevice(
+        on queue: DispatchQueue, notify: @escaping @Sendable () -> Void,
+        open: (_ beforeStart: () -> Void) throws -> Void
+    ) throws {
+        let result = DeviceStartResult()
+        do {
+            try open { queue.async { result.deliver(notify) } }
+            result.complete(true)
+        } catch {
+            result.complete(false)
+            throw error
+        }
+    }
+
+    /// The fact is queued before IO starts, but cannot claim recovery until Start succeeds.
+    /// Waiting happens only on the delivery queue, never on the real-time IO callback.
+    private final class DeviceStartResult: @unchecked Sendable {
+        private let condition = NSCondition()
+        private var succeeded: Bool?
+
+        func complete(_ succeeded: Bool) {
+            condition.lock()
+            self.succeeded = succeeded
+            condition.broadcast()
+            condition.unlock()
+        }
+
+        func deliver(_ notify: () -> Void) {
+            condition.lock()
+            while succeeded == nil { condition.wait() }
+            let deliver = succeeded == true
+            condition.unlock()
+            if deliver { notify() }
+        }
+    }
+
     private static let watched = [kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDevices]
     private let lock = NSLock()
     private let preferredMic: String?
@@ -27,8 +106,10 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     private var device = AudioObjectID(kAudioObjectUnknown)
     private var proc: AudioDeviceIOProcID?
     private var micUID: String?
+    private var recovery = DeviceRecovery()
     private var onChunk: (@Sendable (AudioChunk) -> Void)?
     private var onDevice: (@Sendable (DeviceChange) -> Void)?
+    private var onFailure: (@Sendable (String) -> Void)?
     private var listener: AudioObjectPropertyListenerBlock?
 
     /// `micUid` is the microphone the user chose, or nil for the default input, which is also
@@ -45,7 +126,9 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
             do {
                 try createTap()
                 try openDevice(mic: try? Self.wantedMic(preferredMic)) {}
+                recovery.started(microphoneUID: micUID)
             } catch {
+                recovery.stopped()
                 close()
                 throw error
             }
@@ -55,6 +138,7 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
 
     public func stop() {
+        lock.withLock { recovery.stopped() }
         unlisten()
         lock.withLock {
             close()
@@ -74,6 +158,10 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
 
     public func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {
         lock.withLock { onDevice = handler }
+    }
+
+    func observeFailures(_ handler: @escaping @Sendable (String) -> Void) {
+        lock.withLock { onFailure = handler }
     }
 
     /// Applies to the running tap at once; processes the app starts later are left out at the
@@ -225,19 +313,20 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     private func devicesChanged() {
         let mic = try? Self.wantedMic(preferredMic)
         lock.withLock {
-            guard device != kAudioObjectUnknown, mic != micUID else { return }
-            let lost = Self.epochMs()
-            closeDevice()
+            var next = recovery
+            defer { recovery = next }
             do {
-                try openDevice(mic: mic) { [onDevice, delivery] in
+                try next.rebuild(microphoneUID: mic, atMs: Self.epochMs(), close: closeDevice) { lost in
                     let name = mic.flatMap(Self.name(uid:)) ?? "No microphone"
                     let change = DeviceChange(name: name, lostAtMs: lost, backAtMs: Self.epochMs())
-                    delivery.async { onDevice?(change) }  // after the old device's chunks
+                    try Self.startDevice(on: delivery, notify: { [onDevice] in onDevice?(change) }) { beforeStart in
+                        try openDevice(mic: mic, beforeStart: beforeStart)
+                    }
                 }
             } catch {
-                // shortcut: no retry; the core sees silent levels (`MicrophoneOff`) until the
-                // next device change rebuilds the device. Add a retry if the runbook shows one.
-                FileHandle.standardError.write(Data("noter-engine: device change: \(error)\n".utf8))
+                let message = "capture device change failed: \(error)"
+                if let onFailure { delivery.async { onFailure(message) } }
+                FileHandle.standardError.write(Data("noter-engine: \(message)\n".utf8))
             }
         }
     }

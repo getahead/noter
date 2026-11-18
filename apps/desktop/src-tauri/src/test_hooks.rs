@@ -10,9 +10,9 @@ use noter_core::{CoreDeps, EventEmitter, ShortcutRegistrar};
 use noter_core_harness::boot::{Harness, Options};
 use tauri::{AppHandle, Manager, Runtime, Webview};
 
-use crate::Booted;
 use crate::native::{MacOps, Windows};
 use crate::surfaces::TauriSurfaces;
+use crate::Booted;
 
 #[cfg(target_os = "macos")]
 const NATIVE_TEST_CLIPBOARD: &str = "org.getahead.noter.native-uitests";
@@ -39,6 +39,22 @@ fn write_native_test_clipboard(text: &noter_native::ClipboardText) -> Result<(),
 
 /// Kept for the app's lifetime: it feeds the scripted engine's meters.
 static HARNESS: OnceLock<Arc<Harness>> = OnceLock::new();
+
+/// One failed host command lets the native suite verify that Quit preserves the running app.
+pub fn quit_error_once(stage: &str) -> Option<noter_protocol::CoreError> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static USED: AtomicBool = AtomicBool::new(false);
+    if HARNESS.get().is_none()
+        || std::env::var("NOTER_TEST_QUIT_ERROR").ok().as_deref() != Some(stage)
+        || USED.swap(true, Ordering::AcqRel)
+    {
+        return None;
+    }
+    Some(noter_protocol::CoreError::new(
+        noter_protocol::ErrorCode::Internal,
+        "injected native quit error",
+    ))
+}
 
 /// `None` without the hooks; otherwise the core they booted, or why they could not.
 pub fn boot<R: Runtime>(
@@ -122,12 +138,10 @@ pub fn watch_hotkey_trigger<R: Runtime>(app: AppHandle<R>) {
     let Some(path) = std::env::var_os("NOTER_TEST_HOTKEY_FILE").map(PathBuf::from) else {
         return;
     };
-    std::thread::spawn(move || {
-        loop {
-            std::thread::sleep(std::time::Duration::from_millis(50));
-            if let Some(chord) = take_trigger(&path) {
-                crate::hotkey_pressed(&app, &chord);
-            }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        if let Some(chord) = take_trigger(&path) {
+            crate::hotkey_pressed(&app, &chord);
         }
     });
 }

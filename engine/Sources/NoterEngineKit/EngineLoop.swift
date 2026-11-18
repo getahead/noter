@@ -179,6 +179,9 @@ public final class EngineLoop: @unchecked Sendable {
                 start: start, container: container, writer: writer, now: now, encoder: encoder, asrQueue: asrQueue,
                 fileModeRing: fileModeRing)
             audio.observeDevices { capture.deviceChanged($0) }
+            (audio as? LiveAudioSource)?.observeFailures { [writer] message in
+                writer.emit(.error(cmdId: nil, code: .deviceUnavailable, message: message))
+            }
             try audio.start { capture.feed($0) }
             // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
             session = (capture, audio)
@@ -231,7 +234,12 @@ public final class EngineLoop: @unchecked Sendable {
         // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-if-stop
         case .stop:
             session.audio.stop()
-            session.capture.stopCapture()
+            do {
+                try session.capture.stopCapture()
+            } catch {
+                writer.emit(.error(cmdId: command.id, code: .internal, message: "could not finalize capture timeline: \(error)"))
+                return
+            }
             writer.emit(.ack(cmdId: command.id))
             facts.withLock {
                 detector.stopSession()

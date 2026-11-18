@@ -4,6 +4,35 @@ import XCTest
 import CoreGraphics
 
 final class WindowSizeTests: NoterTestCase {
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+    func test_cpt_noter_seq_menu_bar_control_recording__main_frame_survives_relaunch() throws {
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
+        let main = window("Noter")
+        let right = main.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
+        right.click(forDuration: 0.1, thenDragTo: right.withOffset(CGVector(dx: 1000 - main.frame.width, dy: 0)))
+        XCTAssertTrue(waitUntil(5) { abs(main.frame.width - 1000) <= 8 }, "the user resized the main window")
+        let bottom = main.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
+        bottom.click(forDuration: 0.1, thenDragTo: bottom.withOffset(CGVector(dx: 0, dy: 700 - main.frame.height)))
+        XCTAssertTrue(waitUntil(5) { abs(main.frame.height - 700) <= 8 }, "the user changed the main window height")
+        let beforeMove = main.frame
+        // The sidebar's blank titlebar area is a native drag region, clear of the traffic lights.
+        let title = main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 110, dy: 14))
+        title.click(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 35, dy: 35)))
+        XCTAssertTrue(waitUntil(5) { main.frame.origin != beforeMove.origin }, "the user moved the main window")
+        let expected = main.frame
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "normal Quit finishes before relaunch")
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not reload")
+        XCTAssertTrue(waitUntil(5) {
+            let actual = self.window("Noter").frame
+            return abs(actual.minX - expected.minX) <= 3 && abs(actual.minY - expected.minY) <= 3
+                && abs(actual.width - expected.width) <= 3 && abs(actual.height - expected.height) <= 3
+        }, "relaunch restores the user's size and position; actual=\(window("Noter").frame), expected=\(expected)")
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+
     /// The window around the region with this VoiceOver label.
     func window(around label: String) -> XCUIElement {
         app.windows.containing(NSPredicate(format: "label == %@", label)).firstMatch

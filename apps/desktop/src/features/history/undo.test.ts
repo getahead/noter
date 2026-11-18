@@ -171,6 +171,21 @@ describe("refresh after a replaced strip", () => {
 });
 
 describe("the last applicable change", () => {
+  it.each(["dismissed", "expired"])("keeps default Undo available after the first strip is %s", async (hidden) => {
+    const calls: string[] = [];
+    const refresh = vi.fn();
+    holdUndo({ target: change, message: "Tagged call", refresh });
+    if (hidden === "dismissed") dismissUndo();
+    else advance(UNDO_MS);
+    expect(peek()).toBeNull();
+    expect(undoMode()).toBe("undo");
+    expect(undoKey({ code: "KeyZ", metaKey: true, shiftKey: false, altKey: false, ctrlKey: false }, undoMode())).toBe(true);
+    await undoLast(bridgeFor(ok(1), calls));
+    expect(calls).toEqual(["undo"]);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(peek()).toMatchObject({ mode: "redo", target: change });
+  });
+
   it("⌘Z and ⇧⌘Z keep working after the strip is dismissed, on the same target", async () => {
     const calls: string[] = [];
     const b = bridgeFor(ok(1), calls);

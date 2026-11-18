@@ -14,7 +14,7 @@ use noter_core::{
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
-use noter_protocol::engine::{EngineCommand, EngineEvent, StartSession};
+use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent, StartSession};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -755,6 +755,197 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
         .await
         .unwrap();
     assert_eq!(again.phase, CapturePhase::Stopped);
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_finalization_error_keeps_the_call_retryable_until_the_engine_flushes() {
+    for try_again in [false, true] {
+        let r = rig_with(Setup {
+            engine: Behaviour {
+                hang: true,
+                ..Behaviour::default()
+            },
+            ..Setup::default()
+        });
+        let start = {
+            let core = r.core.clone();
+            tokio::spawn(async move { core.capture_start(&main_window(), start_args()).await })
+        };
+        let EngineCommand::StartSession(session) = r
+            .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+            .await
+        else {
+            unreachable!()
+        };
+        let call_id = session.call_id;
+        r.engine.inject(EngineEvent::Ack {
+            cmd_id: r.engine.last_command_id().unwrap(),
+        });
+        r.session_started(&call_id);
+        start.await.unwrap().unwrap();
+        r.phase_becomes(CapturePhase::Recording).await;
+        let transcript = r.subscribe_transcript(call_id.clone()).await;
+        r.advance(1_000);
+        let stop = {
+            let core = r.core.clone();
+            let call_id = call_id.clone();
+            tokio::spawn(async move {
+                core.capture_stop(&main_window(), CallIdArgs { call_id })
+                    .await
+            })
+        };
+        r.sent_n(1, |c| matches!(c, EngineCommand::Stop { .. }))
+            .await;
+        r.engine.inject(EngineEvent::Error {
+            cmd_id: r.engine.last_command_id(),
+            code: EngineErrorCode::Internal,
+            message: "could not finalize capture timeline".into(),
+        });
+        assert_eq!(stop.await.unwrap().unwrap_err().code, ErrorCode::Internal);
+        assert_eq!(r.state().await.phase, CapturePhase::Failed);
+        assert_eq!(r.query::<String>("SELECT status FROM calls"), "recording");
+        assert_eq!(
+            r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+            0
+        );
+        assert!(runs_of(&r, JobKind::PostCall).is_empty());
+        assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+        assert!(r.core.capture_guard().borrow().live);
+        assert!(!transcript
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|e| matches!(e, TranscriptEvent::Ended { .. })));
+        r.advance(5_000);
+        let mut retry = {
+            let core = r.core.clone();
+            let call_id = call_id.clone();
+            tokio::spawn(async move {
+                if try_again {
+                    core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                        .await
+                } else {
+                    core.capture_stop(&menu_bar(), CallIdArgs { call_id }).await
+                }
+            })
+        };
+        r.sent_n(2, |c| matches!(c, EngineCommand::Stop { .. }))
+            .await;
+        assert_eq!(
+            r.sessions().len(),
+            1,
+            "retry must not start another session"
+        );
+        r.engine.inject(EngineEvent::Ack {
+            cmd_id: r.engine.last_command_id().unwrap(),
+        });
+        assert_eq!(r.state().await.phase, CapturePhase::Stopping);
+        assert!(runs_of(&r, JobKind::PostCall).is_empty());
+        // A concurrent caller observes the pending stop without issuing a duplicate command.
+        assert_eq!(
+            r.core
+                .capture_stop(
+                    &main_window(),
+                    CallIdArgs {
+                        call_id: call_id.clone()
+                    }
+                )
+                .await
+                .unwrap()
+                .phase,
+            CapturePhase::Stopping
+        );
+        assert_eq!(r.stops(), 2);
+        assert!(tokio::time::timeout(Duration::from_millis(100), &mut retry)
+            .await
+            .is_err());
+        r.session_stopped(&call_id);
+        assert_eq!(retry.await.unwrap().unwrap().phase, CapturePhase::Stopped);
+        assert_eq!(r.query::<i64>("SELECT ended_at FROM calls"), T0 + 1_000);
+        assert_eq!(r.state().await.recorded_ms, DurationMs(1_000));
+        assert!(!r.core.capture_guard().borrow().live);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_retries_a_failed_final_call_write_without_stopping_the_engine_twice() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
+    let db = noter_db::rusqlite::Connection::open(r._dir.path().join("noter.db")).unwrap();
+    db.execute_batch(
+        "CREATE TRIGGER fail_capture_stop BEFORE UPDATE ON calls
+        WHEN NEW.status = 'processing' BEGIN SELECT RAISE(ABORT, 'final call write failed'); END;",
+    )
+    .unwrap();
+    r.advance(1_000);
+    let stop = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_stop(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent(|c| matches!(c, EngineCommand::Stop { .. })).await;
+    r.session_stopped(&call_id);
+    assert_eq!(stop.await.unwrap().unwrap_err().code, ErrorCode::Internal);
+    assert_eq!(r.state().await.phase, CapturePhase::Stopping);
+    assert_eq!(r.query::<String>("SELECT status FROM calls"), "recording");
+    assert!(runs_of(&r, JobKind::PostCall).is_empty());
+    assert_eq!(
+        r.core
+            .capture_stop(
+                &menu_bar(),
+                CallIdArgs {
+                    call_id: call_id.clone()
+                }
+            )
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal,
+        "a still-failing final write must remain an error"
+    );
+    assert_eq!(r.stops(), 1);
+    db.execute_batch("DROP TRIGGER fail_capture_stop").unwrap();
+    r.advance(5_000);
+    let stopped = r
+        .core
+        .capture_stop(&menu_bar(), CallIdArgs { call_id })
+        .await
+        .unwrap();
+    assert_eq!(stopped.phase, CapturePhase::Stopped);
+    assert_eq!(r.stops(), 1);
+    assert_eq!(r.query::<i64>("SELECT ended_at FROM calls"), T0 + 1_000);
+    assert_eq!(stopped.recorded_ms, DurationMs(1_000));
+    assert!(transcript.lock().unwrap().iter().any(|e| matches!(
+        e,
+        TranscriptEvent::Ended {
+            reason: StreamEndReason::CallStopped
+        }
+    )));
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_still_finishes_when_the_engine_crashes_before_its_final_answer() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let stop = {
+        let core = r.core.clone();
+        tokio::spawn(async move {
+            core.capture_stop(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent(|c| matches!(c, EngineCommand::Stop { .. })).await;
+    r.engine.kill_current();
+    assert_eq!(stop.await.unwrap().unwrap().phase, CapturePhase::Stopped);
+    assert!(!r.core.capture_guard().borrow().live);
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+        1
+    );
 }
 
 #[tokio::test(start_paused = true)]

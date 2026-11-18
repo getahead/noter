@@ -359,6 +359,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             EngineSession::Starting,
             EngineSession::Capturing,
             EngineSession::Paused,
+            // A rejected finalization retains the session; another Stop retries its flush.
+            EngineSession::Stopping,
         ])?;
         if let Some(x) = self.shared().session.as_mut() {
             // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopping

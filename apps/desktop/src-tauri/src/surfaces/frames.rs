@@ -5,8 +5,10 @@ use noter_protocol::model::{CallLayout, DisplayInfo};
 use noter_protocol::DisplayId;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, atomic::{AtomicBool, Ordering}};
-
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 
 /// The frame of the call display: the chosen display by identity, else (none chosen, or
 /// unplugged) the main display; frames come from noter-native's AppKit visible-frame query.
@@ -40,7 +42,7 @@ pub fn clamp_frame((x, y, w, h): (f64, f64, f64, f64), visible: &Frame) -> (f64,
     (x, y, w, h)
 }
 
-/// The call window's frames the user left, per display and layout, in a small JSON file beside
+/// The windows' frames the user left, per display and layout, in a small JSON file beside
 /// the data folder; a missing or damaged file is no saved frame.
 pub struct SavedFrames {
     path: PathBuf,
@@ -74,6 +76,26 @@ impl SavedFrames {
         frames.get(&frame_key(display, layout)).copied()
     }
 
+    pub fn main(&self) -> Option<(DisplayId, (f64, f64, f64, f64))> {
+        lock(&self.frames).iter().find_map(|(key, &frame)| {
+            key.strip_prefix("main/")
+                .map(|display| (DisplayId::new(display.to_string()), frame))
+        })
+    }
+
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+    pub fn remember_main(&self, display: &DisplayId, frame: (f64, f64, f64, f64)) {
+        let key = format!("main/{}", display.as_str());
+        let mut frames = lock(&self.frames);
+        if frames.get(&key) == Some(&frame) {
+            return;
+        }
+        frames.retain(|key, _| !key.starts_with("main/"));
+        frames.insert(key, frame);
+        self.dirty.store(true, Ordering::Relaxed);
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+
     /// In memory only: a drag reports many frames; `save` writes the last one.
     pub fn remember(&self, display: &DisplayId, layout: CallLayout, frame: (f64, f64, f64, f64)) {
         let mut frames = lock(&self.frames);
@@ -96,6 +118,24 @@ impl SavedFrames {
         let _ = std::fs::write(&self.path, serde_json::to_string(&file).unwrap_or_default());
     }
 }
+
+// @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+pub fn restored_main_frame(
+    saved: Option<(DisplayId, (f64, f64, f64, f64))>,
+    displays: &[DisplayInfo],
+    visible: impl Fn(&DisplayId) -> Option<Frame>,
+) -> Option<(f64, f64, f64, f64)> {
+    let (display, (x, y, w, h)) = saved?;
+    if ![x, y, w, h].into_iter().all(f64::is_finite) || w <= 0.0 || h <= 0.0 {
+        return None;
+    }
+    let display = display_for(Some(&display), displays)?;
+    Some(clamp_frame(
+        (x, y, w.max(900.0), h.max(600.0)),
+        &visible(&display.id)?,
+    ))
+}
+// @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
 
 /// Where the call window goes: the whole display (dedicated) or a panel in its top-right corner.
 pub fn call_frame(layout: CallLayout, collapsed: bool, screen: &Frame) -> (f64, f64, f64, f64) {
@@ -163,6 +203,57 @@ pub fn prompt_frame(screen: &Frame, (w, h): (f64, f64)) -> (f64, f64, f64, f64) 
 // @cpt-end:cpt-noter-flow-ui-record-prompt-start-recording:p1:inst-core-detect
 
 impl<R: Runtime> TauriSurfaces<R> {
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+    pub fn restore_main_window(&self) {
+        let Some(window) = self.app.get_webview_window(WindowLabel::Main.as_str()) else {
+            return;
+        };
+        let saved = self.frames.main();
+        let app = self.app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if let Some(frame) = restored_main_frame(
+                saved,
+                &noter_native::displays(),
+                noter_native::display_visible_frame,
+            ) {
+                Self::place(&window, frame);
+            }
+        });
+    }
+
+    pub fn main_window_changed(&self, window: &tauri::Window<R>) {
+        // Maximizing or entering full screen must not replace the user's ordinary frame.
+        if window.is_maximized().unwrap_or(false)
+            || window.is_fullscreen().unwrap_or(false)
+            || window.is_minimized().unwrap_or(false)
+        {
+            return;
+        }
+        let scale = window.scale_factor().unwrap_or(1.0);
+        let (Ok(pos), Ok(size)) = (window.outer_position(), window.inner_size()) else {
+            return;
+        };
+        let (pos, size) = (pos.to_logical::<f64>(scale), size.to_logical::<f64>(scale));
+        let displays = noter_native::displays();
+        let center = (pos.x + size.width / 2.0, pos.y + size.height / 2.0);
+        let display = displays
+            .iter()
+            .find(|display| {
+                noter_native::display_frame(&display.id).is_some_and(|frame| {
+                    center.0 >= frame.x
+                        && center.0 < frame.x + frame.width
+                        && center.1 >= frame.y
+                        && center.1 < frame.y + frame.height
+                })
+            })
+            .or_else(|| display_for(None, &displays));
+        if let Some(display) = display {
+            self.frames
+                .remember_main(&display.id, (pos.x, pos.y, size.width, size.height));
+        }
+    }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-placement:p1:inst-frame
+
     /// The record prompt on the display without the call app, 12 pt inside its visible frame.
     pub(super) fn place_prompt(&self, prompt: &WebviewWindow<R>, call_display: Option<&DisplayId>) {
         let (w, h) = *lock(&self.prompt_size);

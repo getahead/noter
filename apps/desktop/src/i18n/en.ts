@@ -813,6 +813,8 @@ export const en = {
   "dialogs.quit.message":
     "Quitting stops the recording. The transcript so far is kept.",
   "dialogs.quit.confirm": "Stop and Quit",
+  "dialogs.quit.failed_title": "Couldn’t quit safely",
+  "dialogs.quit.failed_message": "Noter is still open because it couldn’t confirm the recording was saved. Check the recording, then try Quit again.",
   "dialogs.discard.ask": "Discard this recording? This can't be undone.",
   "dialogs.discard.confirm": "Discard",
   "dialogs.discard.back": "Back",

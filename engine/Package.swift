@@ -5,8 +5,8 @@ import PackageDescription
 
 let package = Package(
     name: "noter-engine",
-    // macOS 14.2 brings the Core Audio process taps the system channel needs.
-    platforms: [.macOS("14.2")],
+    // The supported process-tap capture and System Audio Recording boundary (PRD, Audio capture).
+    platforms: [.macOS("14.4")],
     products: [.executable(name: "noter-engine", targets: ["noter-engine"])],
     // Pinned by revision (the M1 engine spec): a moved tag never changes what the engine runs.
     dependencies: [

@@ -190,6 +190,12 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-resume:p1:inst-else-expired
         // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-try-again
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-try-again
+        if session.stop_rejected {
+            // The visible Try Again retries the user's unfinished Stop; its engine still owns the session.
+            return self
+                .stop_locked(session, ctx, CallIdArgs { call_id }, None)
+                .await;
+        }
         let failed_at = session.failed_at.unwrap_or(now);
         let (t0, t1) = (session.offset(failed_at), session.offset(now));
         // The engine still cannot start: the phase stays failed.

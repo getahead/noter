@@ -10,19 +10,19 @@ use noter_core::{
     Core, CoreDeps, EventEmitter, Notification, NotificationKind, Placement, Surfaces, SystemClock,
     TrayAction, TrayEntry, TrayGlyph, TrayItem, TrayModel,
 };
-use noter_desktop::Booted;
 use noter_desktop::surfaces::{
-    SavedFrames, TauriSurfaces, action_of, call_frame, clamp_frame, frame_of, glyph_image,
-    is_panel, notification_clicked, posted, prompt_display, prompt_frame, quit_alert, running_call,
-    same_shape, settings_url, tray_command,
+    action_of, call_frame, clamp_frame, frame_of, glyph_image, is_panel, notification_clicked,
+    posted, prompt_display, prompt_frame, quit_alert, running_call, same_shape, settings_url,
+    tray_command, SavedFrames, TauriSurfaces,
 };
+use noter_desktop::Booted;
 use noter_native::Frame;
-use noter_protocol::ipc::{Caller, CommandCtx, CoreApi, NativeSurface, dispatch_json, event_names};
+use noter_protocol::ipc::{dispatch_json, event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::{
     CallLayout, CallPageTab, CapturePhase, DegradedState, DisplayInfo, NavTarget, WindowLabel,
 };
 use noter_protocol::{CallId, DisplayId, ErrorCode, NoArgs, PermissionKind, TimestampMs};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tauri::test::{mock_builder, mock_context, noop_assets};
 use tauri::{Listener, Manager};
 
@@ -535,10 +535,9 @@ fn the_host_creates_the_core_windows_on_first_use() {
     );
     surfaces.restore_all();
     assert!(surfaces.hidden_for_presenting().is_empty());
-    assert!(
-        app.get_webview_window(WindowLabel::Settings.as_str())
-            .is_some()
-    );
+    assert!(app
+        .get_webview_window(WindowLabel::Settings.as_str())
+        .is_some());
 }
 
 // The mock runtime's windows are always "visible" and its show/hide do nothing, so these read the
@@ -628,6 +627,67 @@ fn the_call_window_frame_is_saved_per_display_and_layout_and_survives_a_restart(
 }
 
 #[test]
+fn the_main_frame_survives_restart_separately_from_call_frames() {
+    let id = |value: &str| DisplayId::new(value.to_string());
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("frames.json");
+    let saved = SavedFrames::load(&path);
+    assert_eq!(saved.main(), None);
+    let studio = id("dsp_studio");
+    saved.remember(&studio, CallLayout::Floating, (2000.0, 0.0, 380.0, 600.0));
+    saved.remember_main(&studio, (1900.0, 100.0, 1000.0, 700.0));
+    saved.save();
+    let saved = SavedFrames::load(&path);
+    assert_eq!(
+        saved.main(),
+        Some((studio.clone(), (1900.0, 100.0, 1000.0, 700.0)))
+    );
+    assert_eq!(
+        saved.get(&studio, CallLayout::Floating),
+        Some((2000.0, 0.0, 380.0, 600.0))
+    );
+    saved.remember_main(&id("dsp_builtin"), (100.0, 60.0, 1100.0, 720.0));
+    saved.save();
+    assert_eq!(
+        SavedFrames::load(&path).main(),
+        Some((id("dsp_builtin"), (100.0, 60.0, 1100.0, 720.0)))
+    );
+}
+
+#[test]
+fn main_frame_placement_restores_and_clamps_after_display_disconnect() {
+    let id = |value: &str| DisplayId::new(value.to_string());
+    use noter_desktop::surfaces::restored_main_frame;
+    let displays = [display("dsp_builtin", true), display("dsp_studio", false)];
+    assert_eq!(restored_main_frame(None, &displays, frames), None);
+    let saved = Some((id("dsp_studio"), (1900.0, 100.0, 1000.0, 700.0)));
+    assert_eq!(
+        restored_main_frame(saved.clone(), &displays, frames),
+        Some((1900.0, 100.0, 1000.0, 700.0))
+    );
+    assert_eq!(
+        restored_main_frame(saved, &displays[..1], frames),
+        Some((512.0, 100.0, 1000.0, 700.0))
+    );
+    assert_eq!(
+        restored_main_frame(
+            Some((id("dsp_builtin"), (-50.0, -50.0, 2000.0, 2000.0))),
+            &displays,
+            frames
+        ),
+        Some((0.0, 0.0, 1512.0, 982.0))
+    );
+    assert_eq!(
+        restored_main_frame(
+            Some((id("dsp_builtin"), (f64::NAN, 0.0, 1000.0, 700.0))),
+            &displays,
+            frames
+        ),
+        None
+    );
+}
+
+#[test]
 fn a_capture_problem_click_shows_the_call_window_not_the_main_window() {
     let dir = tempfile::tempdir().unwrap();
     let core = Arc::new(
@@ -710,7 +770,7 @@ fn quit_asks_only_while_a_call_records_or_waits_for_try_again() {
         (CapturePhase::Recording, true),
         (CapturePhase::Paused, true),
         (CapturePhase::Failed, true),
-        (CapturePhase::Stopping, false),
+        (CapturePhase::Stopping, true),
         (CapturePhase::Stopped, false),
         (CapturePhase::Idle, false),
     ] {

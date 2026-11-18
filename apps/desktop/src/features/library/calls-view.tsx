@@ -47,7 +47,7 @@ export interface CallsViewProps {
   onPress: (id: string, e: MouseEvent) => void;
   onOpen: (id: string) => void;
   onContext: (id: string, e: MouseEvent) => void;
-  onKeyDown: (e: KeyboardEvent) => void;
+  onKeyDown: (e: KeyboardEvent<HTMLElement>) => void;
   onRetry: () => void;
   onRetryNext: () => void;
   onSelfTest: () => void;
