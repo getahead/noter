@@ -107,8 +107,13 @@ describe("account_use_existing of Claude needs the personal-use box", () => {
       expect(status(ok(await settings.accountUseExisting({ provider: "claude", personal_use_confirmed: true })))).toBe("signed_in");
       // the ticked reuse is recorded: a later reuse without the box goes through
       expect(status(ok(await settings.accountUseExisting({ provider: "claude" })))).toBe("signed_in");
-      // signing out in Noter forgets it
-      ok(await settings.accountSignOut({ provider: "claude", also_in_cli: false }));
+      // signing out in Noter, from any window, forgets it: the core keeps one connection
+      ok(await s.core("main").accountSignOut({ provider: "claude", also_in_cli: false }));
+      expect(refused(await settings.accountUseExisting({ provider: "claude" })).code).toBe("personal_use_not_confirmed");
+      // a ticked browser sign-in that is cancelled before it connects records nothing
+      if (!isFake) await wire(s).invoke("main", "harness.account_cli", { tool: "claude_code", installed: true, path: "/bin/claude", version: "2.1.296", identity: { email: "ann@example.com", plan: "Max" }, login_identity: { email: "ann@example.com", plan: "Max" }, login: { delay_ms: 600000, code: "ONE-TIME-CODE-9137" } });
+      const started = ok(await settings.accountSigninStart({ provider: "claude", personal_use_confirmed: true }));
+      ok(await settings.accountSigninCancel({ session_id: started.id }));
       expect(refused(await settings.accountUseExisting({ provider: "claude" })).code).toBe("personal_use_not_confirmed");
     } finally {
       process.env.NOTER_CORE_CMD = command;
