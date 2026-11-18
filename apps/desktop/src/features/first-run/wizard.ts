@@ -41,8 +41,7 @@ export const downloadPaused = (bundles: readonly ModelBundle[]) => {
   return open.length > 0 && open.every((b) => b.state === "paused");
 };
 
-/** 2100 MB as 2.1 GB: one decimal, in the number format of the locale. */
-/** One decimal, and at least 0.1 for a bundle that has bytes (a 21 MB bundle is not "0 GB"). */
+/** 2100 MB as 2.1 GB: one decimal, in the number format of the locale, and at least 0.1 GB for a bundle that has bytes (a 21 MB bundle is not "0 GB"). */
 export const gigabytes = (mb: number) => t("first_run.models.size", { size: mb > 0 ? Math.max(0.1, Math.round(mb / 100) / 10) : 0 });
 /** The whole download as "2 GB", for "About 2 GB". */
 export const wholeGigabytes = (mb: number) => t("first_run.models.size", { size: Math.max(1, Math.round(mb / 1000)) });
