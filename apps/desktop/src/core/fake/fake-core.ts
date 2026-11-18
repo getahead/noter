@@ -18,6 +18,7 @@
 
 import {
   COMMANDS,
+  type AccountProvider,
   DEFAULT_RETRYABLE,
   isCoreError,
   type CallWindowState,
@@ -100,10 +101,12 @@ export interface HandlerState {
   handoffGenerating: Map<string, FakeCore>;
   skills: Map<string, { rev: number; body: string }>;
   shareWarningSeen: boolean;
+  /** Providers whose personal-use confirmation is recorded; the core keeps it on its one connection until sign-out. */
+  personalUse: Set<AccountProvider>;
 }
 
 function createHandlerState(): HandlerState {
-  return { counter: 0, lastCardAction: null, handoffEdits: new Map(), handoffRevs: new Map([["itm_replay", 1]]), handoffTargets: new Map(), handoffGenerating: new Map(), skills: new Map(), shareWarningSeen: false };
+  return { counter: 0, lastCardAction: null, handoffEdits: new Map(), handoffRevs: new Map([["itm_replay", 1]]), handoffTargets: new Map(), handoffGenerating: new Map(), skills: new Map(), shareWarningSeen: false, personalUse: new Set() };
 }
 
 interface OpenChannel {

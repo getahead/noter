@@ -5,6 +5,8 @@ import * as shared from "./shared";
 
 export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
+  // the world's shared record (one connection, as in the core), read on each call: the fake may swap its handlerState
+  const confirmed = () => fake.handlerState.personalUse;
   return {
   // ── Settings and credentials ─────────────────────────────────────────
   settings_get: (_a, { world }) => world.settings,
@@ -177,6 +179,8 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
         if (acc.status.type !== "signing_in" || acc.status.session_id !== id) return;
         emit("signin:progress", { session_id: id, provider: a.provider, step, identity: i ? identity : null, error: null });
         if (step === "done") {
+          // recorded only when the sign-in connects, as the core does
+          if (a.personal_use_confirmed) confirmed().add(a.provider);
           acc.status = { type: "signed_in", identity, since: shared.now() };
           publish("accounts:changed");
         }
@@ -198,6 +202,8 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     const acc = world.app.accounts.accounts.find((x) => x.provider === a.provider);
     if (!acc) throw coreError("not_found");
     if (!acc.cli.installed) throw coreError("cli_missing");
+    if (a.personal_use_confirmed) confirmed().add(a.provider);
+    if (a.provider === "claude" && !confirmed().has("claude")) throw coreError("personal_use_not_confirmed");
     acc.status = { type: "signed_in", identity: { email: "you@example.com", plan: a.provider === "claude" ? "Max" : "Plus" }, since: shared.now() };
     publish("accounts:changed");
     return world.app.accounts;
@@ -226,6 +232,7 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     if (!acc) throw coreError("not_found");
     acc.status = { type: "not_signed_in" };
     acc.agents = [];
+    confirmed().delete(a.provider);
     publish("accounts:changed");
     return world.app.accounts;
   },
