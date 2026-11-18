@@ -243,7 +243,7 @@ The system **MUST** render the cited-answer variants with original-language quot
 - [x] `default`, `first`, `answering`, `not-found`, `unreachable`, `local`, `sensitive`, `keyword-only`, `weak`, `deleted`, stopped and copied states match the prototype's structure and tokens (QA could not reach the local, sensitive, keyword-only and weak states on the real core, so those are unverified)
 - [x] A follow-up uses the same core thread id; citation numbers restart per answer and never change during a turn
 - [x] Copy writes only the chosen answer and its citations; Copied lasts 2 s after success
-- [ ] At Wide the recent pane is 260 pt and thread at most 860 pt; Medium/Narrow use Recent in the toolbar, with scope overflowing before the mode indicator
+- [x] At Wide the recent pane is 260 pt and thread at most 860 pt; Medium/Narrow use Recent in the toolbar, with scope overflowing before the mode indicator (QA verified the Medium and Narrow layout and the focus items on the real core; the citation speaker chip was not verifiable by hand, because no citation QA got carried a speaker, and is covered by the real-core E2E in `m3-ask-ui.spec.ts`, which cites `seg_live_005`, Dmitri Sokolov)
 - [x] Streaming is silent to VoiceOver; completion is announced once, with weakness included; quotes carry their own language (the weak-variant announcement and quotes in their own language could not be produced on the real core, so those parts are unverified)
 
 ## 7. Additional Context
