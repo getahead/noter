@@ -36,9 +36,13 @@ export function closeOnOutside(popover: { current: HTMLElement | null }, anchor:
   return () => document.removeEventListener("pointerdown", outside);
 }
 
-/** Calls `onClose` on Escape anywhere while the popover is open (Tab may have moved focus out of it); returns the remover. */
+/** Calls `onClose` on Escape anywhere while the popover is open (Tab may have moved focus out of it) and consumes the key, so only the popover closes; returns the remover. */
 export function closeOnEscape(onClose: () => void) {
-  const key = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onClose();
+  const key = (e: KeyboardEvent) => {
+    if (e.key !== "Escape" || e.defaultPrevented) return;
+    e.preventDefault(); // consumed: the shell's window-level Esc must not also close the inspector or a sidebar overlay
+    onClose();
+  };
   document.addEventListener("keydown", key);
   return () => document.removeEventListener("keydown", key);
 }

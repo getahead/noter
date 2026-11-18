@@ -67,11 +67,14 @@ describe("Popover behaviour", () => {
     vi.stubGlobal("document", doc);
     const onClose = vi.fn();
     const remove = closeOnEscape(onClose);
-    listener!({ key: "Tab" });
-    listener!({ key: "Escape", defaultPrevented: true });
+    const preventDefault = vi.fn();
+    listener!({ key: "Tab", preventDefault });
+    listener!({ key: "Escape", defaultPrevented: true, preventDefault });
     expect(onClose).not.toHaveBeenCalled();
-    listener!({ key: "Escape", defaultPrevented: false });
+    expect(preventDefault).not.toHaveBeenCalled();
+    listener!({ key: "Escape", defaultPrevented: false, preventDefault });
     expect(onClose).toHaveBeenCalledOnce();
+    expect(preventDefault).toHaveBeenCalledOnce(); // consumed, so the shell's Esc shortcut skips it
     remove();
     expect(doc.removeEventListener).toHaveBeenCalledWith("keydown", listener);
     vi.unstubAllGlobals();
