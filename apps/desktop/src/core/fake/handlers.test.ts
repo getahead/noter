@@ -252,7 +252,7 @@ describe("fake core stream and record parity", () => {
     vi.useFakeTimers();
     const fake = core("main");
     const messages: AskMsg[] = [];
-    const handle = await fake.invoke("ask_start", { question: "What happened?", scope: {} }, (m) => messages.push(m as AskMsg)) as { turn_id: string; thread_id: string };
+    const handle = await fake.invoke("ask_start", { question: "What did we agree about the websocket notifications?", scope: {} }, (m) => messages.push(m as AskMsg)) as { turn_id: string; thread_id: string };
     await vi.advanceTimersByTimeAsync(900);
     const partial = messages.flatMap((m) => m.event.type === "delta" ? [m.event.text] : []).join("");
     expect(partial.length).toBeGreaterThan(0);
@@ -261,6 +261,16 @@ describe("fake core stream and record parity", () => {
     const thread = await fake.invoke("ask_thread_get", { thread_id: handle.thread_id }) as { turns: Array<{ answer_md: string; stopped: boolean; found: boolean }> };
     expect(thread.turns[0]).toMatchObject({ answer_md: partial, stopped: true, found: false });
     expect(thread.turns[0]?.answer_md).not.toContain("notification service");
+  });
+
+  it("an Ask question none of whose words is in scope answers not found, with no citations and no streamed text", async () => {
+    vi.useFakeTimers();
+    const fake = core("main");
+    const messages: AskMsg[] = [];
+    await fake.invoke("ask_start", { question: "Zzqx quuxplan frobnicate", scope: {} }, (m) => messages.push(m as AskMsg));
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(messages.map((m) => m.event.type)).toEqual(["started", "done"]);
+    expect(messages.at(-1)?.event).toMatchObject({ answer: { found: false, citations: [], answer_md: "I could not find this in your calls." } });
   });
 });
 

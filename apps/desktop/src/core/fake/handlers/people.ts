@@ -63,6 +63,7 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     const dst = shared.person(world, a.target);
     dst.aliases = [...new Set([...dst.aliases, src.display_name, ...src.aliases])];
     dst.open_items += src.open_items;
+    dst.voice_profile ||= src.voice_profile; // the core moves the source's profiles and keeps opt-in as target || source
     dst.rev += 1;
     world.people = world.people.filter((p) => p !== src);
     world.items.forEach((i) => i.owner?.id === src.id && (i.owner = shared.personRef(dst)));
