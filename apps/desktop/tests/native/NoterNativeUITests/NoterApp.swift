@@ -6,6 +6,33 @@
 import XCTest
 
 final class PermissionBundleTests: XCTestCase {
+    // @cpt-dod:cpt-noter-dod-core-engine-capture-pipeline:p1
+    func test_cpt_noter_seq_first_run_complete_setup__bundle_deployment_targets_match_capture_minimum() throws {
+        let path = try XCTUnwrap(ProcessInfo.processInfo.environment["NOTER_APP_PATH"])
+        let bundle = try XCTUnwrap(Bundle(path: path))
+        XCTAssertEqual(bundle.object(forInfoDictionaryKey: "LSMinimumSystemVersion") as? String, "14.4")
+        for binary in ["noter-desktop", "noter-engine"] {
+            let executable = URL(fileURLWithPath: path).appendingPathComponent("Contents/MacOS/\(binary)")
+            XCTAssertTrue(FileManager.default.isExecutableFile(atPath: executable.path), "missing embedded \(binary)")
+            let process = Process()
+            let output = Pipe()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+            process.arguments = ["vtool", "-show-build", executable.path]
+            process.standardOutput = output
+            try process.run()
+            let bytes = output.fileHandleForReading.readDataToEndOfFile()
+            process.waitUntilExit()
+            XCTAssertEqual(process.terminationStatus, 0)
+            let text = String(decoding: bytes, as: UTF8.self)
+            let targets = text.split(separator: "\n").compactMap { line -> String? in
+                let fields = line.split(whereSeparator: { $0.isWhitespace })
+                return fields.first == "minos" ? fields.last.map(String.init) : nil
+            }
+            XCTAssertFalse(targets.isEmpty, "no Mach-O deployment target for \(binary)")
+            XCTAssertTrue(targets.allSatisfy { $0 == "14.4" }, "\(binary) deployment targets: \(targets)")
+        }
+    }
+
     // @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
     func test_cpt_noter_seq_first_run_complete_setup__bundle_permission_descriptions() throws {
         let path = try XCTUnwrap(ProcessInfo.processInfo.environment["NOTER_APP_PATH"])

@@ -331,3 +331,19 @@ test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
     await expect(citationRows(answers(page).last()).filter({ hasText: "Source deleted" })).toHaveCount(0);
   });
 });
+
+
+test("cpt-noter-seq-ask-cited-answer — Medium toolbar keeps the search field usable beside Scope", async ({ page }) => {
+  await openAsk(page, { seed: false });
+  await page.setViewportSize({ width: 1000, height: 800 });
+  await expect(page.locator('.np-win--main[data-width="medium"]')).toBeVisible();
+  const search = toolbar(page).getByRole("searchbox");
+  const scope = toolbar(page).getByRole("combobox", { name: "Scope", exact: true });
+  await expect(scope).toBeVisible();
+  await expect.poll(async () => (await search.boundingBox())?.width ?? 0).toBeGreaterThanOrEqual(140);
+  const box = (await search.boundingBox())!;
+  const bounds = (await toolbar(page).boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+  await search.fill("websocket");
+  await expect(search).toHaveValue("websocket");
+});

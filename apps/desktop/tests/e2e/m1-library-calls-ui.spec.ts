@@ -13,7 +13,7 @@ import type { Page } from "@playwright/test";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { hold } from "../visual/hold";
-import { calls, openWindow, steerFor } from "./support/app";
+import { openWindow, steerFor } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import {
@@ -82,6 +82,30 @@ async function openCalls(
 }
 
 test.describe("cpt-noter-flow-ui-library-calls-browse", () => {
+  test("UI — plain row navigation updates the destructive selection and range anchor", async ({ page }) => {
+    await openCalls(page);
+    const rows = page.locator(ROW);
+    await expect(rows).toHaveCount(2);
+    await rows.first().click();
+    await page.keyboard.press("ArrowDown");
+    await expect(rows.nth(1)).toBeFocused();
+    await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+    await expect(rows.first()).toHaveAttribute("aria-selected", "false");
+    await page.keyboard.press("Home");
+    await expect(rows.first()).toBeFocused();
+    await expect(rows.first()).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("Shift+ArrowDown");
+    await expect(rows.first()).toHaveAttribute("aria-selected", "true");
+    await expect(rows.nth(1)).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("End");
+    await expect(rows.nth(1)).toBeFocused();
+    await expect(rows.first()).toHaveAttribute("aria-selected", "false");
+    const id = await rows.nth(1).getAttribute("data-lib-row");
+    await answerAlerts(page, "confirm");
+    await page.keyboard.press("Meta+Backspace");
+    await expect.poll(() => sent(page, "calls_delete")).toContainEqual({ call_ids: [id] });
+  });
+
   test("UI — happy path: ⌘3 lists the calls newest first with one calls_list read, sort headers toggle and are announced", async ({
     page,
   }) => {

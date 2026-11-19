@@ -29,6 +29,28 @@ extension SpeakerModel {
     }
 }
 
+/// Archive windows and enrollment share one model; its FBank and Embedding instances run serially.
+// @cpt-begin:cpt-noter-algo-core-engine-offline-vectors:p1:inst-vector-speaker
+private final class SerializedSpeaker: SpeakerModel, @unchecked Sendable {
+    private let model: SpeakerModel
+    private let lock = NSLock()
+
+    init(_ model: SpeakerModel) { self.model = model }
+
+    func embed(_ samples: [Float]) throws -> [Float] {
+        try lock.withLock { try model.embed(samples) }
+    }
+
+    func embed(window: [Float], speaking: [Bool]) throws -> [Float] {
+        try lock.withLock { try model.embed(window: window, speaking: speaking) }
+    }
+
+    func embed(window: [Float], speakers: [[Bool]]) throws -> [[Float]] {
+        try lock.withLock { try model.embed(window: window, speakers: speakers) }
+    }
+}
+// @cpt-end:cpt-noter-algo-core-engine-offline-vectors:p1:inst-vector-speaker
+
 /// bge-m3: one text to its 1024 values.
 public protocol TextModel: AnyObject, Sendable {
     func embed(_ text: String) throws -> [Float]
@@ -60,20 +82,30 @@ enum Vectors {
 private final class Loaded<T>: @unchecked Sendable {
     private let make: () throws -> T
     private let lock = NSLock()
+    private let loading = NSLock()
+    private var generation = 0
     private var model: T?
 
     init(_ make: @escaping () throws -> T) { self.make = make }
 
     func get() throws -> T {
-        try lock.withLock {
-            if let model { return model }
+        try loading.withLock {
+            let (cached, generation) = lock.withLock { (model, self.generation) }
+            if let cached { return cached }
             let m = try Self.load(make)
-            model = m
+            lock.withLock {
+                if generation == self.generation { model = m }
+            }
             return m
         }
     }
 
-    func clear() { lock.withLock { model = nil } }
+    func clear() {
+        lock.withLock {
+            generation &+= 1
+            model = nil
+        }
+    }
 
     static func load(_ make: () throws -> T) throws -> T {
         do {
@@ -100,7 +132,7 @@ public final class LocalOfflineWork: @unchecked Sendable {
         text: (() throws -> TextModel)? = nil, clustering: (() throws -> Clustering)? = nil
     ) {
         self.decoder = decoder.map(Loaded.init)
-        speakerModel = speaker.map(Loaded.init)
+        speakerModel = speaker.map { make in Loaded<SpeakerModel> { SerializedSpeaker(try make()) } }
         textModel = text.map(Loaded.init)
         self.clustering = clustering.map(Loaded.init)
     }

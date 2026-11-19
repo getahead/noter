@@ -4,9 +4,11 @@
 import { useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { FOCUSABLE, focusAndReturn, openerOf } from "../../app/a11y/focus";
 import { base } from "./attrs";
+import { dismissPopover } from "./popover-escape";
 
 /** Keys of a modal surface: Esc and Return to the default button. Tab is kept inside by the window's handler (`aria-modal`). */
 export function sheetKey(e: KeyboardEvent<HTMLElement>, onCancel: () => void, onDefault?: () => void) {
+  if (dismissPopover(e)) return;
   if (e.key === "Escape") e.stopPropagation();
   if (e.defaultPrevented || e.nativeEvent.isComposing) return; // an inner control handled it or an input method is composing
   const tag = (e.target as HTMLElement).tagName;

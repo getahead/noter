@@ -7,7 +7,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, coreReady, openWindow } from "./support/app";
+import { coreReady, openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";

@@ -77,7 +77,11 @@ final class CallWindowTests: NoterTestCase {
 
     private func assertVisibleNoterWindowsAreExcludedFromWindowCapture(file: StaticString = #filePath, line: UInt = #line) {
         let infos = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
-        let processID = NSRunningApplication.runningApplications(withBundleIdentifier: "com.getahead.noter").first?.processIdentifier
+        guard let path = ProcessInfo.processInfo.environment["NOTER_APP_PATH"],
+              let identifier = Bundle(path: path)?.bundleIdentifier else {
+            return XCTFail("NOTER_APP_PATH must name the built test app bundle", file: file, line: line)
+        }
+        let processID = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).first?.processIdentifier
         XCTAssertNotNil(processID, "the Noter test app is running", file: file, line: line)
         let ownWindows = infos.filter {
             ($0["kCGWindowOwnerPID"] as? Int) == Int(processID ?? -1)

@@ -11,7 +11,7 @@ import type { Page } from "@playwright/test";
 
 import type { CoreError } from "../../src/core/bindings";
 import { isLaterMilestone } from "../support/milestones";
-import { calls, openWindow, type Steer } from "./support/app";
+import { openWindow, type Steer } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 

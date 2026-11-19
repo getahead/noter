@@ -699,6 +699,13 @@ async fn a_discarded_call_drops_its_open_batch_and_writes_no_file() {
     assert!(r
         .engine
         .inject(confirmed(AudioChannel::Sys, "spk_0", 2000, "after discard")));
+    // The engine's final stop notification can arrive after the discard stream was ended.
+    assert!(r.engine.inject(EngineEvent::SessionStopped {
+        call_id: call_id(),
+        timeline_path: "audio/call_live/timeline.json".into(),
+        mic_path: None,
+        sys_path: None,
+    }));
     settle(400).await;
     assert_eq!(
         events(&got),

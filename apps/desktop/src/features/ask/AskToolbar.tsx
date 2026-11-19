@@ -29,7 +29,7 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
   const scopeActions = base.narrow ? presets.map((p) => ({ label: `${t("ask.scope")}: ${p.id === "all" ? t("ask.scope_all") : p.label}`, checked: p.id === scopeId, onAction: () => setAskState({ scopeId: p.id }) })) : [];
   const scope =
     presets.length > 0 && !base.narrow ? (
-      <PopupButton variant="toolbar" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
+      <PopupButton variant="toolbar" cls="ak-scope-pop" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
     ) : undefined;
   useEffect(() => bindNewKey(document), []);
   return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion }, ...scopeActions]} trailing={

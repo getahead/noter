@@ -2,7 +2,7 @@
 // focus; ⌘Z and ⇧⌘Z run its action while it is shown, except in a text field (native text undo).
 import { useEffect, type FocusEvent, type KeyboardEvent } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
-import { isTyping } from "../../app/a11y/keys";
+import { isModalOpen, isTyping } from "../../app/a11y/keys";
 import { t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { PushButton } from "../../ui/primitives/push-button";
@@ -20,7 +20,7 @@ export function UndoStrip({ bridge }: { bridge: Bridge }) {
   useEffect(() => {
     const on = (e: globalThis.KeyboardEvent) => {
       // @cpt-begin:cpt-noter-algo-ui-history-undo-strip:p1:inst-return
-      if (!undoKey(e, undoMode()) || isTyping(e.target) || e.repeat) return;
+      if (e.defaultPrevented || isModalOpen() || !undoKey(e, undoMode()) || isTyping(e.target) || e.repeat || e.isComposing) return;
       e.preventDefault();
       void undoLast(bridge);
       // @cpt-end:cpt-noter-algo-ui-history-undo-strip:p1:inst-return

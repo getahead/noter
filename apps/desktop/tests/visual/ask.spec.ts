@@ -80,6 +80,17 @@ test.describe("cpt-noter-dod-ui-ask-citations Ask states at wide", () => {
 });
 
 test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide", () => {
+  test("searching before the core reports its selected runtime", async ({ page }) => {
+    await page.clock.install();
+    await page.clock.resume();
+    await ask(page, WIDTHS.wide);
+    await page.clock.pauseAt((await page.evaluate(() => Date.now())) + 500);
+    await page.locator('[data-region="AK-R4"]').getByRole("textbox").fill("What did we decide about the backend?");
+    await page.keyboard.press("Enter");
+    await expect(page.locator(".ak-turn").last().getByText("Searching calls and documents…")).toBeVisible();
+    await shot(page, "searching", "wide");
+  });
+
   test("the started line: the runtime and mode above the answering turn", async ({ page }) => {
     await page.clock.install();
     await page.clock.resume();
@@ -96,7 +107,7 @@ test.describe("cpt-noter-dod-ui-ask-threads Ask scope and stream states at wide"
       await page.clock.runFor(20);
       await expect(status.first()).toContainText("·", { timeout: 200 });
     }).toPass({ timeout: 20000 });
-    await expect(page.locator(".ak-turn").last().getByText("Answering…")).toBeVisible(); // still no word of the answer: the first delta is later than started
+    await expect(page.locator(".ak-turn").last().getByText("Reading calls and documents…")).toBeVisible(); // still no word of the answer: the first delta is later than started
     await shot(page, "started-line", "wide");
   });
 

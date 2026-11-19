@@ -394,7 +394,13 @@ impl<R: Runtime> TauriSurfaces<R> {
     }
 
     fn window(&self, label: WindowLabel) -> Option<WebviewWindow<R>> {
-        window(&self.app, label)
+        let creating_main =
+            label == WindowLabel::Main && self.app.get_webview_window(label.as_str()).is_none();
+        let result = window(&self.app, label);
+        if creating_main {
+            self.restore_main_window();
+        }
+        result
     }
 }
 

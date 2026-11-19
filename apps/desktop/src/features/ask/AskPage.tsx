@@ -67,6 +67,7 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   }, [bridge, refresh]);
 
   const open = (id: string | null) => {
+    restoreComposer.current = false;
     setAnnounce("");
     if (busy) previousTurn.current = afterTurn(data, previousTurn.current); // the turn goes on without the page showing it
     return openThread(bridge, id, { setThread, setTurns, setAsking, setAskedScope, current: thread }, busy);
@@ -108,10 +109,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   // a failed turn leaves its route entry askable again
   useEffect(() => releaseFailedRoute(routeKey, phase), [routeKey, phase]);
   // Stop, Widen Scope and Try Again replace the button that had focus: the composer takes it (never from a control that has it)
-  const settledOnce = useRef(false);
+  const restoreComposer = useRef(false);
   useEffect(() => {
-    if (settledOnce.current) focusComposer(document);
-    settledOnce.current = true;
+    if (!restoreComposer.current) return;
+    restoreComposer.current = false;
+    focusComposer(document);
   }, [asking, phase]);
   const busy = asking !== null && (phase === null || phase === "streaming") && !stream?.error;
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-stream
@@ -153,7 +155,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
     startAsk(bridge, thread, question, sent);
   };
   // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-submit
-  const widen = (question: string) => widenScope(question, ask);
+  const widen = (question: string) => {
+    restoreComposer.current = true;
+    widenScope(question, ask);
+  };
   // @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-follow-up
   const send = () => {
     const question = questionOf(draft, busy);
@@ -163,7 +168,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   const people = usePeople(bridge);
   const replay = useAskReplay(bridge);
 
-  const stop = () => data && stopAsk(bridge, data.turn_id);
+  const stop = () => {
+    if (!data) return;
+    restoreComposer.current = true;
+    stopAsk(bridge, data.turn_id);
+  };
   useEffect(() => {
     if (busy) return bindStopKey(document, stop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,7 +210,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       onWiden={widen}
       onStop={stop}
       // @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-retry
-      onRetry={() => asking && ask(asking)}
+      onRetry={() => {
+        if (!asking) return;
+        restoreComposer.current = true;
+        ask(asking);
+      }}
       // @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-retry
     />
   );
@@ -274,10 +287,10 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
           </article>
         ))}
-        {asking && turn && (
+        {asking && (
           <article className="ak-turn">
             <h3 className="ak-q">{asking}</h3>
-            <Answer bridge={bridge} view={turn} onPlay={onPlay} onRetry={onRetry} onSearch={() => searchByKeyword(asking)} onWiden={narrowed && onWiden ? () => onWiden(asking) : undefined} />
+            <Answer bridge={bridge} view={turn ?? foldTurn([])} onPlay={onPlay} onRetry={onRetry} onSearch={() => searchByKeyword(asking)} onWiden={narrowed && onWiden ? () => onWiden(asking) : undefined} />
             {phase === "interrupted" && <PushButton label={t("ask.try_again")} onAction={onRetry} />}
           </article>
         )}
@@ -314,10 +327,20 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
 /** One turn's answer: its text as escaped paragraphs; citations and richer states arrive with the cited-answer slice. */
 export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, onWiden }: { view: TurnView; bridge: Bridge; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void; onRetry?: () => void; onSearch?: () => void; onWiden?: () => void }) {
   const phase = phaseOf(view);
+  // @cpt-begin:cpt-noter-algo-ui-ask-stream:p1:inst-done
+  const answer = view.answer;
+  const notes = <>
+    {answer?.answered_locally && <div className="ak-status">{t("ask.answered_locally")}</div>}
+    {!!answer?.sensitive_sources_skipped && <InlineBanner banner={{ id: "ask-sensitive", severity: "info", text: t("ask.sensitive_skipped", { count: answer.sensitive_sources_skipped }), actions: [{ label: t("ask.use_local"), onAction: () => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } })) }] }} />}
+    {answer?.keyword_only && <div className="ak-status">{t("search.keyword_only")}</div>}
+    {phase === "weak" && <InlineBanner banner={{ id: "ask-weak", severity: "warning", text: t("ask.weak_warning"), actions: [...(onWiden ? [{ label: t("ask.widen"), onAction: onWiden }] : []), ...(onSearch ? [{ label: t("ask.search_keyword"), onAction: onSearch }] : [])] }} />}
+  </>;
+  // @cpt-end:cpt-noter-algo-ui-ask-stream:p1:inst-done
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   if (phase === "not_found")
     return (
       <div className="ak-ans" data-component="cpt-noter-component-ui-cited-answer">
+        {notes}
         <p className="ak-ans__p">{t("ask.not_found")}</p>
         {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-search */}
         {onSearch && <PushButton label={t("ask.search_keyword")} onAction={onSearch} />}
@@ -332,8 +355,9 @@ export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, on
   // @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-not-found
   return (
     <div className="ak-ans" data-component="cpt-noter-component-ui-cited-answer">
+      {notes}
       {view.runtime && view.mode && <div className="ak-status">{t("mode.runtime", { runtime: runtimeLabel(view.runtime), mode: t(MODE[view.mode]) })}</div>}
-      {phase === "streaming" && !view.text && <div className="ak-status">{t("ask.answering")}</div>}
+      {phase === "streaming" && !view.text && <div className="ak-status">{t(view.runtime ? "ask.reading" : "ask.searching")}</div>}
       {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
       {view.text && <CitedAnswer bridge={bridge} text={view.text} citations={view.citations} live={phase === "streaming"} onAskAgain={onAskAgain} onPlay={onPlay} />}
       {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready */}

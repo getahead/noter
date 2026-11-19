@@ -18,7 +18,7 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { useOutputs } from "../call-page/outputs-cache";
 import { closeInspector } from "../shell/inspector-override";
 import { cancel, copy, generate, load, loadContext, open, refreshHandoff, setTarget } from "./actions";
-import { copyEnabled, drawerState, footer, launchLine, noMapping, openDisabledReason, openLabel, promptOf, schemeHelp, toolLabel, type DrawerState } from "./controls";
+import { copyEnabled, drawerState, footer, launchLine, noMapping, openDisabledReason, openLabel, promptOf, schemeHelp, toolLabel } from "./controls";
 import { patchLocal, useLocal, type Local } from "./local";
 import { useRepos } from "./mappings";
 import { PromptEditor } from "./PromptEditor";

@@ -3,6 +3,7 @@ import { Link } from "../../ui/primitives/link";
 import { Popover } from "../../ui/primitives/popover";
 import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
+import { useAnnounce, type AnnounceEvent } from "../../app/a11y/announce";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallFilter, PlaybackState, SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
@@ -34,6 +35,16 @@ export const keepLink = (to: { current: HTMLElement | null }) => (wrap: HTMLElem
 
 export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
 
+// @cpt-algo:cpt-noter-algo-ui-library-search-topics-results:p1
+/** Each completed read is a new event, even when the count is unchanged; a superseded read stays silent. */
+export function announceSearchResult(read: Read, query: string, announce: (event: AnnounceEvent) => Promise<void>) {
+  if (read.status !== "OK") return;
+  const status = statusOf(read.results);
+  const text = status === "NO_MATCHES" ? t("search.none", { query }) : t(status === "WEAK_ONLY" ? "search.count_weak" : "search.count", { count: resultCount(read.results) });
+  const frame = requestAnimationFrame(() => void announce({ kind: "search_done", text, key: crypto.randomUUID() }));
+  return () => cancelAnimationFrame(frame);
+}
+
 export interface SearchViewProps {
   bridge: Bridge;
   read: Read;
@@ -57,6 +68,10 @@ export interface SearchViewProps {
 export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
   const [how, setHow] = useState(false);
   const howAt = useRef<HTMLElement | null>(null);
+  const announce = useAnnounce(bridge);
+  // @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce
+  useEffect(() => announceSearchResult(read, query, announce), [read, query, announce]);
+  // @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce
   const body = () => {
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-loading-error
     if (read.status === "LOADING") return <div className="lb-loading" aria-busy="true" aria-label={t("search.loading")} />;
@@ -84,7 +99,6 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     if (status === "NO_MATCHES")
       return (
         <>
-          <p className="np-sr" role="status">{t("search.none", { query })}</p>
           <EmptyState variant="filtered" title={t("search.none", { query })} body={[filtered ? t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length }) + "." : "", t("search.try_fewer")].filter(Boolean).join(" ")} />
           {widen}
         </>
@@ -94,9 +108,8 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
     const topic = r.topics[0];
     return (
       <>
-        {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
         {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
-        <p className="np-dim" role="status">
+        <p className="np-dim">
           {status === "WEAK_ONLY" ? t("search.count_weak", { count: total }) : t("search.count", { count: total })} · {r.mode.type === "hybrid" ? t("search.best") : r.mode.rebuild_progress === null ? t("search.keyword_only") : t("search.keyword_progress", { percent: Math.round(r.mode.rebuild_progress * 100) })}
           {" · "}
           <span ref={keepLink(howAt)}>
@@ -104,7 +117,6 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
           </span>
         </p>
         {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
-        {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-announce */}
         {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) + (filtered ? ` ${t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}.` : ""), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>

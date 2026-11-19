@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeCore } from "./fake-core";
-import { createCore, type AskMsg, type CaptureState, type ItemView, type LevelsMsg, type PlaybackState, type TranscriptMsg } from "../bindings";
+import { createCore, type AskMsg, type CaptureState, type ItemView, type LevelsMsg, type TranscriptMsg } from "../bindings";
 
 const cores: FakeCore[] = [];
 const core = (window: "main" | "call-screen" | "settings" = "call-screen") => {

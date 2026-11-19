@@ -38,9 +38,36 @@ pub fn running_call(c: &CaptureState) -> Option<(CallId, String)> {
             | CapturePhase::Recording
             | CapturePhase::Paused
             | CapturePhase::Failed
+            | CapturePhase::Stopping
     );
     let title = c.title.clone().unwrap_or_else(|| "this call".into());
     Some((c.call_id.clone().filter(|_| open)?, title))
+}
+
+fn quit_if_idle(
+    capture: Result<CaptureState, CoreError>,
+    exit: impl FnOnce(),
+) -> Result<Option<(CallId, String)>, CoreError> {
+    let call = running_call(&capture?);
+    if call.is_none() {
+        exit();
+    }
+    Ok(call)
+}
+
+fn quit_after_stop(result: Result<Value, CoreError>, exit: impl FnOnce()) -> Result<(), CoreError> {
+    let capture = result?;
+    let stopped = capture["phase"].as_str() == Some("stopped");
+    let discarded = capture["phase"].as_str() == Some("idle")
+        && matches!(capture.get("call_id"), Some(Value::Null));
+    if !stopped && !discarded {
+        return Err(CoreError::new(
+            noter_protocol::ErrorCode::NotReady,
+            "the recording is still stopping",
+        ));
+    }
+    exit();
+    Ok(())
 }
 
 /// **Quit Noter** from the menu bar or ⌘Q: Noter quits at once when nothing is recording;
@@ -52,8 +79,13 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
         return;
     }
     let Some(core) = core_of(app) else {
-        QUIT_ALERT_PENDING.store(false, Ordering::Release);
-        app.exit(0);
+        quit_error(
+            app,
+            &CoreError::new(
+                noter_protocol::ErrorCode::NotReady,
+                "the core is unavailable",
+            ),
+        );
         return;
     };
     let app = app.clone();
@@ -61,14 +93,22 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
         let ctx = native(NativeSurface::Menu);
         let capture = core.app_snapshot(&ctx, NoArgs {}).await.map(|s| s.capture);
+        #[cfg(all(debug_assertions, feature = "test-hooks"))]
+        let capture = crate::test_hooks::quit_error_once("snapshot").map_or(capture, Err);
         // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-idle
-        let Some((call_id, title)) = capture.ok().as_ref().and_then(running_call) else {
-            QUIT_ALERT_PENDING.store(false, Ordering::Release);
-            // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
-            app.exit(0);
-            return;
-            // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
+        // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
+        let (call_id, title) = match quit_if_idle(capture, || app.exit(0)) {
+            Ok(Some(call)) => call,
+            Ok(None) => {
+                QUIT_ALERT_PENDING.store(false, Ordering::Release);
+                return;
+            }
+            Err(error) => {
+                quit_error(&app, &error);
+                return;
+            }
         };
+        // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-return-quit
         // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-if-idle
         // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-quit-alert
         // NSAlert makes the first button the default: Cancel goes first, so Return keeps recording.
@@ -100,9 +140,18 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
             // @cpt-begin:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-stop-quit
             tauri::async_runtime::spawn(async move {
                 let args = json!({ "call_id": call_id });
-                let _ = dispatch_and_record(core.as_ref(), &ctx, "capture_stop", args).await;
-                QUIT_ALERT_PENDING.store(false, Ordering::Release);
-                app.exit(0);
+                #[cfg(all(debug_assertions, feature = "test-hooks"))]
+                let fault = crate::test_hooks::quit_error_once("stop");
+                #[cfg(not(all(debug_assertions, feature = "test-hooks")))]
+                let fault: Option<CoreError> = None;
+                let result = match fault {
+                    Some(error) => Err(error),
+                    None => dispatch_and_record(core.as_ref(), &ctx, "capture_stop", args).await,
+                };
+                match quit_after_stop(result, || app.exit(0)) {
+                    Ok(()) => QUIT_ALERT_PENDING.store(false, Ordering::Release),
+                    Err(error) => quit_error(&app, &error),
+                }
             });
             // @cpt-end:cpt-noter-flow-ui-dialogs-host-quit:p1:inst-stop-quit
         });
@@ -112,12 +161,32 @@ pub fn quit<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
+/// Keep the pending guard through the error alert too: another Quit cannot stack a second decision.
+fn quit_error<R: Runtime>(app: &AppHandle<R>, error: &CoreError) {
+    eprintln!("noter: could not quit safely: {error}");
+    let dialog = app
+        .dialog()
+        .message(catalogue("dialogs.quit.failed_message"))
+        .title(catalogue("dialogs.quit.failed_title"))
+        .kind(tauri_plugin_dialog::MessageDialogKind::Error);
+    let parent = [WindowLabel::Main, WindowLabel::CallScreen]
+        .into_iter()
+        .filter_map(|label| app.get_webview_window(label.as_str()))
+        .find(|window| window.is_visible().unwrap_or(false));
+    let dialog = match &parent {
+        Some(window) => dialog.parent(window),
+        None => dialog,
+    };
+    dialog.show_with_result(|_| QUIT_ALERT_PENDING.store(false, Ordering::Release));
+}
+
 /// The app menu's id for **Quit Noter** ⌘Q.
 pub const APP_QUIT: &str = "AppQuit";
 pub const APP_SETTINGS: &str = "AppSettings";
 pub const APP_SETUP: &str = "AppSetup";
 pub const APP_MENU_ACTION: &str = "shell:menu-action";
 pub const APP_MENU_CONTEXT: &str = "shell:menu-context";
+pub const APP_SELECT_ALL: &str = "menu.select_all";
 static QUIT_ALERT_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// The default app menu with Noter's own **Quit Noter** ⌘Q in place of the predefined one, which
@@ -130,7 +199,7 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let menu = Menu::default(app)?;
     if let Some(MenuItemKind::Submenu(first)) = menu.items()?.into_iter().next() {
         for item in first.items()?.into_iter().rev() {
-            if matches!(&item, MenuItemKind::Predefined(p) if matches!(p.text().unwrap_or_default().as_str(), "Quit Noter" | "Hide Others" | "Hide Noter"))
+            if matches!(&item, MenuItemKind::Predefined(p) if matches!(p.text().unwrap_or_default().as_str(), "Quit Noter" | "Hide Others" | "Hide Noter" | "Show All"))
             {
                 first.remove(&item)?;
             }
@@ -140,6 +209,8 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         append_model_item(app, &first, &model, "menu.run_setup_again", APP_SETUP)?;
         first.append(&PredefinedMenuItem::separator(app)?)?;
         first.append(&PredefinedMenuItem::hide(app, None)?)?;
+        first.append(&PredefinedMenuItem::hide_others(app, None)?)?;
+        first.append(&PredefinedMenuItem::show_all(app, None)?)?;
         first.append(&PredefinedMenuItem::separator(app)?)?;
         let item = MenuItem::with_id(app, APP_QUIT, "Quit Noter", true, Some("CmdOrCtrl+Q"))?;
         first.append(&item)?;
@@ -148,12 +219,6 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     clear_submenu(&file)?;
     append_model_items(app, &file, &model, "menu.title.file", 0)?;
     let edit = submenu(&menu, "Edit");
-    for item in edit.items()? {
-        if matches!(&item, MenuItemKind::Predefined(p) if p.text().unwrap_or_default() == "Select All")
-        {
-            edit.remove(&item)?;
-        }
-    }
     append_model_items(app, &edit, &model, "menu.title.edit", 6)?;
     edit.append(&PredefinedMenuItem::separator(app)?)?;
     edit.append(&MenuItem::with_id(
@@ -304,6 +369,12 @@ pub fn update_context_menu<R: Runtime>(app: &AppHandle<R>, payload: &str) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
         if let Some(menu) = handle.menu() {
+            if let Some(calls) = state["selectAllCalls"].as_bool() {
+                // Calls publishes this field independently, already scoped to row focus and modal state.
+                if let Err(error) = select_all_context(&handle, &menu, calls) {
+                    eprintln!("noter: Select All menu context: {error}");
+                }
+            }
             for (field, id) in [
                 ("exportEnabled", "menu.export"),
                 ("copySlackEnabled", "menu.copy_for_slack"),
@@ -332,6 +403,41 @@ pub fn update_context_menu<R: Runtime>(app: &AppHandle<R>, payload: &str) {
             }
         }
     });
+}
+
+/// AppKit owns text selection. Only a focused Calls table substitutes its existing row-selection command.
+fn select_all_context<R: Runtime>(
+    app: &AppHandle<R>,
+    menu: &Menu<R>,
+    calls: bool,
+) -> tauri::Result<()> {
+    let edit = submenu(menu, "Edit");
+    for (index, item) in edit.items()?.into_iter().enumerate() {
+        let custom = item.id().as_ref() == APP_SELECT_ALL;
+        let native = matches!(&item, MenuItemKind::Predefined(p) if p.text().unwrap_or_default() == "Select All");
+        if !custom && !native {
+            continue;
+        }
+        if custom != calls {
+            edit.remove(&item)?;
+            if calls {
+                edit.insert(
+                    &MenuItem::with_id(
+                        app,
+                        APP_SELECT_ALL,
+                        "Select All",
+                        true,
+                        Some("CmdOrCtrl+A"),
+                    )?,
+                    index,
+                )?;
+            } else {
+                edit.insert(&PredefinedMenuItem::select_all(app, None)?, index)?;
+            }
+        }
+        break;
+    }
+    Ok(())
 }
 
 /// Mirror the core's recording and presenting state in the app-owned Call menu.
@@ -448,6 +554,77 @@ pub fn navigate_from_menu<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
 #[cfg(test)]
 mod menu_tests {
     use super::*;
+
+    #[test]
+    fn failed_capture_snapshot_never_exits() {
+        let exited = std::cell::Cell::new(false);
+        let result = quit_if_idle(
+            Err(CoreError::new(
+                noter_protocol::ErrorCode::Internal,
+                "read failed",
+            )),
+            || exited.set(true),
+        );
+        assert!(!exited.get(), "an unreadable capture is not proof of idle");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn failed_stop_keeps_the_app_open_and_a_later_success_can_quit() {
+        let exits = std::cell::Cell::new(0);
+        let result = quit_after_stop(
+            Err(CoreError::new(
+                noter_protocol::ErrorCode::Internal,
+                "save failed",
+            )),
+            || exits.set(exits.get() + 1),
+        );
+        assert_eq!(exits.get(), 0, "a failed save must not exit the app");
+        assert!(result.is_err());
+        quit_after_stop(Ok(json!({ "phase": "stopped" })), || {
+            exits.set(exits.get() + 1)
+        })
+        .unwrap();
+        assert_eq!(exits.get(), 1);
+    }
+
+    #[test]
+    fn an_in_progress_stop_is_not_confirmation_that_the_recording_was_saved() {
+        let exited = std::cell::Cell::new(false);
+        let result = quit_after_stop(Ok(json!({ "phase": "stopping" })), || exited.set(true));
+        assert!(
+            !exited.get(),
+            "an idempotent concurrent Stop can still be flushing files"
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn a_completed_discard_can_quit_only_with_explicit_idle_and_no_call() {
+        let exited = std::cell::Cell::new(false);
+        quit_after_stop(Ok(json!({ "phase": "idle", "call_id": null })), || {
+            exited.set(true)
+        })
+        .expect("a successful discard removed the call and returned capture to idle");
+        assert!(exited.get());
+
+        for capture in [
+            json!({ "phase": "idle", "call_id": "call_still_open" }),
+            json!({ "phase": "idle" }),
+            json!({ "phase": "stopping", "call_id": null }),
+            json!({ "call_id": null }),
+        ] {
+            exited.set(false);
+            assert!(
+                quit_after_stop(Ok(capture.clone()), || exited.set(true)).is_err(),
+                "unsafe capture result: {capture}"
+            );
+            assert!(
+                !exited.get(),
+                "unconfirmed discard must not quit: {capture}"
+            );
+        }
+    }
 
     #[test]
     fn native_menu_labels_come_from_the_shared_model() {

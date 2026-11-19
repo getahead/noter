@@ -28,18 +28,6 @@ describe("placeFloating", () => {
 });
 
 describe("Popover behaviour", () => {
-  it("closes on Esc without closing what holds it", async () => {
-    const { find, rendered } = await import("../testing");
-    const onClose = vi.fn();
-    const stopPropagation = vi.fn();
-    const pop = find(rendered(Popover, { anchor: null, onClose }), (p) => p.role === "dialog");
-    const keyDown = pop.props.onKeyDown as (e: unknown) => void;
-    keyDown({ key: "Escape", stopPropagation });
-    keyDown({ key: "a", stopPropagation });
-    expect(onClose).toHaveBeenCalledOnce();
-    expect(stopPropagation).toHaveBeenCalledOnce();
-  });
-
   it("closes on a pointer press outside itself and its anchor", () => {
     let listener: ((e: unknown) => void) | undefined;
     const doc = { addEventListener: vi.fn((_: string, fn: (e: unknown) => void) => (listener = fn)), removeEventListener: vi.fn() };
@@ -63,16 +51,17 @@ describe("Popover behaviour", () => {
 
   it("closes on Escape anywhere, unless something already handled it, and stops listening when removed", () => {
     let listener: ((e: unknown) => void) | undefined;
-    const doc = { addEventListener: vi.fn((_: string, fn: (e: unknown) => void) => (listener = fn)), removeEventListener: vi.fn() };
+    const root = {} as HTMLElement;
+    const doc = { querySelectorAll: () => [root], addEventListener: vi.fn((_: string, fn: (e: unknown) => void) => (listener = fn)), removeEventListener: vi.fn() };
     vi.stubGlobal("document", doc);
     const onClose = vi.fn();
-    const remove = closeOnEscape(onClose);
+    const remove = closeOnEscape(onClose, root);
     const preventDefault = vi.fn();
     listener!({ key: "Tab", preventDefault });
     listener!({ key: "Escape", defaultPrevented: true, preventDefault });
     expect(onClose).not.toHaveBeenCalled();
     expect(preventDefault).not.toHaveBeenCalled();
-    listener!({ key: "Escape", defaultPrevented: false, preventDefault });
+    listener!({ key: "Escape", defaultPrevented: false, preventDefault, stopPropagation: vi.fn() });
     expect(onClose).toHaveBeenCalledOnce();
     expect(preventDefault).toHaveBeenCalledOnce(); // consumed, so the shell's Esc shortcut skips it
     remove();
@@ -103,19 +92,6 @@ describe("Popover behaviour", () => {
   });
 });
 
-describe("Popover Esc", () => {
-  it("leaves an Esc an inner control already handled (a search field clearing its text)", async () => {
-    const { find, rendered } = await import("../testing");
-    const onClose = vi.fn();
-    const dialog = find(rendered(Popover, { anchor: null, label: "Speakers", onClose }), (p) => p.role === "dialog");
-    const key = (defaultPrevented: boolean) => (dialog.props.onKeyDown as (e: unknown) => void)({ key: "Escape", defaultPrevented, stopPropagation: vi.fn() });
-    key(true);
-    expect(onClose).not.toHaveBeenCalled();
-    key(false);
-    expect(onClose).toHaveBeenCalledOnce();
-  });
-});
-
 describe("returnFocus", () => {
   it("goes to a focusable anchor", () => {
     const anchor = { tabIndex: 0, focus: vi.fn() };
@@ -136,3 +112,109 @@ describe("returnFocus", () => {
 });
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+// #988: the sheet's own bubbling handler must offer Esc to the topmost popover first.
+describe("stacked popover Escape", () => {
+  function setup() {
+    const roots = [{}, {}] as HTMLElement[];
+    const listeners = new Set<(event: KeyboardEvent) => void>();
+    const doc = {
+      querySelectorAll: () => roots,
+      addEventListener: vi.fn((_: string, listener: (event: KeyboardEvent) => void) => listeners.add(listener)),
+      removeEventListener: vi.fn((_: string, listener: (event: KeyboardEvent) => void) => listeners.delete(listener)),
+    };
+    vi.stubGlobal("document", doc);
+    const event = (composing = false) => ({
+      key: "Escape", target: { tagName: "INPUT" }, defaultPrevented: false,
+      isComposing: composing, nativeEvent: { isComposing: composing },
+      preventDefault() { this.defaultPrevented = true; }, stopPropagation: vi.fn(),
+    });
+    return { roots, doc, listeners, event };
+  }
+
+  it("wires the dialog's Escape to only its topmost popover without closing what holds it", async () => {
+    const { find, rendered } = await import("../testing");
+    const { roots, event } = setup();
+    const close = vi.fn();
+    const remove = closeOnEscape(close, roots[0]);
+    try {
+      const pop = find(rendered(Popover, { anchor: null, onClose: close }), (p) => p.role === "dialog");
+      const keyDown = pop.props.onKeyDown as (e: unknown) => void;
+      const escape = event();
+      keyDown(escape);
+      keyDown({ ...event(), key: "a" });
+      expect(close).toHaveBeenCalledOnce();
+      expect(escape.stopPropagation).toHaveBeenCalledOnce();
+      expect(escape.defaultPrevented).toBe(true);
+    } finally { remove(); }
+  });
+
+  it("leaves an Escape that an inner search control handled or an input method is composing", async () => {
+    const { find, rendered } = await import("../testing");
+    const { roots, event } = setup();
+    const close = vi.fn();
+    const remove = closeOnEscape(close, roots[0]);
+    try {
+      const dialog = find(rendered(Popover, { anchor: null, label: "Speakers", onClose: close }), (p) => p.role === "dialog");
+      const keyDown = dialog.props.onKeyDown as (e: unknown) => void;
+      keyDown({ ...event(), defaultPrevented: true });
+      keyDown(event(true));
+      expect(close).not.toHaveBeenCalled();
+      keyDown(event());
+      expect(close).toHaveBeenCalledOnce();
+    } finally { remove(); }
+  });
+
+  it("closes the inner popover before its enclosing sheet, even with focus outside the popover", async () => {
+    const { sheetKey } = await import("./sheet");
+    const { roots, event } = setup();
+    const close = vi.fn();
+    const cancel = vi.fn();
+    const remove = closeOnEscape(close, roots[0]);
+    try {
+      sheetKey(event() as never, cancel);
+      expect(close).toHaveBeenCalledOnce();
+      expect(cancel).not.toHaveBeenCalled();
+    } finally { remove(); }
+  });
+
+  it.each([false, true])("closes only the topmost DOM popover (child registered first: %s)", (childFirst) => {
+    const { roots, listeners, event } = setup();
+    const outer = vi.fn();
+    const inner = vi.fn();
+    const removeFirst = closeOnEscape(childFirst ? inner : outer, roots[childFirst ? 1 : 0]);
+    const removeSecond = closeOnEscape(childFirst ? outer : inner, roots[childFirst ? 0 : 1]);
+    const removeInner = childFirst ? removeFirst : removeSecond;
+    const removeOuter = childFirst ? removeSecond : removeFirst;
+    try {
+      const key = event();
+      for (const listener of listeners) listener(key as never);
+      expect(inner).toHaveBeenCalledOnce();
+      expect(outer).not.toHaveBeenCalled();
+      removeInner();
+      roots.pop();
+      const next = event();
+      for (const listener of listeners) listener(next as never);
+      expect(outer).toHaveBeenCalledOnce();
+    } finally { removeInner(); removeOuter(); }
+    expect(listeners.size).toBe(0);
+  });
+
+  it("leaves composing and already handled Escape alone", async () => {
+    const { sheetKey } = await import("./sheet");
+    const { roots, listeners, event } = setup();
+    const close = vi.fn();
+    const cancel = vi.fn();
+    const remove = closeOnEscape(close, roots[0]);
+    try {
+      const composing = event(true);
+      sheetKey(composing as never, cancel);
+      for (const listener of listeners) listener(composing as never);
+      const handled = { ...event(), defaultPrevented: true };
+      sheetKey(handled as never, cancel);
+      for (const listener of listeners) listener(handled as never);
+      expect(close).not.toHaveBeenCalled();
+      expect(cancel).not.toHaveBeenCalled();
+    } finally { remove(); }
+  });
+});

@@ -70,6 +70,30 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     await expect(page.getByRole("status").filter({ hasText: "No matches for “Lizenzprüfung im Installer”" })).toHaveCount(1);
   });
 
+  test("UI — AC2: a filter repeats the same final count in the existing live region without taking focus", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "Lizenzprüfung im Installer");
+    const status = page.locator('[data-live="polite"]');
+    const text = "No matches for “Lizenzprüfung im Installer”";
+    await expect(status).toHaveText(text);
+    await status.evaluate((region) => {
+      const changes: string[] = [];
+      const observer = new MutationObserver(() => changes.push(region.textContent ?? ""));
+      observer.observe(region, { childList: true, characterData: true, subtree: true });
+      Object.assign(window, { searchAnnouncement: { region, changes } });
+    });
+    const filter = button(page, "Has Open Items");
+    await filter.focus();
+    await page.keyboard.press("Space");
+    await expect.poll(async () => (await sent(page, "search")).length).toBe(2);
+    await expect(status).toHaveText(text);
+    await expect(filter).toBeFocused();
+    await expect.poll(() => page.evaluate(() => {
+      const recorded = (window as unknown as { searchAnnouncement: { region: Element; changes: string[] } }).searchAnnouncement;
+      return { connected: recorded.region === document.querySelector('[data-live="polite"]'), changes: recorded.changes };
+    })).toEqual({ connected: true, changes: ["", text] });
+  });
+
   test("UI — AC4: Esc on the mouse-opened Show How Noter Searched popover puts focus back on its link", async ({ page }) => {
     await openCalls(page);
     await search(page, "notification service");

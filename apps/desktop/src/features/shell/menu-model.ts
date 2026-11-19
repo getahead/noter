@@ -46,6 +46,7 @@ export const shellActionForMenuItem = (key: string): ShellAction | undefined => 
 
 /** Runs a page's existing keyboard handler for a native command, preserving its focused selection/context. */
 export function nativeMenuShortcut(key: string): KeyboardEventInit | null {
+  if (key === "menu.select_all") return { key: "a", code: "KeyA", metaKey: true, bubbles: true, cancelable: true };
   const item = model.flatMap((menu) => menu.items).find((entry) => entry?.key === key);
   if (!item?.shortcut) return null;
   const label = item.shortcut;

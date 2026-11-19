@@ -4,6 +4,53 @@ import CoreGraphics
 
 // @cpt-dod:cpt-noter-dod-ui-main-window-shell-navigation:p1
 final class NativeAppMenuTests: NoterTestCase {
+    func test_cpt_noter_dod_ui_main_window_shell_navigation__standard_hide_others_is_preserved() {
+        let visible = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").filter { !$0.isHidden }
+        defer { visible.forEach { _ = $0.unhide() } }
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10))
+        let originallyVisible = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular && !$0.isHidden }
+        defer { originallyVisible.forEach { _ = $0.unhide() } }
+        other.activate()
+        app.activate()
+        app.menuBars.menuBarItems["Noter"].click()
+        let hideOthers = app.menuItems["Hide Others"]
+        XCTAssertTrue(hideOthers.waitForExistence(timeout: 5), "the standard Hide Others command remains in the app menu")
+        XCTAssertTrue(app.menuItems["Show All"].exists)
+        hideOthers.click()
+        XCTAssertTrue(waitUntil(5) { NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first?.isHidden == true })
+    }
+
+    func test_cpt_noter_dod_ui_main_window_shell_navigation__select_all_routes_calls_and_native_text() {
+        launch("idle")
+        XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10))
+        app.typeKey("3", modifierFlags: .command)
+        let table = app.tables["Calls"].firstMatch
+        let row = table.staticTexts["Backend sync"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.click()
+        app.menuBars.menuBarItems["Edit"].click()
+        let selectAll = app.menuItems["Select All"]
+        XCTAssertTrue(selectAll.waitForExistence(timeout: 5), "the native Edit menu retains Select All")
+        selectAll.click()
+        app.typeKey(.delete, modifierFlags: .command)
+        XCTAssertTrue(alert.staticTexts.matching(NSPredicate(format: "value BEGINSWITH 'Delete' AND value ENDSWITH 'calls?'")).firstMatch.waitForExistence(timeout: 5), "Select All selected the Calls rows, not DOM text")
+        alert.buttons["Cancel"].click()
+
+        app.typeKey(",", modifierFlags: .command)
+        let search = app.windows["Settings"].searchFields["Search"]
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.click()
+        search.typeText("abcdef")
+        app.menuBars.menuBarItems["Edit"].click()
+        app.menuItems["Select All"].click()
+        search.typeText("q")
+        XCTAssertEqual(search.value as? String, "q", "text fields use native text selection")
+        app.typeKey("a", modifierFlags: .command)
+        search.typeText("z")
+        XCTAssertEqual(search.value as? String, "z", "the standard Command+A accelerator remains native in text")
+    }
+
     func test_cpt_noter_dod_ui_main_window_shell_navigation__call_menu_tracks_and_runs_core_state() {
         launch("idle")
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window loaded")

@@ -57,3 +57,15 @@ describe("live transcript initial scroll position", () => {
     expect(log.scrolled(following, { ...area, scrollTop: 1_499 }, 0)).toEqual({ following: false, base: 0 });
   });
 });
+
+describe("live transcript detachment", () => {
+  it("keeps a detached upward pixel through duplicate native scroll events", () => {
+    const log = new LogScroller(32);
+    log.prevTop = 1_500;
+    const position = { scrollTop: 1_499, clientHeight: 500, scrollHeight: 2_000 };
+    const detached = log.scrolled({ following: true, base: 0 }, position, 7);
+    expect(detached).toEqual({ following: false, base: 7 });
+    expect(log.scrolled(detached, position, 8)).toBe(detached);
+    expect(log.scrolled(detached, { ...position, scrollTop: 1_500 }, 8)).toEqual({ following: true, base: 8 });
+  });
+});

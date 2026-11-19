@@ -83,6 +83,9 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 api.prevent_close();
                 let _ = window.hide();
                 surfaces::main_window_will_hide(window.app_handle());
+                if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
+                    surfaces.save_frames();
+                }
             }
             WindowEvent::Destroyed => {
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
@@ -95,6 +98,13 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 }
             }
             // The user moved or resized the call window: its frame is saved (inst-frame).
+            WindowEvent::Moved(_) | WindowEvent::Resized(_)
+                if window.label() == WindowLabel::Main.as_str() =>
+            {
+                if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
+                    surfaces.main_window_changed(window);
+                }
+            }
             WindowEvent::Moved(_) | WindowEvent::Resized(_)
                 if window.label() == WindowLabel::CallScreen.as_str() =>
             {
@@ -153,6 +163,7 @@ pub fn run() {
                 let context_command = matches!(
                     event.id().as_ref(),
                     "menu.export"
+                        | "menu.select_all"
                         | "menu.delete"
                         | "menu.copy_for_slack"
                         | "menu.copy_for_jira"
@@ -185,6 +196,7 @@ pub fn run() {
                 .unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
+            surfaces.restore_main_window();
             let menu_context_app = app.handle().clone();
             app.listen(surfaces::APP_MENU_CONTEXT, move |event| {
                 surfaces::update_app_menu_context(&menu_context_app, event.payload());
@@ -197,6 +209,18 @@ pub fn run() {
                 surfaces,
                 group,
             ));
+            // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-open
+            if let Ok(core) = app.state::<Booted>().0.clone() {
+                let app = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    match startup_setup_target(&core).await {
+                        Ok(Some(target)) => surfaces::navigate_from_menu(&app, target),
+                        Ok(None) => {}
+                        Err(error) => eprintln!("noter: startup setup status: {error}"),
+                    }
+                });
+            }
+            // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-open
             #[cfg(all(debug_assertions, feature = "test-hooks"))]
             test_hooks::watch_hotkey_trigger(app.handle().clone());
             #[cfg(all(debug_assertions, feature = "test-hooks", target_os = "macos"))]
@@ -220,6 +244,20 @@ pub fn run() {
             }
         }
     });
+}
+
+// @cpt-flow:cpt-noter-flow-ui-first-run-complete-setup:p1
+async fn startup_setup_target(
+    core: &Core,
+) -> Result<Option<noter_protocol::model::NavTarget>, CoreError> {
+    use noter_protocol::ipc::{CoreApi, NativeSurface};
+    let ctx = CommandCtx {
+        caller: Caller::Native {
+            surface: NativeSurface::Menu,
+        },
+    };
+    let setup = core.setup_status(&ctx, noter_protocol::NoArgs {}).await?;
+    Ok((!setup.complete).then_some(noter_protocol::model::NavTarget::FirstRun { step: None }))
 }
 
 fn boot<R: Runtime>(
@@ -615,6 +653,60 @@ mod tests {
     use noter_protocol::model::{StreamEndReason, WindowLabel};
     use noter_protocol::Seq;
     use std::sync::Mutex;
+
+    #[test]
+    fn startup_setup_target_follows_persisted_setup_completion() {
+        use noter_protocol::ipc::{CoreApi, NativeSurface};
+        use noter_protocol::model::{NavTarget, SetupStep, StepArgs, StepState};
+        use noter_protocol::NoArgs;
+
+        let dir = tempfile::tempdir().unwrap();
+        let open = || {
+            Core::open(
+                dir.path(),
+                CoreDeps::new(Arc::new(SystemClock), Arc::new(NoEvents)),
+            )
+            .unwrap()
+        };
+        let core = open();
+        let ctx = CommandCtx {
+            caller: Caller::Native {
+                surface: NativeSurface::Menu,
+            },
+        };
+        tauri::async_runtime::block_on(async {
+            assert_eq!(
+                startup_setup_target(&core).await.unwrap(),
+                Some(NavTarget::FirstRun { step: None })
+            );
+            for step in [
+                SetupStep::Welcome,
+                SetupStep::Models,
+                SetupStep::Permissions,
+                SetupStep::CallDisplay,
+                SetupStep::AudioStorage,
+                SetupStep::Assistants,
+            ] {
+                core.setup_set_step(
+                    &ctx,
+                    StepArgs {
+                        step,
+                        state: StepState::Done,
+                    },
+                )
+                .await
+                .unwrap();
+            }
+            assert!(core.setup_status(&ctx, NoArgs {}).await.unwrap().complete);
+            assert_eq!(startup_setup_target(&core).await.unwrap(), None);
+        });
+        drop(core);
+        let restored = open();
+        assert_eq!(
+            tauri::async_runtime::block_on(startup_setup_target(&restored)).unwrap(),
+            None
+        );
+    }
 
     #[test]
     fn navigation_waits_for_the_target_webview_to_finish_loading() {

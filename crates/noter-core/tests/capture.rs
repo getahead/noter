@@ -14,7 +14,7 @@ use noter_core::{
 };
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
 use noter_engine_client::EngineLauncher;
-use noter_protocol::engine::{EngineCommand, EngineEvent, StartSession};
+use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent, StartSession};
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface, Sink};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -755,6 +755,197 @@ async fn stop_ends_the_call_and_offers_continue_for_five_minutes() {
         .await
         .unwrap();
     assert_eq!(again.phase, CapturePhase::Stopped);
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_finalization_error_keeps_the_call_retryable_until_the_engine_flushes() {
+    for try_again in [false, true] {
+        let r = rig_with(Setup {
+            engine: Behaviour {
+                hang: true,
+                ..Behaviour::default()
+            },
+            ..Setup::default()
+        });
+        let start = {
+            let core = r.core.clone();
+            tokio::spawn(async move { core.capture_start(&main_window(), start_args()).await })
+        };
+        let EngineCommand::StartSession(session) = r
+            .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+            .await
+        else {
+            unreachable!()
+        };
+        let call_id = session.call_id;
+        r.engine.inject(EngineEvent::Ack {
+            cmd_id: r.engine.last_command_id().unwrap(),
+        });
+        r.session_started(&call_id);
+        start.await.unwrap().unwrap();
+        r.phase_becomes(CapturePhase::Recording).await;
+        let transcript = r.subscribe_transcript(call_id.clone()).await;
+        r.advance(1_000);
+        let stop = {
+            let core = r.core.clone();
+            let call_id = call_id.clone();
+            tokio::spawn(async move {
+                core.capture_stop(&main_window(), CallIdArgs { call_id })
+                    .await
+            })
+        };
+        r.sent_n(1, |c| matches!(c, EngineCommand::Stop { .. }))
+            .await;
+        r.engine.inject(EngineEvent::Error {
+            cmd_id: r.engine.last_command_id(),
+            code: EngineErrorCode::Internal,
+            message: "could not finalize capture timeline".into(),
+        });
+        assert_eq!(stop.await.unwrap().unwrap_err().code, ErrorCode::Internal);
+        assert_eq!(r.state().await.phase, CapturePhase::Failed);
+        assert_eq!(r.query::<String>("SELECT status FROM calls"), "recording");
+        assert_eq!(
+            r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+            0
+        );
+        assert!(runs_of(&r, JobKind::PostCall).is_empty());
+        assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+        assert!(r.core.capture_guard().borrow().live);
+        assert!(!transcript
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|e| matches!(e, TranscriptEvent::Ended { .. })));
+        r.advance(5_000);
+        let mut retry = {
+            let core = r.core.clone();
+            let call_id = call_id.clone();
+            tokio::spawn(async move {
+                if try_again {
+                    core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                        .await
+                } else {
+                    core.capture_stop(&menu_bar(), CallIdArgs { call_id }).await
+                }
+            })
+        };
+        r.sent_n(2, |c| matches!(c, EngineCommand::Stop { .. }))
+            .await;
+        assert_eq!(
+            r.sessions().len(),
+            1,
+            "retry must not start another session"
+        );
+        r.engine.inject(EngineEvent::Ack {
+            cmd_id: r.engine.last_command_id().unwrap(),
+        });
+        assert_eq!(r.state().await.phase, CapturePhase::Stopping);
+        assert!(runs_of(&r, JobKind::PostCall).is_empty());
+        // A concurrent caller observes the pending stop without issuing a duplicate command.
+        assert_eq!(
+            r.core
+                .capture_stop(
+                    &main_window(),
+                    CallIdArgs {
+                        call_id: call_id.clone()
+                    }
+                )
+                .await
+                .unwrap()
+                .phase,
+            CapturePhase::Stopping
+        );
+        assert_eq!(r.stops(), 2);
+        assert!(tokio::time::timeout(Duration::from_millis(100), &mut retry)
+            .await
+            .is_err());
+        r.session_stopped(&call_id);
+        assert_eq!(retry.await.unwrap().unwrap().phase, CapturePhase::Stopped);
+        assert_eq!(r.query::<i64>("SELECT ended_at FROM calls"), T0 + 1_000);
+        assert_eq!(r.state().await.recorded_ms, DurationMs(1_000));
+        assert!(!r.core.capture_guard().borrow().live);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_retries_a_failed_final_call_write_without_stopping_the_engine_twice() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let transcript = r.subscribe_transcript(call_id.clone()).await;
+    let db = noter_db::rusqlite::Connection::open(r._dir.path().join("noter.db")).unwrap();
+    db.execute_batch(
+        "CREATE TRIGGER fail_capture_stop BEFORE UPDATE ON calls
+        WHEN NEW.status = 'processing' BEGIN SELECT RAISE(ABORT, 'final call write failed'); END;",
+    )
+    .unwrap();
+    r.advance(1_000);
+    let stop = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_stop(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent(|c| matches!(c, EngineCommand::Stop { .. })).await;
+    r.session_stopped(&call_id);
+    assert_eq!(stop.await.unwrap().unwrap_err().code, ErrorCode::Internal);
+    assert_eq!(r.state().await.phase, CapturePhase::Stopping);
+    assert_eq!(r.query::<String>("SELECT status FROM calls"), "recording");
+    assert!(runs_of(&r, JobKind::PostCall).is_empty());
+    assert_eq!(
+        r.core
+            .capture_stop(
+                &menu_bar(),
+                CallIdArgs {
+                    call_id: call_id.clone()
+                }
+            )
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Internal,
+        "a still-failing final write must remain an error"
+    );
+    assert_eq!(r.stops(), 1);
+    db.execute_batch("DROP TRIGGER fail_capture_stop").unwrap();
+    r.advance(5_000);
+    let stopped = r
+        .core
+        .capture_stop(&menu_bar(), CallIdArgs { call_id })
+        .await
+        .unwrap();
+    assert_eq!(stopped.phase, CapturePhase::Stopped);
+    assert_eq!(r.stops(), 1);
+    assert_eq!(r.query::<i64>("SELECT ended_at FROM calls"), T0 + 1_000);
+    assert_eq!(stopped.recorded_ms, DurationMs(1_000));
+    assert!(transcript.lock().unwrap().iter().any(|e| matches!(
+        e,
+        TranscriptEvent::Ended {
+            reason: StreamEndReason::CallStopped
+        }
+    )));
+}
+
+#[tokio::test(start_paused = true)]
+async fn stop_still_finishes_when_the_engine_crashes_before_its_final_answer() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let stop = {
+        let core = r.core.clone();
+        tokio::spawn(async move {
+            core.capture_stop(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent(|c| matches!(c, EngineCommand::Stop { .. })).await;
+    r.engine.kill_current();
+    assert_eq!(stop.await.unwrap().unwrap().phase, CapturePhase::Stopped);
+    assert!(!r.core.capture_guard().borrow().live);
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+        1
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -1721,6 +1912,214 @@ async fn while_hidden_for_presenting_the_call_seems_ended_for_ten_minutes() {
 }
 
 // --- Nothing heard, discard ----------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn discard_waits_for_the_engine_final_audio_writes_before_removing_the_folder() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    let call_audio = r._dir.path().join("audio").join(call_id.as_str());
+    std::fs::create_dir_all(&call_audio).unwrap();
+    let stops = r.stops();
+    let mut discard = {
+        let core = r.core.clone();
+        let call_id = call_id.clone();
+        tokio::spawn(async move {
+            core.capture_discard(&main_window(), CallIdArgs { call_id })
+                .await
+        })
+    };
+    r.sent_n(stops + 1, |c| matches!(c, EngineCommand::Stop { .. }))
+        .await;
+    // Stop was acknowledged, but the engine still owns its final audio/timeline writes.
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut discard)
+            .await
+            .is_err()
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 1);
+    std::fs::write(call_audio.join("mic.m4a"), b"final audio after Stop ACK").unwrap();
+    std::fs::write(call_audio.join("timeline.json"), b"final timeline").unwrap();
+    r.session_stopped(&call_id);
+    assert_eq!(discard.await.unwrap().unwrap().phase, CapturePhase::Idle);
+    assert!(
+        !call_audio.exists(),
+        "the engine's final writes were discarded too"
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn failed_discard_stop_and_try_again_preserve_discard_until_engine_flushes() {
+    for try_again in [false, true] {
+        for rejected in [false, true] {
+            let r = rig_with(Setup {
+                engine: Behaviour {
+                    hang: true,
+                    ..Behaviour::default()
+                },
+                ..Setup::default()
+            });
+            let start = {
+                let core = r.core.clone();
+                tokio::spawn(async move { core.capture_start(&main_window(), start_args()).await })
+            };
+            let EngineCommand::StartSession(started) = r
+                .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+                .await
+            else {
+                unreachable!()
+            };
+            let call_id = started.call_id;
+            r.engine.inject(EngineEvent::Ack {
+                cmd_id: r.engine.last_command_id().unwrap(),
+            });
+            r.session_started(&call_id);
+            start.await.unwrap().unwrap();
+            r.phase_becomes(CapturePhase::Recording).await;
+            let mut state = r.state().await;
+            state.notice = Some(CaptureNotice::NothingHeard {
+                since: TimestampMs(T0),
+            });
+            noter_core::testing::seed_capture(&r.core, state)
+                .await
+                .unwrap();
+            let transcript = r.subscribe_transcript(call_id.clone()).await;
+            let folder = r._dir.path().join("audio").join(call_id.as_str());
+            std::fs::create_dir_all(&folder).unwrap();
+            let discard = {
+                let core = r.core.clone();
+                let call_id = call_id.clone();
+                tokio::spawn(async move {
+                    core.capture_discard(&main_window(), CallIdArgs { call_id })
+                        .await
+                })
+            };
+            r.sent_n(1, |c| matches!(c, EngineCommand::Stop { .. }))
+                .await;
+            if rejected {
+                r.engine.inject(EngineEvent::Error {
+                    cmd_id: r.engine.last_command_id(),
+                    code: EngineErrorCode::Internal,
+                    message: "could not finalize capture timeline".into(),
+                });
+            } else {
+                r.engine.inject(EngineEvent::Ack {
+                    cmd_id: r.engine.last_command_id().unwrap(),
+                });
+            }
+            assert_eq!(
+                discard.await.unwrap().unwrap_err().code,
+                ErrorCode::EngineUnavailable
+            );
+            assert_eq!(r.state().await.phase, CapturePhase::Failed);
+            let mut retry = {
+                let core = r.core.clone();
+                let call_id = call_id.clone();
+                tokio::spawn(async move {
+                    if try_again {
+                        core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                            .await
+                    } else {
+                        core.capture_stop(&menu_bar(), CallIdArgs { call_id }).await
+                    }
+                })
+            };
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), &mut retry)
+                    .await
+                    .is_err(),
+                "failed Discard must not become a completed call or a new capture session"
+            );
+            r.sent_n(2, |c| matches!(c, EngineCommand::Stop { .. }))
+                .await;
+            assert_eq!(r.sessions().len(), 1);
+            assert_eq!(
+                r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+                0
+            );
+            assert!(runs_of(&r, JobKind::PostCall).is_empty());
+            assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+            r.engine.inject(EngineEvent::Ack {
+                cmd_id: r.engine.last_command_id().unwrap(),
+            });
+            std::fs::write(folder.join("mic.m4a"), b"final audio").unwrap();
+            r.session_stopped(&call_id);
+            assert_eq!(retry.await.unwrap().unwrap().phase, CapturePhase::Idle);
+            assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+            assert!(!folder.exists());
+            assert!(runs_of(&r, JobKind::PostCall).is_empty());
+            assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+            r.engine.inject(segment(&call_id));
+            r.pass(1).await;
+            assert!(
+                !folder.exists(),
+                "the original Discard transcript tombstone survives retry"
+            );
+            assert_eq!(
+                transcript
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|event| matches!(
+                        event,
+                        TranscriptEvent::Ended {
+                            reason: StreamEndReason::Discarded
+                        }
+                    ))
+                    .count(),
+                1
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retry() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.pass(300_000).await;
+    r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NothingHeard { .. })))
+        .await;
+    let call_audio = r._dir.path().join("audio").join(call_id.as_str());
+    std::fs::create_dir_all(&call_audio).unwrap();
+    let args = CallIdArgs {
+        call_id: call_id.clone(),
+    };
+    let error = r
+        .core
+        .capture_discard(&main_window(), args.clone())
+        .await
+        .unwrap_err();
+    assert_eq!(error.code, ErrorCode::EngineUnavailable);
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 1);
+    assert!(call_audio.exists());
+    let retry = r
+        .core
+        .capture_discard(&main_window(), args.clone())
+        .await
+        .unwrap_err();
+    assert_eq!(retry.code, ErrorCode::EngineUnavailable);
+    assert!(
+        call_audio.exists(),
+        "retry still waits for the in-flight writer"
+    );
+    // A late flush completes before the explicit retry; deletion may now finish safely.
+    std::fs::write(call_audio.join("mic.m4a"), b"late audio").unwrap();
+    r.session_stopped(&call_id);
+    r.pass(1).await;
+    assert_eq!(
+        r.core
+            .capture_discard(&main_window(), args)
+            .await
+            .unwrap()
+            .phase,
+        CapturePhase::Idle
+    );
+    assert!(!call_audio.exists());
+}
 
 fn segment(call_id: &CallId) -> EngineEvent {
     EngineEvent::Segment {

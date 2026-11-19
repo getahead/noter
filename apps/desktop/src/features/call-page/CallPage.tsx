@@ -1,7 +1,7 @@
 // The call page's body (PC-R5 and the page states): reads the call and the call types once, tells the core which
 // call this window shows, and draws the PC-R5 header with the live-transcript feature's stored transcript under it.
 // The toolbar, banner and Call info read the same call from the window store.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useAfter } from "../../app/use-after";

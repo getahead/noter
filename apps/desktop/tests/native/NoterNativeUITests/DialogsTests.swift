@@ -2,6 +2,52 @@
 import XCTest
 
 final class DialogsTests: NoterTestCase {
+    private var quitErrors: XCUIElementQuery {
+        let container = NSPredicate(format: "elementType == %d OR elementType == %d",
+            XCUIElement.ElementType.sheet.rawValue, XCUIElement.ElementType.dialog.rawValue)
+        return app.descendants(matching: .any).matching(container).containing(.button, identifier: "OK")
+    }
+
+    // @cpt-flow:cpt-noter-flow-ui-dialogs-host-quit:p1
+    func test_cpt_noter_seq_menu_bar_control_recording__failed_stop_stays_open_and_retry_saves() {
+        app.launchEnvironment["NOTER_TEST_QUIT_ERROR"] = "stop"
+        launch("idle")
+        startRecording()
+        closeMenu()
+        app.typeKey("q", modifierFlags: .command)
+        let confirm = alert.buttons["Stop and Quit"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.click()
+        XCTAssertTrue(quitErrors.firstMatch.staticTexts["Couldn’t quit safely"].waitForExistence(timeout: 10))
+        XCTAssertNotEqual(app.state, .notRunning, "failed Stop must keep Noter running")
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertEqual(quitErrors.count, 1, "the pending error also keeps one Quit decision")
+        quitErrors.firstMatch.buttons["OK"].click()
+        XCTAssertTrue(recordingLine(in: openMenu()).exists, "the failed command retained the recording")
+        closeMenu()
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(alert.buttons["Stop and Quit"].waitForExistence(timeout: 5))
+        alert.buttons["Stop and Quit"].click()
+        let exited = app.wait(for: .notRunning, timeout: 10)
+        if !exited { dumpTree("QUIT RETRY FAILURE") }
+        XCTAssertTrue(exited, "a successful retry saves and quits")
+    }
+
+    // @cpt-dod:cpt-noter-dod-ui-dialogs-host-delete:p2
+    func test_cpt_noter_seq_menu_bar_control_recording__failed_snapshot_is_not_treated_as_idle() {
+        app.launchEnvironment["NOTER_TEST_QUIT_ERROR"] = "snapshot"
+        launch("idle")
+        startRecording()
+        closeMenu()
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(quitErrors.firstMatch.staticTexts["Couldn’t quit safely"].waitForExistence(timeout: 10))
+        XCTAssertNotEqual(app.state, .notRunning)
+        quitErrors.firstMatch.buttons["OK"].click()
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(alert.buttons["Cancel"].waitForExistence(timeout: 5), "retry reads the live capture and asks before quitting")
+        alert.buttons["Cancel"].click()
+    }
+
     func test_cpt_noter_seq_dialogs_delete_call__error_return_pressed_by_habit() {
         // Nothing recording: the live call's window would cover the library (its fixture display is not this Mac's).
         launch("idle")
@@ -70,10 +116,10 @@ final class DialogsTests: NoterTestCase {
     }
 
     private func dumpTree(_ tag: String) {
-        let tree = XCTAttachment(string: app.debugDescription)
+        let tree = XCTAttachment(string: app!.debugDescription)
         tree.lifetime = .keepAlways
         add(tree)
-        print("\(tag)\n\(app.debugDescription)")
+        print("\(tag)\n\(app!.debugDescription)")
     }
 
     // M3 People (docs/features/ui/people.md › Edit, merge or delete a person): Delete Person… asks with a native alert

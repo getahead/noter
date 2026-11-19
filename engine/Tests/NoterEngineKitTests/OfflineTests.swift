@@ -185,6 +185,52 @@ final class OfflineTests: XCTestCase {
         XCTAssertTrue(exists("audio/call_1/three.json"))
     }
 
+    func testCaptureAndPingDoNotWaitForAColdArchiveLoadOrRetainItsInvalidatedCache() throws {
+        try storeCall(in: session, seconds: 1, mic: [(0, 1)], sys: [])
+        let loading = DispatchSemaphore(value: 0)
+        let release = DispatchSemaphore(value: 0)
+        let returned = DispatchSemaphore(value: 0)
+        let lock = NSLock()
+        var loads = 0
+        let work = LocalOfflineWork(decoder: {
+            let first = lock.withLock { loads += 1; return loads == 1 }
+            if first {
+                loading.signal()
+                release.wait()
+            }
+            return FakeDecoder()
+        })
+        let lines = Lines()
+        let audio = FakeSource()
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: [], sandboxed: false, container: container,
+            offline: work, source: { _ in audio })
+        _ = e.handle(offlinePass(1))
+        XCTAssertEqual(loading.wait(timeout: .now() + 5), .success)
+        DispatchQueue.global().async {
+            _ = e.handle(#"{"id":2,"cmd":{"type":"start_session","call_id":"capture","session_dir":"audio/capture","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}"#)
+            _ = e.handle(#"{"id":3,"cmd":{"type":"ping"}}"#)
+            returned.signal()
+        }
+        let answered = returned.wait(timeout: .now() + 0.25)
+        XCTAssertEqual(answered, .success, "capture and ping answer while the archive factory is still gated")
+        XCTAssertTrue(acked(lines, 2))
+        XCTAssertTrue(lines.types.contains("session_started"), "the fake audio source opened before releasing the loader")
+        XCTAssertTrue(lines.types.contains("pong"))
+        release.signal()
+        if answered != .success { XCTAssertEqual(returned.wait(timeout: .now() + 5), .success) }
+        _ = e.handle(#"{"id":4,"cmd":{"type":"stop","call_id":"capture"}}"#)
+        e.flushStops()
+        XCTAssertNotNil(lines.waitFor("offline_done"))
+        let pass = OfflinePass(
+            callId: "call_1", sessionDir: "audio/call_1", resultPath: "audio/call_1/after-capture.json",
+            constraintsPath: nil, backend: "whisper_large_v3")
+        try work.archive(
+            pass, session: session, result: session.appendingPathComponent("after-capture.json"), constraints: .none,
+            yieldIfNeeded: {}) { _ in }
+        XCTAssertEqual(lock.withLock { loads }, 2, "a load invalidated by capture cannot repopulate the archive cache")
+    }
+
     // MARK: embeddings
 
     func testSpeakerSpansAndCallsAreCheckedBeforeAnyFileOpens() throws {

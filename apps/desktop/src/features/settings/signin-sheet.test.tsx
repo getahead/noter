@@ -125,7 +125,12 @@ describe("AccountSignInSheet", () => {
     fake.failNext("account_use_existing", "personal_use_not_confirmed");
     await m().proceed("claude");
     expect(m().state.claude.phase).toBe("SIGNIN_ERROR");
-    expect(html("claude")).toContain("Something went wrong");
+    expect(html("claude")).toContain("Tick the personal-use box");
+    press("claude", "Try Again");
+    await vi.waitFor(() => expect(m().state.claude.prepare).not.toBeNull());
+    expect(m().state.claude.phase).toBe("PREPARE");
+    expect(html("claude")).toContain("I’ll use my Claude account only for my own work");
+    expect(canContinue(m().state.claude)).toBe(false);
   });
 
   it("a failed install shows the error instead of staying on Prepare", async () => {
@@ -136,6 +141,50 @@ describe("AccountSignInSheet", () => {
     await m().install("claude");
     expect(m().state.claude.phase).toBe("SIGNIN_ERROR");
     expect(m().state.claude.code).toBe("offline");
+  });
+
+  it("#1013: retrying a refused existing account offers that account again without starting a browser", async () => {
+    const { fake, seen } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "confirm", on: true });
+    fake.failNext("account_use_existing", "offline");
+    await m().proceed("claude");
+    const other = m().state.chatgpt;
+    press("claude", "Try Again");
+    await vi.waitFor(() => expect(m().state.claude.choice).toBe("existing"));
+    expect(m().state.claude.phase).toBe("PREPARE");
+    expect(html("claude")).toContain("Use you@example.com");
+    expect(seen.filter(([c]) => c === "account_signin_prepare")).toHaveLength(2);
+    expect(seen.map(([c]) => c)).not.toContain("account_signin_start");
+    expect(m().state.chatgpt).toBe(other);
+  });
+
+  it("#1013: retrying a failed install prepares again and offers Install while the CLI is missing", async () => {
+    const { fake, seen } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepareFailed", code: "cli_missing" });
+    fake.failNext("cli_install", "offline");
+    await m().install("claude");
+    fake.failNext("account_signin_prepare", "cli_missing");
+    press("claude", "Try Again");
+    await vi.waitFor(() => expect(m().state.claude.cliMissing).toBe(true));
+    expect(m().state.claude.phase).toBe("PREPARE");
+    expect(html("claude")).toContain("Install Claude Code");
+    expect(canContinue(m().state.claude)).toBe(false);
+    expect(seen.map(([c]) => c)).not.toContain("account_signin_start");
+  });
+
+  it("#1013: a browser timeout retry starts a fresh browser session", async () => {
+    const { seen } = await ready();
+    await m().open("chatgpt");
+    await m().proceed("chatgpt");
+    const id = m().state.chatgpt.sessionId!;
+    m().dispatch("chatgpt", { type: "progress", progress: { session_id: id, provider: "chatgpt", step: "waiting_for_browser", identity: null, error: "sign_in_timed_out" }, signedIn: false });
+    press("chatgpt", "Open the Page Again");
+    await vi.waitFor(() => expect(m().state.chatgpt.phase).toBe("BROWSER"));
+    expect(m().state.chatgpt.sessionId).not.toBe(id);
+    expect(seen.filter(([c]) => c === "account_signin_start")).toHaveLength(2);
+    expect(seen.filter(([c]) => c === "account_signin_prepare")).toHaveLength(1);
   });
 
   it("says a missing CLI can be installed and returns to Prepare after the install job", async () => {

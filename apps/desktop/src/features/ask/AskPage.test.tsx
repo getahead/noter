@@ -32,10 +32,19 @@ describe("AskPage (cpt-noter-flow-ui-ask-question)", () => {
 
 describe("Answer (cpt-noter-state-ui-ask-turn)", () => {
   it("shows the status while nothing has streamed, then the escaped paragraphs", () => {
-    expect(renderToString(<Answer bridge={bridge} view={view()} />)).toContain("Answering…");
+    expect(renderToString(<Answer bridge={bridge} view={view()} />)).toContain("Searching calls and documents…");
     const h = renderToString(<Answer bridge={bridge} view={view({ type: "delta", text: "<b>x</b>\n\ny" })} />);
     expect(h).not.toContain("<b>");
     expect(h.match(/ak-ans__p/g)).toHaveLength(2);
+    expect(h).not.toContain("Searching calls and documents…");
+    expect(h).not.toContain("Reading calls and documents…");
+  });
+  it("shows Reading after retrieval selects the runtime, until answer text arrives", () => {
+    const started = { type: "started", runtime: "claude_account", mode: "local_only" } as const;
+    const h = renderToString(<Answer bridge={bridge} view={view(started)} />);
+    expect(h).toContain("Reading calls and documents…");
+    expect(h).not.toContain("Searching calls and documents…");
+    expect(renderToString(<Answer bridge={bridge} view={view(started, { type: "delta", text: "An answer" })} />)).not.toContain("Reading calls and documents…");
   });
   it("shows a stored stopped turn's partial text with Stopped by you", () => {
     const h = renderToString(<Answer bridge={bridge} view={view(done({ stopped: true, found: false, answer_md: "Partial text" }))} />);
@@ -97,6 +106,7 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
     expect(h).toContain("Ask a follow-up");
   });
   it("shows the turn being asked with Stop while streaming and Try Again after a failure", () => {
+    expect(renderToString(<AskView {...props} asking="Q?" phase={null} busy />)).toContain("Searching calls and documents…");
     const streaming = view({ type: "delta", text: "So far" });
     expect(renderToString(<AskView {...props} asking="Q?" turn={streaming} phase="streaming" busy />)).toContain("Stop");
     const failed = view({ type: "failed", error: { code: "x", message: "", retryable: true } as never });
@@ -144,5 +154,40 @@ describe("AskPage wiring (cpt-noter-flow-ui-ask-question)", () => {
     const answers = find(tree, (p) => typeof p.onSearch === "function").props as { onSearch: () => void; onAskAgain: () => void };
     expect(() => answers.onSearch()).not.toThrow();
     expect(() => answers.onAskAgain()).not.toThrow();
+  });
+});
+
+describe("Answer flags (cpt-noter-algo-ui-ask-stream)", () => {
+  const cited = { n: 1, provenance: { type: "model_guess" }, quote: "q", speaker: null, strength: "weak", deleted: false } as const;
+  it("keeps the local-runtime and skipped-source facts on stored and not-found turns", () => {
+    const local = renderToString(<Answer bridge={bridge} view={view(done({ answered_locally: true, runtime: "local", citations: [cited] }))} />);
+    expect(local).toContain("Answered by the local model");
+    for (const count of [1, 2]) {
+      const h = renderToString(<Answer bridge={bridge} view={view(done({ found: false, sensitive_sources_skipped: count }))} />);
+      expect(h).toContain(`${count} sensitive ${count === 1 ? "source was" : "sources were"} not searched because this answer uses a cloud model`);
+      expect(h).toContain("I could not find this in your calls.");
+    }
+  });
+  it("opens runtime settings explicitly when a sensitive answer offers the local alternative", () => {
+    const navigate = vi.fn(() => Promise.resolve({ status: "ok", data: {} }));
+    const act = vi.fn((_key: string, _command: string, run: () => unknown) => run());
+    const own = { ...bridge, act, core: { windowNavigate: navigate } } as unknown as Bridge;
+    const banner = find(rendered(Answer, { bridge: own, view: view(done({ found: false, sensitive_sources_skipped: 1 })) }), (p) => (p.banner as { id?: string } | undefined)?.id === "ask-sensitive");
+    const actions = (banner.props.banner as { actions: { onAction: () => void }[] }).actions;
+    actions[0].onAction();
+    expect(navigate).toHaveBeenCalledWith({ target: { type: "settings", pane: "models_and_runtimes" } });
+    expect(act).toHaveBeenCalledOnce();
+  });
+  it("warns about weak evidence and keyword-only retrieval without inventing rebuild progress", () => {
+    const h = renderToString(<Answer bridge={bridge} onSearch={() => {}} onWiden={() => {}} view={view(done({ citations: [cited], only_weak_evidence: true, keyword_only: true }))} />);
+    expect(h).toContain("Based on weak matches. Check the citations before you rely on this answer.");
+    expect(h).toContain("Searching by keyword only while the index rebuilds");
+    expect(h).toContain("Search by Keyword");
+    expect(h).toContain("Widen Scope");
+    expect(h).not.toContain("64 %");
+    const plain = renderToString(<Answer bridge={bridge} view={view(done({ citations: [cited] }))} />);
+    expect(plain).not.toContain("Based on weak matches");
+    expect(plain).not.toContain("index rebuilds");
+    expect(plain).not.toContain("Answered by the local model");
   });
 });

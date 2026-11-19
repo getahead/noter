@@ -9,6 +9,7 @@ import XCTest
 final class FakeSource: AudioSource, @unchecked Sendable {
     private let lock = NSLock()
     private var onChunk: (@Sendable (AudioChunk) -> Void)?
+    private var onDevice: (@Sendable (DeviceChange) -> Void)?
     private(set) var starts = 0
     private(set) var stops = 0
     var failStart = false
@@ -27,6 +28,14 @@ final class FakeSource: AudioSource, @unchecked Sendable {
             onChunk = nil
             stops += 1
         }
+    }
+
+    func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {
+        lock.withLock { onDevice = handler }
+    }
+
+    func changeDevice(_ change: DeviceChange) {
+        lock.withLock { onDevice }?(change)
     }
 
     var devices: (mic: String, output: String) { (microphoneAvailable ? "Test Mic" : "", "Test Speakers") }
@@ -109,6 +118,64 @@ final class LiveAudioSourcePlanningTests: XCTestCase {
         XCTAssertEqual(withMic[kAudioAggregateDeviceMainSubDeviceKey] as? String, "mic")
         XCTAssertEqual(
             (withMic[kAudioAggregateDeviceSubDeviceListKey] as? [[String: String]])?.first?[kAudioSubDeviceUIDKey], "mic")
+    }
+
+    // cpt-noter-flow-core-engine-capture-session: a failed replacement does not end capture intent.
+    func testFailedDeviceRebuildRecoversOnNextNotificationAndStopStaysStopped() throws {
+        var recovery = LiveAudioSource.DeviceRecovery()
+        recovery.started(microphoneUID: "mic_A")
+        var closes = 0
+        var attempts: [Int64] = []
+        var partialResources = 0
+        XCTAssertThrowsError(try recovery.rebuild(microphoneUID: "mic_B", atMs: 10, close: {
+            closes += 1
+            partialResources = 0
+        }, open: { lost in
+            attempts.append(lost)
+            partialResources = 1
+            throw LiveAudioSource.Failure(description: "one-shot aggregate failure")
+        }))
+        XCTAssertEqual(partialResources, 0)
+        XCTAssertEqual(closes, 2)
+        XCTAssertTrue(recovery.running)
+        XCTAssertFalse(recovery.available)
+        try recovery.rebuild(microphoneUID: "mic_B", atMs: 50, close: { closes += 1 }, open: { attempts.append($0) })
+        XCTAssertEqual(attempts, [10, 10], "the recovered gap starts at the original loss")
+        XCTAssertTrue(recovery.available)
+        XCTAssertEqual(recovery.microphoneUID, "mic_B")
+        recovery.stopped()
+        try recovery.rebuild(microphoneUID: "mic_C", atMs: 100, close: { closes += 1 }, open: { attempts.append($0) })
+        XCTAssertEqual(attempts.count, 2, "a queued notification after Stop must not restart capture")
+    }
+
+    // cpt-noter-flow-core-engine-capture-session: only a successfully started replacement closes the gap.
+    func testFailedDeviceStartSuppressesRecoveryFactAndSuccessfulRetryPrecedesChunks() throws {
+        let (lines, queue) = (Lines(), DispatchQueue(label: "test.device-start"))
+        let out = writer(lines)
+        var recovery = LiveAudioSource.DeviceRecovery()
+        recovery.started(microphoneUID: "mic_A")
+        XCTAssertThrowsError(try recovery.rebuild(microphoneUID: "mic_B", atMs: 10, close: {}) { lost in
+            try LiveAudioSource.startDevice(on: queue, notify: {
+                out.emit(.deviceChanged(callId: "call_1", deviceName: "Mic B", gapFromMs: Int(lost), gapToMs: 20))
+            }) { beforeStart in
+                beforeStart() // IO proc exists, but AudioDeviceStart fails.
+                throw LiveAudioSource.Failure(description: "one-shot device start failure")
+            }
+        })
+        queue.sync {}
+        XCTAssertEqual(lines.types, [], "a failed start must not announce recovery")
+        try recovery.rebuild(microphoneUID: "mic_B", atMs: 50, close: {}) { lost in
+            try LiveAudioSource.startDevice(on: queue, notify: {
+                out.emit(.deviceChanged(callId: "call_1", deviceName: "Mic B", gapFromMs: Int(lost), gapToMs: 50))
+            }) { beforeStart in
+                beforeStart()
+                queue.async { out.emit(.levels(callId: "call_1", micDb: -20, sysDb: -20)) }
+            }
+        }
+        queue.sync {}
+        XCTAssertEqual(lines.types, ["device_changed", "levels"])
+        XCTAssertEqual(lines.events.first?["gap_from_ms"] as? Int, 10)
+        XCTAssertEqual(lines.events.first?["gap_to_ms"] as? Int, 50)
     }
 
     func testMissingMicrophoneDoesNotLookUpADeviceOrCreateMicBuffers() throws {
@@ -227,6 +294,44 @@ final class CaptureTests: XCTestCase {
         XCTAssertEqual(t["duration_ms"] as? Int, 1000)
         XCTAssertEqual(gaps(t).count, 0)
         XCTAssertEqual(lines.types.filter { $0 == "ack" }.count, 2)
+    }
+
+    // cpt-noter-flow-core-engine-capture-session: failed timeline commit is retryable.
+    func testFailedFinalTimelineDoesNotReportStopOrEraseRecoveryAndCanRetry() throws {
+        let (lines, source, root, clock) = (Lines(), FakeSource(), try container(), TestClock())
+        defer { try? FileManager.default.removeItem(at: root) }
+        let e = engine(lines, source, root, clock)
+        _ = e.handle(startLine(id: 1, store: false))
+        source.push(ms: 1000)
+        _ = e.handle(#"{"id":2,"cmd":{"type":"pause","call_id":"call_1"}}"#)
+        clock.advance(500)
+        _ = e.handle(#"{"id":3,"cmd":{"type":"resume","call_id":"call_1"}}"#)
+        source.push(ms: 1000)
+        source.changeDevice(DeviceChange(name: "Mic B", lostAtMs: clock.now(), backAtMs: clock.now() + 300))
+        let path = root.appendingPathComponent("audio/call_1/timeline.json")
+        try FileManager.default.removeItem(at: path)
+        try FileManager.default.createDirectory(at: path, withIntermediateDirectories: false)
+        _ = e.handle(#"{"id":4,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        e.flushStops()
+        XCTAssertFalse(lines.types.contains("session_stopped"))
+        XCTAssertTrue(lines.events.contains { $0["type"] as? String == "error" && $0["cmd_id"] as? Int == 4 })
+        XCTAssertFalse(lines.events.contains { $0["type"] as? String == "ack" && $0["cmd_id"] as? Int == 4 })
+        let ring = try CaptureRing(url: root.appendingPathComponent(CaptureRing.fileName), callId: "call_1")
+        XCTAssertGreaterThan(ring.written(.mic), 0)
+        XCTAssertNotNil(ring.last)
+        try FileManager.default.removeItem(at: path)
+        _ = e.handle(#"{"id":5,"cmd":{"type":"stop","call_id":"call_1"}}"#)
+        e.flushStops()
+        XCTAssertEqual(lines.types.filter { $0 == "session_stopped" }.count, 1)
+        XCTAssertEqual(ring.written(.mic), 0)
+        XCTAssertNil(ring.last)
+        let saved = try timeline(root)
+        XCTAssertEqual(saved["duration_ms"] as? Int, 2800)
+        XCTAssertEqual(gaps(saved).first?["reason"] as? String, "paused")
+        XCTAssertEqual(gaps(saved).first?["t1_ms"] as? Int, 1500)
+        XCTAssertEqual(gaps(saved).last?["reason"] as? String, "device_changed")
+        XCTAssertEqual(gaps(saved).last?["t0_ms"] as? Int, 2500)
+        XCTAssertEqual(gaps(saved).last?["t1_ms"] as? Int, 2800)
     }
 
     func testACallThatStoresNoAudioWritesOnlyItsTimeline() throws {

@@ -3,19 +3,22 @@ import XCTest
 
 // @cpt-dod:cpt-noter-dod-ui-record-prompt-panel:p2
 final class RecordPromptTests: NoterTestCase {
+    // These focus-only paths keep the core detection valid through the host's 10 s WebKit recovery (#965).
     func test_cpt_noter_seq_record_prompt_start_recording__hotkey_keeps_focus() {
+        app.launchEnvironment["NOTER_TEST_CLOCK"] = "fixed"
         launch("detected")
         other.activate()
-        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 10), "no record prompt")
+        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 30), "no record prompt")
         hotkey("r")
         XCTAssertTrue(waitUntil(10) { self.statusItem.label.localizedCaseInsensitiveContains("recording") }, "the menu bar reports Recording")
         XCTAssertTrue(waitUntil(3) { self.other.state == .runningForeground }, "the prompt never takes focus from the call app")
     }
 
     func test_cpt_noter_seq_record_prompt_start_recording__click_record_keeps_focus() {
+        app.launchEnvironment["NOTER_TEST_CLOCK"] = "fixed"
         launch("detected")
         other.activate()
-        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 10), "no record prompt")
+        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 30), "no record prompt")
         let record = recordPrompt.buttons["Record"]
         XCTAssertTrue(record.waitForExistence(timeout: 5), "no Record button")
         XCTAssertTrue(recordPrompt.frame.contains(record.frame), "Record lies inside the panel (window_fit)")

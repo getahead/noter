@@ -331,7 +331,9 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-check-privacy on the real core (
     for (let i = 0; i < 3; i++) runs.push((await control("llm_run", { skill: "post-call", items: [{ id: "seg_1", text: PAYLOAD }] })) as { llm_run_id: string });
     const all = await auditList();
     const ids = runs.map((r) => r.llm_run_id);
-    expect(all.rows.filter((r) => ids.includes(r.llm_run_id!)).map((r) => r.llm_run_id)).toEqual(ids);
+    // Run IDs and audit IDs are independent: tied timestamps order by audit ID, not run creation.
+    expect(all.rows.filter((r) => ids.includes(r.llm_run_id!)).map((r) => r.llm_run_id).sort()).toEqual([...ids].sort());
+    expect(all.rows).toEqual([...all.rows].sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
     for (const row of all.rows.filter((x) => ids.includes(x.llm_run_id!))) expect(row).toMatchObject({ kind: "run", what: "full_transcript", destination: "api.anthropic.com", runtime: "claude_api_key" });
     expect(all.rows.every((r) => r.bytes_out > 0)).toBe(true);
     // Order is stable and the pages cover the same rows.

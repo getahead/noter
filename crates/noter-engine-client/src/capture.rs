@@ -294,30 +294,64 @@ impl<L: EngineLauncher> EngineClient<L> {
     pub async fn stop_session(&self) -> Result<(), CommandError> {
         let mut stopped = Vec::new();
         let mut stopping_restart = false;
-        let mut stop_ready_engine = false;
+        let stop_ready_engine;
         {
             // Serialize cancellation with a restart's StartSession write. The restart
             // write checks the state under this same lock before sending the command.
             let _conn = self.inner.conn.lock().await;
             let mut shared = self.shared();
+            stop_ready_engine = shared.state == EngineState::Ready;
             if let Some(x) = shared
                 .session
                 .as_mut()
                 .filter(|x| x.state == EngineSession::Restarting)
             {
                 x.stopped(&mut stopped);
+                if stop_ready_engine {
+                    x.state = EngineSession::Stopping;
+                }
                 stopping_restart = true;
-                stop_ready_engine = shared.state == EngineState::Ready;
             }
         }
         if stopping_restart {
             self.send_facts(stopped);
             if stop_ready_engine {
-                let _ = self
+                let mut events = self.events();
+                let call_id = self.call_id(&[EngineSession::Stopping])?;
+                let result = self
                     .command(EngineCommand::Stop {
-                        call_id: self.call_id(&[EngineSession::Stopped])?,
+                        call_id: call_id.clone(),
                     })
                     .await;
+                if matches!(
+                    result,
+                    Err(CommandError::Engine {
+                        code: EngineErrorCode::NoSession,
+                        ..
+                    })
+                ) {
+                    // Restart was cancelled before its session was installed; no final writes remain.
+                    let mut facts = Vec::new();
+                    if let Some(x) = self.shared().session.as_mut() {
+                        x.stopped(&mut facts);
+                    }
+                    self.send_facts(facts);
+                    return Ok(());
+                }
+                result?;
+                // A ready restart may already have installed the session; ACK alone cannot close its files.
+                return tokio::time::timeout(self.inner.config.command_timeout, async {
+                    loop {
+                        if self.session() == EngineSession::Stopped {
+                            return Ok(());
+                        }
+                        match events.recv().await {
+                            Ok(line) if matches!(line.event, EngineEvent::SessionStopped { call_id: ref stopped, .. } if stopped == &call_id) => return Ok(()),
+                            Ok(_) | Err(broadcast::error::RecvError::Lagged(_)) => {}
+                            Err(broadcast::error::RecvError::Closed) => return Err(CommandError::Unavailable),
+                        }
+                    }
+                }).await.unwrap_or(Err(CommandError::Unavailable));
             }
             return Ok(());
         }
@@ -325,6 +359,8 @@ impl<L: EngineLauncher> EngineClient<L> {
             EngineSession::Starting,
             EngineSession::Capturing,
             EngineSession::Paused,
+            // A rejected finalization retains the session; another Stop retries its flush.
+            EngineSession::Stopping,
         ])?;
         if let Some(x) = self.shared().session.as_mut() {
             // @cpt-begin:cpt-noter-state-core-engine-capture-session:p1:inst-st-stopping
@@ -500,7 +536,7 @@ impl<L: EngineLauncher> EngineClient<L> {
             };
             let now = Instant::now();
             match event {
-                EngineEvent::SessionStarted { .. } => {
+                EngineEvent::SessionStarted { .. } if x.state != EngineSession::Stopping => {
                     x.started_at.get_or_insert(now);
                     let resumed = x.state == EngineSession::Restarting;
                     if resumed && x.paused {
@@ -682,6 +718,137 @@ mod tests {
             enrolled_embeddings_path: None,
             resume_from_ms: None,
         }
+    }
+
+    async fn ready_restart() -> EngineClient<crate::scripted::ScriptedEngine> {
+        let engine =
+            crate::scripted::ScriptedEngine::new().with_default(crate::scripted::Behaviour {
+                hang: true,
+                ..crate::scripted::Behaviour::default()
+            });
+        let client = EngineClient::new(engine, crate::Config::default());
+        let opening = {
+            let client = client.clone();
+            tokio::spawn(async move { client.start_session(start()).await })
+        };
+        let id = pending_command(&client).await;
+        reply(&client, EngineEvent::Ack { cmd_id: id });
+        opening.await.unwrap().unwrap();
+        client.shared().session.as_mut().unwrap().state = EngineSession::Restarting;
+        assert_eq!(client.state(), EngineState::Ready);
+        client
+    }
+
+    async fn pending_command(client: &EngineClient<crate::scripted::ScriptedEngine>) -> u64 {
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if let Some(id) = client.shared().pending.keys().next().copied() {
+                    return id;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("the command was not written")
+    }
+
+    fn reply(client: &EngineClient<crate::scripted::ScriptedEngine>, event: EngineEvent) {
+        client.dispatch(noter_protocol::engine::EngineEventLine {
+            seq: 1,
+            at: noter_protocol::TimestampMs(0),
+            event,
+        });
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn ready_restart_stop_waits_for_final_writes_after_start_was_accepted() {
+        let client = ready_restart().await;
+        let mut stopping = {
+            let client = client.clone();
+            tokio::spawn(async move { client.stop_session().await })
+        };
+        let id = pending_command(&client).await;
+        reply(&client, EngineEvent::Ack { cmd_id: id });
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), &mut stopping)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            client.session(),
+            EngineSession::Stopping,
+            "Stop ACK does not prove the final file flush ended"
+        );
+        reply(
+            &client,
+            EngineEvent::SessionStarted {
+                call_id: start().call_id,
+                mic_device: "mic".into(),
+                output_device: "output".into(),
+            },
+        );
+        assert_eq!(
+            client.session(),
+            EngineSession::Stopping,
+            "late session_started must not revive a cancelled restart"
+        );
+        reply(
+            &client,
+            EngineEvent::SessionStopped {
+                call_id: start().call_id,
+                timeline_path: "audio/call_1/timeline.json".into(),
+                mic_path: None,
+                sys_path: None,
+            },
+        );
+        stopping.await.unwrap().unwrap();
+        assert_eq!(client.session(), EngineSession::Stopped);
+    }
+
+    #[tokio::test]
+    async fn ready_restart_stop_without_an_installed_session_needs_no_final_flush() {
+        let client = ready_restart().await;
+        let stopping = {
+            let client = client.clone();
+            tokio::spawn(async move { client.stop_session().await })
+        };
+        let id = pending_command(&client).await;
+        reply(
+            &client,
+            EngineEvent::Error {
+                cmd_id: Some(id),
+                code: EngineErrorCode::NoSession,
+                message: "no installed session".into(),
+            },
+        );
+        stopping.await.unwrap().unwrap();
+        assert_eq!(client.session(), EngineSession::Stopped);
+        client.clone().restart_capture().await;
+        assert_eq!(
+            client.session(),
+            EngineSession::Stopped,
+            "cancelled restart must not replay StartSession"
+        );
+    }
+
+    #[tokio::test]
+    async fn ready_restart_stop_with_an_ambiguous_error_does_not_claim_files_are_closed() {
+        let client = ready_restart().await;
+        let stopping = {
+            let client = client.clone();
+            tokio::spawn(async move { client.stop_session().await })
+        };
+        let id = pending_command(&client).await;
+        reply(
+            &client,
+            EngineEvent::Error {
+                cmd_id: Some(id),
+                code: EngineErrorCode::Internal,
+                message: "stop failed".into(),
+            },
+        );
+        assert!(stopping.await.unwrap().is_err());
+        assert_eq!(client.session(), EngineSession::Stopping);
     }
 
     #[tokio::test]

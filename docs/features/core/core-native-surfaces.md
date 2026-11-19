@@ -28,7 +28,7 @@ design: docs/DESIGN-core.md
   - [Allow and deliver notifications](#allow-and-deliver-notifications)
   - [Navigate, announce, report and open](#navigate-announce-report-and-open)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
-  - [Place the call window](#place-the-call-window)
+  - [Place the call and main windows](#place-the-call-and-main-windows)
   - [Non-activating, content-protected panels](#non-activating-content-protected-panels)
   - [Calendar facts for detection](#calendar-facts-for-detection)
   - [Native E2E command log](#native-e2e-command-log)
@@ -213,18 +213,18 @@ During a call Noter must never steal focus from the call app, never appear in a 
 
 ## 3. Processes / Business Logic (CDSL)
 
-### Place the call window
+### Place the call and main windows
 
 - [x] `p1` - **ID**: `cpt-noter-algo-core-native-surfaces-placement`
 
-**Input**: The connected displays by identity (read without collecting unrelated environment state), the chosen call display, the layout preference, the saved frames per display.
+**Input**: The connected displays by identity (read without collecting unrelated environment state), the chosen call display, the layout preference, the saved frames per display and the last main-window frame with its display.
 
-**Output**: Display, layout and frame for the call window; `chosen_display_missing`.
+**Output**: Display, layout and frame for the call window; `chosen_display_missing`; restored main-window frame.
 
 **Steps**:
 1. [x] - `p1` - **IF** the chosen call display is connected, use it with the preferred layout (dedicated by default) - `inst-chosen-display`
 2. [x] - `p1` - **ELSE** use the display with the main window, the floating layout, and set `chosen_display_missing` - `inst-fallback-display`
-3. [x] - `p1` - Use the display's AppKit visible frame (excluding menu bar and Dock); restore the saved frame for that display and layout, clamped to the visible frame - `inst-frame`
+3. [x] - `p1` - Use the display's AppKit visible frame (excluding menu bar and Dock); restore the saved call frame for that display and layout, clamped to the visible frame. On main-window creation restore its last frame on its saved display, or the primary display if disconnected, clamped to the visible frame; without a saved main frame use the configured 1280×820 size and 900×600 minimum. Remember main-window moves and resizes with their display across relaunches; hiding and reopening keeps the current frame - `inst-frame`
 4. [x] - `p1` - **RETURN** the placement - `inst-return-placement`
 
 ### Non-activating, content-protected panels

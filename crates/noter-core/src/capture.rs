@@ -114,6 +114,10 @@ pub(crate) struct Session {
     pub(crate) failed_at: Option<i64>,
     /// When the last stop was asked for, and by whom (its change row names the surface).
     stop: Option<(i64, CommandCtx)>,
+    /// The engine retained its session after rejecting finalization; Stop must retry it.
+    pub(crate) stop_rejected: bool,
+    /// Discard has ended the transcript; every retry must finish deletion, never resume it.
+    pub(crate) discard_requested: bool,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
     pub(crate) app: Option<(String, String)>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
@@ -769,17 +773,36 @@ impl Core {
         if state.call_id.as_ref() != Some(&args.call_id) || state.phase == CapturePhase::Idle {
             return Err(not_recording());
         }
-        if matches!(state.phase, CapturePhase::Stopped | CapturePhase::Stopping) {
+        if session.discard_requested {
+            drop(session);
+            return self.discard_call(ctx, args).await;
+        }
+        if state.phase == CapturePhase::Stopped {
             return Ok(state);
+        }
+        if state.phase == CapturePhase::Stopping {
+            // The engine may have finalized while the call's final database write failed.
+            // Retry that write only after confirmation; an in-flight engine still owns its files.
+            if self.engine.session() == noter_engine_client::EngineSession::Stopped {
+                self.finish_stop(&mut session, &args.call_id)?;
+            }
+            return Ok(self.capture_now());
         }
         if let Some(pause) = &state.pause {
             let (t0, t1) = (session.offset(pause.since.0), session.offset(now));
             self.insert_gap(&args.call_id, t0, t1, GapReason::Paused)?;
             session.away_ms += now - pause.since.0;
         }
-        session.stop = Some((ended.unwrap_or(now), ctx.clone()));
+        if !session.stop_rejected {
+            session.stop = Some((ended.unwrap_or(now), ctx.clone()));
+        }
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-stopping
-        let recorded = session.recorded(now, None);
+        let stopped_at = session.stop.as_ref().map_or(now, |(at, _)| *at);
+        let recorded = if session.stop_rejected {
+            state.recorded_ms
+        } else {
+            session.recorded(now, None)
+        };
         self.set_capture(|c| {
             c.phase = CapturePhase::Stopping;
             c.pause = None;
@@ -789,15 +812,27 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // A failed engine runs no session: the call ends at the last audio at once.
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
-        if state.phase != CapturePhase::Failed {
+        if state.phase != CapturePhase::Failed || session.stop_rejected {
             drop(session);
-            if self.engine.stop_session().await.is_ok()
-                && self.engine.session() != noter_engine_client::EngineSession::Stopped
-            {
-                self.phase_leaves(CapturePhase::Stopping).await;
+            match self.engine.stop_session().await {
+                Err(error @ noter_engine_client::CommandError::Engine { .. }) => {
+                    session = self.capture.lock().await;
+                    // An explicit rejection leaves the engine owning its ring and timeline.
+                    // Preserve the original end time and do not publish/schedule a completed call.
+                    session.stop_rejected = true;
+                    session.failed_at = Some(stopped_at);
+                    self.set_capture(|c| c.phase = CapturePhase::Failed);
+                    return Err(error.into());
+                }
+                Ok(()) if self.engine.session() != noter_engine_client::EngineSession::Stopped => {
+                    self.phase_leaves(CapturePhase::Stopping).await;
+                }
+                // Preserve recovery when the engine crashed or cannot answer.
+                Ok(()) | Err(noter_engine_client::CommandError::Unavailable) => {}
             }
             session = self.capture.lock().await;
         }
+        session.stop_rejected = false;
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-failed-stop
         // @cpt-end:cpt-noter-flow-core-capture-session-stop:p1:inst-engine-stop
         // Without the engine's answer in time the call still ends, at the stop.
@@ -823,7 +858,10 @@ impl Core {
     /// the post-call hand-off. Nothing happens unless `call_id` is stopping.
     fn finish_stop(&self, session: &mut Session, call_id: &CallId) -> Result<(), CoreError> {
         let state = self.capture_now();
-        if state.phase != CapturePhase::Stopping || state.call_id.as_ref() != Some(call_id) {
+        if session.discard_requested
+            || state.phase != CapturePhase::Stopping
+            || state.call_id.as_ref() != Some(call_id)
+        {
             return Ok(());
         }
         let (ended, ctx) = session
@@ -986,7 +1024,10 @@ impl Core {
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let heard_nothing = matches!(state.notice, Some(CaptureNotice::NothingHeard { .. }));
-        if !(live(&state, &args.call_id) && heard_nothing) {
+        let retry = session.discard_requested
+            && matches!(state.phase, CapturePhase::Failed | CapturePhase::Stopping)
+            && state.call_id.as_ref() == Some(&args.call_id);
+        if !((live(&state, &args.call_id) || retry) && heard_nothing) {
             return Err(CoreError::new(
                 ErrorCode::NoticeExpired,
                 "the nothing-heard notice is not shown",
@@ -995,8 +1036,36 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         let call_id = args.call_id;
+        session.discard_requested = true;
         self.set_capture(|c| c.phase = CapturePhase::Stopping);
+        // Discard wins over the engine's normal transcript finalization and its late events.
+        self.capture_event(CaptureEvent::Stopped {
+            call_id: call_id.clone(),
+            reason: StreamEndReason::Discarded,
+        });
+        let mut events = self.engine.events();
         let _ = self.engine.stop_session().await;
+        // Stop ACK precedes the final file flush; retain the capture lock so it cannot queue post-call work.
+        if self.engine.state() == noter_engine_client::EngineState::Ready
+            && self.engine.session() != noter_engine_client::EngineSession::Stopped
+        {
+            let confirmed = tokio::time::timeout(ENGINE_WAIT, async {
+                loop {
+                    match events.recv().await {
+                        Ok(line) if matches!(line.event, EngineEvent::SessionStopped { call_id: ref stopped, .. } if stopped == &call_id) => return true,
+                        Ok(_) | Err(RecvError::Lagged(_)) => {}
+                        Err(RecvError::Closed) => return false,
+                    }
+                }
+            }).await.unwrap_or(false);
+            if !confirmed {
+                self.set_capture(|c| c.phase = CapturePhase::Failed);
+                return Err(CoreError::new(
+                    ErrorCode::EngineUnavailable,
+                    "the engine did not finish stopping; the recording was not discarded",
+                ));
+            }
+        }
         let meta = self.change_meta(ctx, "Discarded recording".into(), "capture_discard");
         let id = call_id.as_str().to_string();
         self.store().delete("call", "calls", vec![id], meta)?;
@@ -1007,10 +1076,6 @@ impl Core {
                 })));
             }
         }
-        self.capture_event(CaptureEvent::Stopped {
-            call_id: call_id.clone(),
-            reason: StreamEndReason::Discarded,
-        });
         self.drop_sources_of(&call_id);
         self.clear_engine_states();
         *session = session.restart(0);

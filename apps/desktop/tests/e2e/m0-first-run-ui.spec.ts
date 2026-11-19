@@ -11,7 +11,7 @@ import type { Page } from "@playwright/test";
 import type { ModelBundle } from "../../src/core/bindings";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { calls, openWindow } from "./support/app";
+import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { confirmSystemAudio, startSelfTest } from "./support/self-test";
 import { expect, test } from "./support/fixtures";

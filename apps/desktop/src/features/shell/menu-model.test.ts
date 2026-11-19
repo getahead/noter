@@ -48,6 +48,7 @@ describe("app menu model", () => {
   });
 
   it("routes page menu commands through the focused page's existing keyboard handler", () => {
+    expect(nativeMenuShortcut("menu.select_all")).toMatchObject({ code: "KeyA", key: "a", metaKey: true, bubbles: true, cancelable: true });
     expect(nativeMenuShortcut("menu.export")).toMatchObject({ code: "KeyE", key: "e", metaKey: true, shiftKey: false });
     expect(nativeMenuShortcut("menu.copy_for_slack")).toMatchObject({ code: "KeyC", key: "c", metaKey: true, shiftKey: true });
     expect(nativeMenuShortcut("menu.copy_for_jira")).toMatchObject({ code: "KeyC", altKey: true, metaKey: true });
