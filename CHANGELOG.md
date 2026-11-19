@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.24.0](https://github.com/getahead/noter/compare/v0.23.0...v0.24.0) (2026-11-19)
+
+
+### Features
+
+* **contract:** account_use_existing carries the personal-use confirmation ([#1008](https://github.com/getahead/noter/issues/1008)) ([8089c09](https://github.com/getahead/noter/commit/8089c09f7a33eee0af8bc293037fadead706fa1a))
+
+
+### Bug fixes
+
+* **core:** a model file that cannot be written fails as internal, not disk_full, and is logged ([#1002](https://github.com/getahead/noter/issues/1002)) ([1f9d8e7](https://github.com/getahead/noter/commit/1f9d8e7b2dcec9acc0de8d60a4cbc4e5e1fc9723))
+* **fake:** claude reuse needs the personal-use box, as on the real core ([#1014](https://github.com/getahead/noter/issues/1014)) ([77c13af](https://github.com/getahead/noter/commit/77c13afae753da199acda1585a95040543ba7979))
+* **fake:** match the real core for people_merge, call_tags_set, search and ask not-found ([#994](https://github.com/getahead/noter/issues/994)) ([2f7bb55](https://github.com/getahead/noter/commit/2f7bb5565667ef7c5d9bd41341226615f759e771))
+* resolve actionable desktop and engine bugs ([#1028](https://github.com/getahead/noter/issues/1028)) ([3ea0fef](https://github.com/getahead/noter/commit/3ea0fef4f2b76a2951ac326393cd57e9075c6796))
+* **ui:** a failed model download gives models the error glyph, like a failed check ([#1010](https://github.com/getahead/noter/issues/1010)) ([9d9ba73](https://github.com/getahead/noter/commit/9d9ba73f977abccaae9c5e04e69f85651045fa0f))
+* **ui:** first-run models say download failed apart from check failed, and no bundle reads 0 gb ([#1003](https://github.com/getahead/noter/issues/1003)) ([109a469](https://github.com/getahead/noter/commit/109a46902eb5c0a246095f4832f2d091d41e86b8))
+* **ui:** use this account sends the personal-use box and shows a refusal ([#1012](https://github.com/getahead/noter/issues/1012)) ([1ee5e45](https://github.com/getahead/noter/commit/1ee5e452f9944aeb993663b1081f334108e1057a))
+
 ## [0.23.0](https://github.com/getahead/noter/compare/v0.22.16...v0.23.0) (2026-11-18)
 
 
