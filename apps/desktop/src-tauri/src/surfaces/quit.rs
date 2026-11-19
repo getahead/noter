@@ -56,7 +56,11 @@ fn quit_if_idle(
 }
 
 fn quit_after_stop(result: Result<Value, CoreError>, exit: impl FnOnce()) -> Result<(), CoreError> {
-    if result?["phase"].as_str() != Some("stopped") {
+    let capture = result?;
+    let stopped = capture["phase"].as_str() == Some("stopped");
+    let discarded = capture["phase"].as_str() == Some("idle")
+        && matches!(capture.get("call_id"), Some(Value::Null));
+    if !stopped && !discarded {
         return Err(CoreError::new(
             noter_protocol::ErrorCode::NotReady,
             "the recording is still stopping",
@@ -593,6 +597,33 @@ mod menu_tests {
             "an idempotent concurrent Stop can still be flushing files"
         );
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn a_completed_discard_can_quit_only_with_explicit_idle_and_no_call() {
+        let exited = std::cell::Cell::new(false);
+        quit_after_stop(Ok(json!({ "phase": "idle", "call_id": null })), || {
+            exited.set(true)
+        })
+        .expect("a successful discard removed the call and returned capture to idle");
+        assert!(exited.get());
+
+        for capture in [
+            json!({ "phase": "idle", "call_id": "call_still_open" }),
+            json!({ "phase": "idle" }),
+            json!({ "phase": "stopping", "call_id": null }),
+            json!({ "call_id": null }),
+        ] {
+            exited.set(false);
+            assert!(
+                quit_after_stop(Ok(capture.clone()), || exited.set(true)).is_err(),
+                "unsafe capture result: {capture}"
+            );
+            assert!(
+                !exited.get(),
+                "unconfirmed discard must not quit: {capture}"
+            );
+        }
     }
 
     #[test]

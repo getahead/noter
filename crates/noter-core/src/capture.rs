@@ -116,6 +116,8 @@ pub(crate) struct Session {
     stop: Option<(i64, CommandCtx)>,
     /// The engine retained its session after rejecting finalization; Stop must retry it.
     pub(crate) stop_rejected: bool,
+    /// Discard has ended the transcript; every retry must finish deletion, never resume it.
+    pub(crate) discard_requested: bool,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
     pub(crate) app: Option<(String, String)>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
@@ -771,6 +773,10 @@ impl Core {
         if state.call_id.as_ref() != Some(&args.call_id) || state.phase == CapturePhase::Idle {
             return Err(not_recording());
         }
+        if session.discard_requested {
+            drop(session);
+            return self.discard_call(ctx, args).await;
+        }
         if state.phase == CapturePhase::Stopped {
             return Ok(state);
         }
@@ -852,7 +858,10 @@ impl Core {
     /// the post-call hand-off. Nothing happens unless `call_id` is stopping.
     fn finish_stop(&self, session: &mut Session, call_id: &CallId) -> Result<(), CoreError> {
         let state = self.capture_now();
-        if state.phase != CapturePhase::Stopping || state.call_id.as_ref() != Some(call_id) {
+        if session.discard_requested
+            || state.phase != CapturePhase::Stopping
+            || state.call_id.as_ref() != Some(call_id)
+        {
             return Ok(());
         }
         let (ended, ctx) = session
@@ -1015,8 +1024,9 @@ impl Core {
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let heard_nothing = matches!(state.notice, Some(CaptureNotice::NothingHeard { .. }));
-        let retry =
-            state.phase == CapturePhase::Failed && state.call_id.as_ref() == Some(&args.call_id);
+        let retry = session.discard_requested
+            && matches!(state.phase, CapturePhase::Failed | CapturePhase::Stopping)
+            && state.call_id.as_ref() == Some(&args.call_id);
         if !((live(&state, &args.call_id) || retry) && heard_nothing) {
             return Err(CoreError::new(
                 ErrorCode::NoticeExpired,
@@ -1026,6 +1036,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-discard
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-discard
         let call_id = args.call_id;
+        session.discard_requested = true;
         self.set_capture(|c| c.phase = CapturePhase::Stopping);
         // Discard wins over the engine's normal transcript finalization and its late events.
         self.capture_event(CaptureEvent::Stopped {

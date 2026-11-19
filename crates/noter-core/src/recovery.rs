@@ -190,6 +190,11 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-resume:p1:inst-else-expired
         // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-try-again
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-try-again
+        if session.discard_requested {
+            // The transcript is already discarded; Try Again completes that cleanup intent.
+            drop(session);
+            return self.discard_call(ctx, CallIdArgs { call_id }).await;
+        }
         if session.stop_rejected {
             // The visible Try Again retries the user's unfinished Stop; its engine still owns the session.
             return self

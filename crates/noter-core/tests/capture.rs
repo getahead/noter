@@ -1952,6 +1952,131 @@ async fn discard_waits_for_the_engine_final_audio_writes_before_removing_the_fol
 }
 
 #[tokio::test(start_paused = true)]
+async fn failed_discard_stop_and_try_again_preserve_discard_until_engine_flushes() {
+    for try_again in [false, true] {
+        for rejected in [false, true] {
+            let r = rig_with(Setup {
+                engine: Behaviour {
+                    hang: true,
+                    ..Behaviour::default()
+                },
+                ..Setup::default()
+            });
+            let start = {
+                let core = r.core.clone();
+                tokio::spawn(async move { core.capture_start(&main_window(), start_args()).await })
+            };
+            let EngineCommand::StartSession(started) = r
+                .sent(|c| matches!(c, EngineCommand::StartSession(_)))
+                .await
+            else {
+                unreachable!()
+            };
+            let call_id = started.call_id;
+            r.engine.inject(EngineEvent::Ack {
+                cmd_id: r.engine.last_command_id().unwrap(),
+            });
+            r.session_started(&call_id);
+            start.await.unwrap().unwrap();
+            r.phase_becomes(CapturePhase::Recording).await;
+            let mut state = r.state().await;
+            state.notice = Some(CaptureNotice::NothingHeard {
+                since: TimestampMs(T0),
+            });
+            noter_core::testing::seed_capture(&r.core, state)
+                .await
+                .unwrap();
+            let transcript = r.subscribe_transcript(call_id.clone()).await;
+            let folder = r._dir.path().join("audio").join(call_id.as_str());
+            std::fs::create_dir_all(&folder).unwrap();
+            let discard = {
+                let core = r.core.clone();
+                let call_id = call_id.clone();
+                tokio::spawn(async move {
+                    core.capture_discard(&main_window(), CallIdArgs { call_id })
+                        .await
+                })
+            };
+            r.sent_n(1, |c| matches!(c, EngineCommand::Stop { .. }))
+                .await;
+            if rejected {
+                r.engine.inject(EngineEvent::Error {
+                    cmd_id: r.engine.last_command_id(),
+                    code: EngineErrorCode::Internal,
+                    message: "could not finalize capture timeline".into(),
+                });
+            } else {
+                r.engine.inject(EngineEvent::Ack {
+                    cmd_id: r.engine.last_command_id().unwrap(),
+                });
+            }
+            assert_eq!(
+                discard.await.unwrap().unwrap_err().code,
+                ErrorCode::EngineUnavailable
+            );
+            assert_eq!(r.state().await.phase, CapturePhase::Failed);
+            let mut retry = {
+                let core = r.core.clone();
+                let call_id = call_id.clone();
+                tokio::spawn(async move {
+                    if try_again {
+                        core.capture_resume_interrupted(&main_window(), CallIdArgs { call_id })
+                            .await
+                    } else {
+                        core.capture_stop(&menu_bar(), CallIdArgs { call_id }).await
+                    }
+                })
+            };
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), &mut retry)
+                    .await
+                    .is_err(),
+                "failed Discard must not become a completed call or a new capture session"
+            );
+            r.sent_n(2, |c| matches!(c, EngineCommand::Stop { .. }))
+                .await;
+            assert_eq!(r.sessions().len(), 1);
+            assert_eq!(
+                r.query::<i64>("SELECT count(*) FROM calls WHERE ended_at IS NOT NULL"),
+                0
+            );
+            assert!(runs_of(&r, JobKind::PostCall).is_empty());
+            assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+            r.engine.inject(EngineEvent::Ack {
+                cmd_id: r.engine.last_command_id().unwrap(),
+            });
+            std::fs::write(folder.join("mic.m4a"), b"final audio").unwrap();
+            r.session_stopped(&call_id);
+            assert_eq!(retry.await.unwrap().unwrap().phase, CapturePhase::Idle);
+            assert_eq!(r.query::<i64>("SELECT count(*) FROM calls"), 0);
+            assert!(!folder.exists());
+            assert!(runs_of(&r, JobKind::PostCall).is_empty());
+            assert!(runs_of(&r, JobKind::ArchivePass).is_empty());
+            r.engine.inject(segment(&call_id));
+            r.pass(1).await;
+            assert!(
+                !folder.exists(),
+                "the original Discard transcript tombstone survives retry"
+            );
+            assert_eq!(
+                transcript
+                    .lock()
+                    .unwrap()
+                    .iter()
+                    .filter(|event| matches!(
+                        event,
+                        TranscriptEvent::Ended {
+                            reason: StreamEndReason::Discarded
+                        }
+                    ))
+                    .count(),
+                1
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retry() {
     let r = rig();
     let call_id = r.recording().await;
