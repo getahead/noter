@@ -9,17 +9,47 @@ final class WindowSizeTests: NoterTestCase {
         launch("idle")
         XCTAssertTrue(app.groups["Sidebar"].waitForExistence(timeout: 10), "the main window did not load")
         let main = window("Noter")
-        let right = main.coordinate(withNormalizedOffset: CGVector(dx: 1, dy: 0.5)).withOffset(CGVector(dx: -1, dy: 0))
-        right.click(forDuration: 0.1, thenDragTo: right.withOffset(CGVector(dx: 1000 - main.frame.width, dy: 0)))
-        XCTAssertTrue(waitUntil(5) { abs(main.frame.width - 1000) <= 8 }, "the user resized the main window")
-        let bottom = main.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -1))
-        bottom.click(forDuration: 0.1, thenDragTo: bottom.withOffset(CGVector(dx: 0, dy: 700 - main.frame.height)))
-        XCTAssertTrue(waitUntil(5) { abs(main.frame.height - 700) <= 8 }, "the user changed the main window height")
+        let initial = main.frame
+        func moveMain(to origin: CGPoint) {
+            for _ in 0..<3 {
+                let frame = main.frame
+                if abs(frame.minX - origin.x) <= 3 && abs(frame.minY - origin.y) <= 3 { break }
+                // The blank sidebar titlebar is a native drag region, clear of the traffic lights.
+                let title = main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 110, dy: 14))
+                title.hover()
+                title.click(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: origin.x - frame.minX, dy: origin.y - frame.minY)))
+                _ = waitUntil(1) { abs(main.frame.minX - origin.x) <= 3 && abs(main.frame.minY - origin.y) <= 3 }
+            }
+        }
+        func resizeEdge(horizontal: Bool, to target: CGFloat) {
+            for _ in 0..<3 {
+                let frame = main.frame
+                let current = horizontal ? frame.width : frame.height
+                if abs(current - target) <= 8 { break }
+                let edge = main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(
+                    dx: horizontal ? frame.width - 1 : frame.width / 2,
+                    dy: horizontal ? frame.height / 2 : frame.height - 1))
+                edge.hover()
+                edge.click(forDuration: 0.1, thenDragTo: edge.withOffset(CGVector(
+                    dx: horizontal ? target - current : 0,
+                    dy: horizontal ? 0 : target - current)))
+                _ = waitUntil(1) { abs((horizontal ? main.frame.width : main.frame.height) - target) <= 8 }
+            }
+        }
+        // CI's 1024 pt display opens this window flush to both sides. Move it first so the
+        // right resize border is reachable; the initial frame also bounds the final placement.
+        moveMain(to: CGPoint(x: initial.minX - 40, y: initial.minY))
+        resizeEdge(horizontal: true, to: 1000)
+        XCTAssertTrue(waitUntil(5) { abs(main.frame.width - 1000) <= 8 }, "the user resized the main window; actual=\(main.frame)")
+        let targetHeight = min(700, initial.height - 40)
+        resizeEdge(horizontal: false, to: targetHeight)
+        XCTAssertTrue(waitUntil(5) { abs(main.frame.height - targetHeight) <= 8 }, "the user changed the main window height; actual=\(main.frame), target=\(targetHeight)")
+        XCTAssertLessThan(main.frame.height, initial.height - 8, "the test genuinely resized the height")
         let beforeMove = main.frame
-        // The sidebar's blank titlebar area is a native drag region, clear of the traffic lights.
-        let title = main.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: 110, dy: 14))
-        title.click(forDuration: 0.1, thenDragTo: title.withOffset(CGVector(dx: 35, dy: 35)))
+        moveMain(to: CGPoint(x: initial.minX + min(12, (initial.width - main.frame.width) / 2),
+                             y: initial.minY + min(20, (initial.height - main.frame.height) / 2)))
         XCTAssertTrue(waitUntil(5) { main.frame.origin != beforeMove.origin }, "the user moved the main window")
+        XCTAssertTrue(initial.contains(main.frame), "the saved frame fits the known visible initial frame")
         let expected = main.frame
         app.typeKey("q", modifierFlags: .command)
         XCTAssertTrue(app.wait(for: .notRunning, timeout: 10), "normal Quit finishes before relaunch")
