@@ -15,6 +15,9 @@ const minPixelMatch = Number(/min_pixel_match\s*=\s*([\d.]+)/.exec(harness)?.[1]
 const colorThreshold = Number(/pixel_color_threshold\s*=\s*([\d.]+)/.exec(harness)?.[1]);
 if (!(minPixelMatch > 0) || !(colorThreshold >= 0)) throw new Error("harness.toml [gates.visual] is missing or unreadable");
 const hasApp = existsSync(fileURLToPath(new URL("./index.html", import.meta.url)));
+const port = Number(process.env.NOTER_E2E_PORT ?? 5173);
+if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("NOTER_E2E_PORT must be a valid TCP port");
+const baseURL = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
@@ -43,7 +46,7 @@ export default defineConfig({
     colorScheme: "light",
     locale: "en-US",
     timezoneId: "Europe/Berlin",
-    baseURL: "http://127.0.0.1:5173",
+    baseURL,
     trace: "retain-on-failure",
   },
   projects: [
@@ -54,6 +57,6 @@ export default defineConfig({
   // suites run against the dev server with the fake core, or the real core
   // through the harness bridge when NOTER_CORE=stdio (docs/HARNESS.md).
   webServer: hasApp
-    ? { command: "pnpm exec vite --port 5173 --strictPort", url: "http://127.0.0.1:5173", reuseExistingServer: !process.env.CI, env: { VITE_FAKE_CORE: process.env.NOTER_CORE === "stdio" ? "" : "1" } }
+    ? { command: `pnpm exec vite --port ${port} --strictPort`, url: baseURL, reuseExistingServer: !process.env.CI, env: { VITE_FAKE_CORE: process.env.NOTER_CORE === "stdio" ? "" : "1" } }
     : undefined,
 });
