@@ -28,8 +28,11 @@ describe("cpt-noter-seq-today-review-before-call", () => {
     const today = ok(await main.todayGet({}));
     expect(today.calendar).toBe("granted");
     expect(today.live_call?.id).toBe(LIVE_CALL);
-    // The review line counts the suggested items of every call.
-    expect(today.review_waiting).toBe(ok(await main.itemsList({ filter: { reviews: ["suggested"] }, page: {} })).rows.length);
+    // The review line counts the suggested items of every call not still recording: a live call has no rows to review
+    // yet (#1038). The fake serves the fixture's Today as given, so it keeps the fixture's count.
+    const suggested = ok(await main.itemsList({ filter: { reviews: ["suggested"] }, page: {} })).rows;
+    const reviewable = s.target === "stdio" ? suggested.filter((i) => i.call.id !== LIVE_CALL) : suggested;
+    expect(today.review_waiting).toBe(reviewable.length);
     expect(today.ranking).toBe("owed_to_todays_people");
 
     // The ranking is a setting: the other order is what the next read says.
