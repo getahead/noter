@@ -13,6 +13,7 @@ import { localOf, patchLocal, resetLocal } from "./local";
 import { rememberItem } from "./actions";
 import { RejectedList } from "./RejectedList";
 import { slots } from "./slots";
+import { ProvenanceChip } from "./ProvenanceChip";
 import "./register";
 
 let bridge: Bridge;
@@ -494,12 +495,15 @@ it("gives repeated compact items distinct menu and row ids across Today cards", 
   expect(new Set(ids).size).toBe(ids.length);
 });
 
-it("compact rows open their source Transcript in one action", async () => {
+it("compact rows open their source Transcript in one action from the timestamp chip, with no extra link (#1072)", async () => {
   await ready();
   const seen = sent();
   const it = item("itm_spec");
   const tree = rendered(ActionItemRow, { bridge, item: it, variant: "compact" });
-  press(tree, "Show in transcript");
+  expect(() => find(tree, (p) => p.label === "Show in transcript")).toThrow();
+  const chip = find(tree, (_p, type) => type === ProvenanceChip);
+  expect(chip.props.span).toEqual(it.spans[0]);
+  (find(rendered(ProvenanceChip, chip.props as Parameters<typeof ProvenanceChip>[0]), (p) => typeof p.onClick === "function").props.onClick as () => void)();
   await settle();
   expect(seen).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }]);
 });

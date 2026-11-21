@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { setPseudo, t } from "../../i18n/format";
+import { setPseudo, shortCallTime, t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
@@ -15,7 +15,6 @@ import { TodayBanners } from "./TodayBanners";
 import { positionOf } from "./position";
 import { shouldClearFocusedRow, TodayPage, watchTodayDate } from "./TodayPage";
 import { TodayToolbar } from "./TodayToolbar";
-import { clockOf } from "./clock";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 
 let bridge: Bridge;
@@ -150,9 +149,12 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
     const html = renderToString(<TodayToolbar route={{ section: "today", key: "root" }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
     expect(html).toContain('data-region="TD-R1"');
-    expect(html).toMatch(/Record|Recording/);
-    expect(clockOf(754)).toBe("12:34");
-    expect(clockOf(754.9)).toBe("12:34");
+    // the fixture records: the indicator's button variant is the dot and the clock, without the word (#1069)
+    expect(html).toContain('data-variant="button"');
+    expect(html).not.toContain(">Recording<");
+    expect(shortCallTime(754)).toBe("12:34"); // MM:SS on the button (#1069)
+    expect(shortCallTime(754.9)).toBe("12:34");
+    expect(shortCallTime(3754)).toBe("01:02:34");
   });
   it("explains that Record has no keyboard shortcut when its binding is cleared", async () => {
     await open();
@@ -209,7 +211,7 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
     put([event("a", { last_time: { call: { id: "call_1" }, line: "Agreed the plan" } }), event("b", { sensitive: true })])();
     await loadToday(bridge);
     const html = renderToString(<TodayPage bridge={bridge} />);
-    expect(html).toContain("Today · 2 calls");
+    expect(html).toMatch(/Today(<!-- -->)? <span class="np-dim">· 2 calls<\/span>/); // the count is dimmed (#1073)
     expect(html).toMatch(/data-variant="today"[^>]*data-state="expanded"/);
     expect(html).toMatch(/data-state="collapsed"/);
     expect(html).toContain("Anna");
@@ -259,7 +261,7 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     let html = renderToString(<TodayPage bridge={bridge} />);
     expect(html).toContain('data-region="TD-R5"');
     expect(html).toContain("Due this week, no call");
-    expect(html).toContain("Done today · 1");
+    expect(html).toMatch(/Done today(<!-- -->)? <span class="np-dim">· 1<\/span>/);
     expect(html).toContain('data-variant="compact"');
     items().splice(items().length - extra.length, extra.length);
     await loadToday(bridge);

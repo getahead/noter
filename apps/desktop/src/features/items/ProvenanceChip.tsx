@@ -25,6 +25,7 @@ export function ProvenanceChip({ bridge, span, variant = "timestamp", unverified
     <>
       <button type="button" {...common} className="np-prov" disabled={phase === "loading"} aria-label={t("items.open_source", { at: spanTime(span) })} onClick={() => void open()}>
         {phase === "loading" ? t("items.finding_source") : spanTime(span)}
+        {phase !== "loading" && variant === "timestamp" && <span aria-hidden="true">↗</span>}
       </button>
       {notes?.audioGone && <span role="status" className="np-dim">{t("items.audio_gone")}</span>}
       {notes?.archiveChanged && <span role="status" className="np-dim">{t("items.archive_changed")}</span>}
