@@ -9,6 +9,7 @@ import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
 import type { World } from "../../../tests/support/scenario";
 import { openReview } from "../items/review-banner";
+import { navigateEffect } from "../shell/navigate";
 import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showPreviousCall } from "./actions";
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
@@ -324,6 +325,21 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     expect(html).not.toContain("Row 5");
     expect(html).toContain("Show 2 More");
   });
+});
+
+it("Show All in Activity opens Activity, and the recording button shows the call window (#1069, #1075)", async () => {
+  await open();
+  await loadToday(bridge);
+  const out = sentCommands(fake);
+  const moves: unknown[] = [];
+  const stop = navigateEffect((e) => moves.push(e));
+  (find(rendered(TodayPage, { bridge }), (p) => p.label === "Show All in Activity").props.onAction as () => void)();
+  stop();
+  expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "activity", key: "root" } } }]);
+  const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
+  const toolbar = rendered(TodayToolbar, { route: { section: "today", key: "root" }, bridge, base, inspectorOpen: false, onToggleInspector() {} });
+  (find(toolbar.props.trailing, (p) => p["data-variant"] === "button").props.onClick as () => void)();
+  await vi.waitFor(() => expect(out.map((c) => c[0])).toContain("window_show_call"));
 });
 
 it("Today row keys tick, open typed evidence, and preserve the last focused item", async () => {
