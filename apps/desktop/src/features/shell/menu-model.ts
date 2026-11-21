@@ -1,6 +1,6 @@
 import { t } from "../../i18n/format";
 import type { MsgKey } from "../../i18n/en";
-import type { ShortcutTable } from "../../app/a11y/keys";
+import { isTyping, type ShortcutTable } from "../../app/a11y/keys";
 import { SECTIONS } from "./sections";
 import type { SectionKey } from "./history";
 import model from "./menu-model.json";
@@ -56,6 +56,14 @@ export function nativeMenuShortcut(key: string): KeyboardEventInit | null {
   if (!code) return null;
   const keyValue = code === "Backspace" ? "Backspace" : code === "Comma" ? "," : code === "Equal" ? "+" : code === "Minus" ? "-" : code.startsWith("Key") ? code.slice(3).toLowerCase() : code.slice(5);
   return { ...modifiers, code, key: keyValue, bubbles: true, cancelable: true };
+}
+
+/** Edit › Undo and Redo are the app's (the change log, issue 1064); in a text field they stay the text's own edit. */
+export function textEditFromMenu(key: string, doc: Pick<Document, "activeElement" | "execCommand"> | undefined = globalThis.document): boolean {
+  if ((key !== "menu.undo" && key !== "menu.redo") || !doc || !isTyping(doc.activeElement)) return false;
+  // execCommand is the only way a page can ask WebKit for its text undo
+  doc.execCommand(key === "menu.undo" ? "undo" : "redo");
+  return true;
 }
 
 export function dispatchNativeMenuShortcut(key: string): boolean {

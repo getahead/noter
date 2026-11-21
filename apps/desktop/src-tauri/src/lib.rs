@@ -178,6 +178,26 @@ pub fn run() {
                     app,
                     noter_protocol::model::NavTarget::FirstRun { step: None },
                 );
+            } else if let Some(edit) = match event.id().as_ref() {
+                "menu.undo" => Some("undo"),
+                "menu.redo" => Some("redo"),
+                _ => None,
+            } {
+                // Edit › Undo and Redo go to the window in front (issue 1064): the main page undoes the
+                // change log or its text field; any other window gets its text field's own undo.
+                let focused = app
+                    .webview_windows()
+                    .into_values()
+                    .find(|w| w.is_focused().unwrap_or(false));
+                match focused {
+                    Some(w) if w.label() == WindowLabel::Main.as_str() => {
+                        let _ = w.emit(surfaces::APP_MENU_ACTION, event.id().as_ref());
+                    }
+                    Some(w) => {
+                        let _ = w.eval(format!("document.execCommand('{edit}')"));
+                    }
+                    None => {}
+                }
             } else if surfaces::app_menu_action(app, event.id().as_ref()) {
                 // Core-backed Call items keep their own native context and focus policy.
             } else if let Some(main) = app.get_webview_window(WindowLabel::Main.as_str()) {

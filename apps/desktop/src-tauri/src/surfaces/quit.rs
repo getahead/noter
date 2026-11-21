@@ -219,6 +219,16 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     clear_submenu(&file)?;
     append_model_items(app, &file, &model, "menu.title.file", 0)?;
     let edit = submenu(&menu, "Edit");
+    // Undo and Redo are the app's (the change log, issue 1064): the stock items sent `undo:` to the
+    // first responder and took ⌘Z before the page saw it. Cut, Copy, Paste and Select All stay native.
+    for (index, key) in ["menu.undo", "menu.redo"].into_iter().enumerate() {
+        if let Some(stock) = edit.items()?.into_iter().nth(index) {
+            edit.remove(&stock)?;
+        }
+        let accelerator = model_accelerator(&model, key);
+        let item = MenuItem::with_id(app, key, catalogue(key), true, accelerator)?;
+        edit.insert(&item, index)?;
+    }
     append_model_items(app, &edit, &model, "menu.title.edit", 6)?;
     edit.append(&PredefinedMenuItem::separator(app)?)?;
     edit.append(&MenuItem::with_id(
@@ -290,6 +300,17 @@ fn append_model_items<R: Runtime>(
         }
     }
     Ok(())
+}
+
+/// A model entry's accelerator, if it has one.
+fn model_accelerator<'a>(model: &'a Value, key: &str) -> Option<&'a str> {
+    model
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|group| group["items"].as_array().into_iter().flatten())
+        .find(|entry| entry["key"] == key)
+        .and_then(|entry| entry["accelerator"].as_str())
 }
 
 fn append_model_item<R: Runtime>(
