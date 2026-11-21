@@ -187,7 +187,33 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 });
 
 test.describe("cpt-noter-seq-first-run-download-models", () => {
-  test("UI — happy path: the bundles with size and progress, About 2 GB, Pause and Resume, Continue at once, ring on Models", async ({ page }) => {
+  test("UI — optional choices update the selected total before any download", async ({ page }) => {
+    let bundles: ModelBundle[] = [];
+    await openWindow(page, "first-run", { world: (w) => {
+      W.firstRun(w, { modelsReady: false });
+      bundles = structuredClone(w.app.setup.models.bundles);
+    } });
+    for (const b of bundles) {
+      const choice = stepBody(page).getByRole("checkbox", { name: b.name, exact: true });
+      await expect(choice).toBeChecked();
+      if (b.required_for_capture) await expect(choice).toBeDisabled();
+      else {
+        await expect(choice).toBeEnabled();
+        await stepBody(page).getByText(b.name, { exact: true }).click(); // the label is the checkbox’s hit area
+        await expect(choice).not.toBeChecked();
+      }
+    }
+    const requiredMb = bundles.filter((b) => b.required_for_capture).reduce((sum, b) => sum + b.size_mb, 0);
+    await expect(stepBody(page)).toContainText(`About ${requiredMb} MB`);
+    expect((await sent(page, "models_download")).every((c) => (c as { action: string }).action === "select")).toBe(true);
+    await expect(button(page, "Download")).toBeEnabled();
+    await expect(button(page, "Pause")).toHaveCount(0);
+    await button(page, "Download").click();
+    await expect(stepBody(page)).toContainText("Models downloaded");
+    await expect(button(page, "Pause")).toHaveCount(0);
+    await expect(stepBody(page).getByText("Not selected", { exact: true })).toHaveCount(3);
+  });
+  test("UI — happy path: bundles with size and progress, selected total, Pause and Resume, Continue at once, ring on Models", async ({ page }) => {
     let bundles: ModelBundle[] = [];
     // the real core's download waits at 40 % so there is something left to pause and resume (it finishes in a blink otherwise)
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w, { modelsReady: false }), (bundles = structuredClone(w.app.setup.models.bundles))), holdDownloadAt: 40 });
@@ -195,7 +221,8 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     await expect(step(page, "Models")).toHaveAttribute("aria-current", "step");
     for (const b of bundles) await expect(stepBody(page)).toContainText(b.name);
     await expect(stepBody(page).getByRole("progressbar")).toHaveCount(bundles.length);
-    await expect(stepBody(page)).toContainText(/About \d+ GB/);
+    await expect(stepBody(page)).toContainText(/About [\d.,]+ (MB|GB)/);
+    await button(page, "Download").click();
     await expect.poll(() => sent(page, "models_download")).toContainEqual({ action: "start" });
 
     await button(page, "Pause").click();
@@ -227,6 +254,7 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
   test("UI — error path: Not enough disk space — Needs 2.1 GB, 1.4 GB free, Try Again starts the downloads", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => W.firstRun(w, { modelsReady: false }), holdDownloadAt: 40 });
     await expect(step(page, "Models")).toHaveAttribute("aria-current", "step");
+    await button(page, "Download").click();
     await button(page, "Pause").click();
     await expect(button(page, "Resume")).toBeVisible(); // the pause command finished before injecting the next failure
     await steer.failNext("models_download", "disk_full", { type: "disk_space", free_mb: 1400, needed_mb: 2100 });
@@ -245,6 +273,7 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     // the window's own download fails its check once (harness.corrupt_next_download, and the fake's corruptNextDownload)
     await openWindow(page, "first-run", { world: (w) => W.firstRun(w, { modelsReady: false }), corruptNextDownload: true });
 
+    await button(page, "Download").click();
     await expect(stepBody(page)).toContainText("Check failed");
     await button(page, "Continue").click(); // moving on shows the error glyph on Models
     await expect(step(page, "Models")).toHaveAttribute("data-state", "error");
@@ -260,11 +289,15 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     const steer = await openWindow(page, "first-run", {
       world: (w) => {
         W.firstRun(w, { modelsReady: false });
-        audioGranted(w); // the window starts the download itself; the speech model is still coming in
+        audioGranted(w);
         w.app.setup.steps.find((s) => s.step === "models")!.state = "done";
       },
       holdDownloadAt: 62, // the real core's download waits at 62 % until released
     });
+
+    await step(page, "Models").getByRole("button").click();
+    await button(page, "Download").click();
+    await button(page, "Continue").click();
 
     await confirmSystemAudio(page);
     await expect(selfTest(page)).toContainText(/Waiting for the speech model · \d+ %/);

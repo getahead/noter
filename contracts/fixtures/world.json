@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.13",
+    "contract_version": "2.15",
     "copilot": {
       "agents": [
         {
@@ -460,29 +460,33 @@
         "bundles": [
           {
             "done_mb": 950,
-            "name": "WhisperKit Large v3 Turbo",
+            "name": "whisper-turbo",
             "required_for_capture": true,
+            "selected": true,
             "size_mb": 950,
             "state": "ready"
           },
           {
             "done_mb": 1550,
-            "name": "WhisperKit Large v3",
+            "name": "whisper-large-v3",
             "required_for_capture": false,
+            "selected": true,
             "size_mb": 1550,
             "state": "ready"
           },
           {
             "done_mb": 120,
-            "name": "FluidAudio VAD and diarization",
-            "required_for_capture": true,
+            "name": "wespeaker",
+            "required_for_capture": false,
+            "selected": true,
             "size_mb": 120,
             "state": "ready"
           },
           {
             "done_mb": 1150,
-            "name": "bge-m3 (CoreML)",
+            "name": "bge-m3",
             "required_for_capture": false,
+            "selected": true,
             "size_mb": 1150,
             "state": "ready"
           }

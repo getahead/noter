@@ -9,25 +9,42 @@ export function firstRunHandlers(fake: Core.FakeCore): Core.Handlers {
   setup_status: (_a, { world }) => world.app.setup,
   models_download: (a, { world, fake, publish }) => {
     const m = world.app.setup.models;
+    if (a.bundles) {
+      if (a.bundles.some((name) => !m.bundles.some((b) => b.name === name))) throw coreError("invalid_input");
+      if (m.bundles.some((b) => b.state === "downloading" || b.state === "verifying") &&
+        m.bundles.some((b) => (b.selected !== false) !== (b.required_for_capture || a.bundles!.includes(b.name)))) throw coreError("not_ready");
+      for (const b of m.bundles) b.selected = b.required_for_capture || a.bundles.includes(b.name);
+      m.error = null;
+    }
+    const selected = m.bundles.filter((b) => b.selected !== false);
+    const totals = () => {
+      m.total_mb = selected.reduce((n, b) => n + b.size_mb, 0);
+      m.done_mb = selected.reduce((n, b) => n + Math.min(b.done_mb, b.size_mb), 0);
+    };
+    totals();
+    if (a.action === "select" || selected.every((b) => b.state === "ready")) {
+      publish("setup:changed");
+      return world.app.setup;
+    }
     if (a.action !== "pause" && !world.app.environment.online) throw coreError("offline");
     const corrupt = a.action !== "pause" && fake.corruptDownload; // one shot: the speech bundle fails its check
     if (corrupt) fake.corruptDownload = false;
     if (a.action !== "pause") m.error = null;
-    m.bundles.forEach((b) => {
+    selected.forEach((b) => {
       if (b.state === "ready") return;
       b.state = a.action === "pause" ? "paused" : "downloading";
     });
     publish("setup:changed");
     if (a.action !== "pause") {
       fake.later(800, () => {
-        m.bundles.forEach((b) => {
+        selected.forEach((b) => {
           if (b.state !== "downloading") return;
           if (corrupt && b.required_for_capture) {
             b.state = "checksum_failed";
             m.error = "checksum_failed";
           } else Object.assign(b, { state: "ready", done_mb: b.size_mb });
         });
-        m.done_mb = m.bundles.reduce((n, b) => n + b.done_mb, 0);
+        totals();
         publish("setup:changed");
       });
     }

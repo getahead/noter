@@ -144,7 +144,7 @@ It implements `cpt-noter-component-screen-settings` and `cpt-noter-component-ui-
    - [x] - `p1` - **CASE** **Apps Noter doesn't ask about** › **Remove**: `settings_unignore_app` (bundle id) - `inst-case-unignore`
    - [x] - `p1` - **CASE** Glossary **+**, edit or **−**: `glossary_upsert` or `glossary_remove`; a new term leads to proposals in Activity (M5) - `inst-case-glossary`
    - [x] - `p1` - **CASE** **Run Audio Self-Test…**: open the self-test sheet with the self-test panel (sheet variant, `self_test_run`) - `inst-case-selftest`
-   - [x] - `p1` - **CASE** Models › download or update: `models_download` - `inst-case-models`
+   - [x] - `p1` - **CASE** Models › download or update: `models_download` with the stored selected bundles plus the chosen row; skipped optional bundles remain available to download later. Never start unrelated skipped bundles - `inst-case-models`
    - [x] - `p1` - **CASE** **Call screen display**: the display picker, `setup_set_call_display` - `inst-case-display`
    - [x] - `p1` - **CASE** **Allow Calendar Access** (Privacy): `permission_request` (calendar) - `inst-case-calendar`
    - [x] - `p1` - **CASE** **Open System Settings…**: `open_external` (M1) - `inst-case-open`

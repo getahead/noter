@@ -86,7 +86,7 @@ export function stepperItemNext(state: StepperItemState, event: StepperItemEvent
 /** Each step's stepper state for the step the wizard shows and the core's setup status. */
 export function stepperItems(current: WizardStep, status: Pick<SetupStatus, "steps" | "models">): { step: SetupStep; state: StepperItemState }[] {
   const at = current === "done" ? STEP_ORDER.length : STEP_ORDER.indexOf(current);
-  const bundles = status.models.bundles;
+  const bundles = status.models.bundles.filter((b) => b.selected !== false);
   return STEP_ORDER.map((step, i) => {
     if (i > at) return { step, state: "UPCOMING" };
     let state = stepperItemNext("UPCOMING", "reach");

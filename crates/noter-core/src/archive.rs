@@ -16,7 +16,7 @@ use noter_protocol::*;
 use serde_json::json;
 
 use crate::transcript::{lang_word, shadow};
-use crate::{object, Core};
+use crate::{lock, object, Core};
 
 /// A live speaker as the install copies it onto its archive row.
 #[derive(Debug, Clone, PartialEq)]
@@ -491,6 +491,16 @@ impl Core {
         let (_, live) = self.store().read(move |c| live_of(c, &id))?;
         let constraints = self.constraints_file(call).map_err(Stop::Failed)?;
         let result_path = format!("audio/{call}/archive-{}.json", ulid::Ulid::generate());
+        let backend = if lock(&self.downloads)
+            .status()
+            .bundles
+            .iter()
+            .any(|b| b.name == "whisper-large-v3" && b.state == BundleState::Ready)
+        {
+            AsrBackend::WhisperLargeV3
+        } else {
+            AsrBackend::WhisperTurbo
+        };
         let pass = self
             .engine
             .offline_pass(
@@ -498,7 +508,7 @@ impl Core {
                 format!("audio/{call}"),
                 result_path,
                 constraints,
-                AsrBackend::WhisperLargeV3,
+                backend,
             )
             .await;
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-archive

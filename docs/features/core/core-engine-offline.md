@@ -96,7 +96,7 @@ The live transcript can improve after the call without losing the user's speaker
 - Missing audio or model, malformed constraints, failed decode or disk failure returns the protocol's correlated error or `offline_failed`; the live transcript remains usable.
 
 **Steps**:
-1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }` - `inst-archive-request`
+1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }`; use whisper-turbo when optional whisper-large-v3 is absent - `inst-archive-request`
 2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the App Group - `inst-archive-paths`
 3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
 4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; if capture starts, yield at the next diarization-window boundary and resume after capture ends - `inst-archive-progress`
@@ -139,7 +139,7 @@ The live transcript can improve after the call without losing the user's speaker
 **Steps**:
 1. [x] - `p1` - Read both stored channels against the timeline, keeping pauses and gaps in call-relative time - `inst-decode-timeline`
 2. [x] - `p1` - Split speech with VAD and identify language per utterance using the configured languages and speaker priors - `inst-decode-language`
-3. [x] - `p1` - Run full Large v3 with beam size 5 and temperature fallback, then apply glossary and hallucination filters - `inst-decode-asr`
+3. [x] - `p1` - Run installed Large v3 with beam size 5 and temperature fallback, or required whisper-turbo when Large v3 was skipped, then apply glossary and hallucination filters. Without wespeaker keep the live speaker label; requests for speaker vectors return `model_missing`. Without bge-m3 search and Ask retrieval use keyword results; Settings offers the missing bundle's download - `inst-decode-asr`
 4. [x] - `p1` - Re-decode low-probability mixed-language utterances with the alternative language and keep the better-scoring result - `inst-decode-alternative`
 5. [x] - `p1` - Run offline pyannote segmentation, WeSpeaker embeddings and VBx across the system channel; embed every local speaker in a window from one shared filterbank result and enforce must-link and cannot-link time-span constraints from user corrections - `inst-decode-cluster`
 6. [x] - `p1` - Mark overlapping spans with both candidate labels and low ASR confidence; leave voices with under three seconds of speech unnamed - `inst-decode-overlap`

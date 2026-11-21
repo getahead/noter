@@ -196,8 +196,102 @@ fn first_run() -> CommandCtx {
 }
 
 async fn download(core: &Core, action: DownloadAction) -> Result<SetupStatus, CoreError> {
-    core.models_download(&first_run(), ModelsDownloadArgs { action })
+    core.models_download(
+        &first_run(),
+        ModelsDownloadArgs {
+            action,
+            bundles: None,
+        },
+    )
+    .await
+}
+
+// cpt-noter-seq-first-run-download-models: only selected bundles are fetched, even
+// when free space would be insufficient for the full manifest.
+#[tokio::test]
+async fn selection_keeps_capture_required_and_survives_reopening() {
+    let dir = tempfile::tempdir().unwrap();
+    let manifest = || {
+        Bundles::default()
+            .with("whisper-turbo", b"live", "huggingface.co", b"live", true)
+            .with(
+                "optional",
+                &vec![b'e'; 2 * 1024 * 1024],
+                "huggingface.co",
+                &vec![b'e'; 2 * 1024 * 1024],
+                false,
+            )
+    };
+    let Setup { core, source, .. } = open(dir.path(), manifest(), 501);
+    let args = serde_json::from_value(serde_json::json!({
+        "action": "start", "bundles": []
+    }))
+    .unwrap();
+    let started = core.models_download(&first_run(), args).await.unwrap();
+    assert_eq!(
+        started.models.total_mb, 1,
+        "only required live model counts"
+    );
+    let done = until(&core, "selected models", |s| {
+        state(s, "whisper-turbo") == BundleState::Ready
+    })
+    .await;
+    assert_eq!(state(&done, "optional"), BundleState::Pending);
+    assert_eq!(source.fetches.lock().unwrap().len(), 1);
+    let selection = serde_json::to_value(&done.models.bundles).unwrap();
+    assert_eq!(selection[0]["selected"], true);
+    assert_eq!(selection[1]["selected"], false);
+    core.shutdown().await;
+    drop(core);
+    let Setup { core, .. } = open(dir.path(), manifest(), 0);
+    let status = core.setup_status(&first_run(), NoArgs {}).await.unwrap();
+    assert_eq!(status.models.total_mb, 1);
+    assert_eq!(
+        serde_json::to_value(status.models.bundles).unwrap()[1]["selected"],
+        false
+    );
+    assert!(
+        download(&core, DownloadAction::Start).await.is_ok(),
+        "a completed selection does not need disk space or another job"
+    );
+    core.shutdown().await;
+}
+
+#[tokio::test]
+async fn selecting_does_not_download_and_unknown_names_are_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let Setup { core, source, .. } = open(
+        dir.path(),
+        Bundles::default()
+            .with("whisper-turbo", b"live", "huggingface.co", b"live", true)
+            .with("optional", b"extra", "huggingface.co", b"extra", false),
+        10_000,
+    );
+    let select = |names: Vec<&str>| {
+        serde_json::from_value(serde_json::json!({
+            "action": "select", "bundles": names
+        }))
+        .unwrap()
+    };
+    let status = core
+        .models_download(&first_run(), select(vec![]))
         .await
+        .unwrap();
+    assert_eq!(status.models.total_mb, 1);
+    assert!(source.fetches.lock().unwrap().is_empty());
+    assert!(core
+        .models_download(&first_run(), select(vec!["unknown"]))
+        .await
+        .is_err());
+    assert_eq!(
+        core.setup_status(&first_run(), NoArgs {})
+            .await
+            .unwrap()
+            .models
+            .total_mb,
+        1
+    );
+    core.shutdown().await;
 }
 
 /// Waits until `test` holds for the setup status, or fails after 5 s.
