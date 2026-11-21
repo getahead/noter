@@ -123,6 +123,13 @@ function over([r, g, b, a]: Rgba, [R, G, B]: Rgba): Rgba {
   return [r * a + R * (1 - a), g * a + G * (1 - a), b * a + B * (1 - a), 1];
 }
 
+/** Resolve a translucent surface against its opaque parent for nested selection contrast checks. */
+// @cpt-begin:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-text-ratio
+export function compositeColor(surface: string, base: string): string {
+  return `rgb(${over(parseColor(surface), parseColor(base)).slice(0, 3).join(",")})`;
+}
+// @cpt-end:cpt-noter-algo-ui-tokens-theming-check-contrast:p1:inst-text-ratio
+
 function luminance([r, g, b]: Rgba): number {
   const lin = (c: number) => ((c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);

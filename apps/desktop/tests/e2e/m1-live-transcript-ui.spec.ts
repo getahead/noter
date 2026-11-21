@@ -329,9 +329,21 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
   test("UI — happy path: ⌘J follows live again while the panel is key", async ({ page }) => {
     await page.addInitScript(() => {
       const seen = new WeakSet<Element>();
+      const duplicated = new WeakSet<Element>();
+      const previous = new WeakMap<Element, number>();
       Object.defineProperty(window, "__noterTranscriptScrollEvents", { value: seen });
+      Object.defineProperty(window, "__noterTranscriptDuplicateScrolls", { value: duplicated });
       document.addEventListener("scroll", (event) => {
-        if (event.target instanceof Element && event.target.matches(".cw-tv__scroll")) seen.add(event.target);
+        const area = event.target;
+        if (!(area instanceof Element) || !area.matches(".cw-tv__scroll")) return;
+        const before = previous.get(area);
+        previous.set(area, area.scrollTop);
+        // Duplicate the first upward notification before React commits either state update.
+        if (before !== undefined && area.scrollTop < before && !duplicated.has(area)) {
+          duplicated.add(area);
+          area.dispatchEvent(new Event("scroll"));
+        }
+        seen.add(area);
       }, true);
     });
     const steer = await openWindow(page, "call-screen", {
@@ -346,6 +358,7 @@ test.describe("cpt-noter-seq-call-screen-replay-line", () => {
     await scroller.hover();
     await page.mouse.wheel(0, -1);
     await expect(log(page)).toHaveAttribute("data-state", "detached");
+    await expect.poll(() => scroller.evaluate((el) => (window as unknown as { __noterTranscriptDuplicateScrolls: WeakSet<Element> }).__noterTranscriptDuplicateScrolls.has(el))).toBe(true);
     // A second native scroll notification at the same pixel must not resume following (#1006).
     await scroller.dispatchEvent("scroll");
     await expect(log(page)).toHaveAttribute("data-state", "detached");

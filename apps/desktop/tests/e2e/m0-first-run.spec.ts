@@ -111,13 +111,13 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     const fr = scenario.core("first-run");
     const setupEvents = await scenario.events("setup:changed");
 
-    const denied = refused(await fr.permissionRequest({ kind: "system_audio" }));
-    expect(denied.code).toBe("permission_denied"); // System audio recording · not allowed yet
-    expect(denied.detail).toEqual({ type: "permission", kind: "system_audio" });
+    // A previous denial is the starting row, not proof that a new probe must be denied.
+    expect(ok(await fr.setupStatus({})).permissions.find((p) => p.kind === "system_audio")?.state).toBe("denied");
     ahead(await fr.openExternal({ target: { type: "system_settings", permission: "system_audio" } })); // Open System Settings… (M1 command)
 
     await scenario.change((w) => W.permission(w, "system_audio", "granted"));
     await until(() => setupEvents.latest() && granted(setupEvents.latest()!, "system_audio"), "the row checked again by itself");
+    expect(ok(await fr.permissionRequest({ kind: "system_audio" })).state).toBe("granted");
     const run: SelfTestMsg[] = [];
     ok(await fr.selfTestRun({ play_clip: false }, (m) => run.push(m))); // Run Test ready
     await until(() => run.some((m) => m.event.type === "passed"), "Self-test passed");

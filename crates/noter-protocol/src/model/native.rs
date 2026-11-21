@@ -1,10 +1,13 @@
 use std::path::PathBuf;
 
-use super::{DisplayInfo, HandoffTarget, NotificationAuth, OutputDeviceInfo, OutputRoute};
+use super::{
+    DisplayInfo, HandoffTarget, NativeEnvironment, NotificationAuth, OutputDeviceInfo, OutputRoute,
+};
 
 /// The native environment fields shared by the host and core.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnvironmentReading {
+    pub native: Option<NativeEnvironment>,
     pub displays: Vec<DisplayInfo>,
     pub output_device: Option<OutputDeviceInfo>,
     pub output_route: OutputRoute,
@@ -16,6 +19,7 @@ pub struct EnvironmentReading {
 impl Default for EnvironmentReading {
     fn default() -> Self {
         Self {
+            native: None,
             displays: Vec::new(),
             output_device: None,
             output_route: OutputRoute::Unknown,

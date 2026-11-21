@@ -489,9 +489,11 @@ async fn an_external_grant_is_read_again_after_world_set() {
 }
 
 #[tokio::test]
-async fn system_audio_the_world_denies_is_refused_without_a_second_prompt() {
+async fn silent_system_audio_remains_unverified_on_repeated_checks() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
     for path in ["setup", "environment"] {
         for row in world["app"][path]["permissions"].as_array_mut().unwrap() {
             if row["kind"] == "system_audio" {
@@ -503,13 +505,13 @@ async fn system_audio_the_world_denies_is_refused_without_a_second_prompt() {
         .await;
     for _ in 0..2 {
         assert_eq!(
-            r.code(
+            r.ok(
                 "first-run",
                 "permission_request",
                 json!({ "kind": "system_audio" })
             )
-            .await,
-            "permission_denied"
+            .await["state"],
+            "not_asked"
         );
     }
     r.finish().await;
@@ -1014,7 +1016,7 @@ async fn push_reaches_the_running_self_test_as_an_engine_fact() {
 }
 
 #[tokio::test]
-async fn system_audio_the_world_denies_is_denied_by_the_engine() {
+async fn system_audio_permission_probes_never_interrupt_a_live_capture() {
     let mut r = start().await;
     let mut world = r.ok("main", "harness.world_get", json!({})).await;
     for path in ["setup", "environment"] {
@@ -1033,7 +1035,11 @@ async fn system_audio_the_world_denies_is_denied_by_the_engine() {
             json!({ "kind": "system_audio" }),
         )
         .await;
-    assert_eq!(reply["error"]["code"], "permission_denied", "{reply}");
+    assert_eq!(reply["error"]["code"], "conflict", "{reply}");
+    assert_eq!(
+        r.ok("main", "app_snapshot", json!({})).await["capture"]["phase"],
+        "recording"
+    );
     r.finish().await;
 }
 

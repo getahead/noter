@@ -2,8 +2,8 @@
 title: "Feature: First run, permissions and environment"
 description: "Setup status, resumable model downloads with checksums, permission requests at the step that needs them, the self-test stream, the call display and audio storage choices, the environment state, launch at login and update install; none of it ever gates a start."
 status: PROPOSED
-version: "0.2"
-date: "2026-10-18"
+version: "0.3"
+date: "2026-11-20"
 milestone: M0
 lane: core (src-tauri, noter-core) and engine (noter-native)
 decomposition: docs/DECOMPOSITION-core.md
@@ -67,8 +67,8 @@ The user should finish setup in one sitting before the first real call, and call
 - Events: `setup:changed`, `env:changed`.
 - DESIGN.md stories (M0): `cpt-noter-seq-first-run-complete-setup`, `cpt-noter-seq-first-run-download-models`.
 
-**Pending** (named follow-ups, not in M0's first run yet):
-- The D-19 re-check needs the Swift engine to play its clip (`inst-play-clip`, moved to `cpt-noter-flow-core-engine-capture-self-test` in M1 by D-12); until it does, a granted tap with nothing playing still reads as denied.
+**System-audio permission interpretation**:
+- System-audio silence is inconclusive: a process tap can deliver zeros with permission granted. Only non-zero system buffers prove access; an explicit permission error may report denied. D-19 rechecks after a previous attempt on activation or a native change, without playing the excluded own-sound clip.
 
 Decision D14 (the App Group container from `noter-native`, passed to the engine and to `models/`, with `noter-native` as `NativeServices` and `noter-llm` as `ModelSource`) is delivered (#104, #106, #107).
 
@@ -125,7 +125,7 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 **Error Scenarios**:
 - The user denies it: the row becomes `denied` and the command answers `permission_denied`; the UI offers System Settings (`open_external`, M1).
 - System Audio Recording cannot be queried: it is reported as inferred from the self-test (non-zero buffers) and never blocks anything.
-- Back from System Settings (the app becomes active, or macOS reports a change) while first run shows system audio denied: one engine test of about 3 s plays the test clip and re-checks it, never during a capture; the row becomes `granted` or stays `denied`, and `setup:changed` ends the check either way (decision D-19). Settings leaves it to **Run Test**.
+- Back from System Settings (activation or a native change) after an inconclusive attempt: one engine test of about 3 s rechecks system audio without playing a clip, only while capture is idle or stopped, never during an active capture or another test. Non-zero system buffers grant access; silence leaves it unverified (`not_asked`), never denied. `setup:changed` ends the check either way (D-19, corrected for #1001). Settings may also explicitly recheck through `permission_request`. A prior inferred denial is unverified after reopening. An unavailable engine or a probe with no audio result does not count as a completed permission attempt and cannot schedule an automatic prompt.
 
 **Steps**:
 1. [x] - `p1` - API: `permission_request { kind }` from the First run, Settings or main window - `inst-permission-call`
@@ -238,13 +238,13 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 
 - [x] `p1` - **ID**: `cpt-noter-algo-core-first-run-status`
 
-**Input**: Settings, model states, permission rows, self-test state, displays, output route and device, notification authorization, network reachability, update info, free disk.
+**Input**: Settings, model states, permission rows, self-test state, displays, output route and device, notification authorization, network reachability, update info, free disk, optional native accent sRGB and running bundle identity/OS.
 
 **Output**: `SetupStatus` and `EnvironmentState`, each with a new `version` when it changed.
 
 **Steps**:
 1. [x] - `p1` - Build `SetupStatus` from the stored choices and the current states; `complete` is true when every step is done or skipped - `inst-build-setup`
-2. [x] - `p1` - Build `EnvironmentState` from `noter-native` readings; re-read on display, output-route, permission, notification-authorization, reachability and disk notifications - `inst-build-env`
+2. [x] - `p1` - Build `EnvironmentState` from `noter-native` readings, including optional accent sRGB and running app name, bundle identifier/path and actual OS version; re-read on native environment changes (the existing polling watcher also observes accent changes) - `inst-build-env`
 3. [x] - `p1` - **IF** either changed, stamp a new version and emit `setup:changed` or `env:changed` - `inst-emit-changes`
 4. [x] - `p1` - **RETURN** both - `inst-return-status`
 
@@ -334,7 +334,7 @@ The system **MUST** download the pinned bundles with range resume, verify each c
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-first-run-permissions`
 
-The system **MUST** ask for a permission only from `permission_request`, report each as `not_asked`, `granted`, `denied` or `needs_relaunch` (System Audio Recording inferred from the self-test), and never read a permission in `capture_start`.
+The system **MUST** ask for a permission only from `permission_request`, report each as `not_asked`, `granted`, `denied` or `needs_relaunch` (System Audio Recording verified by non-zero system buffers; zeros remain unverified, `not_asked`), and never read a permission in `capture_start`.
 
 **Implements**:
 - `cpt-noter-flow-core-first-run-permission`
@@ -386,3 +386,7 @@ The system **MUST** apply `launch_at_login` through SMAppService and install a v
 ## 7. Change log
 
 - 2026-11-14: Clarified that an install requested during capture starts automatically after capture ends.
+
+**2026-11-20 — #1001/#1021 reconciliation.** System-audio silence never proves denial. Permission UI must distinguish a confirmed grant, an inconclusive test, and an explicit relaunch requirement; it shows running-copy facts with conditional copy/relaunch guidance, without asserting another copy owns a grant. Unit tests cover short probes, return from Settings, capture exclusion and metadata propagation; real-core conformance and `cpt-noter-seq-first-run-complete-setup` E2E retain coverage. Delivery requires `just gate` to pass.
+
+Apple's [Core Audio process-tap guide](https://developer.apple.com/documentation/coreaudio/capturing-system-audio-with-core-audio-taps) documents that opening capture requests permission; [Apple engineering guidance](https://developer.apple.com/forums/thread/771864) confirms that silence does not identify permission denial.

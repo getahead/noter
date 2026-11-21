@@ -43,6 +43,8 @@ describe.skipIf(!isFake)("fake core controls", () => {
     const fake = fakeFor("first-run");
     const core = createCore(fake);
     fake.world.app.setup.models.bundles.forEach((b) => (b.state = "ready"));
+    const microphone = fake.world.app.setup.permissions.find((p) => p.kind === "microphone")!;
+    microphone.state = "not_asked"; // the explicit held-script override also bypasses automatic preflight
     fake.holdSelfTest = true;
     const held: SelfTestMsg[] = [];
     expect((await core.selfTestRun({ play_clip: false }, (m) => held.push(m))).status).toBe("ok");
@@ -53,6 +55,7 @@ describe.skipIf(!isFake)("fake core controls", () => {
     fake.push("self_test_run", { event: { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } } });
     expect(held).toHaveLength(1);
     expect(held[0]!.event).toEqual({ type: "failed", reason: { type: "one_stream_silent", channel: "sys" } });
+    microphone.state = "granted";
     const automatic: SelfTestMsg[] = [];
     expect((await core.selfTestRun({ play_clip: false }, (m) => automatic.push(m))).status).toBe("ok");
     await vi.advanceTimersByTimeAsync(2000);

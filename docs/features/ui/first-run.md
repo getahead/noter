@@ -2,8 +2,8 @@
 title: "Feature — First-run wizard"
 description: "Six-step first-run window that downloads the models in the background, asks for Microphone and System Audio Recording, proves both streams with the self-test, and sets the call display and audio retention, so call detection is on before the first call."
 status: DRAFT
-version: "1.1"
-date: "2026-11-14"
+version: "1.2"
+date: "2026-11-20"
 feature: cpt-noter-feature-ui-first-run
 milestone: M0
 ---
@@ -109,7 +109,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 3. [x] - `p1` - UI: open at the step where setup stopped (resumed variant of the stepper), or **Welcome** - `inst-open-step`
 4. [x] - `p1` - User reads **Welcome to Noter** and clicks **Continue**; API: `setup_set_step` (models) - `inst-welcome`
 5. [x] - `p1` - Flow: the Models step runs `cpt-noter-flow-ui-first-run-download-models`; **Continue** is enabled at once - `inst-models-step`
-6. [x] - `p1` - UI: the Permissions step shows the **Microphone** and **System audio recording** rows and the self-test, with **Run Test** dimmed until system audio is allowed - `inst-permissions-step`
+6. [x] - `p1` - UI: the Permissions step shows the **Microphone** and **System audio recording** rows and the self-test, with **Run Test** available when system audio is unverified, so the test can establish access - `inst-permissions-step`
 7. [x] - `p1` - User clicks **Allow…** beside **Microphone** - `inst-allow-mic`
 8. [x] - `p1` - API: `permission_request` (microphone); macOS shows its prompt - `inst-api-mic`
 9. [x] - `p1` - **IF** the user allows - `inst-if-mic-allowed`
@@ -118,7 +118,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
     1. [x] - `p1` - UI: the row reads **Microphone · not allowed** with **Open System Settings…** - `inst-mic-denied`
 11. [x] - `p1` - User clicks **Open System Settings…** beside **System audio recording** (or beside a denied microphone) - `inst-open-settings`
 12. [x] - `p2` - API: `open_external` (the System Settings privacy pane, M1) - `inst-api-open-settings`
-13. [x] - `p1` - UI: when Noter becomes active again, the row shows a spinner and **Checking…** while the core re-reads the permission (`setup:changed`), then **Granted**; the self-test line **System audio recording is not allowed yet.** goes away - `inst-checking`
+13. [x] - `p1` - UI: when Noter becomes active again, the row shows a spinner and **Checking…** while the core re-reads the permission (`setup:changed`), then the core's reported state; silence remains **Not verified yet** with instructions to play sound in another app, check the running copy and quit/reopen if already enabled - `inst-checking`
 14. [x] - `p1` - User clicks **Run Test**; Flow: `cpt-noter-flow-ui-first-run-self-test` - `inst-run-test`
 15. [x] - `p1` - **IF** the user clicks **Skip for Now** on steps 3 or 4 - `inst-if-skip`
     1. [x] - `p1` - API: `setup_set_step` (skip); the stepper marks the step skipped with a dash - `inst-api-skip`
@@ -200,7 +200,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
    - [x] - `p1` - **CASE** `line`: show the live transcript line with each part's language attribute; never announce it - `inst-case-line`
    - [x] - `p1` - **CASE** `stream_arrived`: tick **System audio arrives** or **Your microphone arrives** - `inst-case-arrived`
    - [x] - `p1` - **CASE** `passed`: tick **Both streams line up**; show the fourth line as passed, as **Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.** (exclusion off) or as **Noter's own sounds reached the recording. Replay while recording stays off until this passes.** (exclusion failed) - `inst-case-passed`
-   - [x] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone; **zero buffers** counts as system audio recording not allowed: **System audio recording is not allowed yet.** with **Open System Settings…** and the **System audio recording** row back to its missing state; **timed out** fails with **The test didn't finish. Check that sound is playing, then try again.** and **Run Test** enabled (HoD decision D-14) - `inst-case-failed`
+   - [x] - `p1` - **CASE** `failed`: show **We hear your microphone but not system audio. Play any sound in another app and try again.** or its mirror for the microphone; **zero buffers** is inconclusive: **No system audio was heard. Play sound in another app and try again.** with **Run Test** enabled; it never locally overrides the core's permission row or labels permission denied; **timed out** fails with **The test didn't finish. Check that sound is playing, then try again.** and **Run Test** enabled (HoD decision D-14) - `inst-case-failed`
    - [x] - `p1` - **CASE** `ended`: stop the running state; **Run Test** is enabled again - `inst-case-ended`
 2. [x] - `p1` - **RETURN** the panel state - `inst-return-panel`
 
@@ -261,17 +261,17 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 
 - [x] `p1` - **ID**: `cpt-noter-state-ui-first-run-permission-row`
 
-**States**: NOT_ASKED, MISSING, CHECKING, GRANTED, DENIED
+**States**: NOT_ASKED, MISSING, CHECKING, GRANTED, DENIED, NEEDS_RELAUNCH
 
 **Initial State**: NOT_ASKED
 
 **Transitions**:
 1. [x] - `p1` - **FROM** NOT_ASKED **TO** GRANTED **WHEN** the core reports the permission granted after **Allow…** - `inst-notasked-granted`
 2. [x] - `p1` - **FROM** NOT_ASKED **TO** DENIED **WHEN** the core reports the permission denied after **Don't Allow** - `inst-notasked-denied`
-3. [x] - `p1` - **FROM** MISSING **TO** CHECKING **WHEN** the user returns from System Settings after **Open System Settings…** (system audio starts in MISSING because macOS has no prompt for it) - `inst-missing-checking`
+3. [x] - `p1` - **FROM** MISSING **TO** CHECKING **WHEN** the user returns from System Settings after **Open System Settings…** (system audio starts unverified in MISSING because its TCC state cannot be queried) - `inst-missing-checking`
 4. [x] - `p1` - **FROM** DENIED **TO** CHECKING **WHEN** the user returns from System Settings - `inst-denied-checking`
 5. [x] - `p1` - **FROM** CHECKING **TO** GRANTED **WHEN** the core reports the permission granted - `inst-checking-granted`
-6. [x] - `p1` - **FROM** CHECKING **TO** MISSING or DENIED **WHEN** the re-check finishes without a grant; the row reflects the core's current permission state - `inst-checking-missing`
+6. [x] - `p1` - **FROM** CHECKING **TO** MISSING, DENIED or NEEDS_RELAUNCH **WHEN** the re-check finishes without a grant; the row reflects the core's current permission state - `inst-checking-missing`
 
 ### Self-test panel
 
@@ -383,3 +383,5 @@ The system **MUST** provide the permission check row (setup and status variants)
 **Milestone notes.** `levels_subscribe`, `open_external` and `window_navigate` are placed in M1 by milestones.toml; M0 builds and unit-tests them against the fake core, and their E2E proof against the real core counts from M1 (`docs/DECOMPOSITION.md`, discrepancy 2). The skipped-self-test banner shows in MW-R5 until Today ships in M2 (discrepancy 8).
 
 **Not applicable.** Credentials in this feature: none; step 6's key fields are M2 and its sign-ins M3 (`cpt-noter-feature-ui-accounts`). Data: the UI stores nothing; every choice is a setting the core writes.
+
+**2026-11-20 — #1001 reconciliation.** For system audio, MISSING means **Not verified yet**, not a confirmed denial; `not_asked` does not disable Run Test. A failed test names a missing microphone explicitly and leaves its Allow/System Settings action in the microphone row. An explicit `needs_relaunch` row says **Quit and reopen Noter** instead of being flattened to MISSING. The shared permission details show the running application path and bundle identifier, the actual macOS version, and conditional guidance that grants to other copies may not apply and an enabled grant may require quitting/reopening. No signing or TCC changes are performed. Unit tests cover uncertain silence, retries and relaunch rendering; `cpt-noter-seq-first-run-complete-setup` covers the permission flow through the real core. Delivery requires `just gate` to pass.

@@ -1619,6 +1619,7 @@ pub fn world() -> FakeWorld {
         },
         environment: EnvironmentState {
             version: V1,
+            native: None,
             displays: vec![
                 DisplayInfo {
                     id: DisplayId(s("dsp_builtin")),

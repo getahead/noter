@@ -9,7 +9,7 @@ import { PushButton } from "../primitives/push-button";
 import "./setup.css";
 
 export interface PermissionCheckRowProps {
-  /** Which row: it decides the Allow… button (the microphone has a macOS prompt, system audio has not). */
+  /** Which row: it decides the Allow… button (system audio is checked by opening its process tap). */
   id: "mic" | "sys" | "cal";
   label: string;
   /** The Allow… button's label when it differs (Settings › Privacy: **Allow Calendar Access**). */
@@ -31,6 +31,7 @@ const WORD: Record<PermissionRowState, MsgKey> = {
   NOT_ASKED: "permission.not_asked",
   DENIED: "permission.denied",
   CHECKING: "permission.checking",
+  NEEDS_RELAUNCH: "permission.needs_relaunch",
 };
 
 // @cpt-dod:cpt-noter-dod-ui-first-run-components:p1
@@ -57,7 +58,7 @@ export function PermissionCheckRow({ id, label, allowLabel, state, variant = "se
       <div className="fr-perm__main">
         <div className="fr-perm__head">
           <span className="fr-perm__name">{label}</span>
-          <span className="fr-perm__word"> · <Msg id={WORD[state]} /></span>
+          <span className="fr-perm__word"> · <Msg id={state === "MISSING" && id === "sys" ? "permission.unverified" : WORD[state]} /></span>
         </div>
         {variant !== "status" && why && <div className="fr-perm__why">{why}</div>}
         {variant !== "status" && howto && state !== "GRANTED" && <div className="fr-perm__how">{howto}</div>}

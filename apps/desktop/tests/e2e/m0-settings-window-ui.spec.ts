@@ -2,6 +2,7 @@
 // DoD settings-window): a failed first read, keyboard use of the search results, a refused change and the
 // card-key modifier set. The Hotkeys story paths are in m0-settings-hotkeys-ui.spec.ts.
 import type { Page } from "@playwright/test";
+import * as W from "../support/world-presets";
 
 import { openWindow, type CorePlan } from "./support/app";
 import { sent } from "./support/call-page";
@@ -13,11 +14,13 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
   test("the Settings self-test rechecks System Audio Recording when focus returns", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => {
-      for (const p of [w.app.setup.permissions, w.app.environment.permissions]) p.find((row) => row.kind === "system_audio")!.state = "not_asked";
+      W.idle(w);
+      W.permission(w, "system_audio", "denied");
     } });
     await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
     await page.getByRole("button", { name: "Run Audio Self-Test…" }).click();
     const sheet = page.getByRole("dialog", { name: "Run Audio Self-Test" });
+    await expect(sheet).toContainText("System audio recording is not allowed yet.");
     await sheet.getByRole("button", { name: "Open System Settings…" }).click();
     await steer.change((w) => {
       w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "granted"));
@@ -27,6 +30,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await expect.poll(async () => sent(page, "permission_request")).toContainEqual({ kind: "system_audio" });
     await expect.poll(async () => sent(page, "setup_status")).not.toEqual([]);
     await expect(sheet).not.toContainText("System audio recording is not allowed yet.");
+    await expect(sheet.getByRole("button", { name: "Run Test", exact: true })).toBeEnabled();
   });
 
   test("a refused Screen Share Test table read shows Try Again and recovers", async ({ page }) => {

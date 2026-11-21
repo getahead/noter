@@ -2,8 +2,8 @@
 title: "Feature — Design tokens and theming"
 description: "The macOS 27 foundations of the Noter UI: colour tokens for light, dark and Increase Contrast, typography, spacing and radii, Liquid Glass materials, Reduce transparency and Reduce motion, ported from the clickable prototype."
 status: DRAFT
-version: "1.0"
-date: "2026-10-18"
+version: "1.1"
+date: "2026-11-21"
 feature: cpt-noter-feature-ui-tokens-theming
 milestone: M0
 ---
@@ -41,7 +41,7 @@ milestone: M0
 
 ### 1.1 Overview
 
-One stylesheet of CSS custom properties defines every colour, size, radius, material and motion value the UI uses, with a value for light, dark, Increase Contrast light and Increase Contrast dark. The appearance follows macOS: `prefers-color-scheme`, `prefers-contrast: more`, `prefers-reduced-transparency` and `prefers-reduced-motion`. The values are the prototype's, which are the record (PM-57, PM-59).
+One stylesheet of CSS custom properties defines every colour, size, radius, material and motion value the UI uses, with a value for light, dark, Increase Contrast light and Increase Contrast dark. The appearance follows macOS: `prefers-color-scheme`, `prefers-contrast: more`, `prefers-reduced-transparency` and `prefers-reduced-motion`. Prototype values remain the browser fallback (PM-57, PM-59). Native windows overlay the actual macOS control accent from the environment snapshot and `env:changed`; accessible foreground, selection and focus values are derived from that sRGB color.
 
 ### 1.2 Purpose
 
@@ -86,8 +86,8 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 - None: the media features always have a value; without one the light default applies
 
 **Steps**:
-1. [x] - `p1` - User changes Appearance, Increase Contrast, Reduce transparency or Reduce motion in System Settings - `inst-user-changes`
-2. [x] - `p1` - UI: the WebView reports the new media feature values to every open window - `inst-media-change`
+1. [x] - `p1` - User changes Appearance, accent color, Increase Contrast, Reduce transparency or Reduce motion in System Settings - `inst-user-changes`
+2. [x] - `p1` - UI: the WebView reports the new media values; the environment bridge delivers native accent changes to every open window - `inst-media-change`
 3. [x] - `p1` - Algorithm: resolve the token set with `cpt-noter-algo-ui-tokens-theming-resolve-tokens` - `inst-resolve`
 4. [x] - `p1` - UI: every element restyles from the custom properties; no component holds a colour of its own - `inst-restyle`
 5. [x] - `p1` - **RETURN** windows in the new appearance - `inst-return-appearance`
@@ -98,7 +98,7 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-tokens-theming-resolve-tokens`
 
-**Input**: `prefers-color-scheme`, `prefers-contrast`, `prefers-reduced-transparency`, `prefers-reduced-motion`
+**Input**: `prefers-color-scheme`, `prefers-contrast`, `prefers-reduced-transparency`, `prefers-reduced-motion`, optional native accent sRGB
 
 **Output**: the active values of every custom property
 
@@ -113,7 +113,7 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
    1. [x] - `p1` - Make the sidebar, toolbar control groups, menus, popovers, alerts, the undo strip, the record prompt and the floating panel opaque in the window or card colour; drop the backdrop blur - `inst-opaque`
 5. [x] - `p1` - **IF** Reduce motion is on - `inst-if-motion`
    1. [x] - `p1` - Set every transition and animation duration to zero except the row spinner and the level meters, which carry state (motion table of DESIGN) - `inst-no-motion`
-6. [x] - `p1` - **RETURN** the active token set - `inst-return-tokens`
+6. [x] - `p1` - **RETURN** the active token set, with the optional native text, fill, selection and focus overlay derived against content, card, window and composited sidebar surfaces - `inst-return-tokens`
 
 ### Check contrast
 
@@ -125,7 +125,7 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 
 **Steps**:
 1. [x] - `p1` - **FOR EACH** text token and each background it is used on - `inst-for-each-text`
-   1. [x] - `p1` - Compute the contrast ratio; record a failure below 4.5:1 - `inst-text-ratio`
+   1. [x] - `p1` - Composite a translucent surface over its opaque parent, compute the contrast ratio, and record a failure below 4.5:1 - `inst-text-ratio`
 2. [x] - `p1` - **FOR EACH** non-text token (control border, focus ring, meter fill, status icon) and its neighbour - `inst-for-each-nontext`
    1. [x] - `p1` - Compute the ratio; record a failure below 3:1 - `inst-nontext-ratio`
 3. [x] - `p1` - **RETURN** pass when no failure was recorded; the build fails otherwise - `inst-return-check`
@@ -156,7 +156,7 @@ Success criteria: every text and control colour reaches WCAG 2.2 AA (4.5:1 text,
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-tokens-theming-tokens`
 
-The system **MUST** ship one token stylesheet with the prototype's custom-property names and values for light, dark and Increase Contrast, the typography scale (Large title 26/32 to Footnote 10/13, Call transcript 15/22, Call card 15/21 and 13/19), the 4-pt spacing grid, the radius scale (window 26, panel 20, sheet 22, popover 18, card 14, menu 12, row 9, control 8, tag 6, key cap 5, capsule) and the three glass materials, driven only by macOS media features.
+The system **MUST** ship one token stylesheet with the prototype's custom-property names and values for light, dark and Increase Contrast, the typography scale (Large title 26/32 to Footnote 10/13, Call transcript 15/22, Call card 15/21 and 13/19), the 4-pt spacing grid, the radius scale (window 26, panel 20, sheet 22, popover 18, card 14, menu 12, row 9, control 8, tag 6, key cap 5, capsule) and the three glass materials, driven by macOS media features and optional native accent sRGB through the existing environment bridge.
 
 **Implements**:
 - `cpt-noter-flow-ui-tokens-theming-follow-appearance`
@@ -181,19 +181,19 @@ The system **MUST** run a unit test that reads the Increase Contrast values of t
 **Constraints**: `cpt-noter-constraint-accessibility-baseline`
 
 **Touches**:
-- Tests: `apps/desktop/src/styles/tokens.test.ts`
+- Tests: `apps/desktop/src/styles/tokens.test.ts`, `apps/desktop/src/styles/native-accent.test.ts`; native metadata collection in `crates/noter-native/tests/native.rs`; environment propagation and live restyling in `apps/desktop/tests/e2e/m0-first-run-ui.spec.ts` (`cpt-noter-seq-first-run-complete-setup`)
 
 ## 6. Acceptance Criteria
 
 - [x] Every custom property used by a component is defined in the token stylesheet; no component file holds a literal colour
-- [x] In each of the four appearance states every token of the prototype resolves to the prototype's value, and the token sheet renders identically to its baseline (screenshot match ≥ 98 % in the pinned container). The primitives page compared with the prototype's renderings is an acceptance criterion of `cpt-noter-feature-ui-primitives`, which builds that page
+- [x] In browser fixtures without native metadata, in each of the four appearance states every token of the prototype resolves to the prototype's value, and the token sheet renders identically to its baseline (screenshot match ≥ 98 % in the pinned container). The primitives page compared with the prototype's renderings is an acceptance criterion of `cpt-noter-feature-ui-primitives`, which builds that page
 - [x] With Reduce transparency or Increase Contrast on, no element uses `backdrop-filter`
 - [x] With Reduce motion on, no transition or animation runs except row spinners and level meters
 - [x] The contrast test passes for light and dark Increase Contrast values
 
 ## 7. Additional Context
 
-**Prototype reuse.** Ported as-is: the `:root` block and the dark block of `src/css/00-base.css`, the `:root[data-contrast="more"]` and `prefers-contrast: more` blocks of `src/css/02-contrast.css` (token values and the component treatments: solid tag and chip outlines, the solid focus outline, control borders, no blur on glass surfaces), and the material, radius and control-height rules of `src/css/01-macos27.css`, with the same custom-property names (`--win-bg`, `--side-bg`, `--content-bg`, `--card-bg`, `--label`, `--label-2`, `--label-3`, `--sep`, `--ctrl-border`, `--accent`, `--accent-fill`, `--accent-text`, `--rec`, `--error`, `--warning`, `--success`, the `*-tint` tokens, `--glass-*`, `--focus-ring`, `--r-*`, `--font*`, `--mono`). Dropped as prototype-only: `--wall-*`, `--desk-*`, `--chrome-*`, the desktop wallpaper, and the `[data-theme]` and `[data-contrast]` toggles used by the prototype's bar (production follows the media features only).
+**Prototype reuse.** Ported as-is: the `:root` block and the dark block of `src/css/00-base.css`, the `:root[data-contrast="more"]` and `prefers-contrast: more` blocks of `src/css/02-contrast.css` (token values and the component treatments: solid tag and chip outlines, the solid focus outline, control borders, no blur on glass surfaces), and the material, radius and control-height rules of `src/css/01-macos27.css`, with the same custom-property names (`--win-bg`, `--side-bg`, `--content-bg`, `--card-bg`, `--label`, `--label-2`, `--label-3`, `--sep`, `--ctrl-border`, `--accent`, `--accent-fill`, `--accent-text`, `--rec`, `--error`, `--warning`, `--success`, the `*-tint` tokens, `--glass-*`, `--focus-ring`, `--r-*`, `--font*`, `--mono`). Dropped as prototype-only: `--wall-*`, `--desk-*`, `--chrome-*`, the desktop wallpaper, and the `[data-theme]` and `[data-contrast]` toggles used by the prototype's bar (production follows media features and the native accent).
 
 **DESIGN versus prototype.** Under Increase Contrast the prototype's glass is 94 % white in light and 96 % in dark, where DESIGN says opaque, and its dark focus ring is #4DA3FF where DESIGN names the accent #0A84FF. This feature follows the prototype (owner decision); the difference is listed in `docs/DECOMPOSITION.md`. The prototype has no Reduce transparency rule; DESIGN's rule (materials opaque) applies, because there is no prototype state to follow.
 
@@ -213,3 +213,7 @@ The error fill needs its own token: as text on the dark content background the e
 **States coverage.** The prototype's appearance controls **Auto / Light / Dark** and **Capture ▾ › Increase contrast** correspond to the four states above.
 
 **Not applicable.** Commands, data, security and error handling: the tokens hold no data and call nothing. Performance: `backdrop-filter` is used only on the surfaces DESIGN lists, never behind scrolling content (DESIGN 1.3, technology risks); its cost on long lists is measured in M4 (DESIGN 4.3).
+
+**2026-11-20 — #1021 reconciliation.** Native accent overlay supersedes prototype blue for interaction accents in every open window, on snapshot, environment changes and appearance media changes. Preserve hue while adjusting accent fill for white text (4.5:1), accent text against content/card/window/sidebar and their selection surfaces (4.5:1), and focus/control boundaries against those same surfaces (3:1), in light/dark and Increase Contrast. Composite translucent sidebars over their content parent before checking contrast, and recompute when Reduce Transparency changes their opacity. Keep `--on-accent` white because error controls share it. Browser fixtures without native metadata keep prototype tokens and baselines. Unit tests cover blue, purple, graphite, extreme RGB values and live update/cleanup; conformance checks environment metadata and token E2E checks dynamic colors without changing system preferences. Existing token visual specs remain the screenshot gate. Delivery requires `just gate` to pass.
+
+The native source is Apple's [controlAccentColor](https://developer.apple.com/documentation/appkit/nscolor/controlaccentcolor), converted to sRGB before crossing the bridge because AppKit does not promise its source color space.

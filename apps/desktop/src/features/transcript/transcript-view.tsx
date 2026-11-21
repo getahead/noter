@@ -10,7 +10,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { LevelMeter } from "../../ui/primitives/level-meter";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
-import { holdFollow, LogScroller, newLines, viewState, type Follow, type RowList } from "./follow";
+import { holdFollow, LogScroller, newLines, onScroll, viewState, type Follow, type RowList } from "./follow";
 import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
 import { SegmentRow } from "./segment-row";
@@ -163,7 +163,11 @@ export function TranscriptView(p: TranscriptViewProps) {
   const scroll = () => {
     const area = el()!;
     const at = { scrollTop: area.scrollTop, clientHeight: area.clientHeight, scrollHeight: area.scrollHeight };
-    setFollow(log.current.scrolled(follow, at, confirmed));
+    const previousTop = log.current.prevTop;
+    log.current.prevTop = at.scrollTop;
+    const estimate = log.current.est;
+    // Native notifications can share a render; compose from the latest queued follow state.
+    setFollow((current) => onScroll(current, at, previousTop, estimate, confirmed));
     setPos({ top: at.scrollTop, height: at.clientHeight });
   };
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-follow
