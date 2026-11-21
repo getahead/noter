@@ -228,6 +228,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     dst.calls += src.calls;
     dst.decisions += src.decisions;
     dst.open_items += src.open_items;
+    dst.open_questions += src.open_questions;
     dst.merge_suggestion = null;
     dst.rev += 1;
     world.topics = world.topics.filter((t) => t !== src);

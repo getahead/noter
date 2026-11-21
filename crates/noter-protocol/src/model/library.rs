@@ -440,7 +440,11 @@ pub struct TopicRow {
     pub aliases: Vec<String>,
     pub calls: u32,
     pub decisions: u32,
+    /// Every open item of the topic: action items, open questions and risks, suggested ones
+    /// included (rejected ones count nowhere).
     pub open_items: u32,
+    /// The open questions among them, for the **Open questions** column and thread header.
+    pub open_questions: u32,
     pub last_seen: TimestampMs,
     pub merge_suggestion: Option<TopicChip>,
 }

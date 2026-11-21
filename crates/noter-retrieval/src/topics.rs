@@ -241,7 +241,9 @@ fn row(conn: &Connection, id: &str, near: Option<&Neighbours>) -> Db<Option<Topi
                    AND review_state != 'rejected'),
                 (SELECT count(*) FROM items WHERE topic_id = t.id AND status = 'open'
                    AND review_state != 'rejected'),
-                suggested.id, suggested.name
+                suggested.id, suggested.name,
+                (SELECT count(*) FROM items WHERE topic_id = t.id AND status = 'open'
+                   AND kind = 'open_question' AND review_state != 'rejected')
          FROM topics t
          LEFT JOIN topic_suggestions s ON s.topic_id = t.id
          LEFT JOIN topics suggested ON suggested.id = s.target_id
@@ -260,6 +262,7 @@ fn row(conn: &Connection, id: &str, near: Option<&Neighbours>) -> Db<Option<Topi
                 calls: r.get(5)?,
                 decisions: r.get(6)?,
                 open_items: r.get(7)?,
+                open_questions: r.get(10)?,
                 merge_suggestion: match (
                     r.get::<_, Option<String>>(8)?,
                     r.get::<_, Option<String>>(9)?,

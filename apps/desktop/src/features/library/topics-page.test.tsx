@@ -30,7 +30,7 @@ async function ready() {
   await bridge.open();
   return fake;
 }
-const row = (o: Partial<TopicRow> = {}): TopicRow => ({ id: "t1", rev: 1, name: "Websocket notifications", aliases: [], calls: 3, decisions: 2, open_items: 1, last_seen: Date.UTC(2026, 9, 5, 12), merge_suggestion: null, ...o });
+const row = (o: Partial<TopicRow> = {}): TopicRow => ({ id: "t1", rev: 1, name: "Websocket notifications", aliases: [], calls: 3, decisions: 2, open_items: 1, open_questions: 1, last_seen: Date.UTC(2026, 9, 5, 12), merge_suggestion: null, ...o });
 const body = (o: Partial<Parameters<typeof TopicsBody>[0]> = {}) => {
   const topics = [row(), row({ id: "t2", name: "Notification service", merge_suggestion: { id: "t1", name: "Websocket notifications" } })];
   return renderToString(<TopicsBody bridge={bridge} status="READY" retry={() => {}} topics={topics} shown={topics} names={new Map(topics.map((x) => [x.id, x.name]))} words="" {...o} />);
