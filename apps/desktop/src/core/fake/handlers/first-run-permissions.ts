@@ -56,6 +56,18 @@ export function firstRunHandlers(fake: Core.FakeCore): Core.Handlers {
       fake.holdSelfTest = false;
       return { subscription_id: sub, last_seq: 0 };
     }
+    // E2: an unasked or denied microphone fails after opening the stream, as in the real core.
+    if (world.app.setup.permissions.find((p) => p.kind === "microphone")?.state !== "granted") {
+      const reason = { type: "permission_missing", kind: "microphone" } as const;
+      fake.later(0, () => {
+        fake.push(sub, { event: { type: "failed", reason } });
+        world.app.setup.self_test = { type: "failed", reason };
+        world.app.setup.detection_enabled = false;
+        publish("setup:changed");
+        fake.closeChannel(sub, "call_stopped");
+      });
+      return { subscription_id: sub, last_seq: 0 };
+    }
     const at = (ms: number, event: Parameters<typeof fake.push<"self_test_run">>[1]["event"]) => fake.later(ms, () => fake.push(sub, { event }));
     at(300, { type: "stream_arrived", channel: "mic" });
     at(600, { type: "stream_arrived", channel: "sys" });
