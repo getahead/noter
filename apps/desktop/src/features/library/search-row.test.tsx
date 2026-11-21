@@ -6,10 +6,20 @@ import { isPlayingSpan, SearchResultRow, togglePlay } from "./SearchResultRow";
 const hit = { target: { type: "item", item_id: "i1" }, title: "Planning", snippet: "<img src=x onerror=alert(1)> websocket", highlights: [{ start: 29, end: 38 }], lang: "ru", strength: "weak", call: { id: "c1", title: "Planning" }, cross_language: true } as never;
 
 describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
-  it("shows the stored item kind and leaves an unknown kind absent", () => {
-    const draw = (item_kind: string | null) => renderToString(<SearchResultRow bridge={{} as never} hit={{ ...(hit as object), item_kind } as never} />);
-    expect(draw("decision")).toContain("Decision");
-    expect(draw(null)).not.toContain("Decision");
+  it.each([
+    ["decision", "Decision"], ["action_item", "Action item"],
+    ["open_question", "Open question"], ["risk", "Risk"],
+  ])("shows the stored known kind %s", (item_kind, label) => {
+    const html = renderToString(<SearchResultRow bridge={{} as never} hit={{ ...(hit as object), item_kind } as never} />);
+    expect(html).toContain("np-badge--kind");
+    expect(html).toContain(label);
+  });
+  it.each([undefined, null, "future_kind", "__proto__", "constructor", "toString", "hasOwnProperty"])("renders an unsupported or absent kind neutrally: %s", (item_kind) => {
+    // Raw wire values can include enum variants this UI does not know yet.
+    const html = renderToString(<SearchResultRow bridge={{} as never} hit={{ ...(hit as object), item_kind } as never} />);
+    expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).toContain("<mark>websocket</mark>");
+    expect(html).not.toContain("np-badge--kind");
   });
   it("marks the highlighted range, escapes the text, keeps the language and the weak tag, and says cross-language", () => {
     const html = renderToString(<SearchResultRow bridge={{} as never} hit={hit} />);

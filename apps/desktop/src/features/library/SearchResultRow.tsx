@@ -70,7 +70,7 @@ export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit
   return (
     <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
       {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}
-      {hit.target.type === "item" && hit.item_kind && <Badge kind="kind" text={t(KIND_KEY[hit.item_kind])} />}
+      {hit.target.type === "item" && hit.item_kind && Object.hasOwn(KIND_KEY, hit.item_kind) && <Badge kind="kind" text={t(KIND_KEY[hit.item_kind])} />}
       {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
       <span className="lb-hit__snippet" lang={lang}>
         {segments(hit.snippet, hit.highlights).map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : s.text))}
