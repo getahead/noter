@@ -1,7 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { rendered } from "../testing";
-import { closeOnEscape, closeOnOutside, measure, placeFloating, Popover, returnFocus, zoomedRegionRoot } from "./popover";
+import { closeOnEscape, closeOnOutside, measure, placeFloating, Popover, popoverFocus, returnFocus, zoomedRegionRoot } from "./popover";
 
 describe("Popover (cpt-noter-dod-ui-primitives-controls)", () => {
   it("renders the prototype's popover as a dialog", () => {
@@ -242,5 +242,18 @@ describe("a popover in a region Text size zooms (#1190)", () => {
     expect(zoomedRegionRoot(tree("1").anchor)).toBeNull();
     expect(zoomedRegionRoot({ closest: () => null } as unknown as HTMLElement)).toBeNull();
     expect(zoomedRegionRoot(null)).toBeNull();
+  });
+});
+
+// #1098: a menu in a popover takes focus on its first item (roving items have tabIndex -1), not the popover box
+describe("popoverFocus", () => {
+  it("cpt-noter-seq-people-prepare-one-on-one — #1098: puts focus on the first menu item when the popover holds a menu", () => {
+    const item = { focus: vi.fn() };
+    const root = { focus: vi.fn(), querySelector: (sel: string) => (sel.includes('[role^="menuitem"]') ? item : null) };
+    vi.stubGlobal("document", { activeElement: null });
+    popoverFocus(root as never);
+    expect(item.focus).toHaveBeenCalled();
+    expect(root.focus).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
