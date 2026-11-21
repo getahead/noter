@@ -124,6 +124,17 @@ test.describe("cpt-noter-seq-settings-replace-api-key", () => {
 });
 
 test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
+  // #1058 (owner, 21 Nov): the idle footer names what is set up. The fixture runs a local model, so with the key removed
+  // the footer says the local model answers, never "API key"
+  test("other path — #1058: with the API key removed the idle footer says only the local model answers", async ({ page }) => {
+    const steer = await openWindow(page, "main", { world: W.idle });
+    const footer = page.locator('[data-region="MW-R2"]').getByText(/^Idle · /);
+    await expect(footer).toHaveText("Idle · API key · local fallback ready");
+    if (process.env.NOTER_CORE === "stdio") await steer.invoke("api_key_remove", { provider: "anthropic" }, "settings");
+    else await steer.change((w) => void (w.app.accounts.keys.find((k) => k.provider === "anthropic")!.status = { type: "not_set" })); // the fake's steer calls as this window
+    await expect(footer).toHaveText("Idle · local model only");
+  });
+
   const atAssistants = (w: Parameters<typeof W.firstRun>[0]) => {
     W.firstRun(w);
     w.app.setup.steps.forEach((s) => (s.state = s.step === "assistants" ? "todo" : "done"));

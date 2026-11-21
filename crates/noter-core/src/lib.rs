@@ -411,6 +411,12 @@ impl Core {
         let this: Arc<std::sync::OnceLock<std::sync::Weak<Core>>> =
             Arc::new(std::sync::OnceLock::new());
         let switched = this.clone();
+        let assisted = this.clone();
+        accounts.on_view(move |view| {
+            if let Some(core) = assisted.get().and_then(std::sync::Weak::upgrade) {
+                core.set_no_assistant(accounts::no_assistant(view));
+            }
+        });
         let llm = Llm::new(store.clone(), deps.llm.clone(), move || clock.now())
             .with_secrets(deps.secrets.clone())
             // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-failover
@@ -573,6 +579,23 @@ impl Core {
         let mut app = self.app();
         app.banners.banners = banners;
         self.publish(event_names::BANNERS_CHANGED, &mut app.banners)
+    }
+
+    /// Adds or clears the no-assistant state (issue 1058); unchanged, nothing is sent.
+    pub(crate) fn set_no_assistant(&self, on: bool) {
+        let mut states = self.app().degraded.states.clone();
+        if states
+            .iter()
+            .any(|s| matches!(s, DegradedState::NoAssistant))
+            == on
+        {
+            return;
+        }
+        states.retain(|s| !matches!(s, DegradedState::NoAssistant));
+        if on {
+            states.push(DegradedState::NoAssistant);
+        }
+        self.set_degraded(states);
     }
 
     /// Replaces the degraded set and sends `degraded:changed`; a call switched to local is the

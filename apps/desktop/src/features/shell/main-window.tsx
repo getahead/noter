@@ -21,7 +21,7 @@ import { InspectorSlot } from "./inspector";
 import { closeInspector, inspectorOverride, useInspectorOverride } from "./inspector-override";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
 import { elapsedSeconds, isLive, receivedAtOf, shortTitle } from "./live-row";
-import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
+import { idleFooter, modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
@@ -76,6 +76,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-mode:p1:inst-core-privacy
   const privacy = useWhole("privacy");
   const degraded = useWhole("degraded");
+  const accounts = useWhole("accounts");
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-mode:p1:inst-core-privacy
   const proposals = useWhole("proposals");
   const banners = useWhole("banners");
@@ -211,7 +212,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
     if (event) void announce(event);
   }, [announce, mode.state]);
   const word = mode.warning || mode.state === "LOCAL_ONLY";
-  const footer = word ? t(MODE_MSG[mode.state].word) : live ? t("footer.recording", { name: live.title }) : t("footer.idle");
+  const footer = word ? t(MODE_MSG[mode.state].word) : live ? t("footer.recording", { name: live.title }) : idleFooter(accounts);
 
   const bannerActions: BannerActions = {
     runSelfTest: () => openTarget({ type: "first_run", step: "permissions" }),

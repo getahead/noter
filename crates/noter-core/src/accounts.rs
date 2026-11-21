@@ -124,6 +124,23 @@ pub(crate) struct Accounts {
     events: Arc<dyn EventEmitter>,
     clock: Arc<dyn Clock>,
     state: Mutex<State>,
+    /// Told each recomputed view, outside the state lock (the core's no-assistant check).
+    on_view: std::sync::OnceLock<OnView>,
+}
+
+/// What the core is told of each recomputed view.
+type OnView = Box<dyn Fn(&AccountsView) + Send + Sync>;
+
+/// Nothing can answer: no stored key, no signed-in account, no local model (issue 1058).
+pub(crate) fn no_assistant(v: &AccountsView) -> bool {
+    !v.keys
+        .iter()
+        .any(|k| matches!(k.status, KeyStatus::Configured { .. }))
+        && !v
+            .accounts
+            .iter()
+            .any(|a| matches!(a.status, AccountStatus::SignedIn { .. }))
+        && !(v.local.running && !v.local.models.is_empty())
 }
 
 impl WholeState for AccountsView {
@@ -160,6 +177,7 @@ impl Accounts {
             secrets,
             events,
             clock,
+            on_view: std::sync::OnceLock::new(),
             state: Mutex::new(State {
                 connections,
                 sessions: HashMap::new(),
@@ -179,6 +197,11 @@ impl Accounts {
 
     pub(crate) fn view(&self) -> AccountsView {
         lock(&self.state).view.clone()
+    }
+
+    /// Calls `f` with every view `observe` computes, once it has been published.
+    pub(crate) fn on_view(&self, f: impl Fn(&AccountsView) + Send + Sync + 'static) {
+        let _ = self.on_view.set(Box::new(f));
     }
 
     /// What the account CLIs' port reports now; the next `observe` shows it.
@@ -249,7 +272,12 @@ impl Accounts {
         }
         // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-version
         // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-return
-        state.view.clone()
+        let view = state.view.clone();
+        drop(state);
+        if let Some(f) = self.on_view.get() {
+            f(&view);
+        }
+        view
         // @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-return
     }
 
