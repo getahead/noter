@@ -36,10 +36,14 @@ export interface MonthGroup {
 export function groupByMonth(
   rows: CallRow[],
   prefs?: UiPrefs,
+  today: number = Date.now(),
 ): MonthGroup[] {
   const groups: MonthGroup[] = [];
+  const year = (ms: number) => zoned(ms, { year: "numeric" }, prefs, locale());
+  const thisYear = year(today);
   for (const r of rows) {
-    const label = zoned(r.started_at, { month: "long", year: "numeric" }, prefs, locale());
+    // the current year's months read alone (**October**); older ones keep the year
+    const label = zoned(r.started_at, year(r.started_at) === thisYear ? { month: "long" } : { month: "long", year: "numeric" }, prefs, locale());
     if (groups.at(-1)?.label === label) groups.at(-1)!.rows.push(r);
     else groups.push({ label, rows: [r] });
   }
