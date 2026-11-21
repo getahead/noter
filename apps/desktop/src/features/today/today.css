@@ -21,8 +21,8 @@
 .td-card[data-state="collapsed"] { padding-block: 6px; }
 .td-card[data-state="live"] { box-shadow: inset 3px 0 0 var(--rec); }
 .td-card__head { display: flex; align-items: center; gap: 12px; }
-/* the prototype's time gutter: 52 pt plus the 12-pt gap, so titles start 64 pt in */
-.td-card__time { display: inline-flex; align-items: center; gap: 6px; color: var(--label-2); width: 52px; flex: none; font-variant-numeric: tabular-nums; }
+/* the prototype's time gutter: 52 pt plus the 12-pt gap, so titles start 64 pt in; a 12-hour time (10:00 AM) may widen it */
+.td-card__time { display: inline-flex; align-items: center; gap: 6px; color: var(--label-2); min-width: 52px; flex: none; font-variant-numeric: tabular-nums; }
 .td-card__title { flex: 1; margin: 0; font: 600 13px/18px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .td-card__elapsed { font-variant-numeric: tabular-nums; }
 .td-card__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--label-2); padding-left: 64px; font-size: 12px; }
