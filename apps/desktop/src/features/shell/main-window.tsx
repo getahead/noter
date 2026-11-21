@@ -183,7 +183,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // moving focus: the heading is not focused for it, and the core decides whether the window activates.
   const flags = useRef<NavFlags>({ first: true, quiet: null });
   useEffect(() => navEffect(nav, flags.current, dispatch), [nav]);
-  useEffect(() => navigateEffect(dispatch), []);
+  useEffect(() => navigateEffect(dispatch, (id) => void (flags.current.quiet = id)), []);
   // A search opened from a page (Search by Keyword) or reached by Back shows its words in the field.
   useEffect(() => void setSearch((typed) => searchWords(route) ?? typed), [routeId]); // eslint-disable-line react-hooks/exhaustive-deps
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request

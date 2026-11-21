@@ -88,8 +88,11 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   }, [fresh]);
 
   // `thread:<id>` opens that thread; the key is the route's, so Back and the core's nav:request land here
+  const settledHere = useRef<string | null>(null);
   useEffect(() => {
     const id = threadOfRoute(routeKey);
+    // a question asked on this page became its thread entry (issue 1068): the thread already shows, its announcement and focus stay
+    if (id && id === settledHere.current) return void (settledHere.current = null);
     if (id) void open(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
@@ -102,7 +105,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
   }, [routeKey]);
   // Commit the thread entry before the ready view can receive Back; a later effect could replace Today.
   useLayoutEffect(() => {
-    settleRoute(routeKey, thread, asking === null && turns.length > 0, (route) => navigate(route, true));
+    settleRoute(routeKey, thread, asking === null && turns.length > 0, (route) => {
+      if (routeKey === "root") settledHere.current = thread;
+      navigate(route, true);
+    });
   }, [routeKey, thread, asking, turns]);
 
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-stream

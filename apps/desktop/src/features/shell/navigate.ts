@@ -11,9 +11,13 @@ let sink: ((route: Route, replace: boolean) => void) | null = null;
 export const navigate = (route: Route, replace = false) => sink?.(route, replace);
 // @cpt-end:cpt-noter-flow-ui-main-window-shell-navigate:p1:inst-user-nav
 
-/** The main window's effect: its history takes the routes pages ask for, until the returned release runs. */
-export function navigateEffect(dispatch: (e: ShellEvent) => void): () => void {
-  const mine = (route: Route, replace: boolean) => dispatch({ type: "move", move: { type: replace ? "replace" : "push", route } });
+/** The main window's effect: its history takes the routes pages ask for, until the returned release runs. A replace is the
+ *  page settling its own entry (an Ask question becoming its thread), so `quiet` keeps focus where it is (issue 1068). */
+export function navigateEffect(dispatch: (e: ShellEvent) => void, quiet?: (routeId: string) => void): () => void {
+  const mine = (route: Route, replace: boolean) => {
+    if (replace) quiet?.(`${route.section}/${route.key}`);
+    dispatch({ type: "move", move: { type: replace ? "replace" : "push", route } });
+  };
   sink = mine;
   return () => void (sink === mine && (sink = null));
 }

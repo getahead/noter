@@ -35,5 +35,14 @@ describe("navigate with replace", () => {
     expect(dispatch).toHaveBeenCalledWith({ type: "move", move: { type: "replace", route: { section: "ask", key: "thread:ask_1" } } });
     release();
   });
+  it("leaves focus where it is: the page settles its own entry (an Ask question becoming its thread, issue 1068), a push moves it", () => {
+    const quiet = vi.fn();
+    const release = navigateEffect(vi.fn(), quiet);
+    navigate({ section: "ask", key: "thread:ask_1" }, true);
+    expect(quiet).toHaveBeenCalledWith("ask/thread:ask_1");
+    navigate({ section: "library", key: "search:x" });
+    expect(quiet).toHaveBeenCalledTimes(1);
+    release();
+  });
 });
 
