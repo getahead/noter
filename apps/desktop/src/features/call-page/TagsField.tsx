@@ -7,6 +7,7 @@ import { t } from "../../i18n/format";
 import { SearchField } from "../../ui/primitives/search-field";
 import { setTags, loadTags } from "./share-actions";
 import { validateTag } from "./share-logic";
+import { tagsIn } from "../library/tags";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1
 export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: string; tags: string[] }) {
@@ -17,11 +18,14 @@ export function TagsField({ bridge, callId, tags }: { bridge: Bridge; callId: st
   useEffect(() => void loadTags(bridge).then((r) => r.status === "ok" && setKnown(r.data.tags.map((x) => x.tag))), [bridge, tags.length]);
 
   const fail = () => setError(t("tags.failed"));
+  // every tag of the draft in one write: one strip, one Undo (issues 1049, 1054)
   const add = async (raw: string) => {
-    const v = validateTag(raw, tags);
-    if (!v.ok) return setError(v.error);
+    const parts = tagsIn(raw);
+    const checked = (parts.length ? parts : [raw]).map((part, i, all) => validateTag(part, [...tags, ...all.slice(0, i)]));
+    const bad = checked.find((v) => !v.ok);
+    if (bad && !bad.ok) return setError(bad.error);
     setError(null);
-    const r = await setTags(bridge, callId, [v.tag], []);
+    const r = await setTags(bridge, callId, checked.map((v) => (v as { tag: string }).tag), []);
     if (r.status === "ok") setText("");
     else fail();
   };

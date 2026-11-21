@@ -60,8 +60,7 @@ export function SearchField({ variant: v, state, value = "", tokens = [], placeh
     // leaving lets the Esc go on, so a sheet around the field closes and focus is not stranded
     if (action !== "remove-last-token" && action !== "leave") e.preventDefault();
     if (action === "run") onEnter?.(input.value);
-    // a comma that reached the text without its key (pasted, typed by automation) still separates tokens (issue 1049)
-    else if (action === "add-token") input.value.split(",").map((part) => part.trim()).filter(Boolean).forEach((part) => onAddToken?.(part));
+    else if (action === "add-token") onAddToken?.(input.value.trim());
     else if (action === "remove-last-token") onRemoveToken?.(tokens.length - 1);
     else if (action === "clear") onChange?.("");
     else input.blur();

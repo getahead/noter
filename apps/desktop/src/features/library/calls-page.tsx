@@ -304,8 +304,8 @@ export function CallsPage() {
               count={chosen.length}
               inUse={lists.tags.map((g) => g.tag)}
               onClose={() => setTagging(null)}
-              onAdd={async (tag) => {
-                const r = await tagCalls(bridge, chosen.map((c) => c.id), [tag], []);
+              onAdd={async (tags) => {
+                const r = await tagCalls(bridge, chosen.map((c) => c.id), tags, []);
                 if (r.status === "ok") setFresh((n) => n + 1);
                 return r.status === "ok";
               }}
