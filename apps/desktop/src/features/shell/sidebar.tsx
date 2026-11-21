@@ -2,7 +2,7 @@
 // eight sections in three groups with their badges, and the status footer with the mode indicator.
 import { Fragment, useEffect, useState } from "react";
 
-import { callTime, t } from "../../i18n/format";
+import { shortCallTime, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { SourceList, SourceListGroup, SourceListItem, SourceListLive } from "../../ui/primitives/source-list";
 import { Progress } from "../../ui/primitives/progress";
@@ -58,7 +58,7 @@ function LiveRow({ live, onShowCall }: { live: LiveCall; onShowCall: () => void 
         <span className={live.paused ? "np-recdot is-paused" : "np-recdot"} aria-hidden="true" />
         <span className="np-recind__title">{live.title}</span>
         <span className="np-recind__sep">·</span>
-        {live.paused ? <span>{t("shell.live_paused")}</span> : <span className="np-tnum">{callTime(live.seconds(now))}</span>}
+        {live.paused ? <span>{t("shell.live_paused")}</span> : <span className="np-tnum">{shortCallTime(live.seconds(now))}</span>}
       </button>
     </SourceListLive>
   );

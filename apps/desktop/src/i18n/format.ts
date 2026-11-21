@@ -195,6 +195,9 @@ export const callTime = (seconds: number): string => {
     .join(":");
 };
 
+/** The short recording clock: MM:SS under an hour, then HH:MM:SS (the Today button and the sidebar live row). */
+export const shortCallTime = (seconds: number): string => (seconds < 3600 ? callTime(seconds).slice(3) : callTime(seconds));
+
 /** A short localised duration, e.g. "48 min"; seconds only under a minute. */
 export const duration = (seconds: number): string => {
   const s = Math.round(seconds);
