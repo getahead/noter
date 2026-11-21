@@ -314,6 +314,8 @@ The system **MUST** create profiles only on explicit opt-in, encrypt their sever
 
 ## 6. Acceptance Criteria
 
+**Contract batch regression requirements (2026-11-20; pending).** Contract 2.14 (#983): person reads include nullable voice-profile statistics containing the recorded opted-in date, the number of currently available centroid rows, and the number of distinct retained calls with a speaker linked to this person and named_by=voice_profile. Counts use grouped queries, never embeddings or assumed participation. Deleted calls cease to count, manual names do not count and multiple matching speakers in one call count once. Profile deletion removes these statistics; names already set stay intact. Matched centroid ids are not retained, so a distinct matched-profile count cannot be reconstructed. Unit tests in `crates/noter-core/tests/profiles.rs`, conformance and `cpt-noter-seq-dialogs-set-up-voice-profile` cover these reads; new criteria remain open until `just gate` passes.
+
 - [x] E2E against the real core, `cpt-noter-seq-people-prepare-one-on-one`: a Person page shows commitments, what is owed, shared topics and calls; a new person has empty sections.
 - [x] E2E against the real core, `cpt-noter-seq-people-name-unnamed-speaker`: alias search for Дима finds Dmitri's identity, the existing naming command updates established linked speakers with Undo, and Create and Name creates no profile.
 - [x] E2E against the real core, `cpt-noter-seq-dialogs-set-up-voice-profile`: Create produces an encrypted profile; Delete Profile stops matching and keeps names.

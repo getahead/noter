@@ -11,6 +11,10 @@ const call = (n: number, o: Partial<Citation> = {}): Citation => ({ n, provenanc
 const html = (text: string, citations: Citation[], live = false) => renderToString(<CitedAnswer bridge={bridge} text={text} citations={citations} live={live} onAskAgain={() => {}} />);
 
 describe("CitedAnswer (cpt-noter-dod-ui-ask-citations)", () => {
+  it("uses the citation's stored language on its quote, leaving unknown language absent", () => {
+    expect(html("x [1]", [call(1, { lang: "ru" } as Partial<Citation>)])).toContain('lang="ru"');
+    expect(html("x [1]", [call(1)])).not.toContain("lang=");
+  });
   it("binds [n] to its citation and lists the sources with quote, call and Copy", () => {
     const h = html("Ship **Friday** [1].", [call(1)]);
     expect(h).toContain("<strong>Friday</strong>");

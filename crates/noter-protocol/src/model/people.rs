@@ -19,12 +19,24 @@ pub struct PersonRow {
     pub aliases: Vec<String>,
     pub is_you: bool,
     pub voice_profile: bool,
+    #[serde(default)]
+    pub voice_profile_stats: Option<VoiceProfileStats>,
     pub last_call_at: Option<TimestampMs>,
     pub open_items: u32,
     /// The user's own open action items from calls this person was on ("You owe"); 0 for You.
     pub you_owe: u32,
     /// The user's notes about them.
     pub notes: Option<String>,
+}
+
+/// Retained profile data, without biometric vectors or inferred match history.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct VoiceProfileStats {
+    pub opted_in_at: Option<TimestampMs>,
+    /// Currently available centroid rows, not distinct profiles that matched.
+    pub profiles: u32,
+    /// Distinct retained calls with speakers named by voice profile.
+    pub matched_calls: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

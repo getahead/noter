@@ -239,6 +239,7 @@ impl Core {
     }
 
     async fn run_turn(&self, job: &Job, cancel: Cancel) -> Result<(), Ended> {
+        let began = tokio::time::Instant::now();
         self.enter(&job.turn, TurnState::Retrieving)?;
         // @cpt-begin:cpt-noter-flow-core-retrieval-ask-answer:p1:inst-ask-context
         let route = self.ask_route();
@@ -323,6 +324,14 @@ impl Core {
             checked.citations.iter().map(|c| c.strength).collect()
         };
         let answer = AskAnswer {
+            scope: Some(job.scope.clone()),
+            meta: Some(AskMeta {
+                call_hits: found.calls.len() as u32,
+                item_hits: found.items.len() as u32,
+                document_hits: found.documents.len() as u32,
+                elapsed_ms: began.elapsed().as_millis().min(u32::MAX as u128) as u32,
+            }),
+            rating: None,
             turn_id: job.turn.clone(),
             question: job.question.clone(),
             answer_md: checked.answer_md,
@@ -617,6 +626,9 @@ impl Core {
         };
         let route = self.ask_route();
         let partial = AskAnswer {
+            scope: None, // already recorded at acceptance; finish_turn preserves it
+            meta: None,
+            rating: None,
             turn_id: args.turn_id,
             question: String::new(),
             answer_md: active.partial,

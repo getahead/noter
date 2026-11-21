@@ -228,6 +228,8 @@ The system **MUST** let the conformance suite (`NOTER_CORE=stdio`) and the Playw
 
 ## 6. Acceptance Criteria
 
+**Contract batch regression requirements (2026-11-20; pending).** Issues #977–#978: `harness.world_set` accepts a topics-only replacement without deleting calls or items; item links to removed topics become absent. `harness.topic_centroids { topic_ids }` seeds identical valid synthetic centroid inputs for two or more existing topics, then runs the normal core suggestion computation. Missing/duplicate ids are rejected before writes; Keep Separate suppressions still apply. Regression tests in `crates/noter-core-harness/tests/boot.rs`, real-core conformance and `cpt-noter-seq-library-follow-topic` prove no-topics, suggested merge and Keep Separate. These additional criteria stay open until `just gate` passes.
+
 - [x] `cargo run -p noter-core-harness -- --fixture world` answers `app_snapshot` from the `main` window and refuses a settings-only command from the `call-screen` window with `window_not_allowed`.
 - [x] A subscribing command's Channel messages always follow its result line, in `seq` order.
 - [x] Closing stdin ends every open stream with `shutdown` and exits with code 0; stdout holds only protocol lines.

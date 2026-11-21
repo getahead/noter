@@ -19,8 +19,8 @@ use noter_db::Migration;
 
 pub use ask::{
     ask_query, begin_turn, check_answer, check_start, delete_thread, evidence_id, finish_turn,
-    only_weak, prior_turns, sensitive, thread, threads, Checked, Ending, NewTurn, Prior, ASK_HITS,
-    NOT_FOUND_MD,
+    only_weak, prior_turns, rate_turn, sensitive, thread, threads, Checked, Ending, NewTurn, Prior,
+    ASK_HITS, NOT_FOUND_MD,
 };
 pub use index::{embed_query, missing, rebuild, stale, Embedder, Index, Readiness, Run, DIMS};
 pub use normalize::{estimate_tokens, normalize, terms};
@@ -79,6 +79,12 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 6,
         name: "cache topic merge suggestions",
         sql: include_str!("../migrations/0006_topic_suggestions.sql"),
+    },
+    Migration {
+        owner: "noter-retrieval",
+        version: 7,
+        name: "per-turn Ask scope, measured metadata and feedback",
+        sql: include_str!("../migrations/0007_ask_metadata.sql"),
     },
 ];
 

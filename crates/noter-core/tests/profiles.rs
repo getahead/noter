@@ -253,6 +253,19 @@ async fn create_encrypts_every_centroid_and_returns_only_counts() {
     assert!(view.enabled);
     assert_eq!(view.centroids, 1);
     assert_eq!(view.opted_in_at, Some(TimestampMs(NOW)));
+    let read = core
+        .person_get(
+            &ctx(),
+            PersonIdArgs {
+                person_id: PersonId::new("per_anna"),
+            },
+        )
+        .await
+        .unwrap();
+    let read = serde_json::to_value(read).unwrap();
+    assert_eq!(read["person"]["voice_profile_stats"]["opted_in_at"], NOW);
+    assert_eq!(read["person"]["voice_profile_stats"]["profiles"], 1);
+    assert_eq!(read["person"]["voice_profile_stats"]["matched_calls"], 0);
     let blob: Vec<u8> = noter_db::rusqlite::Connection::open(dir.path().join("noter.db"))
         .unwrap()
         .query_row("SELECT embedding FROM voice_profiles", [], |r| r.get(0))
@@ -373,6 +386,31 @@ async fn a_voice_above_the_threshold_is_named_and_one_below_is_not() {
     assert_eq!(who.as_deref(), Some("per_anna"));
     assert_eq!(by.as_deref(), Some("voice_profile"));
     assert_eq!(named(&core, "new_b", dir.path()).await.0, None);
+    // A second matching speaker in the same retained call is still one matched call.
+    exec(
+        dir.path(),
+        "UPDATE speakers SET person_id = 'per_anna', named_by = 'voice_profile' WHERE id = 'new_b'",
+    )
+    .unwrap();
+    let args = PersonIdArgs {
+        person_id: PersonId::new("per_anna"),
+    };
+    let read = core.person_get(&ctx(), args.clone()).await.unwrap();
+    assert_eq!(read.person.voice_profile_stats.unwrap().matched_calls, 1);
+    // The old manually named sample is not a match. Deleted calls cease to count.
+    exec(dir.path(), "DELETE FROM calls WHERE id = 'call_new'").unwrap();
+    let read = core.person_get(&ctx(), args.clone()).await.unwrap();
+    assert_eq!(read.person.voice_profile_stats.unwrap().matched_calls, 0);
+    core.voice_profile_delete(&ctx(), args.clone())
+        .await
+        .unwrap();
+    assert!(core
+        .person_get(&ctx(), args)
+        .await
+        .unwrap()
+        .person
+        .voice_profile_stats
+        .is_none());
 }
 
 #[tokio::test]

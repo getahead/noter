@@ -224,6 +224,158 @@ impl World {
 }
 
 #[tokio::test(start_paused = true)]
+async fn stored_turn_metadata_keeps_its_own_scope_language_and_rating() {
+    let w = world("").await;
+    let scope = AskScope {
+        call_id: Some(CallId::new("call_ws")),
+        ..AskScope::default()
+    };
+    let (channel, got) = sink();
+    let handle = w
+        .core
+        .ask_start(
+            &main_window(),
+            AskStartArgs {
+                thread_id: None,
+                question: "websockets".into(),
+                scope: scope.clone(),
+            },
+            channel,
+        )
+        .await
+        .unwrap();
+    w.settle().await;
+    let AskEvent::Done { answer } = terminal(&got) else {
+        panic!("not done")
+    };
+    let serialized = serde_json::to_value(&answer).unwrap();
+    assert_eq!(serialized["scope"], json!(scope));
+    assert_eq!(serialized["citations"][0]["lang"], "en");
+    assert_eq!(serialized["meta"]["call_hits"], 1);
+    assert_eq!(serialized["meta"]["item_hits"], 0);
+    assert_eq!(serialized["meta"]["document_hits"], 0);
+    assert!(serialized["meta"]["elapsed_ms"].is_u64());
+    assert!(serialized["rating"].is_null());
+    let result = noter_protocol::ipc::dispatch_json(
+        &*w.core,
+        &main_window(),
+        "ask_rate",
+        json!({"turn_id": handle.turn_id, "rating": "helpful"}),
+        None,
+    )
+    .await;
+    assert!(result.is_ok(), "{result:?}");
+    let _ = w.ask(Some(&handle.thread_id), "polling").await;
+    w.settle().await;
+    let read = serde_json::to_value(w.thread(&handle.thread_id).await.unwrap()).unwrap();
+    assert_eq!(read["turns"][0]["scope"], json!(scope));
+    assert_eq!(read["turns"][0]["rating"], "helpful");
+    assert_eq!(read["turns"][1]["scope"], json!(AskScope::default()));
+    for rating in [json!("not_helpful"), Value::Null] {
+        noter_protocol::ipc::dispatch_json(
+            &*w.core,
+            &main_window(),
+            "ask_rate",
+            json!({"turn_id": handle.turn_id, "rating": rating}),
+            None,
+        )
+        .await
+        .unwrap();
+        let read = serde_json::to_value(w.thread(&handle.thread_id).await.unwrap()).unwrap();
+        assert_eq!(read["turns"][0]["rating"], rating);
+    }
+    noter_protocol::ipc::dispatch_json(
+        &*w.core,
+        &main_window(),
+        "ask_rate",
+        json!({"turn_id": handle.turn_id, "rating": "helpful"}),
+        None,
+    )
+    .await
+    .unwrap();
+    let reopened = Core::open(
+        w._dir.path(),
+        CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(NoEvents)),
+    )
+    .unwrap();
+    let read = reopened
+        .ask_thread_get(
+            &main_window(),
+            AskThreadArgs {
+                thread_id: handle.thread_id,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(&read.turns[0]).unwrap()["scope"],
+        json!(scope)
+    );
+    assert_eq!(
+        serde_json::to_value(&read.turns[0]).unwrap()["meta"],
+        serialized["meta"]
+    );
+    assert_eq!(read.turns[0].rating, Some(AskRating::Helpful));
+}
+
+#[tokio::test(start_paused = true)]
+async fn ratings_reject_missing_running_stopped_turns_and_other_windows() {
+    let w = world("").await;
+    let (handle, _) = w.ask(None, "websockets").await;
+    let rate = |turn: &str| json!({"turn_id": turn, "rating": "helpful"});
+    for (turn, code) in [
+        ("missing", ErrorCode::NotFound),
+        (handle.turn_id.as_str(), ErrorCode::InvalidInput),
+    ] {
+        let error = noter_protocol::ipc::dispatch_json(
+            &*w.core,
+            &main_window(),
+            "ask_rate",
+            rate(turn),
+            None,
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.code, code);
+    }
+    w.core
+        .ask_stop(
+            &main_window(),
+            AskTurnArgs {
+                turn_id: handle.turn_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    let error = noter_protocol::ipc::dispatch_json(
+        &*w.core,
+        &main_window(),
+        "ask_rate",
+        rate(handle.turn_id.as_str()),
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidInput);
+    let error = noter_protocol::ipc::dispatch_json(
+        &*w.core,
+        &window(WindowLabel::CallScreen),
+        "ask_rate",
+        rate(handle.turn_id.as_str()),
+        None,
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::WindowNotAllowed);
+    assert!(w.thread(&handle.thread_id).await.unwrap().turns[0].stopped);
+    assert_eq!(
+        serde_json::to_value(&w.thread(&handle.thread_id).await.unwrap().turns[0]).unwrap()
+            ["scope"],
+        json!(AskScope::default())
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_handle_comes_first_then_started_deltas_citations_and_done() {
     let w = world("").await;
     let (handle, got) = w.ask(None, "What did we decide about websockets?").await;

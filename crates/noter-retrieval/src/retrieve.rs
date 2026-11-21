@@ -68,6 +68,7 @@ pub enum Evidence {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Hit {
     pub evidence: Evidence,
+    pub item_kind: Option<ItemKind>,
     pub target: HitTarget,
     pub title: String,
     /// The evidence text as stored (a segment, an item, a chunk without its call header).
@@ -416,6 +417,7 @@ fn span_hit(
     };
     Hit {
         evidence,
+        item_kind: None,
         target: HitTarget::Segment { span: span.clone() },
         title: call.title.clone(),
         text,
@@ -699,13 +701,13 @@ fn chunk_vectors(
     rows.collect()
 }
 
-const ITEM_COLUMNS: &str = "i.id, i.text, i.lang, sp.channel, sp.t0_ms, sp.t1_ms";
+const ITEM_COLUMNS: &str = "i.id, i.text, i.lang, sp.channel, sp.t0_ms, sp.t1_ms, i.kind";
 /// An item's first span, one row even when several start at the same time.
 const ITEM_SPAN: &str = "LEFT JOIN item_spans sp ON sp.rowid =
     (SELECT rowid FROM item_spans WHERE item_id = i.id ORDER BY t0_ms, rowid LIMIT 1)";
 
 fn item_row(r: &Row<'_>) -> noter_db::rusqlite::Result<Candidate> {
-    let (call, sensitive) = call_of(r, 6)?;
+    let (call, sensitive) = call_of(r, 7)?;
     let id = call.id.clone();
     let item_id = ItemId::new(r.get::<_, String>(0)?);
     let text: String = r.get(1)?;
@@ -722,6 +724,15 @@ fn item_row(r: &Row<'_>) -> noter_db::rusqlite::Result<Candidate> {
     );
     let hit = Hit {
         target: HitTarget::Item { item_id },
+        item_kind: Some(
+            serde_json::from_value(serde_json::Value::String(r.get(6)?)).map_err(|e| {
+                noter_db::rusqlite::Error::FromSqlConversionFailure(
+                    6,
+                    noter_db::rusqlite::types::Type::Text,
+                    Box::new(e),
+                )
+            })?,
+        ),
         title: text,
         ..hit
     };

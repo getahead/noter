@@ -6,6 +6,11 @@ import { isPlayingSpan, SearchResultRow, togglePlay } from "./SearchResultRow";
 const hit = { target: { type: "item", item_id: "i1" }, title: "Planning", snippet: "<img src=x onerror=alert(1)> websocket", highlights: [{ start: 29, end: 38 }], lang: "ru", strength: "weak", call: { id: "c1", title: "Planning" }, cross_language: true } as never;
 
 describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
+  it("shows the stored item kind and leaves an unknown kind absent", () => {
+    const draw = (item_kind: string | null) => renderToString(<SearchResultRow bridge={{} as never} hit={{ ...(hit as object), item_kind } as never} />);
+    expect(draw("decision")).toContain("Decision");
+    expect(draw(null)).not.toContain("Decision");
+  });
   it("marks the highlighted range, escapes the text, keeps the language and the weak tag, and says cross-language", () => {
     const html = renderToString(<SearchResultRow bridge={{} as never} hit={hit} />);
     expect(html).toContain("<mark>websocket</mark>");

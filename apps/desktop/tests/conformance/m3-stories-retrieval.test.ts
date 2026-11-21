@@ -3,7 +3,7 @@
 // explain metadata, filtered calls and their export, topic threads with rename, an undoable merge
 // and Keep Separate, and Ask turns streamed on their Channel with validated citations. Steps that
 // read the real core's database or depend on its retrieval are guarded by `s.target === "stdio"`;
-// the commands run on the fake too. All twelve 2.22 commands succeed at least once here.
+// the commands run on the fake too. All thirteen 2.22 commands succeed at least once here.
 import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 
@@ -24,7 +24,7 @@ const open = () => {
   s = openScenario({ alsoRecord: exercised });
   main = s.core("main");
 };
-const scope = (patch: Partial<AskScope> = {}): AskScope => ({ people: [], call_types: [], from: null, to: null, topic_id: null, call_id: null, include_documents: false, ...patch });
+const scope = (patch: Partial<AskScope> = {}): AskScope => ({ preset: null, people: [], call_types: [], from: null, to: null, topic_id: null, call_id: null, include_documents: false, ...patch });
 const search = async (query: string) => ok(await main.search({ query, filter: {}, limit: null }));
 const calls = async (filter: object) => ok(await main.callsList({ filter, sort: "newest", page: {} })).rows.map((r) => r.id);
 
@@ -62,7 +62,21 @@ describe("cpt-noter-seq-library-search-calls", () => {
     expect(span!.provenance.type).toBe("past_call");
     expect(span!.strength).toBe("strong");
     expect(r.explain.keyword_hits).toBeGreaterThan(0);
+    expect(r.query_lang).toBe("ru");
+    expect(r.items.every((h) => h.item_kind != null)).toBe(true);
     if (s.target === "stdio") expect(r.explain.normalized_query).toBe("websocket уведомления");
+  });
+
+  it.each([
+    ["U\u0308ber", "de"],
+    ["Ｗｅｂｓｏｃｋｅｔ", "en"],
+    ["ß", "en"],
+    ["123", null],
+  ] as const)("query language estimate uses normalized text: %s", async (query, language) => {
+    open();
+    const r = await search(query);
+    expect(r.query).toBe(query);
+    expect(r.query_lang).toBe(language);
   });
 
   it("empty — nothing matches: every section is empty and the results are not weak-only", async () => {
@@ -335,6 +349,31 @@ describe("cpt-noter-seq-ask-cited-answer", () => {
 });
 
 describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
+  it("retains each turn's scope, measured work, citation language and replaceable feedback on reopen", async () => {
+    open();
+    const narrowed = scope({ call_id: LIVE_CALL });
+    const first = await ask("websocket notifications", null, narrowed);
+    expect(first.answer?.scope).toEqual(narrowed);
+    expect(first.answer?.found).toBe(true);
+    expect(first.answer!.citations.length).toBeGreaterThan(0);
+    expect(first.answer!.citations.every((c) => c.lang != null)).toBe(true);
+    if (s.target === "stdio") {
+      const meta = first.answer!.meta!;
+      expect(meta.call_hits + meta.item_hits + meta.document_hits).toBeGreaterThan(0);
+      expect(first.answer?.meta?.elapsed_ms).toBeGreaterThanOrEqual(0);
+    }
+    ok(await main.askRate({ turn_id: first.handle.turn_id, rating: "helpful" }));
+    await ask("polling", first.handle.thread_id, scope());
+    let stored = ok(await s.reopen("main").askThreadGet({ thread_id: first.handle.thread_id }));
+    expect(stored.turns[0]).toMatchObject({ scope: narrowed, rating: "helpful", meta: first.answer?.meta ?? null });
+    expect(stored.turns[1].scope).toEqual(scope());
+    ok(await main.askRate({ turn_id: first.handle.turn_id, rating: "not_helpful" }));
+    expect(ok(await main.askThreadGet({ thread_id: first.handle.thread_id })).turns[0].rating).toBe("not_helpful");
+    ok(await main.askRate({ turn_id: first.handle.turn_id, rating: null }));
+    stored = ok(await main.askThreadGet({ thread_id: first.handle.thread_id }));
+    expect(stored.turns[0].rating).toBeNull();
+    expect(refused(await main.askRate({ turn_id: "missing", rating: "helpful" })).code).toBe("not_found");
+  });
   it("happy path: reopen a thread, append a follow-up, and its citations carry what Markdown copy needs", async () => {
     open();
     const first = await ask("What did we agree about the websocket notifications?");

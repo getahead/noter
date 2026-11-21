@@ -10,7 +10,7 @@ import type { Replay } from "../transcript/playback";
 import { toMarkdown } from "./copy";
 import type { TurnPhase } from "./model";
 
-export const NEW_SCOPE: AskScope = { preset: "all" };
+export const NEW_SCOPE: AskScope = { preset: "all", include_documents: true };
 
 export async function loadRows(bridge: Bridge): Promise<AskThreadRow[] | null> {
   // @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-open
@@ -294,7 +294,7 @@ export const focusNewQuestion = (doc: Parameters<typeof focusFirstAvailable>[0])
 export const recentChoices = (rows: ReadonlyArray<Pick<AskThreadRow, "id" | "title">>, title: string) => [{ value: "", label: title }, ...rows.map((r) => ({ value: r.id, label: r.title }))];
 
 /** Whether a question was asked with a scope narrower than All calls · all sources (no scope means all). */
-export const isNarrowed = (scope: AskScope | undefined): boolean => !!scope && scope.preset !== NEW_SCOPE.preset;
+export const isNarrowed = (scope: AskScope | undefined): boolean => !!scope && (!!scope.call_id || !!scope.topic_id || !!scope.people?.length || !!scope.call_types?.length || !!scope.from || !!scope.to || scope.include_documents !== true);
 
 /** Widen Scope: choose All calls · all sources and ask the same question again with it. */
 export function widenScope(question: string, ask: (question: string, scope: AskScope) => void): void {

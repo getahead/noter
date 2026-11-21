@@ -13,6 +13,7 @@ import { PlaybackBar } from "../transcript/playback-bar";
 import { useAskReplay } from "./replay";
 import { RecentRow } from "./RecentRow";
 import { CitedAnswer } from "./CitedAnswer";
+import { AnswerFeedback } from "./AnswerFeedback";
 import { afterTurn, bindStopKey, endedWhileAway, copyText, currentStream, removeThread, searchByKeyword, settleRoute, startRoute, recoverGap, releaseFailedRoute, widenScope, isNarrowed, loadPresets, loadRows, openThread, questionOf, settleTurn, scopeOf, startAsk, stopAsk, threadOfRoute, afterDelete, COMPOSER_ID, nextOpenRequest, keepRowFocus, focusComposer, focusNewQuestion } from "./actions";
 import { setPresets, setRecent, useAskState } from "./ask-state";
 import { usePeople } from "../speakers/people";
@@ -240,7 +241,7 @@ export interface AskViewProps {
   onSend: () => void;
   announce: string;
   suggestions: string[];
-  onSuggest: (question: string) => void;
+  onSuggest: (question: string, scope?: AskScope) => void;
   /** The chosen scope is narrower than All calls · all sources: a not-found answer offers Widen Scope. */
   narrowed?: boolean;
   onWiden?: (question: string) => void;
@@ -282,7 +283,7 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             <h3 className="ak-q">{a.question}</h3>
             {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
             {/* @cpt-begin:cpt-noter-state-ui-ask-turn:p1:inst-again */}
-            <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question)} onWiden={narrowed && onWiden && !asking && a === turns.at(-1) ? () => onWiden(a.question) : undefined} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
+            <Answer bridge={bridge} onPlay={onPlay} onSearch={() => searchByKeyword(a.question)} onAskAgain={() => onSuggest(a.question, a.scope ?? undefined)} onWiden={isNarrowed(a.scope ?? undefined) && onWiden && !asking && a === turns.at(-1) ? () => onWiden(a.question) : undefined} view={foldTurn([{ seq: 1, event: { type: "done", answer: a } }])} />
             {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
             {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
           </article>
@@ -348,6 +349,7 @@ export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, on
         {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-if-widen */}
         {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-widen */}
         {onWiden && <PushButton label={t("ask.widen")} onAction={onWiden} />}
+        {answer && <AnswerFeedback key={`${answer.turn_id}:${answer.rating}`} bridge={bridge} answer={answer} />}
         {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-widen */}
         {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-if-widen */}
       </div>
@@ -364,6 +366,7 @@ export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, on
       {phase === "stopped" && <div className="ak-status">{t("ask.stopped")}</div>}
       {phase === "interrupted" && <div className="ak-status">{t("ask.interrupted")}</div>}
       {phase === "error" && <ErrorBanner view={view} onRetry={onRetry} onLocal={() => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } }))} />}
+      {answer && <AnswerFeedback key={`${answer.turn_id}:${answer.rating}`} bridge={bridge} answer={answer} />}
     </div>
   );
 }

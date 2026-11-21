@@ -465,6 +465,8 @@ commands! {
     /// Ask with a scope; the answer streams with citations.
     ask_start(AskStartArgs, channel: AskMsg) -> AskHandle [LibraryAndAsk, Frozen, Main];
     ask_stop(AskTurnArgs) -> Ack [LibraryAndAsk, Frozen, Main];
+    /// Set or clear feedback on a completed answer.
+    ask_rate(AskRateArgs) -> Ack [LibraryAndAsk, Frozen, Main];
     ask_threads_list(NoArgs) -> AskThreadList [LibraryAndAsk, Frozen, Main];
     ask_thread_get(AskThreadArgs) -> AskThread [LibraryAndAsk, Frozen, Main];
     ask_thread_delete(AskThreadArgs) -> Ack [LibraryAndAsk, Frozen, Main];

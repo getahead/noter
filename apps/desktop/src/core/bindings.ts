@@ -293,6 +293,10 @@ export type AskAboutCallArgs = {
 export type AskAnswer = {
 	turn_id: AskTurnId,
 	question: string,
+	/**  The scope recorded for this turn; historical turns may not have one. */
+	scope?: AskScope | null,
+	meta?: AskMeta | null,
+	rating?: AskRating | null,
 	answer_md: string,
 	citations: Citation[],
 	/**  `false` = "I could not find this in your calls"; never a guess. */
@@ -320,10 +324,27 @@ export type AskHandle = {
 	subscription_id: SubscriptionId,
 };
 
+/**  Measured work for an answer, never inferred from its citations. */
+export type AskMeta = {
+	call_hits: number,
+	item_hits: number,
+	document_hits: number,
+	/**  Retrieval and answer preparation, measured with a monotonic clock. */
+	elapsed_ms: number,
+};
+
 export type AskMsg = {
 	seq: Seq,
 	event: AskEvent,
 };
+
+export type AskRateArgs = {
+	turn_id: AskTurnId,
+	/**  Null clears a previous rating. */
+	rating?: AskRating | null,
+};
+
+export type AskRating = "helpful" | "not_helpful";
 
 export type AskScope = {
 	preset?: string | null,
@@ -1023,6 +1044,8 @@ export type Citation = {
 	n: number,
 	provenance: Provenance,
 	quote: string,
+	/**  Original evidence language, absent when the source did not record one. */
+	lang?: Lang | null,
 	speaker: PersonChip | null,
 	strength: MatchStrength,
 	/**  The cited call or document was deleted since. */
@@ -2514,6 +2537,7 @@ export type PersonRow = {
 	aliases: string[],
 	is_you: boolean,
 	voice_profile: boolean,
+	voice_profile_stats?: VoiceProfileStats | null,
 	last_call_at: TimestampMs | null,
 	open_items: number,
 	/**  The user's own open action items from calls this person was on ("You owe"); 0 for You. */
@@ -2789,6 +2813,8 @@ export type SearchExplain = {
 
 export type SearchHit = {
 	target: HitTarget,
+	/**  Stored kind for item targets; unknown for other evidence. */
+	item_kind?: ItemKind | null,
 	title: string,
 	snippet: string,
 	highlights: TextRange[],
@@ -2806,6 +2832,8 @@ export type SearchMode = { type: "hybrid" } |
 
 export type SearchResults = {
 	query: string,
+	/**  The retrieval function's language estimate, absent when unknown. */
+	query_lang?: Lang | null,
 	mode: SearchMode,
 	calls: SearchHit[],
 	items: SearchHit[],
@@ -3620,6 +3648,15 @@ export type VoiceProfileArgs = {
 	from_speaker?: SpeakerId | null,
 };
 
+/**  Retained profile data, without biometric vectors or inferred match history. */
+export type VoiceProfileStats = {
+	opted_in_at: TimestampMs | null,
+	/**  Currently available centroid rows, not distinct profiles that matched. */
+	profiles: number,
+	/**  Distinct retained calls with speakers named by voice profile. */
+	matched_calls: number,
+};
+
 export type VoiceProfileView = {
 	person_id: PersonId,
 	enabled: boolean,
@@ -3644,7 +3681,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.13";
+export const CONTRACT_VERSION = "2.14";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3729,6 +3766,7 @@ export const COMMANDS = {
   search: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
   ask_start: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: true },
   ask_stop: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
+  ask_rate: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
   ask_threads_list: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
   ask_thread_get: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
   ask_thread_delete: { group: "library_and_ask", stability: "frozen", windows: ["main"], channel: false },
@@ -3909,6 +3947,7 @@ export interface CommandArgs {
   search: SearchArgs;
   ask_start: AskStartArgs;
   ask_stop: AskTurnArgs;
+  ask_rate: AskRateArgs;
   ask_threads_list: NoArgs;
   ask_thread_get: AskThreadArgs;
   ask_thread_delete: AskThreadArgs;
@@ -4087,6 +4126,7 @@ export interface CommandResults {
   search: SearchResults;
   ask_start: AskHandle;
   ask_stop: Ack;
+  ask_rate: Ack;
   ask_threads_list: AskThreadList;
   ask_thread_get: AskThread;
   ask_thread_delete: Ack;
@@ -4643,6 +4683,10 @@ export function createCore(transport: Transport) {
      */
     askStart: (args: AskStartArgs, onMessage: (message: AskMsg) => void) => call("ask_start", args, onMessage),
     askStop: (args: AskTurnArgs) => call("ask_stop", args),
+    /**
+     * Set or clear feedback on a completed answer.
+     */
+    askRate: (args: AskRateArgs) => call("ask_rate", args),
     askThreadsList: (args: NoArgs) => call("ask_threads_list", args),
     askThreadGet: (args: AskThreadArgs) => call("ask_thread_get", args),
     askThreadDelete: (args: AskThreadArgs) => call("ask_thread_delete", args),

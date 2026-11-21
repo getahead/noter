@@ -11,6 +11,12 @@ const props = (read: Read, o: Partial<SearchViewProps> = {}): SearchViewProps =>
 const html = (p: SearchViewProps) => renderToString(<SearchView {...p} />);
 
 describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
+  it("describes only returned cross-language transcript matches and omits unknown query language", () => {
+    const row = { ...(hit("weak") as object), target: { type: "segment", span: { call_id: "c1", t0_ms: 0, t1_ms: 1 } }, cross_language: true };
+    const draw = (query_lang: string | null) => html(props(results({ query_lang, calls: [row] })));
+    expect(draw("ru")).toContain("Russian query matched English transcripts too");
+    expect(draw(null)).not.toContain("query matched");
+  });
   it("LOADING is a busy region; READ_ERROR offers Try Again", () => {
     expect(html(props({ status: "LOADING" }))).toContain('aria-busy="true"');
     const p = props({ status: "READ_ERROR" });

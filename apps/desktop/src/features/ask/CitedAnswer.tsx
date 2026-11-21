@@ -125,7 +125,7 @@ export function CitationRow({ bridge, c, focused, onPlay, register, back }: { br
       )}
       {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-play */}
       {c.strength === "weak" && <span className="np-dim">{t("ask.weak")}</span>}
-      {c.quote && <blockquote className="ak-cite__quote">{c.quote}</blockquote>}
+      {c.quote && <blockquote className="ak-cite__quote" lang={typeof c.lang === "string" ? c.lang : c.lang?.code}>{c.quote}</blockquote>}
     </li>
   );
 }
