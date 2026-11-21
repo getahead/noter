@@ -180,6 +180,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
     await expect.poll(async () => (await sent(page, "api_key_remove")).length).toBeGreaterThanOrEqual(1);
     await expect(keyField(page)).toBeVisible();
     await expect(step(page)).not.toContainText("Couldn’t remove the key");
+    await expect(step(page)).not.toContainText("Stored in the Keychain"); // no stale line under the empty field
   });
 
   test("error path — API key rejected: the field is invalid with the reason in one line; the corrected key verifies", async ({ page }) => {

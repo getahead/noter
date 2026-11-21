@@ -1,7 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { effects, refs, buttons, sheets, open } = vi.hoisted(() => ({
+const { effects, refs, buttons, sheets, open, reset } = vi.hoisted(() => ({
+  reset: vi.fn(),
   open: { asking: false },
   sheets: [] as { onConfirm: (also: boolean) => void }[],
   buttons: [] as { id?: string; onAction?: () => void }[],
@@ -22,7 +23,7 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 vi.mock("../../ui/primitives/push-button", () => ({ PushButton: (props: { id?: string }) => (buttons.push(props), null) }));
-vi.mock("./KeyField", () => ({ KeyField: () => null, useKeyDraft: () => ({ state: "idle" }) }));
+vi.mock("./KeyField", () => ({ KeyField: () => null, useKeyDraft: () => ({ state: "idle", reset }) }));
 
 vi.mock("../../app/use-window", () => ({ useWindow: () => undefined }));
 vi.mock("./signin-store", () => ({ useSignIn: () => ({ machines: {} }) }));
@@ -64,6 +65,8 @@ describe("credential row focus recovery", () => {
     refs[1]!.current = true;
     effects.at(-1)!();
     expect(focus).toHaveBeenCalledOnce();
+    // #1057: the field comes back empty, without the old "Stored in the Keychain" line
+    expect(reset).toHaveBeenCalledOnce();
   });
 
   it("notes that Remove started the removal, by a mouse press or the keyboard", () => {
