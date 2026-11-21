@@ -31,8 +31,8 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await button(page, "Has Open Items").click();
     await expect.poll(async () => (await sent(page, "calls_list")).at(-1)).toMatchObject({ filter: { people: ["per_anna"], has_open_items: true } });
     await expect(page.getByText(/\d+ calls? match/).first()).toBeVisible(); // the header and its live region both say it
-    // the world has one call with Anna: Clear Filters brings both calls back to select two of them
-    await button(page, "Clear Filters").first().click();
+    // the world has one call with Anna: the bar's Clear brings both calls back to select two of them
+    await page.getByRole("button", { name: "Clear", exact: true }).click();
     const rows = page.locator(ROW);
     await rows.first().click();
     await rows.nth(1).click({ modifiers: ["Meta"] });
@@ -76,5 +76,39 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await button(page, "Undo").click();
     expect(await sent(page, "change_undo")).toHaveLength(1);
     await expect(rows.filter({ hasText: "release" })).toHaveCount(0);
+  });
+});
+
+// Design fixes against the prototype of record (docs/prototype/clickable, Main window › Calls, State ▾ Normal).
+test.describe("cpt-noter-seq-library-filter-calls", () => {
+  const openFixed = async (page: Page) => {
+    await openWindow(page, "main", { world: W.idle, fixedClock: true });
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit3");
+      await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+    }).toPass();
+  };
+  test("UI — design — #1077 the counts are the toolbar subtitle, with no header in the content", async ({ page }) => {
+    await openFixed(page);
+    await expect(page.locator('[data-region="LC-R1"]')).toHaveCount(1);
+    await expect(page.locator('[data-region="LC-R1"] .np-toolbar__sub')).toHaveText(/^\d+ calls? · /);
+    await expect(page.locator(".np-content .lb-head")).toHaveCount(0);
+  });
+  test("UI — design — #1078 the filter bar is the 36-pt bar under the toolbar with capsule ˅ buttons and a disabled Clear", async ({ page }) => {
+    await openFixed(page);
+    const bar = page.locator('[data-region="LC-R2"]');
+    const content = await page.locator(".np-content").boundingBox();
+    const box = await bar.boundingBox();
+    expect(Math.round(box!.y - content!.y)).toBe(0);
+    expect(Math.round(box!.height)).toBe(36);
+    await expect(bar).toHaveCSS("border-bottom-width", "1px");
+    const people = bar.getByRole("button", { name: /^People/ });
+    expect(parseFloat(await people.evaluate((el) => getComputedStyle(el).borderTopLeftRadius))).toBeGreaterThanOrEqual(10);
+    await expect(people.locator("svg path")).toHaveAttribute("d", "M4 6l4 4 4-4"); // the single ˅ (chevronDown)
+    await expect(bar.getByRole("button", { name: "Clear", exact: true })).toBeDisabled();
+  });
+  test("UI — design — #1079 the month header of the current year reads the month alone", async ({ page }) => {
+    await openFixed(page);
+    await expect(page.locator(".lb-month th").first()).toHaveText(/^[A-Z][a-z]+$/);
   });
 });
