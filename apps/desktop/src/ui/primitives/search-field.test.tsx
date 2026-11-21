@@ -94,6 +94,12 @@ describe("search-field keys (cpt-noter-flow-ui-primitives-operate-control)", () 
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
 
+  // #1049: a comma separates tags even when it reached the text without its key (pasted, or typed by automation)
+  it("Return on text with commas adds each part as its own token", () => {
+    const r = press("Enter", { value: "release, hotfix ,, ", selectionStart: 19, selectionEnd: 19 });
+    expect(r.onAddToken.mock.calls).toEqual([["release"], ["hotfix"]]);
+  });
+
   it("ignores Return and Esc while an input method is composing", () => {
     const r = press("Enter", { value: "にほ", selectionStart: 2, selectionEnd: 2 }, { composing: true });
     expect(r.onAddToken).not.toHaveBeenCalled();

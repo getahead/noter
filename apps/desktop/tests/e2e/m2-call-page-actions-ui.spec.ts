@@ -29,6 +29,17 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     expect((await sent(page, "tags_list")).length).toBeGreaterThan(0);
   });
 
+  test("UI — #1049: Tags — “release, hotfix” and Return adds the two tags in one call_tags_set", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openSummary(page, call);
+    const field = page.getByLabel("Tags", { exact: true });
+    await field.fill("release, hotfix");
+    await field.press("Enter");
+    await expect(page.getByRole("button", { name: "Remove release" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Remove hotfix" })).toBeVisible();
+    expect(await sent(page, "call_tags_set")).toEqual([{ call_ids: [call], add: ["release", "hotfix"], remove: [] }]);
+  });
+
   test("UI — other path: Delete Audio Now… — the alert asks, Cancel sends nothing, Delete Audio deletes only the audio", async ({ page }) => {
     await watchAlerts(page);
     const { call } = await O.openOutputs(page, "written");
