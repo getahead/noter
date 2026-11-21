@@ -898,3 +898,16 @@ async fn the_harness_seeds_the_self_test_state() {
         .unwrap();
     assert_eq!(row.state, PermissionState::NotAsked);
 }
+
+// cpt-noter-seq-first-run-complete-setup, #1056: Finish hands over to Today. A core with no native
+// surfaces (headless) still accepts it and sends the main window its navigation.
+#[tokio::test]
+async fn finish_hands_over_to_today_without_native_surfaces() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let today = NavigateArgs {
+        target: Some(NavTarget::Today),
+    };
+    s.core.window_navigate(&first_run(), today).await.unwrap();
+    assert!(s.events.names().contains(&event_names::NAV_REQUEST));
+}

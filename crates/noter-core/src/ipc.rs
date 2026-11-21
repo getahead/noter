@@ -743,10 +743,25 @@ impl CoreApi for Core {
 
     async fn window_navigate(
         &self,
-        _ctx: &CommandCtx,
+        ctx: &CommandCtx,
         args: NavigateArgs,
     ) -> Result<Ack, CoreError> {
+        let to_main = !matches!(
+            args.target,
+            Some(NavTarget::Settings { .. } | NavTarget::FirstRun { .. })
+        );
         self.navigate(args.target);
+        // Setup hands over to the main window on Finish: its own window closes (issue 1056).
+        if to_main
+            && matches!(
+                ctx.caller,
+                Caller::Window {
+                    label: WindowLabel::FirstRun
+                }
+            )
+        {
+            self.deps.surfaces.hide_window(WindowLabel::FirstRun);
+        }
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav
         Ok(Ack {})
         // @cpt-end:cpt-noter-flow-core-native-surfaces-navigation:p2:inst-return-nav

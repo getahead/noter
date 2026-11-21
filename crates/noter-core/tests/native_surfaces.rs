@@ -78,6 +78,9 @@ impl Surfaces for Rec {
     fn show_window(&self, window: WindowLabel) {
         self.note(format!("show_window {}", window.as_str()));
     }
+    fn hide_window(&self, window: WindowLabel) {
+        self.note(format!("hide_window {}", window.as_str()));
+    }
     fn fit_record_prompt(&self, width: u32, height: u32) {
         self.note(format!("fit_record_prompt {width}x{height}"));
     }
@@ -732,4 +735,27 @@ async fn tray_next_event_uses_only_permitted_upcoming_calendar_data() {
             .find(|line| line.starts_with("Next:"));
         assert_eq!(next, expected);
     }
+}
+
+// cpt-noter-seq-first-run-complete-setup, #1056: Finish in setup asks for Today; the main window shows it and the setup window closes.
+#[tokio::test]
+async fn the_setup_window_closes_when_it_hands_over_to_the_main_window() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _, rec) = open(dir.path());
+    rec.take();
+    let today = || NavigateArgs {
+        target: Some(NavTarget::Today),
+    };
+    core.window_navigate(&window(WindowLabel::FirstRun), today())
+        .await
+        .unwrap();
+    assert_eq!(rec.take(), ["show_window main", "hide_window first-run"]);
+    core.window_navigate(&window(WindowLabel::Main), today())
+        .await
+        .unwrap();
+    assert_eq!(
+        rec.take(),
+        ["show_window main"],
+        "other windows are left alone"
+    );
 }

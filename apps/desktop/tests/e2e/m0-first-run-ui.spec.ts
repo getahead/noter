@@ -125,6 +125,26 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
   });
 
+  // #1056: Finish hands over to the main window's Today, and the setup window closes (the core asks the host to hide it)
+  test("UI — other path: Finish on the last step opens Today and closes the setup window", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", {
+      world: (w) => {
+        W.firstRun(w);
+        audioGranted(w);
+        w.app.setup.self_test = { type: "passed", at: Date.now() };
+        w.app.setup.detection_enabled = true;
+        for (const s of w.app.setup.steps) if (s.step !== "assistants") s.state = "done";
+      },
+    });
+    await expect(step(page, "Assistants")).toHaveAttribute("aria-current", "step");
+    await button(page, "Finish").click();
+    await expect.poll(() => sent(page, "window_navigate")).toContainEqual({ target: { type: "today" } });
+    if (!FAKE) {
+      const surfaces = () => steer.invoke("harness.surfaces", {}) as Promise<{ calls: string[] }>;
+      await expect.poll(async () => (await surfaces()).calls).toEqual(expect.arrayContaining(["show_window main", "hide_window first-run"]));
+    }
+  });
+
   test("UI — error path: Microphone not allowed — Open System Settings…, turn Noter on, Granted", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), W.permission(w, "microphone", "denied")) });
     const mic = permissionRow(page, "Microphone");

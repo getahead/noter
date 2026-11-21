@@ -2966,3 +2966,31 @@ async fn llm_next_refuses_an_unknown_skill_or_both_output_and_fail() {
         );
     }
 }
+
+// #1056 (cpt-noter-seq-first-run-complete-setup): Finish's hand-over to Today shows the main
+// window and hides the setup window; the scripted surfaces record both for the E2E tests.
+#[tokio::test]
+async fn the_scripted_surfaces_record_the_setup_window_handing_over_to_today() {
+    let mut r = start().await;
+    r.ok(
+        "first-run",
+        "window_navigate",
+        json!({ "target": { "type": "today" } }),
+    )
+    .await;
+    let shown = r.ok("main", "harness.surfaces", json!({})).await;
+    let calls: Vec<&str> = shown["calls"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    let at = calls.iter().position(|c| *c == "show_window main");
+    assert!(at.is_some(), "{calls:?}");
+    assert_eq!(
+        calls.get(at.unwrap() + 1),
+        Some(&"hide_window first-run"),
+        "{calls:?}"
+    );
+    r.finish().await;
+}
