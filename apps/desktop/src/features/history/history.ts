@@ -1,5 +1,6 @@
 // The pure part of the History timeline: the read key, the day groups, the read state and the undo target of a row.
 import type { ActorFilter, ChangeRow, HistoryTarget, UiPrefs, UndoTarget } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
 import { dayOf, shortDay, t } from "../../i18n/format";
 import { runtimeLabel } from "../call-page/outputs-logic";
 
@@ -78,3 +79,7 @@ export const undoTarget = (r: ChangeRow): UndoTarget => (r.batch_id && r.batch_s
 export const sameTarget = (a: UndoTarget, b: UndoTarget) => JSON.stringify(a) === JSON.stringify(b);
 
 export const actorLabel = (r: ChangeRow): string => (r.actor.type === "you" ? t("history.actor_you") : r.actor.type === "job" ? t("history.actor_job", { name: r.actor.name }) : t("history.actor_model", { runtime: runtimeLabel(r.actor.runtime) }));
+
+const FIELDS = new Set(["title", "call_type", "tags", "review_state", "text", "body", "status", "owner_person_id", "due_date", "topic_id", "current_version_id", "name", "person_id", "speakers", "prompt_md", "repos", "hotkeys", "general"]);
+/** A change's field in words (**Review**, **Version**); a field without words is left out, never shown as its column name (#1065). */
+export const fieldLabel = (field: string | null): string | undefined => (field && FIELDS.has(field) ? t(`history.field.${field}` as MsgKey) : undefined);

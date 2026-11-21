@@ -88,7 +88,7 @@ describe("ChangeRow (cpt-noter-component-ui-change-row)", () => {
     const applied = renderToString(<ChangeRow {...props(row("a"))} />);
     expect(applied).toContain("Undo");
     expect(applied).toContain("Diff");
-    expect(applied).toContain("Backend sync · title");
+    expect(applied).toContain("Backend sync › Title");
     const undone = renderToString(<ChangeRow {...props(row("a", { status: "undone", undoable: false, redoable: true }))} />);
     expect(undone).toContain("Redo");
     expect(undone).toContain('data-state="undone"');
