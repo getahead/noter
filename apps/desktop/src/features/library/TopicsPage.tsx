@@ -166,7 +166,8 @@ export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { 
       <td className="np-tnum">{x.decisions}</td>
       <td className="np-tnum">{x.open_questions}</td>
       <td>{last}</td>
-      <td>
+      {/* the row opens the topic too: the button's click stops here, or it opens twice (issue 1045) */}
+      <td onClick={(e) => e.stopPropagation()}>
         <IconButton icon="chevronRight" label={t("topics.open_topic", { name: x.name })} size="inline" onAction={open} />
       </td>
     </tr>

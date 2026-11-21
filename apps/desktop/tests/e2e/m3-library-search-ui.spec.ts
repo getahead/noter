@@ -206,6 +206,14 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await expect(page.getByText(new RegExp(`· ${questions} open questions? ·`))).toBeVisible();
   });
 
+  test("UI — #1045: the row's › button opens the topic once, so one Back returns to Topics", async ({ page }) => {
+    await openTopics(page);
+    await page.getByRole("button", { name: "Open Websocket notifications" }).click();
+    await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
+    await page.keyboard.press("Meta+BracketLeft");
+    await expect(page.getByRole("heading", { name: "Topics", level: 1 })).toBeVisible();
+  });
+
   test("UI — other path: search reconnect finds none, Clear Search restores, Rename… sends topic_rename with the current rev and shows Renamed … · Undo", async ({ page }) => {
     await openTopics(page);
     const field = page.getByRole("searchbox", { name: /Search/ });
