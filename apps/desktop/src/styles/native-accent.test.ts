@@ -33,6 +33,17 @@ describe("native accent (cpt-noter-flow-ui-tokens-theming-follow-appearance)", (
     expect(graphite.slice(1, 3)).toBe(graphite.slice(3, 5));
   });
 
+  it("derives the accent from the minified surfaces a production build computes", () => {
+    // getComputedStyle in the packaged app returns tokens.css as the minifier wrote it (0.24.1 went blank on these)
+    const minified = {
+      LIGHT: { "--content-bg": "#fff", "--card-bg": "#fff", "--win-bg": "#f5f5f5", "--side-bg": "#f2f2f49e" },
+      DARK: { "--content-bg": "#1e1e1e", "--card-bg": "#2a2a2a", "--win-bg": "#262626", "--side-bg": "#26262894" },
+    } as const;
+    for (const appearance of ["LIGHT", "DARK"] as const) {
+      expect(accentTokens([0, 122, 255], appearance, minified[appearance])).toEqual(accentTokens([0, 122, 255], appearance, resolveTokens(css, appearance)));
+    }
+  });
+
   it("updates on appearance changes, replaces an accent and cleans up listeners and overrides", () => {
     let dark = false;
     const listeners = new Map<string, () => void>();

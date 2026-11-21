@@ -106,10 +106,15 @@ export function resolveTokens(css: string, appearance: Appearance, reduceTranspa
 
 type Rgba = [number, number, number, number];
 
-/** The first #RRGGBB or rgb()/rgba() colour in a value, so a box-shadow such as the focus ring works too. */
+/** The first hex (#RGB, #RGBA, #RRGGBB, #RRGGBBAA) or rgb()/rgba() colour in a value, so a box-shadow such as
+ *  the focus ring works too. Production builds minify tokens.css into the short and alpha hex forms. */
 function parseColor(value: string): Rgba {
-  const hex = /#([0-9a-f]{6})\b/i.exec(value);
-  if (hex) return [0, 2, 4].map((i) => parseInt(hex[1].slice(i, i + 2), 16)).concat(1) as Rgba;
+  const hex = /#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})\b/i.exec(value)?.[1];
+  if (hex) {
+    const pairs = hex.length <= 4 ? [...hex].map((c) => c + c) : hex.match(/../g)!;
+    const [r, g, b, a = 255] = pairs.map((p) => parseInt(p, 16));
+    return [r, g, b, a / 255];
+  }
   const fn = /rgba?\(([^)]+)\)/.exec(value);
   if (fn) {
     const [r, g, b, a = 1] = fn[1].split(",").map(Number);
