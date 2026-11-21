@@ -317,6 +317,10 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await expect(title).toHaveCSS("color", "rgba(0, 0, 0, 0.85)");
     await expect(title).toHaveCSS("font-size", "13px");
     await expect(title.locator(".np-recdot")).toHaveCount(0);
+    // the title starts where the other cards' titles do: 14-pt padding, 52-pt time gutter, 12-pt gap
+    const c = await card.boundingBox();
+    const tb = await title.boundingBox();
+    expect(Math.round(tb!.x - c!.x)).toBe(78);
   });
   test("UI — design — #1074 the review line starts 24 pt from the sidebar and 20 pt under the toolbar", async ({ page }) => {
     await openToday(page, () => {});
