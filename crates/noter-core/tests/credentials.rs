@@ -206,7 +206,8 @@ async fn a_rejected_key_state_is_cleared_by_removal_and_other_windows_cannot_rem
         key(&view, KeyProvider::Codex),
         KeyStatus::Rejected { .. }
     ));
-    for label in [WindowLabel::Main, WindowLabel::FirstRun] {
+    // FirstRun may remove too (owner, 21 Nov, #1057): its Assistants step offers Remove.
+    for label in [WindowLabel::Main] {
         let args = json!({"provider": "codex"});
         let err = dispatch_json(&*w.core, &from(label), "api_key_remove", args, None)
             .await

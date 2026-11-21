@@ -1670,7 +1670,8 @@
       "result": "AccountsView",
       "stability": "frozen",
       "windows": [
-        "settings"
+        "settings",
+        "first-run"
       ]
     },
     {
@@ -2222,7 +2223,7 @@
       ]
     }
   ],
-  "contract_version": "2.19",
+  "contract_version": "2.20",
   "default_retryable": [
     "not_ready",
     "internal",

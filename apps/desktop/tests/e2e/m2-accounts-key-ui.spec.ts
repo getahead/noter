@@ -8,6 +8,7 @@ import type { Page } from "@playwright/test";
 import * as W from "../support/world-presets";
 import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
+import { answerAlerts, watchAlerts } from "./support/native-alert";
 import { expect, test } from "./support/fixtures";
 
 const panes = (page: Page) => page.getByRole("navigation", { name: "Settings panes" });
@@ -155,6 +156,19 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
     await expect(step(page).getByRole("button", { name: "Install Ollama…" })).toHaveCount(0);
     await expect(step(page)).toContainText("Without an assistant Noter still records and transcribes");
     await expect(page.getByRole("button", { name: "Finish", exact: true })).toBeEnabled();
+  });
+
+  test("other path — #1057: Remove on a stored key in first run removes it (api_key_remove allows FirstRun), and the empty field comes back", async ({ page }) => {
+    await watchAlerts(page);
+    await openWindow(page, "first-run", { world: atAssistants });
+    await keyField(page).fill(GOOD);
+    await step(page).getByRole("button", { name: "Verify" }).first().click();
+    await expect(step(page)).toContainText("Stored in the Keychain");
+    await answerAlerts(page, "confirm");
+    await step(page).getByRole("button", { name: "Remove", exact: true }).first().click();
+    await expect.poll(async () => (await sent(page, "api_key_remove")).length).toBeGreaterThanOrEqual(1);
+    await expect(keyField(page)).toBeVisible();
+    await expect(step(page)).not.toContainText("Couldn’t remove the key");
   });
 
   test("error path — API key rejected: the field is invalid with the reason in one line; the corrected key verifies", async ({ page }) => {
