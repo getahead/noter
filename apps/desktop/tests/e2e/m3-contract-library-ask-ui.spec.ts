@@ -47,6 +47,56 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
 });
 
 test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
+  test("acknowledged feedback survives a delayed pre-rating thread read", async ({ page }) => {
+    const steer = await openWindow(page, "main", { world: W.idle });
+    await page.evaluate(() => {
+      type Host = { invoke(cmd: string, ...args: unknown[]): Promise<unknown> };
+      const g = globalThis as unknown as {
+        __noterFake?: Host; __TAURI_INTERNALS__?: Host;
+        feedbackRead: { id: string; releases: Array<() => void>; holding: boolean };
+      };
+      const host = g.__noterFake ?? g.__TAURI_INTERNALS__!;
+      const invoke = host.invoke.bind(host);
+      g.feedbackRead = { id: "", releases: [], holding: true };
+      host.invoke = async (cmd, ...args) => {
+        const result = await invoke(cmd, ...args);
+        if (cmd === "ask_thread_get" && g.feedbackRead.holding && (result as AskThread).turns.some((a) => a.question === "zzqxzz quuxplan frobnicate")) {
+          // Capture the old value before Helpful is saved, then deliver that read late.
+          const captured = structuredClone(result) as AskThread;
+          g.feedbackRead.id = captured.id;
+          await new Promise<void>((resolve) => g.feedbackRead.releases.push(resolve));
+          return captured;
+        }
+        return result;
+      };
+    });
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit2");
+      await expect(page.getByRole("heading", { name: "Ask", level: 1 })).toBeVisible({ timeout: 1000 });
+    }).toPass();
+    const composer = page.locator('[data-region="AK-R4"]').getByRole("textbox");
+    await composer.fill("zzqxzz quuxplan frobnicate");
+    await composer.press("Enter");
+    await expect.poll(() => page.evaluate(() => (globalThis as unknown as { feedbackRead: { releases: unknown[] } }).feedbackRead.releases.length)).toBeGreaterThan(0);
+    const helpful = page.getByRole("button", { name: "Helpful", exact: true });
+    await helpful.click();
+    await expect(helpful).toHaveAttribute("aria-pressed", "true");
+    const id = await page.evaluate(async () => {
+      const read = (globalThis as unknown as { feedbackRead: { id: string; releases: Array<() => void>; holding: boolean } }).feedbackRead;
+      read.holding = false;
+      read.releases.splice(0).forEach((release) => release());
+      // Let the read continuation and React's resulting commit reach the screen.
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      return read.id;
+    });
+    expect((await steer.invoke("ask_thread_get", { thread_id: id }) as AskThread).turns[0].rating).toBe("helpful");
+    await expect(helpful).toHaveAttribute("aria-pressed", "true");
+    await helpful.click();
+    await expect(helpful).toHaveAttribute("aria-pressed", "false");
+    expect((await steer.invoke("ask_thread_get", { thread_id: id }) as AskThread).turns[0].rating).toBeNull();
+  });
+
   test("a reloaded narrowed turn widens from its stored scope and retains acknowledged ratings", async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 800 });
     const steer = await openWindow(page, "main", { fixedClock: true, world: W.idle });

@@ -278,7 +278,8 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
         <div role="status" className="ak-live">{announce}</div>
         {routeError && <InlineBanner banner={{ id: "ask-topic-error", severity: "error", text: t("ask.topic_error") }} />}
         {empty && <h2 className="ak-first__h">{t("ask.first_heading")}</h2>}
-        {turns.map((a) => (
+        {/* Keep a completed live turn mounted when its stored snapshot arrives. */}
+        {[...turns.map((a) => (
           <article key={a.turn_id} className="ak-turn">
             <h3 className="ak-q">{a.question}</h3>
             {/* @cpt-begin:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
@@ -287,14 +288,13 @@ export function AskView({ bridge, rows, loadError, routeError, thread, turns, as
             {/* @cpt-end:cpt-noter-state-ui-ask-turn:p1:inst-again */}
             {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-again */}
           </article>
-        ))}
-        {asking && (
-          <article className="ak-turn">
+        )), asking && (
+          <article key={turn?.answer?.turn_id ?? "asking"} className="ak-turn">
             <h3 className="ak-q">{asking}</h3>
             <Answer bridge={bridge} view={turn ?? foldTurn([])} onPlay={onPlay} onRetry={onRetry} onSearch={() => searchByKeyword(asking)} onWiden={narrowed && onWiden ? () => onWiden(asking) : undefined} />
             {phase === "interrupted" && <PushButton label={t("ask.try_again")} onAction={onRetry} />}
           </article>
-        )}
+        )]}
         {bar}
         <div className={`ak-composer${empty ? " is-first" : ""}`} data-region="AK-R4">
           {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-compose */}
