@@ -164,7 +164,7 @@ test.describe("cpt-noter-flow-ui-accessibility-l10n-keyboard", () => {
         }
       }
       if (label === "settings") {
-        const panes = page.locator('[data-region="ST-R1"] [role="list"] > [role="listitem"]');
+        const panes = page.locator('[data-region="ST-R1"] [role="listbox"] > [role="option"]');
         for (let i = 0; i < (await panes.count()); i++) {
           await panes.nth(i).click();
           await assertReachable(page, `settings pane ${i + 1}`);
@@ -226,7 +226,7 @@ test.describe("cpt-noter-dod-ui-accessibility-l10n-strings — pseudo-localisati
 
     test(`UI — Settings window in ${mode} pseudo-localisation: no truncated label in any pane`, async ({ page }) => {
       await openWindow(page, `settings&pseudo=${mode}`);
-      const panes = page.locator('[data-region="ST-R1"] [role="list"] > [role="listitem"]');
+      const panes = page.locator('[data-region="ST-R1"] [role="listbox"] > [role="option"]');
       await expect(panes.first()).toBeVisible();
       const count = await panes.count();
       expect(count).toBe(11);
@@ -247,7 +247,7 @@ test.describe("cpt-noter-dod-ui-accessibility-l10n-strings — lang", () => {
   test("UI — Settings: the document is English and every content cell of the glossary carries a lang", async ({ page }) => {
     await openWindow(page, "settings");
     await expect(page.locator("html")).toHaveAttribute("lang", "en");
-    await page.getByRole("navigation", { name: t("settings.panes") }).getByRole("listitem").filter({ hasText: t("settings.pane.audio_and_transcription") }).click();
+    await page.getByRole("navigation", { name: t("settings.panes") }).getByRole("option").filter({ hasText: t("settings.pane.audio_and_transcription") }).click();
     const rows = page.locator("table tbody tr");
     await expect(rows.first()).toBeVisible();
     const cells = rows.locator("td");

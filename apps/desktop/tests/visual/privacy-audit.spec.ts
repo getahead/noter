@@ -13,7 +13,7 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 async function show(page: Page, rows: AuditEntry[], call?: string) {
   await openWindow(page, "settings", { fixedClock: true, world: (w) => (w.audit = rows) });
   await coreReady(page);
-  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Privacy" }).click();
+  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Privacy" }).click();
   if (call) {
     await page.evaluate((id) => (globalThis as unknown as { __noterFake: { invoke: (c: string, a: unknown) => unknown } }).__noterFake.invoke("window_navigate", { target: { type: "settings", pane: "privacy", call_id: id } }), call);
   }

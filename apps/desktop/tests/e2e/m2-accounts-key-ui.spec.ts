@@ -21,7 +21,7 @@ const GOOD = "test-stand-in-value-0001";
 const keySets = async (page: Page) => (await sent(page, "api_key_set")).map((a) => ({ provider: (a as { provider: string }).provider, hasKey: typeof (a as { key?: unknown }).key === "string" && (a as { key: string }).key.length > 0 }));
 
 async function openModels(page: Page) {
-  await panes(page).getByRole("listitem").filter({ hasText: "Models & Runtimes" }).click();
+  await panes(page).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
   await expect(pane(page).getByRole("heading", { name: "Models & Runtimes", exact: true })).toBeVisible();
 }
 /** **Add…** on the fixture of one core, **Replace…** on the other: the sheet is the same. */

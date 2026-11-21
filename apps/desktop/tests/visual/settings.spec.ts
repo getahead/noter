@@ -24,7 +24,7 @@ const title = (id: SettingsPane) => PANES.find(([p]) => p === id)![1];
 async function show(page: Page, pane: SettingsPane, plan: CorePlan = {}) {
   const steer = await openWindow(page, "settings", plan);
   const nav = page.getByRole("navigation", { name: "Settings panes" });
-  await nav.getByRole("listitem").filter({ hasText: title(pane) }).first().click();
+  await nav.getByRole("option").filter({ hasText: title(pane) }).first().click();
   await expect(page.locator('[data-region="ST-R2"]').getByRole("heading", { name: title(pane), exact: true })).toBeVisible();
   return steer;
 }

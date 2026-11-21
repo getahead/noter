@@ -12,7 +12,7 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 test.describe("cpt-noter-flow-ui-settings-change-setting (glossary)", () => {
   test("UI — other path: the Glossary table is one Tab stop (the selected term, else the first)", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Audio & Transcription" }).click();
     await expect.poll(() => sent(page, "glossary_list")).not.toEqual([]);
     const rows = pane(page).getByRole("table", { name: "Glossary" }).locator("tbody tr");
     await expect(rows.first()).toBeVisible();
@@ -22,7 +22,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting (glossary)", () => {
 
   test("UI — happy path: + adds a term with glossary_upsert, it is listed; − removes the selected one with glossary_remove", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Audio & Transcription" }).click();
     await expect.poll(() => sent(page, "glossary_list")).not.toEqual([]);
     const glossary = pane(page).getByRole("table", { name: "Glossary" });
 

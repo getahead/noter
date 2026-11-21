@@ -22,7 +22,7 @@ const sheet = (page: Page, name: RegExp) => page.getByRole("dialog", { name });
 const sourceRow = (page: Page, name: string) => pane(page).locator('[data-component="cpt-noter-component-ui-status-row"]').filter({ hasText: name });
 
 async function openPane(page: Page, name: string) {
-  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: name }).click();
+  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: name }).click();
   await expect(pane(page).getByRole("heading", { name, exact: true })).toBeVisible();
 }
 
