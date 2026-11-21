@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -338,7 +339,7 @@ it("Show All in Activity opens Activity, and the recording button shows the call
   expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "activity", key: "root" } } }]);
   const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
   const toolbar = rendered(TodayToolbar, { route: { section: "today", key: "root" }, bridge, base, inspectorOpen: false, onToggleInspector() {} });
-  (find(toolbar.props.trailing, (p) => p["data-variant"] === "button").props.onClick as () => void)();
+  (find(toolbar.props.trailing as ReactNode, (p) => p["data-variant"] === "button").props.onClick as () => void)();
   await vi.waitFor(() => expect(out.map((c) => c[0])).toContain("window_show_call"));
 });
 
