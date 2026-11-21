@@ -25,6 +25,15 @@ describe("contrastRatio", () => {
     expect(contrastRatio("0 0 0 3px #0064D1", "#FFFFFF")).toBeCloseTo(contrastRatio("#0064D1", "#FFFFFF"), 5);
   });
 
+  it("reads the short and alpha hex forms the production CSS minifier writes", () => {
+    expect(contrastRatio("#000", "#fff")).toBeCloseTo(21, 5);
+    expect(contrastRatio("#0008", "#FFFFFF")).toBe(contrastRatio("#00000088", "#FFFFFF"));
+    expect(contrastRatio("#00000099", "#FFFFFF")).toBeCloseTo(contrastRatio("rgba(0,0,0,0.6)", "#FFFFFF"), 10);
+    // 0.24.1 shipped --side-bg: rgba(242,242,244,.62) as #f2f2f49e
+    expect(contrastRatio("#000000", "#f2f2f49e", "#fff")).toBeCloseTo(contrastRatio("#000000", "rgba(242,242,244,0.62)", "#FFFFFF"), 2);
+    expect(() => contrastRatio("#00000", "#FFFFFF")).toThrow(/no colour/);
+  });
+
   it("rejects a value without a colour and a translucent background without a base", () => {
     expect(() => contrastRatio("none", "#FFFFFF")).toThrow(/no colour/);
     expect(() => contrastRatio("#000000", "rgba(0,0,0,.5)")).toThrow(/opaque/);
