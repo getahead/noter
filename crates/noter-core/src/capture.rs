@@ -716,7 +716,9 @@ impl Core {
 
     pub(crate) async fn mark_moment(&self, args: MarkMomentArgs) -> Result<MarkView, CoreError> {
         let session = self.capture.lock().await;
-        if !live(&self.capture_now(), &args.call_id) {
+        let state = self.capture_now();
+        // Pause drops the audio, so a paused call has no moment to mark (owner, 21 Nov, issue 1042).
+        if !live(&state, &args.call_id) || state.phase == CapturePhase::Paused {
             return Err(not_recording());
         }
         // @cpt-begin:cpt-noter-flow-core-capture-session-pause-mark:p1:inst-insert-mark

@@ -1274,22 +1274,23 @@ async fn a_live_call_can_be_made_sensitive_but_not_turned_back() {
 async fn start_pause_mark_and_stop_work_from_the_menu_bar() {
     let r = rig();
     let call_id = r.recording_from(&menu_bar()).await;
-    r.core
-        .capture_set_paused(
-            &menu_bar(),
-            CapturePauseArgs {
-                call_id: call_id.clone(),
-                paused: true,
-            },
-        )
-        .await
-        .unwrap();
+    // marked before the pause: a paused call has nothing to mark (#1042)
     r.core
         .capture_mark_moment(
             &menu_bar(),
             MarkMomentArgs {
                 call_id: call_id.clone(),
                 note: None,
+            },
+        )
+        .await
+        .unwrap();
+    r.core
+        .capture_set_paused(
+            &menu_bar(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
             },
         )
         .await
@@ -3745,4 +3746,36 @@ async fn pause_and_resume_send_the_call_row_with_its_new_status() {
             .unwrap();
         assert_eq!(last_status(), Some(Value::from(status)));
     }
+}
+
+// cpt-noter-seq-menu-bar-control-recording, #1042, owner decision 21 Nov: pause drops the audio, so nothing can be marked while paused.
+#[tokio::test(start_paused = true)]
+async fn no_moment_can_be_marked_while_paused() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let pause = |paused| CapturePauseArgs {
+        call_id: call_id.clone(),
+        paused,
+    };
+    let mark = || MarkMomentArgs {
+        call_id: call_id.clone(),
+        note: None,
+    };
+    r.core
+        .capture_set_paused(&main_window(), pause(true))
+        .await
+        .unwrap();
+    assert_eq!(
+        code(r.core.capture_mark_moment(&main_window(), mark()).await),
+        ErrorCode::NotRecording
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM marks"), 0);
+    r.core
+        .capture_set_paused(&main_window(), pause(false))
+        .await
+        .unwrap();
+    r.core
+        .capture_mark_moment(&main_window(), mark())
+        .await
+        .unwrap();
 }

@@ -512,6 +512,20 @@ test.describe("cpt-noter-flow-ui-call-window-controls", () => {
 });
 
 // From m1-dialogs-host-ui.spec.ts (ui-e2e): the call window's inline confirmation, delivered with the call window.
+test.describe("cpt-noter-seq-menu-bar-control-recording", () => {
+  // #1042 (owner, 21 Nov): pause drops the audio, so nothing can be marked while paused, from the panel or anywhere
+  test("UI — other path: while paused Mark Moment is dimmed and the core refuses a mark; Resume brings it back", async ({ page }) => {
+    const steer = await startLive(page);
+    await button(page, "Pause").click();
+    await expect(word(page, "Paused")).toBeVisible();
+    await expect(button(page, "Mark Moment")).toBeDisabled();
+    const refused = await steer.invoke("capture_mark_moment", { ...live, note: null }, "call-screen").then(() => "marked", (e: unknown) => `${(e as Error).message} ${JSON.stringify(e)}`);
+    expect(refused).toMatch(FAKE ? /Error/ : /not_recording/); // the fake's code does not survive page.evaluate
+    await button(page, "Resume").click();
+    await expect(button(page, "Mark Moment")).toBeEnabled();
+  });
+});
+
 test.describe("cpt-noter-flow-ui-dialogs-host-inline-confirm", () => {
   const nothingHeard = (w: Parameters<typeof W.idle>[0]) => W.notice(w, { type: "nothing_heard", since: Date.now() - 5 * W.MIN });
 

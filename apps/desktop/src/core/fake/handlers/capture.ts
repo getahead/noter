@@ -73,6 +73,7 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   capture_mark_moment: (a, { world, fake }) => {
     shared.requireLive(world.app.capture, a.call_id);
+    if (world.app.capture.phase === "paused") throw coreError("not_recording"); // pause drops the audio: nothing to mark (#1042)
     const mark = { id: newId("mrk"), call_id: a.call_id, at_ms: world.app.capture.recorded_ms, note: a.note ?? null };
     fake.push("transcript_subscribe", { event: { type: "mark", mark } });
     return mark;
