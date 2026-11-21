@@ -79,6 +79,8 @@ export function CallsView(p: CallsViewProps) {
   usePublishHead(null, callsSubtitle(p));
   return (
     <>
+      {/* the title is the toolbar's; this hidden heading is where focus and VoiceOver land in the content after ⌘3 */}
+      <h2 className="np-sr" tabIndex={-1}>{t("library.calls.title")}</h2>
       {p.bar}
       {p.actions}
       {p.failed && (

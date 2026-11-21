@@ -105,6 +105,7 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     const people = bar.getByRole("button", { name: /^People/ });
     expect(parseFloat(await people.evaluate((el) => getComputedStyle(el).borderTopLeftRadius))).toBeGreaterThanOrEqual(10);
     await expect(people.locator("svg path")).toHaveAttribute("d", "M4 6l4 4 4-4"); // the single ˅ (chevronDown)
+    await expect(people.locator("svg")).toHaveCSS("margin-left", "0px"); // only the button's 6-pt gap before the ˅, as in the prototype
     await expect(bar.getByRole("button", { name: "Clear", exact: true })).toBeDisabled();
   });
   test("UI — design — #1079 the month header of the current year reads the month alone", async ({ page }) => {
