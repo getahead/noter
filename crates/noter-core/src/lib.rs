@@ -255,6 +255,8 @@ pub struct Core {
     presenting_transition: Mutex<()>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
+    /// When the capture state was last published (clock ms), to keep `recorded_ms` current.
+    capture_stamp: std::sync::atomic::AtomicI64,
     /// The call the main window reports it shows (`window_report_view`).
     viewed: Mutex<Option<CallId>>,
     /// Notifications waiting for the call to end, one per call.
@@ -467,6 +469,7 @@ impl Core {
             windows: Mutex::new(surfaces::Windows::default()),
             presenting_transition: Mutex::new(()),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
+            capture_stamp: std::sync::atomic::AtomicI64::new(0),
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
             audio_dir,

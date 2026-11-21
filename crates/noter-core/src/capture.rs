@@ -316,8 +316,21 @@ impl Core {
 
     /// Changes the capture state and sends it whole with the next version.
     pub(crate) fn set_capture(&self, change: impl FnOnce(&mut CaptureState)) -> CaptureState {
+        let now = self.deps.clock.now().0;
         let mut app = self.app();
+        let (phase, recorded) = (app.capture.phase, app.capture.recorded_ms);
         change(&mut app.capture);
+        // Clocks count from each new version, so a change that leaves a recording call recording
+        // carries the time recorded since the last publish (issue 1043); pause, resume and stop
+        // set `recorded_ms` themselves.
+        let since = self
+            .capture_stamp
+            .swap(now, std::sync::atomic::Ordering::SeqCst);
+        let still = phase == CapturePhase::Recording && app.capture.phase == phase;
+        if still && app.capture.recorded_ms == recorded {
+            let more = u32::try_from((now - since).max(0)).unwrap_or(u32::MAX);
+            app.capture.recorded_ms = DurationMs(recorded.0.saturating_add(more));
+        }
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
         self.capture_phase.send_replace(state.phase);
         self.feed_guard(state.phase);

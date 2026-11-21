@@ -62,3 +62,34 @@ test.describe("cpt-noter-flow-ui-main-window-shell-navigate", () => {
     expect([...seen]).toEqual(expect.arrayContaining(["MW-R2", "MW-R3"]));
   });
 });
+
+// The sidebar's live row counts from each capture state it receives; these prove the real core keeps that state's
+// recorded time current. The fake core keeps a fixed `recorded_ms` (it models no recorded time), so only the real core
+// is held to the clock.
+test.describe("cpt-noter-seq-menu-bar-control-recording", () => {
+  const REAL = process.env.NOTER_CORE === "stdio";
+  const liveClock = (page: Page) => sidebar(page).locator('[data-variant="live-row"] .np-tnum');
+  const liveSeconds = async (page: Page) => {
+    const text = await liveClock(page).innerText();
+    return text.split(":").map(Number).reduce((total, n) => total * 60 + n, 0);
+  };
+  /** Three seconds of the core's (real) time, while the page's own clock may stand still. */
+  const coreRuns3s = async () => {
+    const t0 = Date.now();
+    await expect.poll(() => Date.now() - t0, { intervals: [500], timeout: 10_000 }).toBeGreaterThanOrEqual(3000);
+  };
+
+  // #1043: a capture change other than pause or resume (here Sensitive) carries the time recorded so far; the page
+  // clock stands still, so only the new state can move the live row forward, and a stale one moves it back
+  test("UI — other path: making the live call sensitive keeps the recording clock running", async ({ page }) => {
+    await page.clock.install();
+    const steer = await openWindow(page, "main", { world: () => {} });
+    await expect(liveClock(page)).toBeVisible();
+    await page.clock.pauseAt(Date.now() + 1000);
+    const before = await liveSeconds(page);
+    await coreRuns3s();
+    await steer.invoke("capture_set_sensitive", { call_id: W.LIVE_CALL, sensitive: true }, "call-screen");
+    if (REAL) await expect.poll(() => liveSeconds(page), { message: "the clock did not fall back to the last pause" }).toBeGreaterThanOrEqual(before + 2);
+    else await expect(liveClock(page)).toBeVisible();
+  });
+});

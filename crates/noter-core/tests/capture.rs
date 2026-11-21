@@ -3779,3 +3779,41 @@ async fn no_moment_can_be_marked_while_paused() {
         .await
         .unwrap();
 }
+
+// cpt-noter-seq-menu-bar-control-recording, #1043: every capture state while recording carries the running total, so a clock counting from
+// the latest version never falls back to the last pause or resume.
+#[tokio::test(start_paused = true)]
+async fn a_capture_change_while_recording_keeps_the_recorded_time_current() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.advance(60_000);
+    let state = r
+        .core
+        .capture_set_sensitive(
+            &main_window(),
+            SensitiveArgs {
+                call_id: call_id.clone(),
+                sensitive: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(state.recorded_ms, DurationMs(60_000));
+    r.advance(30_000);
+    let paused = r
+        .core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        paused.recorded_ms,
+        DurationMs(90_000),
+        "never counted twice"
+    );
+}
