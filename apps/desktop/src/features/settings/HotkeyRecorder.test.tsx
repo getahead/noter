@@ -2,7 +2,7 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { find, rendered } from "../../ui/testing";
-import { HotkeyRecorder, hotkeyConflictDescription, hotkeyRecorderLabel } from "./HotkeyRecorder";
+import { HotkeyRecorder, hotkeyConflictDescription, hotkeyRecorderLabel, releaseHotkeysWhile } from "./HotkeyRecorder";
 
 describe("HotkeyRecorder", () => {
   it("shows the chord as key caps on a field named with its row and chord", () => {
@@ -68,5 +68,19 @@ describe("HotkeyRecorder", () => {
     expect(cleared).toEqual(["x"]);
     const field = find(tree, (p, type) => type === "button" && typeof p.onKeyUp === "function");
     (field.props.onKeyUp as (e: unknown) => void)({ code: "ControlLeft", ctrlKey: false, altKey: false, metaKey: false, shiftKey: false });
+  });
+});
+
+// #1104: a pressed app chord must reach the field, not run its action (it stopped a live recording):
+// while a field records, the app's hotkeys are paused through the core
+describe("releaseHotkeysWhile", () => {
+  it("pauses the hotkeys while recording and takes them back after", () => {
+    const pause = vi.fn();
+    expect(releaseHotkeysWhile(false, pause)).toBeUndefined();
+    expect(pause).not.toHaveBeenCalled();
+    const stop = releaseHotkeysWhile(true, pause);
+    expect(pause).toHaveBeenLastCalledWith(true);
+    stop?.();
+    expect(pause).toHaveBeenLastCalledWith(false);
   });
 });

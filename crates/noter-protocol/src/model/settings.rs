@@ -345,6 +345,13 @@ pub struct HotkeyList {
     pub bindings: Vec<HotkeyBinding>,
 }
 
+/// A shortcut field in Settings records (`paused`) or stopped: while it records the app's global
+/// hotkeys are released, so a pressed app chord reaches the field instead of running its action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct HotkeysPauseArgs {
+    pub paused: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HotkeySetArgs {
     pub action: HotkeyAction,
