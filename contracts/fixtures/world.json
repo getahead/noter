@@ -980,49 +980,49 @@
       {
         "builtin": true,
         "id": "one_on_one",
-        "label": "one on one",
+        "label": "1:1",
         "skill_path": "skills/one_on_one/SKILL.md"
       },
       {
         "builtin": true,
         "id": "standup",
-        "label": "standup",
+        "label": "Standup",
         "skill_path": "skills/standup/SKILL.md"
       },
       {
         "builtin": true,
         "id": "planning",
-        "label": "planning",
+        "label": "Planning",
         "skill_path": "skills/planning/SKILL.md"
       },
       {
         "builtin": true,
         "id": "retro",
-        "label": "retro",
+        "label": "Retro",
         "skill_path": "skills/retro/SKILL.md"
       },
       {
         "builtin": true,
         "id": "cross_team",
-        "label": "cross team",
+        "label": "Cross-team",
         "skill_path": "skills/cross_team/SKILL.md"
       },
       {
         "builtin": true,
         "id": "vendor",
-        "label": "vendor",
+        "label": "Vendor",
         "skill_path": "skills/vendor/SKILL.md"
       },
       {
         "builtin": true,
         "id": "interview",
-        "label": "interview",
+        "label": "Interview",
         "skill_path": "skills/interview/SKILL.md"
       },
       {
         "builtin": true,
         "id": "incident",
-        "label": "incident",
+        "label": "Incident",
         "skill_path": "skills/incident/SKILL.md"
       }
     ]

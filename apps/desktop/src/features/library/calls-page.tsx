@@ -27,6 +27,7 @@ import { exportStore } from "./export-store";
 import { AddTagPopover } from "./add-tag";
 import { tagCalls, tagsKey } from "./tags";
 import { FilterBar, useLists } from "./filter-bar";
+import { typeLabel } from "./call-row";
 import { heldFilter, holdFilter, isFiltered, reconcile, syncFilter, watchFilter, type FilterAction, type FilterState } from "./filters";
 import { nextSort, sortOf, withProgress, type Column } from "./calls-model";
 import {
@@ -106,6 +107,8 @@ export function CallsPage() {
   });
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-export
   const lists = useLists(bridge, `${fresh}:${tagsKey(state.rows)}`);
+  // the core's names once the lists are read; the spaced id until then (issue 1055)
+  const typeName = useMemo(() => (id: string) => lists.types.find((c) => c.id === id)?.label ?? typeLabel(id), [lists]);
   // the page's own filter changes and a # tag chosen in the toolbar both reach the list through this one watcher
   const sync = useMemo(() => syncFilter((f) => void list.setFilter(f), heldFilter().filter), [list]);
   useEffect(
@@ -322,6 +325,7 @@ export function CallsPage() {
       failed={failed}
       selfTestPassed={selfTestPassed}
       prefs={prefs}
+      typeName={typeName}
       menu={menu}
       sentinel={sentinel}
       onSort={sortBy}

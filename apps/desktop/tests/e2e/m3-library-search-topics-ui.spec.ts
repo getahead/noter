@@ -81,6 +81,14 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await expect(tagged("hotfix")).toHaveCount(0);
   });
 
+  test("UI — #1055: the Type column names call types as DESIGN writes them (Cross-team), the same as the Type filter", async ({ page }) => {
+    await openCalls(page);
+    await expect(page.locator(ROW).filter({ hasText: "Backend sync" }).locator(".lb-crow__type")).toHaveText("Cross-team");
+    await button(page, /^Type/).click();
+    await expect(page.getByRole("checkbox", { name: "Cross-team" })).toBeAttached();
+    await expect(page.getByRole("checkbox", { name: "1:1" })).toBeAttached();
+  });
+
   test("UI — other path: Add Tag… on two selected calls tags both with one call_tags_set, shows Tagged 2 calls “release” · Undo, # offers release and filters to the tagged calls", async ({ page }) => {
     await openCalls(page);
     const rows = page.locator(ROW);

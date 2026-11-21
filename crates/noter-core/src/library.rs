@@ -29,6 +29,18 @@ const BUILT_IN_TYPES: [&str; 8] = [
     "incident",
 ];
 
+/// Their names as DESIGN writes them (1:1, Cross-team), one per type on every surface (issue 1055).
+const BUILT_IN_LABELS: [&str; 8] = [
+    "1:1",
+    "Standup",
+    "Planning",
+    "Retro",
+    "Cross-team",
+    "Vendor",
+    "Interview",
+    "Incident",
+];
+
 /// Capture writes this type for a call nobody classified yet; it is listed on calls and filters
 /// but is not a choice (`call_types_list`).
 const UNCLASSIFIED: &str = "unclassified";
@@ -728,9 +740,10 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-library-calls-types:p2:inst-types-read
         let mut call_types: Vec<CallTypeInfo> = BUILT_IN_TYPES
             .iter()
-            .map(|id| CallTypeInfo {
+            .zip(BUILT_IN_LABELS)
+            .map(|(id, label)| CallTypeInfo {
                 id: CallTypeId((*id).into()),
-                label: id.replace('_', " "),
+                label: label.into(),
                 builtin: true,
                 skill_path: format!("skills/{id}/SKILL.md"),
             })

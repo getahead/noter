@@ -41,6 +41,8 @@ export interface CallsViewProps {
   selfTestPassed: boolean;
   /** The core's time zone and 12/24-hour setting. */
   prefs?: UiPrefs;
+  /** The call types' names, for the Type column (issue 1055). */
+  typeName?: (id: string) => string;
   menu: { x: number; y: number } | null;
   sentinel?: Ref<HTMLDivElement>;
   onSort: (col: Column) => void;
@@ -255,6 +257,7 @@ function Body(p: CallsViewProps) {
                 onOpen={p.onOpen}
                 onContext={p.onContext}
                 prefs={p.prefs}
+                typeName={p.typeName}
               />
             )),
           ])}
