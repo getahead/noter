@@ -399,9 +399,14 @@ fn filter_of(args: &HistoryListArgs) -> (String, Vec<Sql>) {
             clauses.push("(c.entity_type = 'item' AND c.entity_id = ?)".into());
             binds.push(text(item_id.as_str()));
         }
+        // A naming is logged on its speaker: the person lists the speakers linked to it now (issue 1092).
         HistoryTarget::Person { person_id } => {
-            clauses.push("(c.entity_type = 'person' AND c.entity_id = ?)".into());
-            binds.push(text(person_id.as_str()));
+            clauses.push(
+                "((c.entity_type = 'person' AND c.entity_id = ?)
+                  OR (c.entity_type = 'speaker' AND c.entity_id IN (SELECT id FROM speakers WHERE person_id = ?)))"
+                    .into(),
+            );
+            binds.extend(std::iter::repeat_with(|| text(person_id.as_str())).take(2));
         }
     }
     match args.actor {
