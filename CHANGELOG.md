@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.24.1](https://github.com/getahead/noter/compare/v0.24.0...v0.24.1) (2026-11-21)
+
+
+### Bug fixes
+
+* **core:** carry Library, Ask and People metadata ([#1031](https://github.com/getahead/noter/issues/1031)) ([7c1beb9](https://github.com/getahead/noter/commit/7c1beb9791699c55ca59e2313a0db83289df58fb))
+* **macos:** recheck audio access and follow system accents ([#1032](https://github.com/getahead/noter/issues/1032)) ([85a0cee](https://github.com/getahead/noter/commit/85a0ceeb22b9f51dccbe497015832e59c994be19))
+* **setup:** persist optional model downloads and await Welcome ([#1030](https://github.com/getahead/noter/issues/1030)) ([409da44](https://github.com/getahead/noter/commit/409da44530d539f6dc0dceffe4be6230c2a4bff7))
+
 ## [0.24.0](https://github.com/getahead/noter/compare/v0.23.0...v0.24.0) (2026-11-19)
 
 
