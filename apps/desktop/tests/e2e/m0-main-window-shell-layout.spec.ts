@@ -32,6 +32,22 @@ test.describe("cpt-noter-flow-ui-main-window-shell-resize", () => {
     await expect(win(page)).toHaveAttribute("data-collapse", "none");
   });
 
+  // #1060: the traffic lights sit at the window's top-left (x 9–70 pt) whether or not the sidebar is there
+  test("UI — at every zoom step that collapses the sidebar, and with the sidebar hidden, the toolbar's sidebar toggle starts clear of the traffic lights", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await openWindow(page, "main");
+    const toggle = page.getByRole("button", { name: "Show Sidebar" });
+    const clear = async () => expect((await toggle.boundingBox())!.x).toBeGreaterThanOrEqual(78);
+    await page.keyboard.press("Control+Meta+KeyS"); // hidden at 100 %
+    await clear();
+    await page.keyboard.press("Control+Meta+KeyS");
+    for (let i = 0; i < 3; i++) await page.keyboard.press("Meta+Equal");
+    await expect(win(page)).toHaveAttribute("data-collapse", "sidebar"); // 175 %
+    await clear();
+    await page.keyboard.press("Meta+Equal"); // 200 %
+    await clear();
+  });
+
   test("UI — a window narrower than 900 pt collapses the sidebar; below 760 pt of content the toolbar search becomes an icon", async ({ page }) => {
     await page.setViewportSize({ width: 740, height: 700 }); // the collapsed sidebar takes no width: 740 pt of content is Narrow
     await openWindow(page, "main");

@@ -30,3 +30,7 @@
 .np-sidebar__footer .np-mode__word { white-space: normal; overflow: visible; text-overflow: clip; }
 /* focus moves to the page heading after navigation for VoiceOver; a heading is not a control, so it shows no ring (#1085) */
 :is(h1, h2, h3)[tabindex="-1"]:focus-visible { outline: none; }
+
+/* The sidebar hidden or collapsed: the traffic lights (x 9–70 pt) sit over the toolbar's leading edge, so it starts
+   80 window points in at every zoom step (#1060). */
+.np-win--main.no-sidebar .np-toolbar { padding-left: calc(80px / var(--np-zoom, 1)); }

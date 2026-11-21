@@ -63,7 +63,8 @@ export function shellReduce(s: ShellState, e: ShellEvent): ShellState {
 }
 
 /** The window fills the WebView at any zoom: CSS zoom scales every length, so the box is the viewport divided by it. */
-export function zoomStyle(percent: number): { zoom: number | undefined; width: string; height: string } {
+export function zoomStyle(percent: number): { zoom: number | undefined; width: string; height: string; "--np-zoom": number } {
   const z = percent / 100;
-  return { zoom: percent === 100 ? undefined : z, width: `calc(100vw / ${z})`, height: `calc(100vh / ${z})` };
+  // --np-zoom lets a length stay fixed in window points under the zoom (the toolbar's traffic-light inset)
+  return { zoom: percent === 100 ? undefined : z, width: `calc(100vw / ${z})`, height: `calc(100vh / ${z})`, "--np-zoom": z };
 }

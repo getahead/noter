@@ -53,7 +53,7 @@ describe("shell state", () => {
   });
 
   it("sizes the zoomed window so it still fills the viewport", () => {
-    expect(zoomStyle(100)).toEqual({ zoom: undefined, width: "calc(100vw / 1)", height: "calc(100vh / 1)" });
-    expect(zoomStyle(200)).toEqual({ zoom: 2, width: "calc(100vw / 2)", height: "calc(100vh / 2)" });
+    expect(zoomStyle(100)).toEqual({ zoom: undefined, width: "calc(100vw / 1)", height: "calc(100vh / 1)", "--np-zoom": 1 });
+    expect(zoomStyle(200)).toEqual({ zoom: 2, width: "calc(100vw / 2)", height: "calc(100vh / 2)", "--np-zoom": 2 });
   });
 });
