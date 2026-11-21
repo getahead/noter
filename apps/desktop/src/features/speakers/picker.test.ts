@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PersonChip, PersonRow, SpeakerView } from "../../core/bindings";
 import {
+  nameMatches,
   candidates,
   fold,
   matchPeople,
@@ -28,6 +29,19 @@ const entry = (id: string, name: string, caption = "") => ({
 const group = (names: string[]): Group => ({
   key: "call",
   entries: names.map((n, i) => entry(`p${i}`, n)),
+});
+
+// #1091: names match across Latin and Cyrillic (DESIGN: transliterations in Latin and Cyrillic)
+describe("nameMatches", () => {
+  it("cpt-noter-seq-people-name-unnamed-speaker — #1091: finds a Latin name from Cyrillic input and back, besides plain folding", () => {
+    expect(nameMatches("Dmitri Sokolov", "Дмитрий")).toBe(true);
+    expect(nameMatches("Dmitri Sokolov", "Соколов")).toBe(true);
+    expect(nameMatches("Дмитрий Соколов", "dmitri")).toBe(true);
+    expect(nameMatches("Anna Kuznetsova", "Анна")).toBe(true);
+    expect(nameMatches("Фёдор", "федор")).toBe(true);
+    expect(nameMatches("Dmitri Sokolov", "Павел")).toBe(false);
+    expect(nameMatches("Pavel", "")).toBe(true);
+  });
 });
 
 describe("fold", () => {

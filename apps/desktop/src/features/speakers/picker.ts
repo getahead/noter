@@ -41,6 +41,21 @@ export function fold(s: string): string {
   // @cpt-end:cpt-noter-algo-ui-speakers-picker:p1:inst-match
 }
 
+const CYRILLIC: Record<string, string> = {
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ж: "zh", з: "z", и: "i", й: "i", к: "k", л: "l", м: "m", н: "n", о: "o",
+  п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f", х: "kh", ц: "ts", ч: "ch", ш: "sh", щ: "shch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+};
+
+/** A folded name's Latin skeleton: Cyrillic transliterated, y as i and a doubled i once, so Дмитрий and Dmitri meet. */
+export const latin = (s: string): string =>
+  [...fold(s)].map((c) => CYRILLIC[c] ?? c).join("").replaceAll("y", "i").replaceAll("ii", "i");
+
+/** A name or alias matches a query when either contains it folded, or in Latin and Cyrillic alike (issue 1091). */
+export const nameMatches = (name: string, query: string): boolean => {
+  const q = fold(query);
+  return !q || fold(name).includes(q) || latin(name).includes(latin(query));
+};
+
 /** The groups' entries that match `query` by name or alias, in the core's order, `cap` per group; empty groups drop out. */
 export function matchPeople(
   query: string,
@@ -52,7 +67,7 @@ export function matchPeople(
   const q = fold(query);
   const hit = (e: Entry) =>
     !q ||
-    [e.display_name, ...(e.aliases ?? [])].some((n) => fold(n).includes(q));
+    [e.display_name, ...(e.aliases ?? [])].some((n) => nameMatches(n, query));
   return groups
     .map((g) => ({ key: g.key, entries: g.entries.filter(hit).slice(0, cap) }))
     .filter((g) => g.entries.length > 0);
