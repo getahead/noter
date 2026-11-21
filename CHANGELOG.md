@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.2](https://github.com/getahead/noter/compare/v0.24.1...v0.24.2) (2026-11-21)
+
+
+### Bug fixes
+
+* **ui:** read minified hex colours so the native accent no longer blanks the window ([#1035](https://github.com/getahead/noter/issues/1035)) ([2116178](https://github.com/getahead/noter/commit/2116178183d0daacb49f079f5956960a17563957))
+
 ## [0.24.1](https://github.com/getahead/noter/compare/v0.24.0...v0.24.1) (2026-11-21)
 
 
