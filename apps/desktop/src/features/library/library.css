@@ -206,8 +206,9 @@
     -1px 0 0 var(--accent-fill);
 }
 
-.lb-filterbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 0; }
-.lb-fbtn { font: inherit; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--ctrl-border); background: transparent; color: inherit; }
+/* LC-R2: the 36-pt bar right under the toolbar, across the content, a hairline above the table (prototype .lb-r-filter) */
+.lb-filterbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; box-sizing: border-box; min-height: 36px; margin: 0 -24px 14px; padding: 5px 24px; border-bottom: 1px solid var(--sep); background: var(--content-bg); position: sticky; top: -20px; z-index: 4; }
+.lb-filterbar:first-child { margin-top: -20px; }
 .lb-pop { display: flex; flex-direction: column; gap: 6px; padding: 8px; max-height: 320px; overflow: auto; }
 
 /* the filter and tag pop-ups are opaque: the call rows never show through */
@@ -217,8 +218,8 @@
   backdrop-filter: none;
 }
 .lb-actions { display: flex; gap: 8px; justify-content: flex-end; margin: 8px 0; }
-.lb-fchev { margin-left: 4px; vertical-align: -1px; }
-.lb-fbtn[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent); }
+.lb-fchev { margin-left: 4px; }
+.lb-fbtn[aria-pressed="true"] { background: var(--sel-accent); }
 /* Library › Topics and the topic thread: the prototype's .lb-* rules (40-d.css), ported as-is. */
 .lb-tsearch { width: 240px; }
 .lb-ttable .lb-trow { cursor: pointer; }

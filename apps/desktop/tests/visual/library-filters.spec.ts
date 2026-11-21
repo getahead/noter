@@ -29,7 +29,7 @@ for (const [width, px] of Object.entries(WIDTHS)) {
     test("bar with a token and Has Open Items", async ({ page }) => {
       await calls(page, px);
       await page.getByRole("button", { name: "Has Open Items" }).click();
-      await expect(page.getByRole("button", { name: "Clear Filters" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Clear", exact: true })).toBeEnabled();
       await shot(page, "filters-bar", width);
     });
     test("Tags pop-up", async ({ page }) => {

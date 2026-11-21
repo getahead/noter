@@ -8,15 +8,15 @@ const lists = { people: [{ id: "per_a", short_name: "Anna", display_name: "Anna 
 const bar = (s = BLANK) => renderToString(<FilterBar state={s} lists={lists} onAction={() => {}} />);
 
 describe("FilterBar (cpt-noter-component-ui-filter-bar)", () => {
-  it("offers the pop-ups and no Clear without filters", () => {
+  it("offers the pop-ups and a disabled Clear without filters (#1078)", () => {
     const html = bar();
     for (const w of ["People", "Type", "Tags", "Language", "Date", "Has Open Items"]) expect(html).toContain(w);
-    expect(html).not.toContain("Clear Filters");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*><span>Clear<\/span>/);
   });
   it("shows a token with the person's short name and Clear once a filter is set", () => {
     const html = bar(apply(BLANK, { type: "toggle", group: "people", value: "per_a" }));
     expect(html).toContain("Anna");
-    expect(html).toContain("Clear Filters");
+    expect(html).toMatch(/<button(?![^>]*disabled)[^>]*><span>Clear<\/span>/);
   });
   it("the People pop-up is headed People with a search field and a checkbox per person, sorted, without you", () => {
     const row = (id: string, display_name: string, is_you = false) => ({ id, display_name, aliases: [], is_you });

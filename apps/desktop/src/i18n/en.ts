@@ -1110,6 +1110,7 @@ export const en = {
   "filters.from": "From",
   "filters.to": "To",
   "filters.clear": "Clear Filters",
+  "filters.clear_bar": "Clear",
   "filters.no_tags": "No tags yet. Add tags in a call’s Call info.",
   "filters.matches": { one: "{count} call matches", other: "{count} calls match" },
   "filters.empty_title": "No calls match these filters",

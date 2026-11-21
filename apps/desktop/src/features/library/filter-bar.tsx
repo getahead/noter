@@ -61,9 +61,10 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
     const first = m === "people" ? lookups(lists).person(held[0] ?? "") : m === "type" ? lookups(lists).type(held[0] ?? "") : m === "language" ? LANG_NAME[held[0] ?? ""] ?? "" : held[0] ?? "";
     const value = m === "date" ? (preset === "any" ? "" : toks.find((k) => k.kind === "date")?.label ?? "") : held.length ? (held.length > 1 ? `${first} +${held.length - 1}` : first) : "";
     return (
-      <button key={m} type="button" className="lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
+      // a glass capsule with a single ˅, as the prototype draws the filter buttons
+      <button key={m} type="button" className="np-btn np-btn--secondary np-btn--small lb-fbtn" aria-expanded={open === m} onClick={(e) => (setAnchor(e.currentTarget), setOpen(open === m ? null : m))}>
         {t(MENU_LABEL[m])}{value && <span className="np-dim"> {value}</span>}
-        <Icon name="updown" size={11} cls="lb-fchev" />
+        <Icon name="chevronDown" size={10} cls="np-btn__chev lb-fchev" />
       </button>
     );
   };
@@ -85,8 +86,10 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
         </span>
       ))}
       {(["people", "type", "tags", "language", "date"] as const).map(pick)}
-      <button type="button" className="lb-fbtn" aria-pressed={!!f.has_open_items} onClick={() => onAction({ type: "open_items", on: !f.has_open_items })}>{t("filters.open_items_toggle")}</button>
-      {toks.length > 0 && <PushButton label={t("filters.clear")} variant="quiet" size="small" onAction={() => onAction({ type: "clear" })} />}
+      <button type="button" className="np-btn np-btn--secondary np-btn--small lb-fbtn" aria-pressed={!!f.has_open_items} onClick={() => onAction({ type: "open_items", on: !f.has_open_items })}>{t("filters.open_items_toggle")}</button>
+      <span className="np-tb__spacer" />
+      {/* Clear sits at the trailing end, disabled while nothing is set */}
+      <PushButton label={t("filters.clear_bar")} variant="quiet" size="small" disabled={toks.length === 0} onAction={() => onAction({ type: "clear" })} />
       {open && (
         <Popover variant={open} anchor={anchor} width={280} label={t(MENU_LABEL[open])} onClose={() => setOpen(null)}>
           <div className="lb-pop">
