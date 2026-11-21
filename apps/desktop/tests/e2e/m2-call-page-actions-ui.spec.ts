@@ -73,6 +73,19 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await expect(page.getByRole("button", { name: "Delete Audio Now…" })).toHaveCount(0);
   });
 
+  test("UI — #1050: the toolbar's More menu offers no Delete Audio Now… on a call whose audio is not stored", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        for (const c of [...w.calls, ...w.call_details.map((d) => d.call)]) if (c.id === W.PAST_CALL) c.audio_kept_until = null;
+      },
+    });
+    await openSummary(page, W.PAST_CALL);
+    await toolbar(page).getByRole("button", { name: "More" }).click();
+    await expect(page.getByRole("menuitem", { name: "Rename…" })).toBeVisible(); // the menu is open
+    await expect(page.getByRole("menuitem", { name: "Delete Audio Now…" })).toHaveCount(0);
+  });
+
   test("UI — other path: Delete Old Audio… — the sheet, Recording goes on, 30 days, Freed … MB across … calls from the result", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openSummary(page, call);

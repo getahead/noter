@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CommandState } from "../../app/store/window-store";
 import type { CallRow, UiPrefs } from "../../core/bindings";
-import { callInfo, callViews, pageState, parseCallKey, subtitleOf } from "./logic";
+import { callInfo, callViews, pageState, parseCallKey, subtitleOf, audioKept } from "./logic";
 import { afterTimer } from "../../app/use-after";
 
 const PREFS: UiPrefs = { time_format: "h24", time_zone: "UTC", first_weekday: 1 };
@@ -93,6 +93,13 @@ describe("callInfo (PC-R4)", () => {
   });
   it("says until when the audio is kept", () => {
     expect(callInfo(row(), { audio_not_stored: false }, NOW, PREFS, "x").audio).toBe("Kept until Nov 15");
+  });
+  // #1050: the toolbar's ⋯ menu and Call info share one rule for "there is audio to delete"
+  it("keeps audio only with a retention date, not deleted and stored", () => {
+    expect(audioKept(row(), false)).toBe(true);
+    expect(audioKept(row({ audio_kept_until: null }), false)).toBe(false);
+    expect(audioKept(row(), true)).toBe(false);
+    expect(audioKept(row({ audio_deleted: true }), false)).toBe(false);
   });
   // #1050: no stored audio, nothing to delete (Delete Audio Now… stays hidden)
   it("offers no audio to delete when none is stored", () => {
