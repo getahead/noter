@@ -82,6 +82,10 @@ pub enum TimeFormat {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct EnvironmentState {
     pub version: StateVersion,
+    /// Native presentation facts; absent for non-macOS hosts and browser fixtures.
+    #[serde(default)]
+    #[specta(optional)]
+    pub native: Option<NativeEnvironment>,
     pub displays: Vec<DisplayInfo>,
     pub output_route: OutputRoute,
     /// The current audio output device, so Settings can offer to mark it as headphones
@@ -94,6 +98,18 @@ pub struct EnvironmentState {
     pub update: Option<UpdateInfo>,
     /// Free space on the storage volume.
     pub disk_free_mb: u32,
+}
+
+/// Read-only facts from the running process, never a claim about another copy's TCC grant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct NativeEnvironment {
+    /// NSColor.controlAccentColor converted to sRGB bytes.
+    pub accent_rgb: [u8; 3],
+    pub app_name: String,
+    pub bundle_id: Option<String>,
+    /// The running .app bundle, or executable when launched without a bundle.
+    pub app_path: String,
+    pub os_version: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]

@@ -251,7 +251,7 @@ impl Core {
             fr.self_test_running = false;
             let mut stored = fr.stored.clone();
             stored.self_test = state.clone();
-            // The newest finding wins: this self-test, not an earlier probe.
+            // This test supersedes earlier inference; silence remains unverified.
             stored.system_audio = None;
             if self
                 .store_setup(ctx, &fr.stored, &stored, "self_test_run")
@@ -271,14 +271,14 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-emit-setup
     }
 
-    /// The app became active (the host calls it): re-check a denied system-audio row (D-19).
+    /// The app became active: re-check an attempted but unverified system-audio row (D-19).
     pub fn app_activated(&self) {
         self.recheck_system_audio();
     }
 
     /// Decision D-19: macOS cannot be asked whether System Audio Recording is on, so while
-    /// first run shows the row denied (never during a capture), one short engine test plays
-    /// the test clip so a granted tap hears something; the row turns granted or stays denied,
+    /// first run has an unverified attempt (never during capture), one short engine test
+    /// listens for another application; the row turns granted or remains unverified,
     /// and `setup:changed` ends the check either way. Settings leaves it to Run Test.
     pub(crate) fn recheck_system_audio(&self) {
         let Some(core) = self.this() else { return };
@@ -289,24 +289,41 @@ impl Core {
                 .steps
                 .iter()
                 .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
+            let attempted = fr.stored.system_audio.is_some()
+                || matches!(
+                    fr.stored.self_test,
+                    SelfTestState::Failed {
+                        reason: SelfTestFailure::ZeroBuffers
+                            | SelfTestFailure::OneStreamSilent {
+                                channel: AudioChannel::Sys
+                            }
+                    }
+                );
             let recent = fr.last_probe.is_some_and(|t| t.elapsed() < RECHECK_EVERY);
             if fr.probing
                 || recent
                 || fr.self_test_running
                 || !first_run
-                || crate::first_run::system_audio(&fr.stored) != PermissionState::Denied
-                || self.app().capture.phase != CapturePhase::Idle
+                || matches!(
+                    crate::first_run::system_audio(&fr.stored),
+                    PermissionState::Granted | PermissionState::Denied
+                )
+                || !attempted
+                || !matches!(
+                    self.app().capture.phase,
+                    CapturePhase::Idle | CapturePhase::Stopped
+                )
             {
                 return;
             }
             fr.probing = true;
         }
         self.spawn(async move {
-            // Own-sound leak detection does not apply: the clip is the signal here.
-            let heard = core.short_engine_test(true).await;
+            // Own sounds are excluded from the tap, so only another application can prove access.
+            let heard = core.prompt_system_audio().await;
             {
                 let mut fr = lock(&core.first_run);
-                if heard == PermissionState::Granted {
+                if heard == Some(PermissionState::Granted) {
                     let mut stored = fr.stored.clone();
                     stored.system_audio = Some(PermissionState::Granted);
                     let ctx = CommandCtx {
@@ -351,38 +368,43 @@ impl Core {
 
     /// Decision F1: the System Audio Recording prompt comes from the engine opening its tap
     /// in a short self-test (no clip). What arrives is the inference: system audio heard →
-    /// granted, only zeros → denied, otherwise not asked.
-    pub(crate) async fn prompt_system_audio(&self) -> PermissionState {
-        self.short_engine_test(false).await
-    }
-
-    /// A short engine self-test (about 3 s): what the tap heard of system audio.
-    async fn short_engine_test(&self, play_clip: bool) -> PermissionState {
+    /// granted, an explicit permission error → denied, silence → unverified (not asked).
+    pub(crate) async fn prompt_system_audio(&self) -> Option<PermissionState> {
         let mut events = self.engine.events();
         let short = EngineCommand::SelfTest {
-            play_clip,
+            play_clip: false,
             timeout_ms: PROMPT_MS,
         };
         if self.engine.command(short).await.is_err() {
-            return PermissionState::NotAsked;
+            return None;
         }
+        let mut heard = false;
         let deadline =
             tokio::time::Instant::now() + Duration::from_millis(PROMPT_MS.into()) + MARGIN;
         loop {
             let line = match tokio::time::timeout_at(deadline, events.recv()).await {
                 Ok(Ok(line)) => line,
                 Ok(Err(RecvError::Lagged(_))) => continue,
-                _ => return PermissionState::NotAsked,
+                _ => {
+                    return if heard {
+                        Some(PermissionState::Granted)
+                    } else {
+                        None
+                    }
+                }
             };
             match line.event {
                 EngineEvent::SelfTestStream {
                     channel: AudioChannel::Sys,
-                } => return PermissionState::Granted,
+                } => heard = true,
                 EngineEvent::SelfTestResult { failure, .. } => {
-                    return match failure {
-                        Some(EngineErrorCode::ZeroBuffers) => PermissionState::Denied,
-                        _ => PermissionState::NotAsked,
+                    if heard {
+                        return Some(PermissionState::Granted);
                     }
+                    return Some(match failure {
+                        Some(EngineErrorCode::PermissionMissing) => PermissionState::Denied,
+                        _ => PermissionState::NotAsked,
+                    });
                 }
                 _ => {}
             }

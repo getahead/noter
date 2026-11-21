@@ -98,7 +98,7 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
   it("shows the permission rows by state", async () => {
     const denied = await screen((w) => (W.permission(w, "microphone", "denied"), W.permission(w, "system_audio", "not_asked")));
     expect(denied).toContain('<span class="fr-perm__word"> · <!-- -->not allowed</span>');
-    expect(denied).toContain("not allowed yet");
+    expect(denied).toContain("Not verified yet");
     expect(denied).toContain("System Settings › Privacy &amp; Security");
     const granted = await screen((w) => (W.permission(w, "microphone", "granted"), W.permission(w, "system_audio", "granted")));
     expect(granted).toContain("Granted");

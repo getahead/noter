@@ -47,14 +47,14 @@ export const gigabytes = (mb: number) => t("first_run.models.size", { size: mb >
 export const wholeGigabytes = (mb: number) => t("first_run.models.size", { size: Math.max(1, Math.round(mb / 1000)) });
 
 /** What the panel shows for the permission and the speech model, after the user or the core changed either. */
-export function syncSelfTest(panel: SelfTestPanel, env: { sysGranted: boolean; modelReady: boolean }): { panel: SelfTestPanel; autoRun: boolean } {
-  let state = selfTestNext(panel.state, { type: "system_audio", state: env.sysGranted ? "granted" : "not_asked" });
+export function syncSelfTest(panel: SelfTestPanel, env: { sysCanTest: boolean; modelReady: boolean; autoTest?: boolean }): { panel: SelfTestPanel; autoRun: boolean } {
+  let state = selfTestNext(panel.state, { type: "system_audio", state: env.sysCanTest ? "granted" : "denied" });
   // the wizard waits at once when the speech model is not in (prototype `speech-wait`), not only after Run Test
   if (state === "IDLE" && !env.modelReady) state = selfTestNext(state, { type: "run", modelReady: false });
   const arrived = state === "WAITING_FOR_MODEL" && env.modelReady;
-  if (arrived) state = selfTestNext(state, { type: "model_arrived" });
+  if (arrived) state = env.autoTest === false ? "IDLE" : selfTestNext(state, { type: "model_arrived" });
   if (state === panel.state) return { panel, autoRun: false };
-  return { panel: { ...initialSelfTestPanel(state, panel.excludeOwnSounds), failure: panel.failure }, autoRun: arrived };
+  return { panel: { ...initialSelfTestPanel(state, panel.excludeOwnSounds), failure: panel.failure }, autoRun: arrived && env.autoTest !== false };
 }
 
 export interface WizardState {
@@ -68,8 +68,6 @@ export interface WizardState {
   away: PermissionKind[];
   /** Permissions the core is re-reading after the user came back. */
   checking: PermissionKind[];
-  /** The self-test heard only digital silence on the system channel: System Audio Recording is not allowed. */
-  zeroBuffers: boolean;
   /** The core's last refusal of a download for lack of disk space. */
   disk: { needed_mb: number; free_mb: number } | null;
   /** The stored settings have been read: until then Continue saves nothing from the defaults below. */
@@ -88,7 +86,7 @@ const DONE: StepState = "done";
 export function createWizard(bridge: Bridge, announce: (text: string, key: string) => void) {
   const win = () => bridge.store.getState();
   const setup = () => win().whole.setup!;
-  const sysGranted = (s: WizardState, status: SetupStatus) => !s.zeroBuffers && status.permissions.find((p) => p.kind === "system_audio")?.state === "granted";
+  const sysCanTest = (status: SetupStatus) => !["denied", "needs_relaunch"].includes(status.permissions.find((p) => p.kind === "system_audio")?.state ?? "not_asked");
   // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-api-status
   const status0 = setup(); // the window's snapshot carries the setup status, kept current by `setup:changed`
   // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-api-status
@@ -100,7 +98,6 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     clip: false,
     away: [],
     checking: [],
-    zeroBuffers: false,
     disk: null,
     loaded: false,
     display: status0.call_display,
@@ -114,6 +111,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   let consumed = { id: "", count: 0 };
   let started = false;
   let requested = false;
+  let requestedTest = false;
   /** What the user changed before the stored settings arrived: those keep the user's value. */
   const edited = new Set<string>();
   let generation = 0;
@@ -129,7 +127,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   function refreshSelfTest(): void {
     const status = setup();
     const s = store.getState();
-    const { panel, autoRun } = syncSelfTest(s.panel, { sysGranted: sysGranted(s, status), modelReady: speechReady(status.models.bundles) });
+    const { panel, autoRun } = syncSelfTest(s.panel, { sysCanTest: sysCanTest(status), modelReady: speechReady(status.models.bundles), autoTest: requestedTest || status.permissions.some((p) => p.kind === "system_audio" && p.state === "granted") });
     if (panel !== s.panel) set({ panel });
     if (autoRun) void subscribeRun(false);
   }
@@ -162,7 +160,6 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       // @cpt-end:cpt-noter-flow-ui-first-run-self-test:p1:inst-passed
       // @cpt-end:cpt-noter-flow-ui-first-run-self-test:p1:inst-if-passed
       panel = next;
-      if (m.event.type === "failed" && m.event.reason.type === "zero_buffers") set({ zeroBuffers: true });
     }
     // @cpt-begin:cpt-noter-flow-ui-first-run-self-test:p1:inst-return-selftest
     set({ panel });
@@ -261,7 +258,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
 
   /** Open the self-test Channel for a panel already RUNNING. */
   async function subscribeRun(playClip: boolean): Promise<void> {
-    set({ clip: playClip, zeroBuffers: false });
+    set({ clip: playClip });
     // @cpt-begin:cpt-noter-flow-ui-first-run-self-test:p1:inst-api-selftest
     await bridge.subscribe("self_test_run", { play_clip: playClip }, { model_missing: "model_missing" });
     // @cpt-end:cpt-noter-flow-ui-first-run-self-test:p1:inst-api-selftest
@@ -277,6 +274,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     const s = store.getState();
     const panel = runSelfTest(s.panel, speechReady(setup().models.bundles));
     if (panel === s.panel) return;
+    requestedTest = true;
     set({ panel });
     // @cpt-end:cpt-noter-flow-ui-first-run-self-test:p1:inst-user-test
     // the speech model is not in: the panel waits and runs by itself when it is (D-21), without asking the core to refuse
@@ -352,11 +350,10 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       const away = store.getState().away;
       if (away.length === 0) return;
       // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-checking
-      set({ away: [], checking: away, zeroBuffers: false });
+      set({ away: [], checking: away });
       try {
-        // macOS reports no change of System Audio Recording: the core hears it, with a short tap, unless it already knows it is off
-        const asked = setup().permissions.find((p) => p.kind === "system_audio")?.state;
-        if (away.includes("system_audio") && asked !== "denied") await send("permission_request", "permission_request", () => bridge.core.permissionRequest({ kind: "system_audio" }));
+        // A previous denial can have changed in Settings; the core serializes the short tap.
+        if (away.includes("system_audio")) await send("permission_request", "permission_request", () => bridge.core.permissionRequest({ kind: "system_audio" }));
         await send("setup_status", "setup_status", () => bridge.core.setupStatus({}), { slice: "setup" });
       } finally {
         set({ checking: [] });
@@ -390,9 +387,9 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   };
 }
 
-/** The permission row's state for what the core reports, the wizard's own checking and the self-test's zero buffers. */
+/** The permission row's state for what the core reports, the wizard's own checking. */
 // @cpt-state:cpt-noter-state-ui-first-run-permission-row:p1
-export function rowStateFor(kind: PermissionKind, core: PermissionState | undefined, s: Pick<WizardState, "checking" | "zeroBuffers">): PermissionRowState {
+export function rowStateFor(kind: PermissionKind, core: PermissionState | undefined, s: Pick<WizardState, "checking">): PermissionRowState {
   const row = initialPermissionRow(kind, core ?? "not_asked");
   if (s.checking.includes(kind)) {
     // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-granted
@@ -400,7 +397,6 @@ export function rowStateFor(kind: PermissionKind, core: PermissionState | undefi
     // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-granted
     return permissionRowNext(row, { type: "returned_from_settings" });
   }
-  if (kind === "system_audio" && s.zeroBuffers) return permissionRowNext(row, { type: "self_test_zero_buffers" });
   // @cpt-begin:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-missing
   return row;
   // @cpt-end:cpt-noter-state-ui-first-run-permission-row:p1:inst-checking-missing

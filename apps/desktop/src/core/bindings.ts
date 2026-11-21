@@ -1276,6 +1276,8 @@ export type EntityRef = {
 /**  Environment facts the core observes (event `env:changed`). */
 export type EnvironmentState = {
 	version: StateVersion,
+	/**  Native presentation facts; absent for non-macOS hosts and browser fixtures. */
+	native?: NativeEnvironment | null,
 	displays: DisplayInfo[],
 	output_route: OutputRoute,
 	/**
@@ -2236,6 +2238,17 @@ export type NameSpeakersArgs = {
 
 export type NamedBy = "you" | "voice_profile" | "calendar";
 
+/**  Read-only facts from the running process, never a claim about another copy's TCC grant. */
+export type NativeEnvironment = {
+	/**  NSColor.controlAccentColor converted to sRGB bytes. */
+	accent_rgb: [number, number, number],
+	app_name: string,
+	bundle_id: string | null,
+	/**  The running .app bundle, or executable when launched without a bundle. */
+	app_path: string,
+	os_version: string,
+};
+
 /**
  *  A place in the main window or the Settings window. The core sends it with
  *  `nav:request` (notification click, Open Last Summary, Open in Noter).
@@ -2862,8 +2875,8 @@ export type SelfTestEvent = { type: "levels"; mic_db: number | null; sys_db: num
 export type SelfTestFailure = { type: "one_stream_silent"; channel: AudioChannel } | 
 /**
  *  System audio buffers are exact digital zeros. The System Audio Recording permission cannot be
- *  queried, so this is how a denied permission (or a missing usage key) shows; the self-test
- *  requires non-zero buffers.
+ *  queried: silence is inconclusive and never establishes denial. The self-test requires
+ *  non-zero buffers from another application.
  */
 { type: "zero_buffers" } | { type: "own_sounds_leak" } | { type: "timed_out" } | { type: "permission_missing"; kind: PermissionKind } | 
 /**  The live speech model is not downloaded. */
@@ -3644,7 +3657,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.13";
+export const CONTRACT_VERSION = "2.16";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

@@ -37,8 +37,8 @@ public struct SelfTestMonitor: Sendable {
 
     // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-result
     /// Passed only with non-zero buffers on both channels and the live model installed. A channel
-    /// that delivered only exact digital zeros is `zero_buffers` (for system audio: the System
-    /// Audio Recording permission is off, inferred); one that delivered nothing is
+    /// that delivered only exact digital zeros is `zero_buffers` (system-audio permission
+    /// remains unverified); one that delivered nothing is
     /// `device_unavailable`. The tap hearing the engine's own clip fails it as `OwnSoundsLeak`.
     public func result(modelsPresent: Bool) -> EngineEvent {
         let failure: EngineErrorCode?

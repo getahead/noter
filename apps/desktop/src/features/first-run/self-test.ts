@@ -27,12 +27,12 @@ export function selfTestNext(state: SelfTestState, input: SelfTestInput): SelfTe
       return state === "WAITING_FOR_MODEL" ? "RUNNING" : state;
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-waiting-running
     case "system_audio": {
-      const granted = input.state === "granted";
+      const canTest = input.state !== "denied" && input.state !== "needs_relaunch";
       // @cpt-begin:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-missing
-      if (state === "IDLE" && !granted) return "PERMISSION_MISSING";
+      if (state === "IDLE" && !canTest) return "PERMISSION_MISSING";
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-idle-missing
       // @cpt-begin:cpt-noter-state-ui-first-run-self-test:p1:inst-missing-idle
-      return state === "PERMISSION_MISSING" && granted ? "IDLE" : state;
+      return state === "PERMISSION_MISSING" && canTest ? "IDLE" : state;
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-missing-idle
     }
     case "core": {
@@ -46,7 +46,7 @@ export function selfTestNext(state: SelfTestState, input: SelfTestInput): SelfTe
         // the fourth line is information only: the first three still passed
         if (e.reason.type === "own_sounds_leak") return "PASSED";
         if (e.reason.type === "model_missing") return "WAITING_FOR_MODEL";
-        return e.reason.type === "permission_missing" || e.reason.type === "zero_buffers" ? "PERMISSION_MISSING" : "FAILED";
+        return e.reason.type === "permission_missing" && e.reason.kind !== "microphone" ? "PERMISSION_MISSING" : "FAILED";
       }
       // @cpt-end:cpt-noter-state-ui-first-run-self-test:p1:inst-running-failed
       return e.type === "ended" ? "IDLE" : state; // the stream ended without a verdict
@@ -126,6 +126,8 @@ export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): Self
       // @cpt-begin:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-case-failed
       if (e.reason.type === "own_sounds_leak") next = { ...next, aligned: true, ownSounds: "leaked" };
       else if (e.reason.type === "one_stream_silent") next = { ...next, failure: ONE_STREAM_SILENT[e.reason.channel] };
+      else if (e.reason.type === "permission_missing" && e.reason.kind === "microphone") next = { ...next, failure: "self_test.mic_missing" };
+      else if (e.reason.type === "zero_buffers") next = { ...next, failure: "self_test.sys_unverified" };
       else if (e.reason.type === "timed_out") next = { ...next, failure: TIMED_OUT };
       // @cpt-end:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-case-failed
       break;

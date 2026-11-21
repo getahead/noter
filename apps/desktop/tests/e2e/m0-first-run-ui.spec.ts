@@ -36,6 +36,30 @@ function audioGranted(w: World): void {
 }
 
 test.describe("cpt-noter-seq-first-run-complete-setup", () => {
+  test("UI — native accent and running-copy facts update through the environment bridge", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: (w) => {
+      W.firstRun(w);
+      w.app.environment.native = { accent_rgb: [0, 122, 255], app_name: "Noter", bundle_id: "ai.noter", app_path: "/tmp/Debug/Noter.app", os_version: "Version 27.2" };
+    } });
+    const details = page.locator('[data-region="running-copy"]');
+    await expect(details).toContainText("/tmp/Debug/Noter.app");
+    await expect(details).toContainText("Version 27.2");
+    const accent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent-text"));
+    await expect.poll(accent).toMatch(/^#/);
+    await expect(page.locator("html")).toHaveAttribute("data-native-accent");
+    const blue = await accent();
+    await steer.change((w) => { w.app.environment.native!.accent_rgb = [175, 82, 222]; });
+    await expect.poll(accent).not.toBe(blue);
+    const purple = await accent();
+    await page.emulateMedia({ colorScheme: "dark", contrast: "more" });
+    await expect.poll(accent).not.toBe(purple);
+    await steer.change((w) => { w.app.environment.native!.accent_rgb = [142, 142, 142]; });
+    await expect.poll(accent).toMatch(/^#([0-9a-f]{2})\1\1$/);
+    await steer.change((w) => { w.app.environment.native = null; });
+    await expect(details).toHaveCount(0);
+    await expect(page.locator("html")).not.toHaveAttribute("data-native-accent");
+  });
+
   test("UI — happy path: Allow… the microphone, system audio from System Settings, Run Test, Self-test passed, Call display next", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => W.firstRun(w) });
 
@@ -43,7 +67,7 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     await expect(step(page, "Permissions")).toHaveAttribute("aria-current", "step");
     await expect(step(page, "Welcome")).toHaveAttribute("data-state", "done");
     await expect(page.getByRole("heading", { name: "Microphone and system audio" })).toBeVisible();
-    await expect(button(page, "Run Test")).toBeDisabled(); // dimmed until system audio is allowed
+    await expect(button(page, "Run Test")).toBeEnabled(); // an unverified tap must be testable
 
     await permissionRow(page, "Microphone").getByRole("button", { name: "Allow…" }).click();
     expect(await sent(page, "permission_request")).toContainEqual({ kind: "microphone" });
@@ -51,7 +75,7 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     if (FAKE) await expect(permissionRow(page, "Microphone")).toContainText("Hearing you"); // the meter needs levels_subscribe (M1)
 
     const sys = permissionRow(page, "System audio recording");
-    await expect(sys).toContainText("not allowed yet");
+    await expect(sys).toContainText("Not verified yet");
     await sys.getByRole("button", { name: "Open System Settings…" }).click();
     await steer.change((w) => W.permission(w, "system_audio", "granted")); // turned on in System Settings
     await backInNoter(page);
@@ -167,6 +191,7 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 
   test("UI — regression: microphone levels continue after reloading first run", async ({ page }) => {
     await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), audioGranted(w)) });
+    await startSelfTest(page);
     const meter = permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" });
     await expect(meter).toBeVisible(); // The retained stream has published at least one sample.
     await page.reload();

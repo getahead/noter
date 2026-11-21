@@ -2,8 +2,8 @@
 title: "Feature: Native surfaces: panels, menu bar, notifications and windows"
 description: "Non-activating, content-protected panels; the call window's two layouts across displays; hide for presenting; the menu bar and tray; notifications through UNUserNotificationCenter; announcements, navigation and external opens; menu and hotkey actions as native callers."
 status: PROPOSED
-version: "0.3"
-date: "2026-11-14"
+version: "0.4"
+date: "2026-11-20"
 milestone: M1
 lane: core (src-tauri) and engine (noter-native)
 decomposition: docs/DECOMPOSITION-core.md
@@ -374,3 +374,5 @@ The system **MUST** answer `window_navigate`, `window_announce`, `window_report_
 - [ ] The call window and record prompt never become key on show and do not appear in a screen capture.
 - [ ] Every window command and `open_external` succeeds at least once in E2E runs (Playwright through the harness for the window-free parts, the native command log for the rest).
 - [ ] `just gate` passes, `just native` included.
+
+**2026-11-20 — native environment integration (#1001/#1021).** `noter-native::environment` also reads the actual control accent (converted to sRGB), the running app bundle name/identifier/path, and macOS version. The existing environment watcher delivers updates through `env:changed` to all windows; this is presentation metadata, with no new command or story. Core-first-run owns permission probing and running-copy guidance; UI tokens-theming owns accessible accent derivation. Read-only inspection and native seams prove collection without changing TCC, signing or system settings; unit/conformance/E2E tests cover propagation and dynamic restyling. Delivery requires `just gate` to pass.

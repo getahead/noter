@@ -220,6 +220,13 @@ export const en = {
   "first_run.assistants.none":
     "Without an assistant Noter still records and transcribes; summaries wait until one is connected.",
   "permission.granted": "Granted",
+  "permission.unverified": "Not verified yet",
+  "permission.needs_relaunch": "Quit and reopen Noter",
+  "permission.copy": "Running {app}: {path} · {id}",
+  "permission.copy_help": "macOS permissions apply to the running copy. A grant for another copy or build may not apply here. If this copy is already enabled in System Settings, quit and reopen Noter, then play sound in another app and run the test again.",
+  "permission.os": "macOS · {version} · Core Audio process tap",
+  "self_test.mic_missing": "Microphone access is not allowed yet. Allow it in the Microphone row, then try again.",
+  "self_test.sys_unverified": "No system audio was heard. Play sound in another app and try again. Silence does not tell us whether permission is allowed.",
   "permission.missing": "not allowed yet",
   "permission.not_asked": "Not allowed yet",
   "permission.denied": "not allowed",

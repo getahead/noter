@@ -184,3 +184,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .t-call-card-floating { font: 400 13px/19px var(--font); }
 .np-mono { font-family: var(--mono); font-size: 12px; line-height: 18px; }
 .np-tnum { font-variant-numeric: tabular-nums; }
+
+/* A native accent uses its contrast-checked solid boundary for keyboard focus. */
+:root[data-native-accent] :focus-visible { outline-color: var(--accent); }

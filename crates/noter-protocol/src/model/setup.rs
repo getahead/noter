@@ -78,8 +78,8 @@ pub enum SelfTestFailure {
         channel: AudioChannel,
     },
     /// System audio buffers are exact digital zeros. The System Audio Recording permission cannot be
-    /// queried, so this is how a denied permission (or a missing usage key) shows; the self-test
-    /// requires non-zero buffers.
+    /// queried: silence is inconclusive and never establishes denial. The self-test requires
+    /// non-zero buffers from another application.
     ZeroBuffers,
     OwnSoundsLeak,
     TimedOut,

@@ -1,3 +1,4 @@
+import * as W from "../../../tests/support/world-presets";
 // The controls of every pane run their commands: each handler a pane gives its controls is called and the
 // core's answer is read back from the store or the fake's world.
 import { renderToString } from "react-dom/server";
@@ -90,7 +91,10 @@ describe("Audio", () => {
   });
 
   it("rechecks system audio and refreshes the snapshot after returning from System Settings", async () => {
-    await ready((w) => w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "not_asked")));
+    await ready((w) => {
+      W.idle(w);
+      w.app.setup.permissions.forEach((p) => p.kind === "system_audio" && (p.state = "not_asked"));
+    });
     const listeners = new Map<string, () => void>();
     const browserWindow = {
       addEventListener: (name: string, listener: () => void) => listeners.set(name, listener),

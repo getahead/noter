@@ -46,6 +46,7 @@ fn display(id: &str, main: bool) -> DisplayInfo {
 
 fn reading() -> EnvironmentReading {
     EnvironmentReading {
+        native: None,
         displays: vec![display("dsp_main", true), display("dsp_side", false)],
         output_device: None,
         output_route: OutputRoute::Speakers,
@@ -53,6 +54,39 @@ fn reading() -> EnvironmentReading {
         online: true,
         disk_free_mb: 90_000,
     }
+}
+
+#[tokio::test]
+async fn an_old_inferred_system_audio_denial_is_unverified_after_reopening() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let steps = s
+        .core
+        .setup_status(&first_run(), NoArgs {})
+        .await
+        .unwrap()
+        .steps;
+    let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES ('setup', ?1)", [
+        serde_json::json!({"steps":steps, "system_audio":"denied", "self_test":{"type":"failed","reason":{"type":"zero_buffers"}}}).to_string()
+    ]).unwrap();
+    drop(db);
+    drop(s);
+    let again = open(dir.path());
+    let setup = again
+        .core
+        .setup_status(&first_run(), NoArgs {})
+        .await
+        .unwrap();
+    assert!(matches!(
+        setup.self_test,
+        SelfTestState::Failed {
+            reason: SelfTestFailure::ZeroBuffers
+        }
+    ));
+    assert!(setup.permissions.iter().any(
+        |row| row.kind == PermissionKind::SystemAudio && row.state == PermissionState::NotAsked
+    ));
 }
 
 impl NativeServices for FakeNative {
@@ -446,6 +480,69 @@ async fn system_audio_is_inferred_from_the_self_test_never_asked_natively() {
 }
 
 #[tokio::test]
+async fn an_unavailable_engine_does_not_schedule_an_automatic_permission_attempt() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let row = s
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(row.state, PermissionState::NotAsked);
+    s.core.app_activated();
+    assert!(!noter_core::testing::system_audio_probing(&s.core));
+}
+
+#[tokio::test]
+async fn system_audio_probes_resume_after_capture_stops_but_refuse_active_phases() {
+    for phase in [
+        CapturePhase::Idle,
+        CapturePhase::Starting,
+        CapturePhase::Recording,
+        CapturePhase::Paused,
+        CapturePhase::Failed,
+        CapturePhase::Stopping,
+        CapturePhase::Stopped,
+    ] {
+        let dir = tempfile::tempdir().unwrap();
+        let s = open(dir.path());
+        let mut capture = s
+            .core
+            .app_snapshot(&first_run(), NoArgs {})
+            .await
+            .unwrap()
+            .capture;
+        capture.phase = phase;
+        noter_core::testing::seed_capture(&s.core, capture)
+            .await
+            .unwrap();
+        let result = s
+            .core
+            .permission_request(
+                &first_run(),
+                PermissionArgs {
+                    kind: PermissionKind::SystemAudio,
+                },
+            )
+            .await;
+        if matches!(phase, CapturePhase::Idle | CapturePhase::Stopped) {
+            assert_eq!(
+                result.unwrap().state,
+                PermissionState::NotAsked,
+                "{phase:?}"
+            );
+        } else {
+            assert_eq!(result.unwrap_err().code, ErrorCode::Conflict, "{phase:?}");
+        }
+    }
+}
+
+#[tokio::test]
 async fn the_environment_comes_from_native_readings_and_changes_are_broadcast() {
     let dir = tempfile::tempdir().unwrap();
     let s = open(dir.path());
@@ -455,6 +552,14 @@ async fn the_environment_comes_from_native_readings_and_changes_are_broadcast() 
     s.events.names();
     let mut changed = reading();
     changed.displays.pop();
+    changed.native = Some(NativeEnvironment {
+        accent_rgb: [175, 82, 222],
+        app_name: "Noter".into(),
+        bundle_id: Some("ai.noter".into()),
+        app_path: "/tmp/Noter.app".into(),
+        os_version: "Version 27.2".into(),
+    });
+    let metadata = changed.native.clone();
     s.core.environment_changed(changed.clone());
     assert_eq!(s.events.names(), vec![event_names::ENV_CHANGED]);
     s.core.environment_changed(changed);
@@ -464,6 +569,7 @@ async fn the_environment_comes_from_native_readings_and_changes_are_broadcast() 
     );
     let snap2 = s.core.app_snapshot(&first_run(), NoArgs {}).await.unwrap();
     assert_eq!(snap2.environment.displays.len(), 1);
+    assert_eq!(snap2.environment.native, metadata);
     assert!(snap2.environment.version.0 > snap.environment.version.0);
 }
 
@@ -779,8 +885,8 @@ async fn the_harness_seeds_the_self_test_state() {
     assert!(status
         .permissions
         .iter()
-        .any(|p| p.kind == PermissionKind::SystemAudio && p.state == PermissionState::Denied));
-    let err = s
+        .any(|p| p.kind == PermissionKind::SystemAudio && p.state == PermissionState::NotAsked));
+    let row = s
         .core
         .permission_request(
             &first_run(),
@@ -789,6 +895,6 @@ async fn the_harness_seeds_the_self_test_state() {
             },
         )
         .await
-        .unwrap_err();
-    assert_eq!(err.code, ErrorCode::PermissionDenied);
+        .unwrap();
+    assert_eq!(row.state, PermissionState::NotAsked);
 }

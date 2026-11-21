@@ -66,26 +66,26 @@ describe("resumeStep", () => {
 describe("syncSelfTest", () => {
   const idle = initialSelfTestPanel("IDLE", true);
   it("shows the missing permission, then Idle once it is granted", () => {
-    const missing = syncSelfTest(idle, { sysGranted: false, modelReady: true });
+    const missing = syncSelfTest(idle, { sysCanTest: false, modelReady: true });
     expect(missing.panel.state).toBe("PERMISSION_MISSING");
-    expect(syncSelfTest(missing.panel, { sysGranted: false, modelReady: true }).panel).toBe(missing.panel);
-    expect(syncSelfTest(missing.panel, { sysGranted: true, modelReady: true }).panel.state).toBe("IDLE");
+    expect(syncSelfTest(missing.panel, { sysCanTest: false, modelReady: true }).panel).toBe(missing.panel);
+    expect(syncSelfTest(missing.panel, { sysCanTest: true, modelReady: true }).panel.state).toBe("IDLE");
   });
   it("waits for the speech model at once, and runs by itself when it arrives (D-21)", () => {
-    const waiting = syncSelfTest(idle, { sysGranted: true, modelReady: false });
+    const waiting = syncSelfTest(idle, { sysCanTest: true, modelReady: false });
     expect(waiting).toMatchObject({ autoRun: false, panel: { state: "WAITING_FOR_MODEL", runEnabled: false } });
-    expect(syncSelfTest(waiting.panel, { sysGranted: true, modelReady: true })).toMatchObject({ autoRun: true, panel: { state: "RUNNING" } });
+    expect(syncSelfTest(waiting.panel, { sysCanTest: true, modelReady: true })).toMatchObject({ autoRun: true, panel: { state: "RUNNING" } });
   });
   it("leaves a finished or running test alone", () => {
     for (const state of ["RUNNING", "PASSED", "FAILED"] as const) {
       const p = initialSelfTestPanel(state, true);
-      expect(syncSelfTest(p, { sysGranted: true, modelReady: true }).panel).toBe(p);
+      expect(syncSelfTest(p, { sysCanTest: true, modelReady: true }).panel).toBe(p);
     }
   });
 });
 
 describe("rowStateFor (cpt-noter-state-ui-first-run-permission-row)", () => {
-  const none = { checking: [], zeroBuffers: false };
+  const none = { checking: [] };
   it("follows the core, starting system audio as missing", () => {
     expect(rowStateFor("microphone", "not_asked", none)).toBe("NOT_ASKED");
     expect(rowStateFor("microphone", "denied", none)).toBe("DENIED");
@@ -93,11 +93,11 @@ describe("rowStateFor (cpt-noter-state-ui-first-run-permission-row)", () => {
     expect(rowStateFor("system_audio", "not_asked", none)).toBe("MISSING");
     expect(rowStateFor("system_audio", undefined, none)).toBe("MISSING");
   });
-  it("checks while the core re-reads, and reads digital silence as missing", () => {
-    expect(rowStateFor("system_audio", "denied", { checking: ["system_audio"], zeroBuffers: false })).toBe("CHECKING");
-    expect(rowStateFor("system_audio", "granted", { checking: ["system_audio"], zeroBuffers: false })).toBe("GRANTED");
-    expect(rowStateFor("system_audio", "granted", { checking: [], zeroBuffers: true })).toBe("MISSING");
-    expect(rowStateFor("microphone", "granted", { checking: [], zeroBuffers: true })).toBe("GRANTED");
+  it("checks while the core re-reads without overriding its permission row", () => {
+    expect(rowStateFor("system_audio", "denied", { checking: ["system_audio"] })).toBe("CHECKING");
+    expect(rowStateFor("system_audio", "granted", { checking: ["system_audio"] })).toBe("GRANTED");
+    expect(rowStateFor("system_audio", "granted", { checking: [] })).toBe("GRANTED");
+    expect(rowStateFor("microphone", "granted", { checking: [] })).toBe("GRANTED");
   });
 });
 
@@ -151,6 +151,7 @@ describe("createWizard", () => {
     expect(said).toEqual(["Models downloaded"]);
     await settle(900);
     expect(said).toHaveLength(1);
+    expect(sent("self_test_run")).toHaveLength(0); // no audio prompt just because models arrived
   });
 
   it("pauses, resumes, and shows the core's refusal for lack of disk space until Try Again", async () => {
@@ -225,6 +226,14 @@ describe("createWizard", () => {
     expect(state()).toMatchObject({ away: [], checking: [] });
   });
 
+  it("rechecks even a previously denied system-audio row after returning from Settings", async () => {
+    await open((w) => (W.firstRun(w), W.permission(w, "microphone", "granted"), W.permission(w, "system_audio", "denied")));
+    await wizard.openSettings("system_audio");
+    await wizard.returned();
+    expect(sent("permission_request")).toContainEqual({ kind: "system_audio" });
+    expect(state().panel.runEnabled).toBe(true);
+  });
+
   it("waits for the speech model without asking the core, then runs the test by itself (D-21)", async () => {
     await open((w) => (W.firstRun(w, { modelsReady: false }), W.permission(w, "microphone", "granted"), W.permission(w, "system_audio", "granted")));
     expect(state().panel.state).toBe("WAITING_FOR_MODEL");
@@ -265,17 +274,17 @@ describe("createWizard", () => {
     expect(state().panel).toMatchObject({ state: "FAILED", runEnabled: true, failure: "self_test.refused" });
   });
 
-  it("reads digital silence as System Audio Recording not allowed", async () => {
+  it("keeps digital silence retryable without overriding the verified permission", async () => {
     await open((w) => (W.permission(w, "microphone", "granted"), W.permission(w, "system_audio", "granted")));
     await wizard.runTest(false);
     await settle(100);
     fake.push("self_test_run", { event: { type: "failed", reason: { type: "zero_buffers" } } });
     await settle(200);
-    expect(state()).toMatchObject({ zeroBuffers: true, panel: { state: "PERMISSION_MISSING" } });
-    expect(rowStateFor("system_audio", "granted", state())).toBe("MISSING");
+    expect(state()).toMatchObject({ panel: { state: "FAILED", runEnabled: true } });
+    expect(rowStateFor("system_audio", "granted", state())).toBe("GRANTED");
     await wizard.openSettings("system_audio");
     await wizard.returned();
-    expect(state().zeroBuffers).toBe(false);
+    expect(state().panel.runEnabled).toBe(true);
   });
 
   it("keeps the old privacy mode on screen when the core refuses the change, and saves one change at a time", async () => {

@@ -36,10 +36,11 @@ export function firstRunHandlers(fake: Core.FakeCore): Core.Handlers {
   permission_request: (a, { world, publish }) => {
     const row = world.app.setup.permissions.find((p) => p.kind === a.kind);
     if (!row) throw coreError("not_found");
-    if (row.state === "denied") throw coreError("permission_denied", "turn it on in System Settings", { type: "permission", kind: a.kind });
-    row.state = "granted";
+    if (a.kind === "system_audio" && row.state !== "granted" && !["idle", "stopped"].includes(world.app.capture.phase)) throw coreError("conflict", "an audio capture is already running");
+    if (row.state === "denied" && a.kind !== "system_audio") throw coreError("permission_denied", "turn it on in System Settings", { type: "permission", kind: a.kind });
+    row.state = a.kind === "system_audio" && row.state === "denied" ? "not_asked" : "granted";
     const env = world.app.environment.permissions.find((p) => p.kind === a.kind);
-    if (env) env.state = "granted";
+    if (env) env.state = row.state;
     if (a.kind === "notifications") world.app.environment.notifications = "authorized";
     publish("setup:changed");
     publish("env:changed");
