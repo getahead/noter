@@ -133,7 +133,7 @@ pub struct CoreDeps {
     pub models: Arc<dyn ModelSource>,
     /// Downloaded app updates (`tauri-plugin-updater` in the app).
     pub updater: Arc<dyn Updater>,
-    /// Where model bundles go (the App Group container's `models/`); `<data>/models` if unset.
+    /// Where model bundles go (the data folder's `models/`); `<data>/models` if unset.
     pub models_dir: Option<std::path::PathBuf>,
     /// Starts the engine (`ProcessLauncher` in the app, a scripted engine in the harness, S12).
     pub engine: Arc<dyn noter_engine_client::EngineLauncher>,
@@ -259,7 +259,7 @@ pub struct Core {
     viewed: Mutex<Option<CallId>>,
     /// Notifications waiting for the call to end, one per call.
     held: Mutex<Vec<Notification>>,
-    /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the App Group container).
+    /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the data folder).
     audio_dir: std::path::PathBuf,
     /// Replay state, `playback:state`.
     playback: playback::Playback,

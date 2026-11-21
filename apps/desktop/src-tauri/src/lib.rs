@@ -190,10 +190,8 @@ pub fn run() {
             }));
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
             let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
-            // D14: the shared App Group container, or the data folder in unsigned development.
-            let group = noter_core::default_data_dir()
-                .map(|dir| noter_native::app_group_container().unwrap_or(dir))
-                .unwrap_or_default();
+            // D14 (ADR-0004): app, core and engine share the data folder; no App Group.
+            let group = noter_core::default_data_dir().unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
             surfaces.restore_main_window();
@@ -281,7 +279,7 @@ fn boot<R: Runtime>(
         .ok()
         .and_then(|exe| Some(exe.parent()?.join("noter-engine")))
         .unwrap_or_else(|| "noter-engine".into());
-    let engine = ProcessLauncher::from_env(bundled).app_group(&group);
+    let engine = ProcessLauncher::from_env(bundled).data_dir(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
     let accounts = account_cli();
     let deps = CoreDeps {

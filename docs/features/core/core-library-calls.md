@@ -207,7 +207,7 @@ Compute call-independent settings once per page and reuse them while assembling 
 **Steps**:
 1. [x] - `p1` - **FOR EACH** call - `inst-del-for`
    1. [x] - `p1` - DB: in one writer transaction, DELETE the call (cascading to segments, speakers, marks, gaps and later tables) and INSERT a `changes` row with `undoable = 0` and a summary without content - `inst-del-tx`
-   2. [x] - `p1` - Remove `audio/<call_id>/` from the App Group container after the commit - `inst-del-files`
+   2. [x] - `p1` - Remove `audio/<call_id>/` from the data folder after the commit - `inst-del-files`
    3. [x] - `p1` - **CATCH** a file removal failure: log it and retry at the next start; the rows stay deleted - `inst-del-catch`
 2. [x] - `p1` - **RETURN** the count deleted - `inst-del-return`
 

@@ -338,7 +338,7 @@ impl<L: EngineLauncher> EngineClient<L> {
         self.inner
             .launcher
             .container()
-            .ok_or_else(|| OfflineError::UnsafePath("no App Group container".into()))
+            .ok_or_else(|| OfflineError::UnsafePath("no data folder".into()))
     }
 
     /// Registers the request, sends `cmd` and waits for the engine's answer; `check` validates it.

@@ -873,7 +873,7 @@ mod sha256_tests {
     fn only_a_full_disk_is_disk_full() {
         let full = std::io::Error::from_raw_os_error(super::ENOSPC);
         assert_eq!(write_error(&full), ("disk_full", ErrorCode::DiskFull));
-        // What an ad-hoc build gets from an App Group container it is not entitled to.
+        // What an ad-hoc build got from the App Group container before ADR-0004 dropped it.
         let denied = std::io::Error::from_raw_os_error(1);
         assert_eq!(write_error(&denied), ("write_failed", ErrorCode::Internal));
     }

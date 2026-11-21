@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- The app's entitlements: the App Group it shares with the sandboxed engine (decision D14;
-     noter-native's app_group_container() looks for it). TEAMID is replaced at signing, as in
-     engine/scripts/sign.sh. -->
+<!-- The app's entitlements under the hardened runtime. No App Group (ADR-0004): releases are
+     ad-hoc signed, so app, core and engine share ~/Library/Application Support/Noter. -->
 <plist version="1.0">
 <dict>
     <!-- @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1 -->
@@ -13,9 +12,5 @@
     <!-- Handoff's terminal fallback drives Terminal or iTerm with Apple Events (hardened runtime). -->
     <key>com.apple.security.automation.apple-events</key>
     <true/>
-    <key>com.apple.security.application-groups</key>
-    <array>
-        <string>TEAMID.ai.noter</string>
-    </array>
 </dict>
 </plist>

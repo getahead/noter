@@ -54,11 +54,11 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The engine gains its main job: a global Core Audio process tap (excluding the engine's and the app's PIDs) and the microphone on one clock, written into a capture ring that is a memory-mapped file in the App Group container, and to AAC-LC files unless the call stores no audio. VAD, per-utterance language ID and Noter's streaming decode loop on WhisperKit produce hypotheses about once a second and confirmed segments with live speaker labels. Detection listeners report meeting apps. Replay plays a span natively. On the Rust side, the supervisor restarts a crashed engine in capture-first mode and translates engine facts into degraded states.
+The engine gains its main job: a global Core Audio process tap (excluding the engine's and the app's PIDs) and the microphone on one clock, written into a capture ring that is a memory-mapped file in the data folder, and to AAC-LC files unless the call stores no audio. VAD, per-utterance language ID and Noter's streaming decode loop on WhisperKit produce hypotheses about once a second and confirmed segments with live speaker labels. Detection listeners report meeting apps. Replay plays a span natively. On the Rust side, the supervisor restarts a crashed engine in capture-first mode and translates engine facts into degraded states.
 
 > **M1 decisions (Backend Teamlead, 21 Oct 2026).** There are two restart rules in `noter-engine-client`: the idle restart (3 in 60 s, M0) and the capture-first restart (3 in 30 s, then `CaptureFailed`); the supervisor picks one by whether a session is running (TL-8). The Swift protocol types stay hand-written for M1, without code generation (TL-9). The scripted engine follows `.plans/engine-script-format.md` (JSON Lines with `on`, `after_ms` and `event` or `kill`), so the Q7 kill drill is proven on it before the owner runs it on the Mac (TL-3). M1 live labels are per side (You and `spk_1`, one `speakers` row of pass `live`); diarization stays with the offline pass (D-32).
 
-> **0.2 clarification (13 Nov 2026).** Make the existing App Group path boundary explicit for capture and replay, and normalize the supervisor's single trailing session-directory slash in returned paths. No protocol or state transition changes.
+> **0.2 clarification (13 Nov 2026).** Make the existing data-folder path boundary explicit for capture and replay, and normalize the supervisor's single trailing session-directory slash in returned paths. No protocol or state transition changes.
 
 ### 1.2 Purpose
 
@@ -101,13 +101,13 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Error Scenarios**:
 - The requested backend is not supported: the engine returns `error { bad_command }` before opening streams or creating capture files.
 - The microphone is unavailable or access is off: the session still starts with the system channel; `error { device_unavailable }` or silent buffers let the core raise `MicrophoneOff`.
-- A session directory is absolute, contains empty, dot, parent or NUL components, or resolves through a symlink outside the App Group container: the command fails before any capture files are created or streams started. One trailing directory slash is removed before validation.
+- A session directory is absolute, contains empty, dot, parent or NUL components, or resolves through a symlink outside the data folder: the command fails before any capture files are created or streams started. One trailing directory slash is removed before validation.
 - The disk fills: AAC writing stops (`disk_full` error event), transcription goes on.
 - The live model fails to load: `error { model_load_failed }`; the supervisor reports `engine_unavailable`.
 
 **Steps**:
 1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
-2. [x] - `p1` - Engine validates the session directory inside the App Group container, then opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
+2. [x] - `p1` - Engine validates the session directory inside the data folder, then opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
 5. [x] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
@@ -167,10 +167,10 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Error Scenarios**:
 - The audio was not stored or was deleted: `error` for the command; the core maps it to `audio_deleted`.
-- The derived audio path contains invalid components or resolves through a symlink outside the App Group container: `bad_command` for the command without opening audio or interrupting current replay.
+- The derived audio path contains invalid components or resolves through a symlink outside the data folder: `bad_command` for the command without opening audio or interrupting current replay.
 
 **Steps**:
-1. [x] - `p1` - Supervisor sends `play`; engine validates the derived audio directory and selected files inside the App Group container before playback - `inst-play`
+1. [x] - `p1` - Supervisor sends `play`; engine validates the derived audio directory and selected files inside the data folder before playback - `inst-play`
 2. [x] - `p1` - Engine plays the span; its own PID is excluded from the tap, so replay never enters the recording - `inst-play-excluded`
 3. [x] - `p1` - Engine emits `playback_position { at_ms, playing }` while playing and once when it stops - `inst-position`
 4. [x] - `p1` - **RETURN** - `inst-return-replay`
@@ -270,7 +270,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
-The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the App Group container; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring. When a stop was missed or finalization was interrupted, archive and replay recover available AAC parts and preserve the saved timeline duration. A completed recording followed by Continue Recording retains both the earlier M4A and new parts. Shutdown and live stdin EOF wait for queued stop finalization.
+The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the data folder; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring. When a stop was missed or finalization was interrupted, archive and replay recover available AAC parts and preserve the saved timeline duration. A completed recording followed by Continue Recording retains both the earlier M4A and new parts. Shutdown and live stdin EOF wait for queued stop finalization.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-session`

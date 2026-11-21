@@ -99,6 +99,24 @@ def check_ui(root: Path) -> list[Violation]:
     return v
 
 
+# The engine is unsandboxed (ADR-0004), so "offline" is code discipline: no networking API in its sources.
+ENGINE_NETWORK_API = re.compile(
+    r"^\s*(?:@testable\s+)?import\s+(?:Network|CFNetwork)\b"
+    r"|\b(?:URLSession|URLSessionConfiguration|NWConnection|NWListener|NWBrowser|NWPathMonitor|NSURLConnection"
+    r"|CFStreamCreatePairWithSocket|CFSocketCreate|SocketPort|getaddrinfo)\b"
+    r"|\b(?:socket|connect|bind|listen|sendto|recvfrom)\s*\(\s*(?:AF_|PF_|Int32\(AF_)"
+)
+
+
+def check_engine_network(root: Path) -> list[Violation]:
+    v: list[Violation] = []
+    for path in sorted((root / "engine/Sources").rglob("*.swift")):
+        for n, line in enumerate(path.read_text(encoding="utf-8", errors="ignore").splitlines(), 1):
+            if not line.lstrip().startswith("//") and ENGINE_NETWORK_API.search(line):
+                v.append(Violation("engine is offline (cpt-noter-constraint-core-engine-offline)", f"{path.relative_to(root)}:{n}: networking API; the engine never touches the network (ADR-0004)"))
+    return v
+
+
 def check_entitlements(root: Path) -> list[Violation]:
     v: list[Violation] = []
     engine = root / "engine"
@@ -149,7 +167,7 @@ def check_opt_outs(root: Path) -> list[Violation]:
 
 
 def run(root: Path = ROOT) -> list[Violation]:
-    return check_crates(workspace_packages(root)) + check_ui(root) + check_entitlements(root) + check_opt_outs(root)
+    return check_crates(workspace_packages(root)) + check_ui(root) + check_entitlements(root) + check_engine_network(root) + check_opt_outs(root)
 
 
 def main() -> int:

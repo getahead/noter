@@ -33,7 +33,7 @@ fn main_window() -> CommandCtx {
     }
 }
 
-/// A started core on `dir` with the scripted engine (its App Group container is `dir`).
+/// A started core on `dir` with the scripted engine (its data folder is `dir`).
 async fn open(dir: &std::path::Path) -> Arc<Core> {
     let deps = CoreDeps {
         engine: Arc::new(ScriptedEngine::new().with_container(dir)),

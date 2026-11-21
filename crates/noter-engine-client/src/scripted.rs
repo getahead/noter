@@ -250,7 +250,7 @@ impl ScriptedEngine {
         self
     }
 
-    /// The App Group container its engines write offline results and vectors into.
+    /// The data folder its engines write offline results and vectors into.
     pub fn with_container(self, dir: impl Into<PathBuf>) -> Self {
         self.lock().container = Some(dir.into());
         self
@@ -803,7 +803,7 @@ async fn run(
                     session.unwrap_or_else(|| (format!("audio/{call_id}"), false));
                 let result = container
                     .as_deref()
-                    .ok_or_else(|| "no App Group container".to_string())
+                    .ok_or_else(|| "no data folder".to_string())
                     .and_then(|root| {
                         answer_stop(root, &session_dir, call_id, store_audio)
                             .map_err(|code| format!("scripted stop failed: {code:?}"))
@@ -895,7 +895,7 @@ async fn run(
                     out.emit(EngineEvent::Error {
                         cmd_id: Some(id),
                         code: EngineErrorCode::BadCommand,
-                        message: "no App Group container".into(),
+                        message: "no data folder".into(),
                     })
                     .await;
                     continue;

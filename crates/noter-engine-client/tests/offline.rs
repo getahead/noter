@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use noter_engine_client::scripted::{Behaviour, Script, ScriptedEngine};
 use noter_engine_client::{
-    Config, EngineClient, EngineSession, OfflineError, OfflineKey, OfflineState,
+    CommandError, Config, EngineClient, EngineSession, OfflineError, OfflineKey, OfflineState,
 };
 use noter_protocol::engine::{
     ArchiveResult, AsrBackend, EngineCommand, EngineErrorCode, EngineEvent, EngineSpan,
@@ -211,6 +211,26 @@ async fn without_a_container_nothing_is_sent() {
     let r = pass(&c, "audio/call_1/r.json").await;
     assert!(matches!(r, Err(OfflineError::UnsafePath(_))));
     assert_eq!(offline_cmds(&engine), 0);
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_scripted_engine_without_a_data_folder_refuses_offline_work() {
+    let engine = ScriptedEngine::new();
+    let c = client(&engine);
+    let r = c
+        .command(EngineCommand::EmbedTexts {
+            request_id: "emb_1".into(),
+            texts: texts(1),
+            out_path: None,
+        })
+        .await;
+    assert_eq!(
+        r,
+        Err(CommandError::Engine {
+            code: EngineErrorCode::BadCommand,
+            message: "no data folder".into(),
+        })
+    );
 }
 
 // cpt-noter-algo-core-harness-scripted-engine: the built-in answer reuses the live transcript.

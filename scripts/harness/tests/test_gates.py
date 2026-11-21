@@ -564,6 +564,17 @@ class ArchCheckTests(unittest.TestCase):
             self.assertTrue(any("engine/Tests/own.swift" in f.detail for f in found))
             self.assertTrue(any("apps/desktop/tests/.build/own.swift" in f.detail for f in found))
 
+    def test_engine_sources_use_no_networking_api(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            src = root / "engine/Sources/NoterEngineKit"
+            src.mkdir(parents=True)
+            (src / "Ok.swift").write_text("import Foundation\n// URLSession is banned here\nlet x = 1\n")
+            (src / "Bad.swift").write_text("import Network\nlet s = URLSession.shared\nlet fd = socket(AF_INET, 1, 0)\n")
+            found = arch_check.check_engine_network(root)
+            self.assertEqual([f.detail.split(":")[1] for f in found], ["1", "2", "3"])
+            self.assertTrue(all("Bad.swift" in f.detail for f in found))
+
     def test_swiftpm_dependency_entitlements_do_not_grant_the_engine_network_access(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

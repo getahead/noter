@@ -63,7 +63,7 @@ public enum JSONValue: Codable, Equatable, Sendable {
 /// `start_session`: everything the engine needs to capture one call.
 public struct StartSession: Equatable, Sendable {
     public var callId: String
-    /// `audio/<call_id>/`, relative to the App Group container.
+    /// `audio/<call_id>/`, relative to the data folder.
     public var sessionDir: String
     public var storeAudio: Bool
     public var micDeviceUid: String?
