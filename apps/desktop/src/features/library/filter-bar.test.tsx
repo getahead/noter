@@ -8,6 +8,16 @@ const lists = { people: [{ id: "per_a", short_name: "Anna", display_name: "Anna 
 const bar = (s = BLANK) => renderToString(<FilterBar state={s} lists={lists} onAction={() => {}} />);
 
 describe("FilterBar (cpt-noter-component-ui-filter-bar)", () => {
+  it("the capsule buttons open their menu, toggle Has Open Items and Clear (#1078)", () => {
+    const onAction = vi.fn();
+    const tree = rendered(FilterBar, { state: apply(BLANK, { type: "toggle", group: "people", value: "per_a" }), lists, onAction });
+    const people = find(tree, (p) => typeof p.className === "string" && p.className.includes("lb-fbtn") && p["aria-expanded"] === false);
+    expect(() => (people.props.onClick as (e: unknown) => void)({ currentTarget: {} })).not.toThrow();
+    (find(tree, (p) => p["aria-pressed"] === false).props.onClick as () => void)();
+    expect(onAction).toHaveBeenCalledWith({ type: "open_items", on: true });
+    (find(tree, (p) => p.label === "Clear").props.onAction as () => void)();
+    expect(onAction).toHaveBeenCalledWith({ type: "clear" });
+  });
   it("offers the pop-ups and a disabled Clear without filters (#1078)", () => {
     const html = bar();
     for (const w of ["People", "Type", "Tags", "Language", "Date", "Has Open Items"]) expect(html).toContain(w);
