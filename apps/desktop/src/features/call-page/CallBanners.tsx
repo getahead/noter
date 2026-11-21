@@ -62,7 +62,8 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-writing
   else if (tab === "summary" && outputs?.written_locally && outputs.status !== "not_started")
     list.push({ id: "local", severity: "info", text: t("outputs.banner.written_locally"), actions: [{ label: t("outputs.banner.regenerate_claude"), onAction: () => openRegenerate(["summary"]) }] });
-  if (review) list.push(review);
+  // no review banner while the call records or before its outputs start: no section has rows to review (issue 1038)
+  if (review && !live && outputs?.status !== "not_started") list.push(review);
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
   if (!offer && list.length === 0) return null;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-return-banner
