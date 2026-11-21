@@ -60,6 +60,19 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect(menu(page)).toContainText(/Your Edit · \d{1,2}:\d{2}/);
   });
 
+  test("UI — #1051: a summary written days after the call reads its delay in days, hours and minutes", async ({ page }) => {
+    const LATE = ((2 * 24 + 3) * 60 + 4) * 60_000; // 2 days, 3 hr, 4 min
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        const call = w.calls.find((c) => c.id === W.PAST_CALL)!;
+        for (const s of O.outputsOf(w).sections) s.writer = { ...s.writer!, generated_at: call.started_at + call.duration_ms + LATE };
+      },
+    });
+    await openReady(page);
+    await expect(section(page, "Summary")).toContainText("Summary · English · Claude Code · 2 days, 3 hr, 4 min after the call");
+  });
+
   test("UI — happy path: Esc discards the draft and the saved text stays", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
     await openReady(page);

@@ -208,7 +208,8 @@ export const duration = (seconds: number): string => {
   };
   if (s < 60) return unit(s, "second");
   const units = [
-    [Math.floor(s / 3600), "hour"],
+    [Math.floor(s / 86400), "day"],
+    [Math.floor(s / 3600) % 24, "hour"],
     [Math.floor(s / 60) % 60, "minute"],
   ] as const;
   // Intl.DurationFormat would do this, but Node 22 (CI) lacks it.

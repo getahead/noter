@@ -58,6 +58,12 @@ describe("metaLine and versionLabel", () => {
   it("names the writer and the time after the call", () => {
     expect(metaLine(sec("summary", { writer }), call, "Summary")).toBe("Summary · English · Claude Code · 1 min 40 s after the call");
   });
+  // #1051: a delay past an hour reads in hours and days, not thousands of minutes
+  it("words a long delay in hours and days", () => {
+    const at = (ms: number) => metaLine(sec("summary", { writer: { ...(writer as object), generated_at: 1_060_000 + ms } as never }), call, "Summary");
+    expect(at(2 * 3_600_000 + 5 * 60_000)).toBe("Summary · English · Claude Code · 2 hr, 5 min after the call");
+    expect(at(19_798 * 60_000)).toBe("Summary · English · Claude Code · 13 days, 17 hr, 58 min after the call");
+  });
   it("is the heading alone for text nobody wrote yet", () => expect(metaLine(sec("summary"), call, "Summary")).toBe("Summary"));
   it("labels a user's edit with its time and a generated version with its number and writer", () => {
     const prefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never;
