@@ -2,8 +2,8 @@
 title: "Feature — Live and stored transcript"
 description: "The virtualised transcript log of a call: confirmed and hypothesis rows with speaker, time and language, gap and mark rows, Jump to Live, the waiting state, and safe replay of a line on headphones during the call and on any output afterwards."
 status: DRAFT
-version: "1.1"
-date: "2026-10-18"
+version: "1.2"
+date: "2026-11-21"
 feature: cpt-noter-feature-ui-live-transcript
 milestone: M1
 ---
@@ -117,7 +117,7 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 - Error — Noter's own sounds not excluded: disabled with **Replay would be recorded. Turn on Exclude Noter's own sounds in Settings › Audio & Transcription.**
 
 **Steps**:
-1. [x] - `p1` - User scrolls up more than one row - `inst-user-scroll`
+1. [x] - `p1` - User scrolls up by any pixel; the first upward frame detaches - `inst-user-scroll`
 2. [x] - `p1` - UI: the view detaches and shows the pill **Jump to Live · N new lines**, counted with plural rules - `inst-detach`
 3. [x] - `p1` - User hovers or focuses a line - `inst-user-hover`
 4. [x] - `p1` - Algorithm: decide the play control with `cpt-noter-algo-ui-live-transcript-play-control` - `inst-play-control`
@@ -168,9 +168,9 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 **Output**: following or detached with a count; a live rename holds following only while its speaker remains in the current snapshot
 
 **Steps**:
-1. [x] - `p1` - **IF** the view is at the end (within one row) - `inst-if-end`
+1. [x] - `p1` - **IF** the view is at the end (within one row) without an upward user move; duplicate notifications at the same pixel do not resume a detached view - `inst-if-end`
    1. [x] - `p1` - Keep the end in view after the flush (smooth scroll; a jump under Reduce motion) - `inst-keep-end`
-   2. [x] - `p1` - **RETURN** following - `inst-return-following`
+   2. [x] - `p1` - **RETURN** following only for the latest queued follow state and a genuine return toward the end; native events batched before a render must not overwrite an earlier detachment - `inst-return-following`
 2. [x] - `p1` - Add the new confirmed rows to the pill's count - `inst-count`
 3. [x] - `p1` - Never move the rows in view: confirmed rows keep their position - `inst-no-jump`
 4. [x] - `p1` - **RETURN** detached with the count - `inst-return-detached`
@@ -213,7 +213,7 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 3. [x] - `p1` - **FROM** LOADING **TO** ERROR **WHEN** the stored transcript fails to load - `inst-loading-error`
 4. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** the user chooses **Try Again** - `inst-error-loading`
 5. [x] - `p1` - **FROM** WAITING_FOR_SPEECH **TO** FOLLOWING **WHEN** the first segment arrives - `inst-waiting-following`
-6. [x] - `p1` - **FROM** FOLLOWING **TO** DETACHED **WHEN** the user scrolls up more than one row - `inst-following-detached`
+6. [x] - `p1` - **FROM** FOLLOWING **TO** DETACHED **WHEN** the user scrolls up by any pixel, including when duplicate notifications arrive before the render commits - `inst-following-detached`
 7. [x] - `p1` - **FROM** DETACHED **TO** FOLLOWING **WHEN** the user chooses **Jump to Live**, presses ⌘J or scrolls back to the end - `inst-detached-following`
 8. [x] - `p1` - **FROM** FOLLOWING **TO** FIND_ACTIVE **WHEN** the user opens the find bar (stored variant) - `inst-following-find`
 9. [x] - `p1` - **FROM** FIND_ACTIVE **TO** FOLLOWING **WHEN** the user closes the find bar - `inst-find-following`
