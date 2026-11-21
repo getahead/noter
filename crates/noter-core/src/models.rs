@@ -78,6 +78,7 @@ impl Downloads {
                     },
                     state,
                     required_for_capture: s.required_for_capture,
+                    selected: true,
                 }
             })
             .collect();
@@ -96,10 +97,27 @@ impl Downloads {
 
     pub(crate) fn status(&self) -> ModelsStatus {
         ModelsStatus {
-            total_mb: self.bundles.iter().map(|b| b.size_mb).sum(),
-            done_mb: self.bundles.iter().map(|b| b.done_mb).sum(),
+            total_mb: self
+                .bundles
+                .iter()
+                .filter(|b| b.selected)
+                .map(|b| b.size_mb)
+                .sum(),
+            done_mb: self
+                .bundles
+                .iter()
+                .filter(|b| b.selected)
+                .map(|b| b.done_mb.min(b.size_mb))
+                .sum(),
             bundles: self.bundles.clone(),
             error: self.error,
+        }
+    }
+
+    pub(crate) fn select(&mut self, names: Option<&[String]>) {
+        for bundle in &mut self.bundles {
+            bundle.selected = bundle.required_for_capture
+                || names.map_or(true, |names| names.contains(&bundle.name));
         }
     }
 
@@ -204,7 +222,14 @@ impl Core {
                 return;
             }
             let (specs, dir) = (d.specs.clone(), d.dir.clone());
+            let selected = d
+                .bundles
+                .iter()
+                .filter(|b| b.selected)
+                .map(|b| b.name.clone())
+                .collect::<Vec<_>>();
             *d = Downloads::load(specs, dir);
+            d.select(Some(&selected));
         }
         self.refresh_setup();
     }
@@ -226,6 +251,9 @@ impl Core {
                     _ => 0,
                 };
                 d.set(&b.name, b.state, Some(done));
+                if let Some(bundle) = d.bundles.iter_mut().find(|bundle| bundle.name == b.name) {
+                    bundle.selected = bundle.required_for_capture || b.selected;
+                }
             }
             d.error = wanted.error;
         }
@@ -235,10 +263,49 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-first-run-download:p1
     pub(crate) fn download_models(
         &self,
+        ctx: &noter_protocol::ipc::CommandCtx,
         args: ModelsDownloadArgs,
     ) -> Result<SetupStatus, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-download-call
         let mut d = lock(&self.downloads);
+        if let Some(names) = &args.bundles {
+            if names
+                .iter()
+                .any(|name| !d.bundles.iter().any(|b| &b.name == name))
+            {
+                return Err(CoreError::new(
+                    ErrorCode::InvalidInput,
+                    "unknown model bundle",
+                ));
+            }
+            if d.running
+                && d.bundles
+                    .iter()
+                    .any(|b| b.selected != (b.required_for_capture || names.contains(&b.name)))
+            {
+                return Err(CoreError::new(
+                    ErrorCode::NotReady,
+                    "pause downloads before changing selection",
+                ));
+            }
+            let mut first_run = lock(&self.first_run);
+            let mut stored = first_run.stored.clone();
+            stored.model_selection = Some(names.clone());
+            self.store_setup(ctx, &first_run.stored, &stored, "models_download")?;
+            first_run.stored = stored;
+            d.select(Some(names));
+            d.error = None;
+        }
+        if args.action == DownloadAction::Select
+            || d.bundles
+                .iter()
+                .filter(|b| b.selected)
+                .all(|b| b.state == BundleState::Ready)
+        {
+            drop(d);
+            self.refresh_setup();
+            return Ok(self.setup_now());
+        }
         // @cpt-end:cpt-noter-flow-core-first-run-download:p1:inst-download-call
         // @cpt-begin:cpt-noter-flow-core-first-run-download:p1:inst-other-actions
         if args.action == DownloadAction::Pause {
@@ -270,7 +337,7 @@ impl Core {
             .specs
             .iter()
             .zip(&d.bundles)
-            .filter(|(_, b)| b.state != BundleState::Ready)
+            .filter(|(_, b)| b.selected && b.state != BundleState::Ready)
             .map(|(s, b)| s.size_bytes().saturating_sub(u64::from(b.done_mb) * MB))
             .sum();
         let needed_mb = ceil_mb(remaining) + MARGIN_MB;
@@ -292,7 +359,7 @@ impl Core {
         for b in d
             .bundles
             .iter_mut()
-            .filter(|b| b.state != BundleState::Ready)
+            .filter(|b| b.selected && b.state != BundleState::Ready)
         {
             b.state = BundleState::Downloading;
         }
@@ -345,9 +412,17 @@ impl Core {
             reading.online && d.resume_online && !d.running
         };
         if resume {
-            let _ = self.download_models(ModelsDownloadArgs {
-                action: DownloadAction::Resume,
-            });
+            let _ = self.download_models(
+                &noter_protocol::ipc::CommandCtx {
+                    caller: noter_protocol::ipc::Caller::Native {
+                        surface: noter_protocol::ipc::NativeSurface::MenuBar,
+                    },
+                },
+                ModelsDownloadArgs {
+                    action: DownloadAction::Resume,
+                    bundles: None,
+                },
+            );
         }
     }
 
@@ -416,7 +491,7 @@ impl Core {
         for b in d
             .bundles
             .iter_mut()
-            .filter(|b| b.state == BundleState::Paused)
+            .filter(|b| b.selected && b.state == BundleState::Paused)
         {
             b.state = BundleState::Downloading;
         }
@@ -436,7 +511,7 @@ impl Core {
             for b in d
                 .bundles
                 .iter_mut()
-                .filter(|b| b.state == BundleState::Paused)
+                .filter(|b| b.selected && b.state == BundleState::Paused)
             {
                 b.state = BundleState::Downloading;
                 any = true;
@@ -456,7 +531,9 @@ impl Core {
         let d = lock(&self.downloads);
         match (
             d.error,
-            d.bundles.iter().any(|b| b.state == BundleState::Paused),
+            d.bundles
+                .iter()
+                .any(|b| b.selected && b.state == BundleState::Paused),
         ) {
             (Some(code), _) => Err(Stop::Failed(CoreError::new(
                 code,
@@ -478,7 +555,7 @@ impl Core {
             let downloading = lock(&self.downloads)
                 .bundles
                 .iter()
-                .any(|b| b.name == spec.name && b.state == BundleState::Downloading);
+                .any(|b| b.selected && b.name == spec.name && b.state == BundleState::Downloading);
             if !downloading {
                 continue;
             }

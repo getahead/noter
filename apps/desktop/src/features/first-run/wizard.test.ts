@@ -17,6 +17,11 @@ const at = (step: SetupStep) => (w: World) => {
 const bundle = (state: ModelBundle["state"], done_mb = 0, required = false): ModelBundle => ({ name: "m", size_mb: 100, done_mb, state, required_for_capture: required });
 
 describe("model bundles (cpt-noter-flow-ui-first-run-download-models)", () => {
+  it("ignores skipped optional bundles when deciding completion and pause", () => {
+    const skipped = { ...bundle("pending"), selected: false };
+    expect(allReady([bundle("ready"), skipped])).toBe(true);
+    expect(downloadPaused([bundle("paused"), skipped])).toBe(true);
+  });
   it("reads progress, readiness and the row state off the bundles", () => {
     expect(bundlePercent(bundle("downloading", 62))).toBe(62);
     expect(bundlePercent(bundle("ready", 100))).toBe(100);
@@ -46,10 +51,10 @@ describe("model bundles (cpt-noter-flow-ui-first-run-download-models)", () => {
     expect(gigabytes(2100)).toBe("2.1 GB");
     expect(gigabytes(1400)).toBe("1.4 GB");
     // wespeaker is 21 MB: never "0 GB" for a bundle that has bytes (owner, v0.23.0)
-    expect(gigabytes(21)).toBe("0.1 GB");
-    expect(gigabytes(0)).toBe("0 GB");
+    expect(gigabytes(21)).toBe("21 MB");
+    expect(gigabytes(0)).toBe("0 MB");
     expect(wholeGigabytes(2048)).toBe("2 GB");
-    expect(wholeGigabytes(100)).toBe("1 GB");
+    expect(wholeGigabytes(100)).toBe("100 MB");
   });
 });
 
@@ -142,10 +147,11 @@ describe("createWizard", () => {
     expect(sent("models_download")).toEqual([]);
   });
 
-  it("starts the downloads while the bundles are pending, and announces Models downloaded once", async () => {
+  it("waits for the user's selection, then downloads and announces completion once", async () => {
     await open((w) => W.firstRun(w, { modelsReady: false }));
     expect(state()).toMatchObject({ current: "models", resumed: true });
-    expect(sent("models_download")).toEqual([{ action: "start" }]);
+    expect(sent("models_download")).toEqual([]);
+    await wizard.download("start");
     await settle(900);
     expect(allReady(bridge.store.getState().whole.setup!.models.bundles)).toBe(true);
     expect(said).toEqual(["Models downloaded"]);
@@ -230,6 +236,7 @@ describe("createWizard", () => {
     expect(state().panel.state).toBe("WAITING_FOR_MODEL");
     await wizard.runTest(false);
     expect(sent("self_test_run")).toEqual([]);
+    await wizard.download("start");
     await settle(900); // the speech model is in
     expect(sent("self_test_run")).toEqual([{ play_clip: false }]);
     expect(state().panel.state).toBe("RUNNING");

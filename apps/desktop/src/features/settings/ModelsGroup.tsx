@@ -5,11 +5,13 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { Progress } from "../../ui/primitives/progress";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Group } from "./form";
-import { modelAction, modelKey, statusKey } from "./models";
+import { modelAction, modelKey, modelPurpose, statusKey } from "./models";
 
 /** **Models**: one row per bundle the core lists; a download or retry runs `models_download`. */
 export function ModelsGroup({ bridge }: { bridge: Bridge }) {
   const bundles = useWindow(bridge, (s) => s.whole.setup?.models.bundles ?? []);
+  const commands = useWindow(bridge, (s) => s.commands);
+  const running = bundles.some((b) => b.state === "downloading" || b.state === "verifying");
   return (
     <Group title={t("settings.models.title")}>
       {bundles.length === 0 && <EmptyState variant="section" title={t("settings.models.empty")} />}
@@ -19,6 +21,8 @@ export function ModelsGroup({ bridge }: { bridge: Bridge }) {
           <div key={b.name} className="e-status" data-state={b.state}>
             <div className="e-status__main">
               <span className="e-status__title">{b.name}</span>
+              <span className="e-status__sub">{t(modelPurpose(b))}</span>
+              {commands[modelKey(b.name)]?.state === "ERROR" && <span role="alert">{t("first_run.models.download_failed")}</span>}
               <span className="e-status__sub">
                 {t("settings.models.size", { size: b.size_mb })} · {b.state === "downloading" ? t("settings.models.downloading", { done: Math.min(b.done_mb, b.size_mb), total: b.size_mb }) : t(statusKey(b.state))}
               </span>
@@ -26,7 +30,7 @@ export function ModelsGroup({ bridge }: { bridge: Bridge }) {
             </div>
             {action && (
               // @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-models
-              <PushButton label={t(action.label)} size="small" onAction={() => void bridge.act(modelKey(b.name), "models_download", () => bridge.core.modelsDownload({ action: action.action }))} />
+              <PushButton label={t(action.label)} size="small" disabled={running} onAction={() => void bridge.act(modelKey(b.name), "models_download", () => bridge.core.modelsDownload({ action: action.action, bundles: bundles.filter((m) => m.selected !== false || m.name === b.name).map((m) => m.name) }), { slice: "setup" })} />
               // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-models
             )}
           </div>

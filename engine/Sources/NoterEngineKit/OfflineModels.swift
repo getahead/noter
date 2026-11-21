@@ -14,21 +14,32 @@ extension LocalOfflineWork {
     /// The offline work on the models the core has installed in `models` (a folder still
     /// downloading is `<name>.partial`, so it is not one of them).
     public static func installed(models: URL) -> LocalOfflineWork {
-        func folder(_ name: String) -> URL? {
+        func exists(_ name: String) -> Bool {
+            FileManager.default.fileExists(atPath: models.appendingPathComponent(name).path)
+        }
+        func folder(_ name: String) throws -> URL {
             let url = models.appendingPathComponent(name)
-            return FileManager.default.fileExists(atPath: url.path) ? url : nil
+            guard exists(name) else { throw OfflineFailure(code: .modelMissing) }
+            return url
         }
-        // A wespeaker folder installed before the segmentation was pinned has none: no clustering.
-        let clustering = folder("wespeaker").flatMap { f in
-            FileManager.default.fileExists(atPath: f.appendingPathComponent("Segmentation.mlmodelc").path) ? f : nil
-        }
+        // Factories check at use time: a Settings download becomes usable without relaunch.
         return LocalOfflineWork(
-            decoder: folder("whisper-large-v3").map { f in { try WhisperArchiveDecoder(folder: f) } },
-            speaker: folder("wespeaker").map { f in { try CoreMLSpeakerModel(folder: f) } },
-            text: folder("bge-m3").map { f in { try CoreMLTextModel(folder: f) } },
-            clustering: clustering.map { f in
-                { Clustering(segmentation: try CoreMLSegmentationModel(folder: f), plda: try PLDA.read(folder: f)) }
-            })
+            decoder: { try WhisperArchiveDecoder(folder: folder("whisper-large-v3")) },
+            speaker: { try CoreMLSpeakerModel(folder: folder("wespeaker")) },
+            text: { try CoreMLTextModel(folder: folder("bge-m3")) },
+            clustering: {
+                let f = try folder("wespeaker")
+                return Clustering(segmentation: try CoreMLSegmentationModel(folder: f), plda: try PLDA.read(folder: f))
+            },
+            turboDecoder: { try WhisperArchiveDecoder(folder: folder("whisper-turbo")) },
+            availability: {
+                var available = Set<OfflineModel>()
+                if exists("whisper-large-v3") || exists("whisper-turbo") { available.insert(.archive) }
+                if exists("wespeaker") { available.insert(.speaker) }
+                if exists("bge-m3") { available.insert(.text) }
+                return available
+            },
+            clusteringAvailable: { exists("wespeaker/Segmentation.mlmodelc") })
     }
 }
 

@@ -12,6 +12,7 @@ import { Msg } from "../../i18n/Msg";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
 import { Progress } from "../../ui/primitives/progress";
+import { Checkbox } from "../../ui/primitives/checkbox";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { Toggle } from "../../ui/primitives/toggle";
@@ -26,7 +27,8 @@ import { keyConfigured, removeAlert } from "../settings/keys";
 import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
 import { dbToLevel, hearing } from "./self-test";
 import { STEP_ORDER, stepperItems, type StepperItemState } from "./steps";
-import { bundlePercent, bundleRowState, createWizard, downloadPaused, gigabytes, overallPercent, rowStateFor, speechPercent, wholeGigabytes, type Wizard, type WizardState } from "./wizard";
+import { allReady, bundlePercent, bundleRowState, createWizard, downloadPaused, gigabytes, overallPercent, rowStateFor, speechPercent, wholeGigabytes, type Wizard, type WizardState } from "./wizard";
+import { modelPurpose } from "../settings/models";
 import "../../ui/setup/setup.css";
 
 /** Read a value of a vanilla store and re-render when it changes. */
@@ -80,6 +82,10 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
   const env = useSelect(bridge.store, (s) => s.whole.environment);
   const { bundles, total_mb, done_mb, error } = status.models;
   const paused = downloadPaused(bundles);
+  const complete = allReady(bundles);
+  const running = bundles.some((b) => b.selected !== false && (b.state === "downloading" || b.state === "verifying"));
+  const saving = useSelect(bridge.store, (s) => s.commands.models_download?.state === "WAITING");
+  const failed = useSelect(bridge.store, (s) => s.commands.models_download?.state === "ERROR");
   // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-match-download
   // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-disk
   const disk = w.disk ?? (error === "disk_full" ? { needed_mb: total_mb - done_mb, free_mb: env?.disk_free_mb ?? 0 } : null);
@@ -92,6 +98,7 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
       <p className="fr-p">
         <Msg id="first_run.models.body" />
       </p>
+      {failed && !disk && <InlineBanner banner={{ id: "models-error", severity: "error", text: t("window.error") }} />}
       {disk && <InlineBanner banner={{ id: "disk", severity: "error", text: t("first_run.models.disk", { needed: gigabytes(disk.needed_mb), free: gigabytes(disk.free_mb) }), actions: [{ label: t("action.try_again"), onAction: () => void wizard.download("start") }] }} />}
       {/* @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-offline */}
       {env && !env.online && (
@@ -104,22 +111,23 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
       {/* @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-list-bundles */}
       <div className="fr-models np-card">
         {bundles.map((b) => {
-          const state = bundleRowState(b);
+          const state = b.selected === false ? "paused" : bundleRowState(b);
           const pct = bundlePercent(b);
           const failedLabel = b.state === "checksum_failed" ? "first_run.models.check_failed" : "first_run.models.download_failed";
           return (
             <div key={b.name} className="fr-model" data-state={state}>
               <div className="fr-model__name">
-                {b.name}
+                <Checkbox label={b.name} checked={b.selected !== false} disabled={b.required_for_capture || running || saving} onAction={(selected) => void wizard.selectModel(b.name, selected)} />
                 <span className="np-dim"> · {gigabytes(b.size_mb)}</span>
+                <div className="np-muted">{t(modelPurpose(b))}</div>
               </div>
               <div className="fr-model__bar">
                 <Progress value={pct} state={state} label={b.name} />
                 <span className="np-tnum fr-model__pct">
-                  {state === "finished" ? <Msg id="first_run.models.ready" /> : state === "failed" ? <Msg id={failedLabel} /> : <Msg id="first_run.models.percent" args={{ value: pct }} />}
+                  {b.selected === false ? <Msg id="first_run.models.skipped" /> : state === "finished" ? <Msg id="first_run.models.ready" /> : state === "failed" ? <Msg id={failedLabel} /> : <Msg id="first_run.models.percent" args={{ value: pct }} />}
                 </span>
                 {/* @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-checksum */}
-                {state === "failed" && <PushButton label={t("action.try_again")} size="small" onAction={() => void wizard.download("retry")} />}
+                {b.selected !== false && state === "failed" && <PushButton label={t("action.try_again")} size="small" onAction={() => void wizard.download("retry")} />}
                 {/* @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-checksum */}
               </div>
             </div>
@@ -131,7 +139,7 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
           </span>
           <span className="np-tb__spacer" />
           {/* @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-progress */}
-          {!disk && <PushButton label={paused ? t("first_run.models.resume") : t("first_run.models.pause")} size="small" onAction={() => void wizard.download(paused ? "resume" : "pause")} />}
+          {complete ? <Msg id="first_run.models.done" /> : !disk && <PushButton label={running ? t("first_run.models.pause") : paused ? t("first_run.models.resume") : t("settings.models.download")} size="small" disabled={saving} onAction={() => void wizard.download(running ? "pause" : paused ? "resume" : "start")} />}
           {/* @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-progress */}
         </div>
       </div>

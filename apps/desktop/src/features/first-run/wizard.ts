@@ -17,7 +17,7 @@ export function resumeStep(steps: readonly StepRow[]): SetupStep {
 
 export const speechBundle = (bundles: readonly ModelBundle[]) => bundles.find((b) => b.required_for_capture);
 export const speechReady = (bundles: readonly ModelBundle[]) => speechBundle(bundles)?.state === "ready";
-export const allReady = (bundles: readonly ModelBundle[]) => bundles.length > 0 && bundles.every((b) => b.state === "ready");
+export const allReady = (bundles: readonly ModelBundle[]) => bundles.some((b) => b.selected !== false) && bundles.every((b) => b.selected === false || b.state === "ready");
 const percent = (done: number, size: number) => (size > 0 ? Math.min(100, Math.round((done / size) * 100)) : 0);
 export const bundlePercent = (b: ModelBundle) => (b.state === "ready" ? 100 : percent(b.done_mb, b.size_mb));
 /** The speech model's progress, for "Waiting for the speech model · N %". */
@@ -37,14 +37,14 @@ export function bundleRowState(b: ModelBundle): BundleRowState {
 
 /** Resume is offered once every unfinished bundle is paused, Pause while one downloads. */
 export const downloadPaused = (bundles: readonly ModelBundle[]) => {
-  const open = bundles.filter((b) => b.state !== "ready");
+  const open = bundles.filter((b) => b.selected !== false && b.state !== "ready");
   return open.length > 0 && open.every((b) => b.state === "paused");
 };
 
-/** 2100 MB as 2.1 GB: one decimal, in the number format of the locale, and at least 0.1 GB for a bundle that has bytes (a 21 MB bundle is not "0 GB"). */
-export const gigabytes = (mb: number) => t("first_run.models.size", { size: mb > 0 ? Math.max(0.1, Math.round(mb / 100) / 10) : 0 });
-/** The whole download as "2 GB", for "About 2 GB". */
-export const wholeGigabytes = (mb: number) => t("first_run.models.size", { size: Math.max(1, Math.round(mb / 1000)) });
+/** Use MB for small bundles and one decimal for GB, in the locale’s number format. */
+export const gigabytes = (mb: number) => mb < 1000 ? t("settings.models.size", { size: mb }) : t("first_run.models.size", { size: Math.round(mb / 100) / 10 });
+/** The selected total uses the same units and precision as its bundle rows. */
+export const wholeGigabytes = gigabytes;
 
 /** What the panel shows for the permission and the speech model, after the user or the core changed either. */
 export function syncSelfTest(panel: SelfTestPanel, env: { sysGranted: boolean; modelReady: boolean }): { panel: SelfTestPanel; autoRun: boolean } {
@@ -113,7 +113,6 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   let rev = 0;
   let consumed = { id: "", count: 0 };
   let started = false;
-  let requested = false;
   /** What the user changed before the stored settings arrived: those keep the user's value. */
   const edited = new Set<string>();
   let generation = 0;
@@ -137,7 +136,11 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
   // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-announce-done
   function refreshModels(): void {
     const s = store.getState();
-    if (s.modelsAnnounced || !allReady(setup().models.bundles)) return;
+    if (!allReady(setup().models.bundles)) {
+      if (s.modelsAnnounced) set({ modelsAnnounced: false });
+      return;
+    }
+    if (s.modelsAnnounced) return;
     set({ modelsAnnounced: true });
     announce(t("first_run.models.done"), "downloads_done");
   }
@@ -197,10 +200,10 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     }));
   }
 
-  async function download(action: "start" | "pause" | "resume" | "retry"): Promise<void> {
+  async function download(action: "start" | "pause" | "resume" | "retry" | "select", bundles?: string[]): Promise<void> {
     // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
     if (action !== "pause") set({ disk: null });
-    const res = await send("models_download", "models_download", () => bridge.core.modelsDownload({ action }), { slice: "setup" });
+    const res = await send("models_download", "models_download", () => bridge.core.modelsDownload({ action, ...(bundles ? { bundles } : {}) }), { slice: "setup" });
     // @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
     // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-case-disk
     if (res.status === "error" && res.error.code === "disk_full" && res.error.detail?.type === "disk_space") {
@@ -285,9 +288,9 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
 
   return {
     store,
-    /** Load the settings the steps show, start the downloads and follow the microphone level. Call once; returns the cleanup. */
-    start(opts: { downloads?: boolean; levels?: boolean } = {}): () => void {
-      const { downloads = true, levels = true } = opts; // the Settings self-test sheet starts neither
+    /** Load the settings and follow microphone levels. Downloads wait for the user’s selection. */
+    start(opts: { levels?: boolean } = {}): () => void {
+      const { levels = true } = opts; // the Settings self-test sheet does not follow levels
       if (started) return () => {};
       started = true;
       generation++;
@@ -297,10 +300,6 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       if (typeof window !== "undefined") window.addEventListener("focus", onFocus);
       lastAction = loadSettings;
       void loadSettings();
-      // @cpt-begin:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
-      if (downloads && !requested && setup().models.bundles.some((b) => b.state === "pending")) void download("start");
-      requested = true; // a remount does not start them again
-      // @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-api-download
       refreshSelfTest();
       // the microphone meter needs the levels stream (M1 on the real core): without it the row shows no meter
       if (levels) void bridge.subscribe("levels_subscribe", { call_id: null }, { not_implemented: "unavailable" });
@@ -315,6 +314,8 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       };
     },
     download,
+    selectModel: (name: string, selected: boolean) => download("select", setup().models.bundles
+      .filter((b) => b.required_for_capture || (b.name === name ? selected : b.selected !== false)).map((b) => b.name)),
     continue: () => ((lastAction = () => leave({ type: "continue" })), lastAction()),
     skip: () => ((lastAction = () => leave({ type: "skip" })), lastAction()),
     /** Try Again on a refused save or read. */

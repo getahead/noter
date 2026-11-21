@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ModelDownloadNotice } from "../../ui/setup/model-download-notice";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
@@ -87,7 +88,7 @@ export function PersonPage({ id }: { id: string }) {
     return () => clearTimeout(timer);
   }, [state.status]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-overview
-  return <PersonBody bridge={bridge} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} onShowAll={() => showAll(id)} notice={notice} status={status}
+  return <PersonBody bridge={bridge} modelNotice={<ModelDownloadNotice bridge={bridge} model="wespeaker" />} state={state} tab={tab} prefs={prefs} slow={slow} onRetry={() => setReads((n) => n + 1)} onShowAll={() => showAll(id)} notice={notice} status={status}
     // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
     onSetUpVoice={() => state.page && sheets.open("person-voice", { bridge, person: state.page.person, calls: state.page.calls.length })}
     // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
@@ -95,6 +96,7 @@ export function PersonPage({ id }: { id: string }) {
 }
 
 export interface PersonBodyProps {
+  modelNotice?: ReactNode;
   bridge: Bridge;
   state: PersonState;
   tab: PersonTab;
@@ -111,7 +113,7 @@ export interface PersonBodyProps {
 }
 
 /** What the page draws for a read of the person. */
-export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll, notice, status, onSetUpVoice, onDeleteVoice }: PersonBodyProps) {
+export function PersonBody({ modelNotice, bridge, state, tab, prefs, slow, onRetry, onShowAll, notice, status, onSetUpVoice, onDeleteVoice }: PersonBodyProps) {
   const { page } = state;
   if (!page) {
     if (state.status === "ERROR")
@@ -135,6 +137,7 @@ export function PersonBody({ bridge, state, tab, prefs, slow, onRetry, onShowAll
     // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare
     <div data-region="PE" data-state={tab}>
       <h2 className="np-sr" tabIndex={-1}>{p.display_name}</h2>
+      {modelNotice}
       {status && <div role="status" className="pe-status">{status}</div>}
       {notice && <InlineBanner banner={{ id: "person-notice", severity: "error", text: notice }} />}
       {tab === "calls" ? (

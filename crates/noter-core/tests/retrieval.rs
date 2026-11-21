@@ -323,3 +323,49 @@ async fn a_failed_query_embedding_reports_keyword_only() {
     assert!(!r.calls.is_empty());
     assert_eq!(r.explain.semantic_hits, 0);
 }
+
+#[tokio::test]
+async fn a_missing_optional_text_model_preserves_keyword_results() {
+    use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new().with_container(dir.path()).with_script(
+        noter_engine_client::scripted::Script::parse(r#"{"on":"embed_texts","after_ms":0,"event":{"type":"silence","call_id":"unused","since_ms":0}}"#).unwrap());
+    let deps = CoreDeps {
+        engine: Arc::new(engine.clone()),
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(NoEvents))
+    };
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    seed(&core);
+    let search = tokio::spawn({
+        let core = core.clone();
+        async move {
+            core.search(
+                &main_window(),
+                search_args("websockets", CallFilter::default(), None),
+            )
+            .await
+        }
+    });
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !engine
+            .commands()
+            .iter()
+            .any(|c| matches!(c, EngineCommand::EmbedTexts { .. }))
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    engine.inject(EngineEvent::Error {
+        cmd_id: engine.last_command_id(),
+        code: EngineErrorCode::ModelMissing,
+        message: "missing text model".into(),
+    });
+    let result = search.await.unwrap().unwrap();
+    assert!(matches!(result.mode, SearchMode::KeywordOnly { .. }));
+    assert!(!result.calls.is_empty());
+    assert_eq!(result.explain.semantic_hits, 0);
+    core.shutdown().await;
+}

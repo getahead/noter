@@ -123,26 +123,35 @@ private final class Loaded<T>: @unchecked Sendable {
 /// are released when capture starts; the embedding models stay loaded.
 public final class LocalOfflineWork: @unchecked Sendable {
     private let decoder: Loaded<ArchiveDecoder>?
+    private let turboDecoder: Loaded<ArchiveDecoder>?
     private let speakerModel: Loaded<SpeakerModel>?
     private let textModel: Loaded<TextModel>?
     private let clustering: Loaded<Clustering>?
+    private let availability: (() -> Set<OfflineModel>)?
+    private let clusteringAvailable: () -> Bool
 
     public init(
         decoder: (() throws -> ArchiveDecoder)? = nil, speaker: (() throws -> SpeakerModel)? = nil,
-        text: (() throws -> TextModel)? = nil, clustering: (() throws -> Clustering)? = nil
+        text: (() throws -> TextModel)? = nil, clustering: (() throws -> Clustering)? = nil,
+        turboDecoder: (() throws -> ArchiveDecoder)? = nil,
+        availability: (() -> Set<OfflineModel>)? = nil, clusteringAvailable: @escaping () -> Bool = { true }
     ) {
         self.decoder = decoder.map(Loaded.init)
+        self.turboDecoder = turboDecoder.map(Loaded.init)
         speakerModel = speaker.map { make in Loaded<SpeakerModel> { SerializedSpeaker(try make()) } }
         textModel = text.map(Loaded.init)
         self.clustering = clustering.map(Loaded.init)
+        self.availability = availability
+        self.clusteringAvailable = clusteringAvailable
     }
 
     public var available: Set<OfflineModel> {
-        Set([decoder.map { _ in .archive }, speakerModel.map { _ in .speaker }, textModel.map { _ in .text }].compactMap { $0 })
+        availability?() ?? Set([(decoder ?? turboDecoder).map { _ in .archive }, speakerModel.map { _ in .speaker }, textModel.map { _ in .text }].compactMap { $0 })
     }
 
     public func releaseArchive() {
         decoder?.clear()
+        turboDecoder?.clear()
         clustering?.clear()
     }
 
@@ -152,9 +161,10 @@ public final class LocalOfflineWork: @unchecked Sendable {
         _ pass: OfflinePass, session: URL, result: URL, constraints: OfflineConstraints,
         yieldIfNeeded: () -> Void, progress: (Float) -> Void
     ) throws {
-        guard let decoder else { throw OfflineFailure(code: .modelMissing) }
+        let chosen = pass.backend == "whisper_turbo" ? (turboDecoder ?? decoder) : decoder
+        guard let decoder = chosen else { throw OfflineFailure(code: .modelMissing) }
         let diarizer: (clustering: () throws -> Clustering, speaker: SpeakerModel)?
-        if let clustering, let speakerModel {
+        if clusteringAvailable(), let clustering, let speakerModel {
             diarizer = (clustering: { try clustering.get() }, speaker: try speakerModel.get())
         } else {
             diarizer = nil

@@ -51,7 +51,7 @@ describe("the controller as the Settings self-test sheet uses it", () => {
   it("starts no model download and no level stream", async () => {
     const fake = await open((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
     const seen = sentCommands(fake);
-    const stop = createWizard(bridge, () => {}).start({ downloads: false, levels: false });
+    const stop = createWizard(bridge, () => {}).start({ levels: false });
     await new Promise((r) => setTimeout(r));
     stop();
     expect(seen.map(([cmd]) => cmd)).not.toContain("models_download");

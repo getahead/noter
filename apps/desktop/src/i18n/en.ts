@@ -162,7 +162,15 @@ export const en = {
   "first_run.welcome.permissions": "Two permissions, both asked in step 3",
   "first_run.models.title": "Models",
   "first_run.models.body":
-    "Noter downloads its speech, speaker and search models once. You can continue while they download.",
+    "Choose which models to download. You can continue while they download, and add skipped models later in Settings › Models & Runtimes.",
+  "first_run.models.required": "Required · live transcription",
+  "first_run.models.archive": "Higher-accuracy post-call transcript; otherwise uses whisper-turbo",
+  "first_run.models.speakers": "Speaker recognition and voice profiles; otherwise keeps live speaker labels",
+  "first_run.models.search": "Search by meaning and Ask retrieval; otherwise uses keyword search",
+  "first_run.models.skipped": "Not selected",
+  "models.missing_search": "bge-m3 is not downloaded. Search and Ask use keyword search until it is ready.",
+  "models.missing_speakers": "wespeaker is not downloaded. Speaker recognition and voice profiles are unavailable until it is ready.",
+  "models.open_settings": "Download in Settings…",
   "first_run.models.offline":
     "Waiting for a connection — downloads resume automatically",
   "first_run.models.disk": "Needs {needed}, {free} free",

@@ -1,3 +1,4 @@
+import { ModelDownloadNotice } from "../../ui/setup/model-download-notice";
 // Ask: recent questions (AK-R2), the thread (AK-R3) and the composer (AK-R4); answers stream from the core.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
@@ -201,9 +202,10 @@ export function AskPage({ bridge, routeKey = "root" }: { bridge: Bridge; routeKe
       onDraft={setDraft}
       onSend={send}
       onPlay={(span) => void replay.play(span)}
-      bar={
-        replay.replay && replay.bar !== "CLOSED" ? <PlaybackBar variant="search-and-ask" state={replay.bar} replay={replay.replay} position_ms={replay.position} onToggle={replay.toggle} onSeek={replay.seek} onClose={replay.close} /> : null
-      }
+      bar={<>
+        <ModelDownloadNotice bridge={bridge} model="bge-m3" />
+        {replay.replay && replay.bar !== "CLOSED" ? <PlaybackBar variant="search-and-ask" state={replay.bar} replay={replay.replay} position_ms={replay.position} onToggle={replay.toggle} onSeek={replay.seek} onClose={replay.close} /> : null}
+      </>}
       announce={announce}
       suggestions={suggestionsOf(people, (name) => t("ask.suggest_person", { name }))}
       onSuggest={ask}
