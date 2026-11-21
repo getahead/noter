@@ -112,6 +112,13 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     expect(Number(mutations[1]!.rev)).toBeGreaterThan(Number(mutations[0]!.rev));
   });
 
+  // #1059: the row Start Review focuses is named with its item's text, so VoiceOver says which item it is (WCAG 4.1.2)
+  test("UI — accessibility: the row Start Review focuses carries its item's text as its name", async ({ page }) => {
+    await openCall(page, three);
+    await button(banner(page), "Start Review").click();
+    await expect(rowOf(page, DECISION)).toBeFocused();
+    await expect(rowOf(page, DECISION)).toHaveAccessibleName(DECISION); // the row just shown focused
+  });
   test("UI — happy path: the banner counts the suggested items, Start Review focuses the first one, A accepts it and moves on", async ({ page }) => {
     await openCall(page, three);
     await expect(banner(page)).toContainText("3 suggested items to review before sharing");
