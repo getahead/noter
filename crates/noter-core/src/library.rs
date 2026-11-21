@@ -449,6 +449,12 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-library-calls-list:p1
     // @cpt-dod:cpt-noter-dod-core-library-calls-read:p1
     pub(crate) fn list_calls(&self, args: CallsListArgs) -> Result<Page<CallRow>, CoreError> {
+        let mut page = self.list_calls_stored(args)?;
+        page.rows = page.rows.into_iter().map(|r| self.live_length(r)).collect();
+        Ok(page)
+    }
+
+    fn list_calls_stored(&self, args: CallsListArgs) -> Result<Page<CallRow>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-call
         self.ready()?;
         // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-call
@@ -638,6 +644,7 @@ impl Core {
                 .calendar_event_near(detail.call.started_at)
                 .filter(|event| event.id.0 == id)
         });
+        detail.call = self.live_length(detail.call);
         Ok(detail)
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-return
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-missing
@@ -712,6 +719,7 @@ impl Core {
                     .transpose()
             })?
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
+        let call = self.live_length(call);
         // @cpt-begin:cpt-noter-flow-core-library-calls-update:p1:inst-update-emit
         self.emit_entity_changed(&EntityChanged::Call { call: call.clone() });
         // @cpt-end:cpt-noter-flow-core-library-calls-update:p1:inst-update-emit
@@ -723,15 +731,30 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-library-calls-update:p1:inst-update-return
     }
 
+    /// A call still recording lasts as long as it has recorded (pauses excluded), as its clocks say,
+    /// not the wall-clock time since it started (issues 1077, 1081).
+    pub(crate) fn live_length(&self, mut row: CallRow) -> CallRow {
+        let capture = self.capture_for_reader(self.capture_now());
+        let live = matches!(
+            capture.phase,
+            CapturePhase::Recording | CapturePhase::Paused
+        );
+        if live && capture.call_id.as_ref() == Some(&row.id) {
+            row.duration_ms = capture.recorded_ms;
+        }
+        row
+    }
+
     /// The call as the Library shows it, `None` when it is gone.
     pub(crate) fn call_row(&self, id: &str) -> Result<Option<CallRow>, CoreError> {
         let now = self.deps.clock.now().0;
-        self.store().read(|c| {
+        let row = self.store().read(|c| {
             let retention_days = retention_days(c)?;
             select_call(c, id)?
                 .map(|s| assemble(c, s, now, retention_days))
                 .transpose()
-        })
+        })?;
+        Ok(row.map(|r| self.live_length(r)))
     }
 
     // @cpt-flow:cpt-noter-flow-core-library-calls-types:p2
