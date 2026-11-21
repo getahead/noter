@@ -18,7 +18,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import type { MenuItem } from "../../ui/primitives/menu";
 import { dbToLevel } from "../first-run/self-test";
 import { capsOf, spokenChord } from "../settings/accelerator";
-import { elapsedSeconds } from "../shell/live-row";
+import { elapsedSeconds, receivedAtOf } from "../shell/live-row";
 import { modeChangeAnnouncement, modeIndicator, type ModeState } from "../shell/mode-indicator";
 import { MODE_MSG } from "../shell/mode-indicator-view";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
@@ -151,7 +151,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const meters = noticeShown?.type === "nothing_heard" && !tr.waiting;
   useEffect(() => subscribeWhile(bridge, meters, "levels_subscribe", { call_id: callId }), [bridge, meters, callId]);
 
-  const receivedAt = useMemo(() => Date.now(), [cap?.version]);
+  const receivedAt = useMemo(() => receivedAtOf(cap), [cap?.version]);
   const ticking = cap?.phase === "recording" || cap?.phase === "paused" || (noticeShown?.type === "call_ended" && noticeShown.stops_at !== null);
   useEffect(() => tickWhile(ticking, setNow), [ticking]);
 

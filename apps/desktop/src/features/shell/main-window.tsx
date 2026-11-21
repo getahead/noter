@@ -20,7 +20,7 @@ import { frameState } from "./frame";
 import { InspectorSlot } from "./inspector";
 import { closeInspector, inspectorOverride, useInspectorOverride } from "./inspector-override";
 import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./shell-state";
-import { elapsedSeconds, isLive, shortTitle } from "./live-row";
+import { elapsedSeconds, isLive, receivedAtOf, shortTitle } from "./live-row";
 import { modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
 import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
@@ -198,7 +198,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
 
   // @cpt-begin:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
   const frame = frameState({ snapshotApplied, phase: capture?.phase ?? "idle", hidden: presenting?.hidden ?? false });
-  const receivedAt = useMemo(() => Date.now(), [capture?.version]);
+  const receivedAt = useMemo(() => receivedAtOf(capture), [capture?.version]);
   const live = capture && isLive(capture) ? { title: shortTitle(capture.title), paused: capture.phase === "paused", seconds: (now: number) => elapsedSeconds(capture, receivedAt, Math.max(now, receivedAt)) } : null;
 
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-if-capture
