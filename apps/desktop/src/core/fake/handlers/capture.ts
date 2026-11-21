@@ -59,10 +59,16 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     fake.closeChannels("transcript_subscribe", a.call_id, "call_stopped");
     return shared.setCapture(fake, { phase: "stopped", pause: null, notice: null, continue_until: shared.now() + 5 * shared.MIN });
   },
-  capture_set_paused: (a, { world, fake }) => {
+  capture_set_paused: (a, { world, fake, emit }) => {
     const cap = world.app.capture;
     // A stopped call is not resumed by un-pausing: that is Continue Recording.
     if (cap.call_id !== a.call_id || (cap.phase !== "recording" && cap.phase !== "paused")) throw coreError("not_recording");
+    const row = world.calls.find((c) => c.id === a.call_id);
+    if (row) {
+      // windows showing the call (Call info › Processing) replace its row, as the real core sends it (#1040)
+      row.status = a.paused ? "paused" : "recording";
+      emit("entity:changed", { type: "call", call: row });
+    }
     return shared.setCapture(fake, { phase: a.paused ? "paused" : "recording", pause: a.paused ? { since: shared.now(), remind_at: shared.now() + 5 * shared.MIN } : null });
   },
   capture_mark_moment: (a, { world, fake }) => {

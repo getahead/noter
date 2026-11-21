@@ -3720,3 +3720,29 @@ async fn continue_recording_cancels_the_calls_pipeline_and_the_next_stop_queues_
     assert_eq!(runs[1].status, JobRunStatus::Running);
     assert_eq!(r.core.capture_guard().borrow().resumed_call, None);
 }
+
+// cpt-noter-seq-menu-bar-control-recording, #1040: windows showing the call (Call info › Processing) replace its row from entity:changed.
+#[tokio::test]
+async fn pause_and_resume_send_the_call_row_with_its_new_status() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let last_status = || {
+        r.events
+            .snapshot()
+            .into_iter()
+            .filter(|(name, v)| *name == event_names::ENTITY_CHANGED && v["type"] == "call")
+            .map(|(_, v)| v["call"]["status"].clone())
+            .next_back()
+    };
+    for (paused, status) in [(true, "paused"), (false, "recording")] {
+        let args = CapturePauseArgs {
+            call_id: call_id.clone(),
+            paused,
+        };
+        r.core
+            .capture_set_paused(&main_window(), args)
+            .await
+            .unwrap();
+        assert_eq!(last_status(), Some(Value::from(status)));
+    }
+}
