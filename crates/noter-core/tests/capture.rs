@@ -3817,3 +3817,17 @@ async fn a_capture_change_while_recording_keeps_the_recorded_time_current() {
         "never counted twice"
     );
 }
+
+// cpt-noter-seq-menu-bar-control-recording, #1048: a window that reads the snapshot late (a reload) gets the time recorded up to now.
+#[tokio::test(start_paused = true)]
+async fn a_snapshot_read_mid_recording_carries_the_time_recorded_so_far() {
+    let r = rig();
+    r.recording().await;
+    r.advance(74_000);
+    let snapshot = r
+        .core
+        .app_snapshot(&main_window(), NoArgs {})
+        .await
+        .unwrap();
+    assert_eq!(snapshot.capture.recorded_ms, DurationMs(74_000));
+}

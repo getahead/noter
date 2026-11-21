@@ -314,6 +314,18 @@ impl Core {
         self.app().capture.clone()
     }
 
+    /// The capture state as a window reads it now: while recording, `recorded_ms` includes the
+    /// time since the state was published, so a window opened or reloaded late counts from
+    /// the right total (issue 1048).
+    pub(crate) fn capture_for_reader(&self, mut c: CaptureState) -> CaptureState {
+        if c.phase == CapturePhase::Recording {
+            let since = self.capture_stamp.load(std::sync::atomic::Ordering::SeqCst);
+            let more = u32::try_from((self.deps.clock.now().0 - since).max(0)).unwrap_or(u32::MAX);
+            c.recorded_ms = DurationMs(c.recorded_ms.0.saturating_add(more));
+        }
+        c
+    }
+
     /// Changes the capture state and sends it whole with the next version.
     pub(crate) fn set_capture(&self, change: impl FnOnce(&mut CaptureState)) -> CaptureState {
         let now = self.deps.clock.now().0;

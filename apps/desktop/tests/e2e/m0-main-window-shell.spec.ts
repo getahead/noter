@@ -92,4 +92,15 @@ test.describe("cpt-noter-seq-menu-bar-control-recording", () => {
     if (REAL) await expect.poll(() => liveSeconds(page), { message: "the clock did not fall back to the last pause" }).toBeGreaterThanOrEqual(before + 2);
     else await expect(liveClock(page)).toBeVisible();
   });
+
+  // #1048: a reloaded window (the WebContent watchdog) reads the time recorded up to now from its snapshot
+  test("UI — error path: a reloaded window keeps the recording clock", async ({ page }) => {
+    await openWindow(page, "main", { world: () => {} });
+    const first = await liveSeconds(page);
+    await expect.poll(() => liveSeconds(page), { timeout: 10_000 }).toBeGreaterThanOrEqual(first + 3);
+    const before = await liveSeconds(page);
+    await page.reload();
+    await expect(liveClock(page)).toBeVisible();
+    if (REAL) expect(await liveSeconds(page), "the clock did not restart from the last capture event").toBeGreaterThanOrEqual(before);
+  });
 });
