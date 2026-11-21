@@ -316,6 +316,26 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await expect(share(page)).toContainText("Copied for Slack");
   });
 
+  test("UI — #1052: an action item closed by evidence is shared ticked, saying it was closed by evidence, never as an open to-do", async ({ page }) => {
+    const steer = await openWindow(page, "main", {
+      world: (w) => {
+        const evidence = structuredClone(w.items.find((i) => i.id === "itm_token")!.closed_by); // the fixture's Jira evidence, before written() replaces the call's items
+        O.written(w);
+        const token = O.sectionOf(w, "action_items").items.find((i) => i.text === "Rotate the staging Jira token")!;
+        for (const i of [token, w.items.find((x) => x.id === token.id)!]) Object.assign(i, { status: "closed_by_evidence", closed_by: evidence });
+      },
+    });
+    await openReady(page, W.PAST_CALL);
+    await share(page).click();
+    await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
+    await expect(share(page)).toContainText("Copied for Slack");
+    await expect.poll(() => sent(page, "share_copy")).toHaveLength(1);
+    if (!H.REAL) return; // the shared text is rendered by the real core only; its clipboard write is in the harness's native log
+    const copied = ((await H.nativeLog(steer)) as unknown as { clipboard: Array<{ markdown: string }> }).clipboard.at(-1)!;
+    const line = copied.markdown.split("\n").find((l) => l.includes("Rotate the staging Jira token"));
+    expect(line).toMatch(/^- \[x\] Rotate the staging Jira token — .*closed by evidence/);
+  });
+
   test("UI — other path: Export to a folder — ⌘E, the sheet with Scope: Whole call, tick Transcript, Export…, Exported to <path> with Show in Finder", async ({ page }) => {
     const { call } = await O.openOutputs(page, "written");
     await openReady(page, call);
