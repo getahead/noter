@@ -56,7 +56,7 @@ async fn main() {
     let client = EngineClient::new(
         ProcessLauncher::new(engine)
             .args(args.iter().skip(3))
-            .app_group(&dir),
+            .data_dir(&dir),
         Config::default(),
     );
     let mut facts = client.capture_facts();

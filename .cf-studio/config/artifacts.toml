@@ -10,6 +10,7 @@ artifacts = [
   { path = "docs/ADR/0001-contract-source-of-truth.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0002-ipc-conventions.md", kind = "ADR", traceability = "FULL" },
   { path = "docs/ADR/0003-harness-and-quality-gates.md", kind = "ADR", traceability = "FULL" },
+  { path = "docs/ADR/0004-no-app-group-unsandboxed-engine.md", kind = "ADR", traceability = "FULL" },
   # Backend decomposition of DESIGN-core and its FEATURE specs (one entry per file).
   { path = "docs/DECOMPOSITION-core.md", kind = "DECOMPOSITION", traceability = "FULL" },
   { path = "docs/features/core/core-contract.md", kind = "FEATURE", traceability = "FULL" },

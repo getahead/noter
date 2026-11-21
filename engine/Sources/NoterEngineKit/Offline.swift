@@ -1,5 +1,5 @@
 // The offline pass and the embeddings as the engine answers them (core-engine-offline.md): every
-// path is checked against the App Group container and every request before a file opens; an
+// path is checked against the data folder and every request before a file opens; an
 // invalid one gets the correlated `error`, a valid one its `ack`, then the work runs below capture
 // priority and its progress, result or failure is reported with the call or request id. The work
 // itself (Large v3 decode, bge-m3 and WeSpeaker) is `LocalOfflineWork`; fake models use the same
@@ -48,7 +48,7 @@ public enum OfflineModel: Sendable {
     case archive, speaker, text
 }
 
-/// Paths the core sends are relative to the App Group container and must stay inside it.
+/// Paths the core sends are relative to the data folder and must stay inside it.
 public enum ContainerPath {
     /// The file `relative` names in `container`, or nil for an absolute path, an empty, `.` or
     /// `..` segment, a NUL, or a symlink leading out of the container.

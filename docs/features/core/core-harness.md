@@ -114,7 +114,7 @@ The E2E bar counts only runs against the real core. Without this binary nothing 
 **Output**: A running core composition root, or exit with an error.
 
 **Steps**:
-1. [x] - `p1` - Create a fresh temporary data folder (database, App Group stand-in) - `inst-temp-dir`
+1. [x] - `p1` - Create a fresh temporary data folder (database and the engine's files) - `inst-temp-dir`
 2. [x] - `p1` - Open the store and run migrations (`cpt-noter-flow-core-storage-open`) - `inst-open-store`
 3. [x] - `p1` - **IF** `--fixture world` - `inst-if-fixture`
    1. [x] - `p1` - DB: seed the rows of `contracts/fixtures/world.json` through the storage write path - `inst-seed`

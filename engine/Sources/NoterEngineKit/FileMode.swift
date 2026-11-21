@@ -74,8 +74,8 @@ public struct FileMode {
     }
 }
 
-/// Installed model folders: `models/` in the App Group container the supervisor passes as
-/// `NOTER_APP_GROUP_DIR`.
+/// Installed model folders: `models/` in the data folder the supervisor passes as
+/// `NOTER_DATA_DIR` (`~/Library/Application Support/Noter`, ADR-0004).
 public enum Models {
     public static func installed(container: URL?) -> [String] {
         guard let container,
@@ -87,6 +87,6 @@ public enum Models {
 
     // @cpt-dod:cpt-noter-dod-core-engine-foundation-offline:p1
     public static func container(environment: [String: String]) -> URL? {
-        environment["NOTER_APP_GROUP_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+        environment["NOTER_DATA_DIR"].map { URL(fileURLWithPath: $0, isDirectory: true) }
     }
 }

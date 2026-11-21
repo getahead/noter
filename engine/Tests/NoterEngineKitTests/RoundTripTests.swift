@@ -311,7 +311,7 @@ final class RoundTripTests: XCTestCase {
 }
 
 final class ModelsTests: XCTestCase {
-    func testInstalledModelsComeFromTheAppGroupContainer() throws {
+    func testInstalledModelsComeFromTheDataFolder() throws {
         let container = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let models = container.appendingPathComponent("models")
         try FileManager.default.createDirectory(at: models, withIntermediateDirectories: true)
@@ -319,7 +319,7 @@ final class ModelsTests: XCTestCase {
         for name in ["whisper-turbo", "bge-m3", ".partial-junk", "fluid-audio.partial"] {
             FileManager.default.createFile(atPath: models.appendingPathComponent(name).path, contents: Data())
         }
-        let env = ["NOTER_APP_GROUP_DIR": container.path]
+        let env = ["NOTER_DATA_DIR": container.path]
         XCTAssertEqual(Models.installed(container: Models.container(environment: env)), ["bge-m3", "whisper-turbo"])
         XCTAssertEqual(Models.installed(container: Models.container(environment: [:])), [])
     }

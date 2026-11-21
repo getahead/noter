@@ -16,9 +16,10 @@
 //!   files referenced by path inside the session or scratch directory.
 //! * Every command has an `id`; the engine answers with `ack` or `error`
 //!   carrying the same id, then emits events.
-//! * Every path in this protocol is relative to the App Group container
-//!   `<TEAMID>.ai.noter` that the app and the sandboxed engine share
-//!   (`audio/`, `models/`, `engine-io/` and the capture ring).
+//! * Every path in this protocol is relative to the data folder
+//!   `~/Library/Application Support/Noter` that the app and the engine share
+//!   (`audio/`, `models/`, `engine-io/` and the capture ring; ADR-0004), which the
+//!   supervisor passes to the engine as `NOTER_DATA_DIR`.
 //! * The engine keeps the capture ring in a memory-mapped file in that container.
 //!   After an engine crash the supervisor restarts it in capture-first mode (taps
 //!   before models load) and sends `start_session` with `resume_from_ms`; the
@@ -80,7 +81,7 @@ pub struct SpeakerPrior {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct StartSession {
     pub call_id: CallId,
-    /// `audio/<call_id>/`, relative to the App Group container.
+    /// `audio/<call_id>/`, relative to the data folder.
     pub session_dir: String,
     /// `false` = "Never store audio": nothing is written, ASR still runs.
     pub store_audio: bool,

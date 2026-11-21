@@ -1,4 +1,4 @@
-// noter-engine: the sandboxed audio and speech sidecar. Live mode answers the core on stdin
+// noter-engine: the offline audio and speech sidecar (unsandboxed since ADR-0004). Live mode answers the core on stdin
 // and stdout; file mode (`--mic mic.wav --sys sys.wav [--fast]`) replays a recording through
 // the same protocol. stdout carries protocol lines only; diagnostics go to stderr.
 

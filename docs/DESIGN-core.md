@@ -78,7 +78,7 @@ The core is one process with one writer. It owns every record, runs the call lif
 
 Requirements that significantly influence architecture decisions.
 
-**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`. Earlier architecture decisions are rows of PRD › Decision log; this design builds on them and does not repeat them.
+**ADRs**: `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`, `cpt-noter-adr-0004-no-app-group-unsandboxed-engine`. Earlier architecture decisions are rows of PRD › Decision log; this design builds on them and does not repeat them.
 
 The PRD has no requirement IDs, so the first column names the PRD section, as in `docs/DESIGN.md`.
 
@@ -139,13 +139,13 @@ flowchart TB
             cross["Cross-cutting · change log, egress gate and audit (noter-llm), metrics, stream hub, job scheduler"]
             infra["Infrastructure · storage (SQLite, FTS5, sqlite-vec), engine client, LLM adapters (noter-llm), native macOS (noter-native), MCP socket"]
         end
-        engine["Engine sidecar · Swift, sandboxed, no network, signed separately"]
+        engine["Engine sidecar · Swift, no network, signed separately"]
         mcp["noter-mcp · one per run, local only, no network port"]
     end
     cli["Claude Code · Codex · Ollama"]
     ext["Jira · Bitbucket · GitHub · MCP servers"]
     files[("Application Support: noter.db · skills/ · handoffs/ · backups/")]
-    group[("App Group container: audio/ · models/ · engine-io/ · capture ring")]
+    group[("Data folder: audio/ · models/ · engine-io/ · capture ring")]
     ui <-->|"noter-protocol IPC"| ipc
     ipc --> svc
     svc --> cross
@@ -264,13 +264,13 @@ Platform, data residency and licensing constraints come from the PRD; this desig
 
 **Source**: PRD › Decision log (Tauri 2 with a React UI and a Swift engine sidecar).
 
-#### The engine is sandboxed and offline
+#### The engine is offline
 
 - [ ] `p1` - **ID**: `cpt-noter-constraint-core-engine-offline`
 
-**Type**: Security. The engine runs in the App Sandbox with audio input and no network entitlement, so audio cannot leave through it. It shares the App Group container `<TEAMID>.ai.noter` with the app for audio, models, bulky payloads and the capture ring, and it is signed in the Swift build with its own entitlements. Q4 (decided 20 Oct 2026, owner): this holds as designed. Noter.app is a Developer ID app with the hardened runtime and is **not** sandboxed; it spawns the sandboxed `noter-engine` with its own entitlements. The week-one spike showed both channels capture in this layout and the System Audio Recording and Microphone prompts are attributed to the app that launches the engine, not to the engine process. The reverse layout does not work: a sandboxed parent cannot start a child that asks for its own, different sandbox (it traps in `libsecinit` before `main`); a child of a sandboxed app must carry `com.apple.security.inherit` and then shares the app's sandbox and network entitlement.
+**Type**: Security. The engine never reaches the network, so audio cannot leave through it. Since ADR-0004 (21 Nov 2026, owner, #998) this is code discipline enforced in CI, not an OS sandbox: releases are ad-hoc signed and cannot use an App Group, so the engine runs **without** the App Sandbox and with audio input only under the hardened runtime. CI rejects any network entitlement (`just arch`), any networking API in the engine's sources (the architecture check), and checks the built engine's signature; WhisperKit is always created with `download: false`. The engine shares the data folder `~/Library/Application Support/Noter` with the app (passed as `NOTER_DATA_DIR`) for audio, models, bulky payloads and the capture ring, and it is signed in the Swift build with its own entitlements. Noter.app has the hardened runtime and is **not** sandboxed; it spawns `noter-engine`. Q4 (decided 20 Oct 2026, owner) proved the prompts in this layout. The week-one spike showed both channels capture in this layout and the System Audio Recording and Microphone prompts are attributed to the app that launches the engine, not to the engine process. The reverse layout does not work: a sandboxed parent cannot start a child that asks for its own, different sandbox (it traps in `libsecinit` before `main`); a child of a sandboxed app must carry `com.apple.security.inherit` and then shares the app's sandbox and network entitlement.
 
-**Future: Mac App Store (fallback A).** The App Store needs the app itself in the App Sandbox. If Noter ever ships there: (1) sandbox Noter.app and give the engine `com.apple.security.app-sandbox` plus `com.apple.security.inherit` only (spike variant A, proven to capture and prompt on the owner's Mac); (2) the engine then inherits the app's network entitlement, so "no network entitlement" can no longer be the guarantee, and the CI network-monitor test becomes it (adjust this constraint, E1, C18 and the CI codesign check); (3) check that the design's needs survive App Review and the sandbox: running the user's own `claude` and `codex` CLIs, reading arbitrary folders as knowledge sources, opening Terminal for handoffs, the local noter-mcp socket and the App Group container; expect to rework or drop some of them; (4) `storage_move` (below) would also need rethinking. Evidence: `.plans/backend/spike-q4-evidence.md`.
+**Future: Mac App Store (fallback A).** The App Store needs the app itself in the App Sandbox. If Noter ever ships there: (1) sandbox Noter.app and give the engine `com.apple.security.app-sandbox` plus `com.apple.security.inherit` only (spike variant A, proven to capture and prompt on the owner's Mac); (2) the engine then inherits the app's network entitlement, so "no network entitlement" can no longer be the guarantee, and the CI network-monitor test becomes it (adjust this constraint, E1, C18 and the CI codesign check); (3) check that the design's needs survive App Review and the sandbox: running the user's own `claude` and `codex` CLIs, reading arbitrary folders as knowledge sources, opening Terminal for handoffs, the local noter-mcp socket and the shared data folder (which would need an App Group and a Developer ID again); expect to rework or drop some of them; (4) `storage_move` (below) would also need rethinking. Evidence: `.plans/backend/spike-q4-evidence.md`.
 
 **Source**: PRD › Audio capture › Entitlements and signing; review resolutions R21, R22.
 
@@ -286,7 +286,7 @@ Platform, data residency and licensing constraints come from the PRD; this desig
 
 - [ ] `p1` - **ID**: `cpt-noter-constraint-core-local-data`
 
-**Type**: Data residency. One SQLite file under Application Support and per-call files in the App Group container, 0600, FileVault at rest; no server, no telemetry endpoint; encryption with a Keychain key for voice profiles and cluster centroids.
+**Type**: Data residency. One SQLite file and per-call files in the data folder under Application Support, 0600, FileVault at rest; no server, no telemetry endpoint; encryption with a Keychain key for voice profiles and cluster centroids.
 
 **Source**: PRD › Data model and storage; PRD › Security, privacy and permissions.
 
@@ -579,11 +579,11 @@ The engine is a separate, sandboxed process that can crash, lag or change protoc
 
 ##### Responsibility scope
 
-Crate `noter-engine-client`, with no Tauri dependency. Spawns the sidecar (`noter-engine`) with `tokio::process` (not the Tauri shell plugin, so no window has a shell permission) and passes it the App Group container; checks `ready.protocol_version`, writes `EngineCommandLine`s, reads `EngineEventLine`s on a dedicated task, detects `seq` gaps. Restarts a dead engine in capture-first mode (taps open before models load) and resumes from the capture ring's write position (capture-first restarts and idle restarts are separate rules: at most 3 within 30 s, and at most 3 within a minute, Backend Teamlead M1 decision, 18 Oct 2026); the expected gap is at most 2 s per restart, reported as a `GapView` with reason `engine_restart` and counted as a dropout. When the engine cannot be restarted, raises `CaptureFailed { call_id, since }` for the session manager. Correlates `ack` and `error` with command ids. Translates engine facts into degraded states: `transcription_stalled` after 10 s without segments while audio flows; `system_audio_silent { confidence }` when the system channel carries exact digital zeros, since the System Audio Recording permission cannot be queried and is inferred. Sends replay requests (`play`, `stop_playback`) for the transcript component, because the engine plays replay audio (owner decision D6). Offers request/response helpers for embeddings and speaker embeddings used by retrieval and identity. Supports the engine's file mode for tests and the golden set.
+Crate `noter-engine-client`, with no Tauri dependency. Spawns the sidecar (`noter-engine`) with `tokio::process` (not the Tauri shell plugin, so no window has a shell permission) and passes it the data folder as `NOTER_DATA_DIR`; checks `ready.protocol_version`, writes `EngineCommandLine`s, reads `EngineEventLine`s on a dedicated task, detects `seq` gaps. Restarts a dead engine in capture-first mode (taps open before models load) and resumes from the capture ring's write position (capture-first restarts and idle restarts are separate rules: at most 3 within 30 s, and at most 3 within a minute, Backend Teamlead M1 decision, 18 Oct 2026); the expected gap is at most 2 s per restart, reported as a `GapView` with reason `engine_restart` and counted as a dropout. When the engine cannot be restarted, raises `CaptureFailed { call_id, since }` for the session manager. Correlates `ack` and `error` with command ids. Translates engine facts into degraded states: `transcription_stalled` after 10 s without segments while audio flows; `system_audio_silent { confidence }` when the system channel carries exact digital zeros, since the System Audio Recording permission cannot be queried and is inferred. Sends replay requests (`play`, `stop_playback`) for the transcript component, because the engine plays replay audio (owner decision D6). Offers request/response helpers for embeddings and speaker embeddings used by retrieval and identity. Supports the engine's file mode for tests and the golden set.
 
 ##### Responsibility boundaries
 
-Does not interpret segments beyond routing them; does not persist. Never gives the engine a network path or a database path; every path it sends is relative to the App Group container.
+Does not interpret segments beyond routing them; does not persist. Never gives the engine a network path or a database path; every path it sends is relative to the data folder.
 
 ##### Related components (by ID)
 
@@ -1036,11 +1036,11 @@ Core Audio taps, CoreML and the Neural Engine are reachable properly only from S
 
 ##### Responsibility scope
 
-Swift 6 executable, sandboxed, signed in the Swift build with its own entitlements and Info.plist. Call detection listeners; the global tap (excluding the engine's and the app's PIDs) and microphone on one clock; the capture ring in a memory-mapped file in the App Group container, so a restart resumes from its write position; AAC-LC writers; VAD, per-utterance language ID, Noter's streaming decode loop on WhisperKit (or Parakeet), the hallucination and term filters; streaming and offline diarization; speaker and text embeddings; the offline pass; the self-test, which requires non-zero buffers on both channels; exact-digital-zero detection on the system channel (`system_audio_silent`); replay playback (owner decision D6). After a crash it opens the taps before loading models. Speaks `cpt-noter-interface-engine-stdio`; runs in file mode for tests.
+Swift 6 executable, unsandboxed (ADR-0004), signed in the Swift build with its own entitlements and Info.plist. Call detection listeners; the global tap (excluding the engine's and the app's PIDs) and microphone on one clock; the capture ring in a memory-mapped file in the data folder, so a restart resumes from its write position; AAC-LC writers; VAD, per-utterance language ID, Noter's streaming decode loop on WhisperKit (or Parakeet), the hallucination and term filters; streaming and offline diarization; speaker and text embeddings; the offline pass; the self-test, which requires non-zero buffers on both channels; exact-digital-zero detection on the system channel (`system_audio_silent`); replay playback (owner decision D6). After a crash it opens the taps before loading models. Speaks `cpt-noter-interface-engine-stdio`; runs in file mode for tests.
 
 ##### Responsibility boundaries
 
-No network, no database, no knowledge of people or items. It reads and writes only inside the App Group container. It reports facts; the core decides.
+No network, no database, no knowledge of people or items. It reads and writes only inside the data folder, checking every path before it opens a file. It reports facts; the core decides.
 
 ##### Related components (by ID)
 
@@ -1202,7 +1202,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `settings_get` | Settings and credentials. `NoArgs → Settings`. Windows: MSF. | frozen |
 | Command | `settings_update` | Settings and credentials. Replace one section (wanted state). `SettingsUpdateArgs → Settings`. Windows: SF. | frozen |
 | Command | `settings_unignore_app` | Settings and credentials. `AppIdArgs → Settings`. Windows: S. | frozen |
-| Command | `storage_move` | Settings and credentials. Available only if the engine ships unsandboxed (Q4). `StorageMoveArgs → JobAccepted`. Windows: S. | draft |
+| Command | `storage_move` | Settings and credentials. The engine ships unsandboxed since ADR-0004, so the move is possible; it stays draft until its milestone. `StorageMoveArgs → JobAccepted`. Windows: S. | draft |
 | Command | `hotkeys_list` | Settings and credentials. `NoArgs → HotkeyList`. Windows: S. | frozen |
 | Command | `hotkey_set` | Settings and credentials. `HotkeySetArgs → HotkeyList`. Windows: S. | frozen |
 | Command | `hotkeys_reset` | Settings and credentials. Restore the default hotkeys and card keys. `NoArgs → HotkeyList`. Windows: S. | frozen |
@@ -1383,7 +1383,7 @@ Degraded states are not errors: they arrive in `degraded:changed` as typed `Degr
 
 Lines: `EngineCommandLine { id, cmd }` from the core, `EngineEventLine { seq, at, event }` from the engine; `ENGINE_PROTOCOL_VERSION` 2.0 is checked on `ready`.
 
-**Paths.** Every path in `engine.rs` is relative to the App Group container `<TEAMID>.ai.noter`, which the app and the engine share. It holds `audio/`, `models/`, `engine-io/` (bulky payloads exchanged by file) and the capture ring, a memory-mapped file. After a crash the supervisor restarts the engine with `resume_from_ms`; the engine opens the taps before loading models and resumes from the ring's write position.
+**Paths.** Every path in `engine.rs` is relative to the data folder `~/Library/Application Support/Noter` (`NOTER_DATA_DIR`), which the app and the engine share (ADR-0004). It holds `audio/`, `models/`, `engine-io/` (bulky payloads exchanged by file) and the capture ring, a memory-mapped file. After a crash the supervisor restarts the engine with `resume_from_ms`; the engine opens the taps before loading models and resumes from the ring's write position.
 
 | Method | Path | Description | Stability |
 |--------|------|-------------|-----------|
@@ -2771,7 +2771,7 @@ Everything runs on the user's Mac; nothing is deployed to a server.
 | --- | --- | --- | --- | --- |
 | Noter (app main process: Rust core and the IPC host) | The user; login item optional (SMAppService) | App lifetime | WebViews (Tauri IPC), engine (stdio), runtimes (spawn, stdio), noter-mcp (Unix socket), Ollama (HTTP localhost), `acli`/`bkt`/`gh` (spawn), MCP servers (HTTPS through the egress gate) | Hardened runtime; Apple Events; calendars (`com.apple.security.personal-information.calendars`); App Group `<TEAMID>.ai.noter`. Usage strings written by hand in Info.plist for microphone, system audio, Apple Events and calendars (`NSCalendarsFullAccessUsageDescription`) |
 | WebView windows | The core | Per window | The core only | No remote content; CSP blocks network |
-| noter-engine (Swift) | The core, with `tokio::process` from `noter-engine-client` | Restarted by the supervisor on exit, capture first | The core over stdio only; files only in the App Group container | App Sandbox, audio input, App Group `<TEAMID>.ai.noter`, no network. Signed in the Swift build with its own entitlements and Info.plist |
+| noter-engine (Swift) | The core, with `tokio::process` from `noter-engine-client` | Restarted by the supervisor on exit, capture first | The core over stdio only; files only in the data folder | Hardened runtime, audio input, no App Sandbox, no App Group, no network (ADR-0004). Signed in the Swift build with its own entitlements and Info.plist |
 | claude, codex | The router, per task or per live session | One task, or one call for warm sessions | Only their runtime's provider host over HTTPS; noter-mcp over stdio | The user's install, version-checked; empty Noter-owned working directory; lockdown flags, and an isolated `CODEX_HOME` for Codex |
 | noter-mcp | The CLI, as a stdio child, from `run/mcp/<run_id>.json` | One run | The CLI (stdio), the core (Unix socket with a per-run token); never a TCP port | Same signing identity as the app |
 | ollama | The user (detected) | Independent daemon | The core over localhost | Not Noter's |
@@ -2779,7 +2779,7 @@ Everything runs on the user's Mac; nothing is deployed to a server.
 **Files**, all 0600:
 
 - Application Support (`~/Library/Application Support/Noter/`), the core's alone: `noter.db` (+ `-wal`, `-shm`), `skills/`, `handoffs/`, `backups/`, `logs/`, `run/core.sock`, `run/mcp/<run_id>.json` (per-run MCP config with the token, deleted after the run).
-- App Group container `<TEAMID>.ai.noter` (`~/Library/Group Containers/`), shared by the app and the sandboxed engine: `audio/<call_id>/` (`mic.m4a`, `sys.m4a`, `timeline.json`, `transcript.jsonl`, `items.json`, `summary.md`), `models/`, `engine-io/` and the capture ring. `storage_move` can move it to a user folder only if the engine ships unsandboxed (Q4).
+- The data folder `~/Library/Application Support/Noter`, beside `noter.db` and `logs/`, shared by the app and the engine (ADR-0004; no App Group, nothing migrated from one): `audio/<call_id>/` (`mic.m4a`, `sys.m4a`, `timeline.json`, `transcript.jsonl`, `items.json`, `summary.md`), `models/`, `engine-io/` and the capture ring. `storage_move` could move it to a user folder now that the engine is unsandboxed; it stays draft.
 
 **Build and release**: one notarised DMG signed by one Developer ID; until the owner has a Developer ID, release builds are ad-hoc signed and not notarised, and signing switches on once the secrets are added (owner, 17 Oct 2026; `docs/DELIVERY.md`). release-please cuts versioned GitHub releases from the Conventional Commit titles on `main`, with the contracts bundle, an SBOM and build provenance. The engine is signed in the Swift build with its own entitlements and Info.plist and shipped through `bundle.macOS.files`, which copies it without re-signing; an `externalBin` would be re-signed with the app's entitlements. noter-mcp is signed with the app's identity. CI runs `codesign -d --entitlements` on the app and the engine and checks the built Info.plist usage strings and entitlements against every `PermissionKind`. `tauri-plugin-updater` with a signed manifest; tauri-nspanel pinned to a commit. CI runs every gate on Linux (the contract crate and its exporter included); the engine and the Tauri host are tested on a hosted macOS runner once they exist, and wall-clock performance and the real-app flows run on the self-hosted Apple Silicon runner, since 18 Oct 2026 the development MacBook Pro (`docs/HARNESS.md`, `docs/DEVELOPMENT.md`).
 
@@ -2846,7 +2846,7 @@ Decisions this design takes beyond the PRD, each with a one-line reason. Decisio
 | C15 | Summary and prompt versions move to their own tables | Every version kept with provenance, as the PRD asks, without growing the parent rows |
 | C16 | Fixtures are written in Rust and exported as JSON, and seeded as database rows for fixture parity | The fake core cannot drift from the contract or from the real read models |
 | C17 | Whole-state payloads carry a monotonic `version`; the generated transport buffers Channel messages until the snapshot resolves | Events, Channels and command results are not ordered relative to each other |
-| C18 | The engine and the app share an App Group container; the engine is signed separately and spawned with `tokio::process` | A sandboxed engine can reach only a shared container, and the Tauri bundler would re-sign an `externalBin` with the app's entitlements |
+| C18 | The engine and the app share the data folder under Application Support; the engine is signed separately and spawned with `tokio::process` | Ad-hoc signed releases cannot use an App Group (ADR-0004), and the Tauri bundler would re-sign an `externalBin` with the app's entitlements |
 | C19 | Notifications through `UNUserNotificationCenter` in `noter-native` | The Tauri notification plugin cannot prompt, reports granted on macOS and has no click callback |
 | C20 | Redo by `UndoTarget` at any time, no redo token | **Redo** on a History row must work long after the undo strip is gone |
 
@@ -2872,7 +2872,7 @@ Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the
 | Q1 | PRD scope cut: full v1 or the Review's MVP? **Decided 17 Oct: full v1.** The contract keeps the full Copilot and Agents groups; they stay draft until the M4 gate | Owner | Nothing (decided) |
 | Q2 | Replay during capture on speakers with echo cancellation on? **Decided 17 Oct: no, headphones only.** Noter has no speakers mode or echo cancellation, and even with one, it would clean only Noter's recording; the meeting app's own microphone path would still carry the replay to the call (`replay_needs_headphones`) | Owner | Nothing (decided) |
 | Q3 | Does the per-turn `structured_output` arrive in a long-lived Claude Code session (M1 prototype)? If not, `emit_card` on noter-mcp becomes the live path, and its stability changes to stable | Core | Copilot latency path |
-| Q4 | Week one: does the sandboxed engine get the System Audio Recording prompt attributed to Noter? **Decided 20 Oct: yes, as designed.** Noter.app is unsandboxed (Developer ID); the engine runs sandboxed with its own entitlements and the prompts name the app. The engine stays sandboxed, so `storage_move` does not ship. Mac App Store, if ever wanted, is fallback A (see the engine constraint above) | Owner | Nothing (decided) |
+| Q4 | Week one: does the sandboxed engine get the System Audio Recording prompt attributed to Noter? **Decided 20 Oct: yes, as designed.** Noter.app is unsandboxed (Developer ID); the engine runs sandboxed with its own entitlements and the prompts name the app. ADR-0004 (21 Nov 2026) later dropped the engine's sandbox for ad-hoc signed releases; prompt attribution is unchanged, and `storage_move` is now possible but stays draft. Mac App Store, if ever wanted, is fallback A (see the engine constraint above) | Owner | Nothing (decided) |
 | Q5 | Where do call types come from in v1? **Decided 17 Oct: the built-in list plus skill folders the user adds.** `CallTypeInfo` carries `builtin` and `skill_path` | Owner | Nothing (decided) |
 | Q6 | Should the UI or the core compute version diffs for very long summaries? This design says the UI (C7); revisit if diffs of role reviews become slow | UI | Nothing now |
 | Q7 | Should capture run in its own minimal process, apart from the ML models? The capture ring in a memory-mapped file and the capture-first restart keep a crash gap at about 2 s; the M1 week-one test (engine kills during capture) decides whether that holds the 99 % no-dropout target | Core | Engine process layout; no contract change |
@@ -2926,7 +2926,7 @@ Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the
 | State version | The monotonic `version` on a whole-state payload; the UI keeps the highest |
 | Caller | Who invoked a command: a window by label, or a native surface (menu, menu bar, hotkey, notification) |
 | Dropout | A gap with reason `interrupted`, `engine_restart`, `device_changed` or `stalled` longer than 2 s |
-| App Group container | `<TEAMID>.ai.noter`, the folder the app and the sandboxed engine share for audio, models, `engine-io/` and the capture ring |
+| Data folder | `~/Library/Application Support/Noter`, the folder the app and the engine share for the database, audio, models, `engine-io/` and the capture ring (ADR-0004 replaced the App Group container) |
 | Lockdown flags | The per-run CLI flags and environment that keep a run to its own MCP config, an allow-listed tool set and its provider host |
 | Carry-forward | Open accepted items from the last two calls with the same people, plus suggested ones marked "Not reviewed", shown on Today and in the copilot's initial context |
 
@@ -2948,7 +2948,7 @@ Items of the DESIGN checklist that do not apply, with the reason; everything els
 
 - **PRD**: [PRD.md](./PRD.md) — Part B is the technical intent this design makes exact
 - **UI design**: [DESIGN.md](./DESIGN.md) — `cpt-noter-interface-ui-core-ipc` is realised by `cpt-noter-interface-core-ipc`
-- **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`
+- **ADRs**: [ADR/](./ADR/) — `cpt-noter-adr-0001-contract-source-of-truth`, `cpt-noter-adr-0002-ipc-conventions`, `cpt-noter-adr-0003-harness-and-quality-gates`, `cpt-noter-adr-0004-no-app-group-unsandboxed-engine`
 - **Review**: [REVIEW-2026-10-17-design-core.md](./REVIEW-2026-10-17-design-core.md) — the owner decisions and resolutions v0.4 applies
 - **Contract**: [crates/noter-protocol](../crates/noter-protocol/), [contracts/](../contracts/), [apps/desktop/src/core](../apps/desktop/src/core/)
 - **Features**: [DECOMPOSITION-core.md](DECOMPOSITION-core.md) splits this design into 31 features by milestone (M0 to M5); each has a FEATURE spec in [features/core/](features/core/) that references the component, interface and sequence IDs of this document

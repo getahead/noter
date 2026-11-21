@@ -14,7 +14,7 @@ stdin and stdout; the Rust supervisor is `crates/noter-engine-client`. Spec:
 
 M0 answers `ping`, `shutdown`, `set_detection` (acknowledged; detection listeners come with
 capture in M1) and `self_test`; other commands are refused with `bad_command`. The engine is
-offline by construction: `Resources/noter-engine.entitlements` grants App Sandbox, audio input
-and the App Group only, and `just arch` fails on any network entitlement under `engine/`.
-A sandboxed build reads files only inside its sandbox and the App Group container
-(`NOTER_APP_GROUP_DIR`), so file mode outside the container uses the debug build.
+offline by code discipline (ADR-0004): it runs without App Sandbox, `Resources/noter-engine.entitlements`
+grants audio input only, WhisperKit is always created with `download: false`, and `just arch`
+fails on any network entitlement under `engine/`. The core passes its data folder
+(`~/Library/Application Support/Noter`) as `NOTER_DATA_DIR`; models, audio and `engine-io/` live there.

@@ -52,7 +52,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The setup service in `noter-core` assembles `SetupStatus` (steps, model bundles, permissions, self-test, call display, whether detection is on) and answers the first-run commands. Model bundles download from pinned URLs with checksums into `models/` in the App Group container. Permissions are asked through `noter-native` only from `permission_request`. The self-test streams over a Channel from the engine. The native side also reports the environment (`env:changed`), registers the login item and installs a downloaded update.
+The setup service in `noter-core` assembles `SetupStatus` (steps, model bundles, permissions, self-test, call display, whether detection is on) and answers the first-run commands. Model bundles download from pinned URLs with checksums into `models/` in the data folder. Permissions are asked through `noter-native` only from `permission_request`. The self-test streams over a Channel from the engine. The native side also reports the environment (`env:changed`), registers the login item and installs a downloaded update.
 
 ### 1.2 Purpose
 
@@ -70,7 +70,7 @@ The user should finish setup in one sitting before the first real call, and call
 **System-audio permission interpretation**:
 - System-audio silence is inconclusive: a process tap can deliver zeros with permission granted. Only non-zero system buffers prove access; an explicit permission error may report denied. D-19 rechecks after a previous attempt on activation or a native change, without playing the excluded own-sound clip.
 
-Decision D14 (the App Group container from `noter-native`, passed to the engine and to `models/`, with `noter-native` as `NativeServices` and `noter-llm` as `ModelSource`) is delivered (#104, #106, #107).
+Decision D14 (the shared folder passed to the engine and to `models/`, with `noter-native` as `NativeServices` and `noter-llm` as `ModelSource`) is delivered (#104, #106, #107). Since `cpt-noter-adr-0004-no-app-group-unsandboxed-engine` (#998) that folder is the data folder `~/Library/Application Support/Noter`, not an App Group container: ad-hoc signed releases cannot write one, and nothing is migrated from it.
 
 ### 1.3 Actors
 
@@ -103,7 +103,7 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 - No connection: `offline` (retryable); the bundle stays `paused` with its partial file.
 - A checksum mismatch: the bundle becomes `checksum_failed`, the partial file is deleted, `checksum_failed` is reported; **Retry** downloads again.
 - Not enough disk for the remaining size: `disk_full` with `detail.needed_mb`.
-- A file that cannot be written while downloading: the bundle becomes `failed`, with `disk_full` only when the disk is full and `internal` otherwise (a folder macOS will not let the app write, such as an App Group container an ad-hoc build is not entitled to). Every bundle failure writes one `models` line to the local log: the bundle, a code (`write_failed`, `disk_full`, `http` with the status, `fetch_failed`, `checksum_failed`, `not_allowed`) and no path or URL.
+- A file that cannot be written while downloading: the bundle becomes `failed`, with `disk_full` only when the disk is full and `internal` otherwise (a folder macOS will not let the app write, such as the App Group container ad-hoc builds before ADR-0004 were not entitled to). Every bundle failure writes one `models` line to the local log: the bundle, a code (`write_failed`, `disk_full`, `http` with the status, `fetch_failed`, `checksum_failed`, `not_allowed`) and no path or URL.
 
 **Steps**:
 1. [x] - `p1` - API: `models_download { action, bundles? }` from First run or Settings; an omitted selection keeps the stored selection (all bundles by default). Validate bundle names, always include capture-required bundles, and persist the selection without changing the settings revision. `select` changes only selection and never starts a download; refuse a changed selection while a download is running - `inst-download-call`

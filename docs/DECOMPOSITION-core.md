@@ -383,7 +383,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
   - Swift package `engine/` with the protocol codec generated from `contracts/engine.schema.json`
   - `ready`, `ping`, `shutdown`, `self_test` with its stream, line and result events, `set_detection`, file mode
   - Crate `noter-engine-client`: spawn with `tokio::process`, version check, `seq` gap detection, ack and error correlation, restart
-  - App Group container layout and relative paths; signing and entitlements checks (engine without network)
+  - Shared data-folder layout and relative paths (App Group until ADR-0004); signing and entitlements checks (engine without network)
   - Week-one spike Q4 results (sandbox, prompt attribution, both channels) recorded in the FEATURE; latency and the streaming-policy/backend decision are M1 week-one capture work
 
 - **Out of scope**:
@@ -728,7 +728,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Scope**:
   - `calls_list` (paged, filtered, sorted), `call_get`, `call_update` with `rev`
   - Call types: built-in list plus user skill folders (Q5)
-  - `calls_delete`: rows, files in the App Group container and index rows in one logged, irreversible change
+  - `calls_delete`: rows, files in the data folder and index rows in one logged, irreversible change
   - `entity:changed` for calls
   - Fixture parity for the M1 read models (fixtures seeded as rows, the fake world generated through the real read models)
 

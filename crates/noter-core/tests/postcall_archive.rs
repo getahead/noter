@@ -78,7 +78,7 @@ fn main_window() -> CommandCtx {
     }
 }
 
-/// A core whose router answers from `script` and whose engine is scripted, with an App Group
+/// A core whose router answers from `script` and whose engine is scripted, with a data
 /// container (`engine: true`) or without one.
 async fn open(script: &str, engine: bool) -> Rig {
     open_with_offline_script(script, engine, None).await
@@ -340,7 +340,7 @@ async fn post_call_chunks_and_embeds_the_live_transcript_before_the_sections() {
 
 #[tokio::test(start_paused = true)]
 async fn without_embeddings_the_chunks_stay_and_the_outputs_are_still_written() {
-    // No App Group container: the engine refuses every embedding.
+    // No data folder: the engine refuses every embedding.
     let r = open("", false).await;
     seed_call(&r.core, CALL, 3);
     let run = trigger(&r.core, JobKind::PostCall, CALL);

@@ -1089,7 +1089,7 @@ fn model_log(dir: &Path) -> Vec<Value> {
         .collect()
 }
 
-/// The owner's v0.23.0 (18 Nov): an ad-hoc build cannot write its App Group container, so the
+/// The owner's v0.23.0 (18 Nov): an ad-hoc build could not write its App Group container (ADR-0004), so the
 /// first file of the first bundle could not be created. That is no lack of space: the bundle
 /// fails as `internal` (never `disk_full`, which the UI shows as a disk banner), and the log says
 /// which bundle and why.
