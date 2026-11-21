@@ -1492,6 +1492,7 @@ pub fn world() -> FakeWorld {
             calls: 6,
             decisions: 3,
             open_items: 2,
+            open_questions: 1,
             last_seen: ts(NOW),
             merge_suggestion: None,
         },
@@ -1503,6 +1504,7 @@ pub fn world() -> FakeWorld {
             calls: 4,
             decisions: 2,
             open_items: 1,
+            open_questions: 0,
             last_seen: ts(NOW),
             merge_suggestion: Some(TopicChip {
                 id: TopicId(s("top_notif")),
@@ -1517,6 +1519,7 @@ pub fn world() -> FakeWorld {
             calls: 5,
             decisions: 2,
             open_items: 1,
+            open_questions: 1,
             last_seen: backend.started_at,
             merge_suggestion: None,
         },

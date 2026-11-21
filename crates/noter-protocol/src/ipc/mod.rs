@@ -544,7 +544,7 @@ commands! {
     accounts_get(NoArgs) -> AccountsView [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     /// Store or replace a key: verified, then kept in the Keychain; never returned.
     api_key_set(ApiKeySetArgs) -> AccountsView [SettingsAndCredentials, Frozen, Settings | FirstRun];
-    api_key_remove(KeyProviderArgs) -> AccountsView [SettingsAndCredentials, Frozen, Settings];
+    api_key_remove(KeyProviderArgs) -> AccountsView [SettingsAndCredentials, Frozen, Settings | FirstRun];
     /// Sign-in sheet step 1 (Prepare): is the CLI installed, is it already signed in.
     account_signin_prepare(AccountProviderArgs) -> SignInPrepare [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     /// Install Claude Code, Codex or Ollama (progress on `jobs:progress`).

@@ -536,6 +536,7 @@ export const en = {
   "settings.keys.replace": "Replace…",
   "settings.keys.remove": "Remove…",
   "settings.keys.remove_short": "Remove",
+  "settings.keys.remove_failed": "Couldn’t remove the key. It is still stored.",
   "settings.keys.saved": "Saved",
   "settings.keys.sheet_add": "Add {name}",
   "settings.keys.sheet_replace": "Replace {name}",

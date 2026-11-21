@@ -1218,7 +1218,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `update_install` | Settings and credentials. Install a downloaded update now (restarts Noter). `NoArgs → Ack`. Windows: SM. | frozen |
 | Command | `accounts_get` | Settings and credentials. `NoArgs → AccountsView`. Windows: MSF. | frozen |
 | Command | `api_key_set` | Settings and credentials. Store or replace a key: verified, then kept in the Keychain; never returned. `ApiKeySetArgs → AccountsView`. Windows: SF. | frozen |
-| Command | `api_key_remove` | Settings and credentials. `KeyProviderArgs → AccountsView`. Windows: S. | frozen |
+| Command | `api_key_remove` | Settings and credentials. `KeyProviderArgs → AccountsView`. Windows: SF (owner, 21 Nov, #1057). | frozen |
 | Command | `account_signin_prepare` | Settings and credentials. Sign-in sheet step 1 (Prepare): is the CLI installed, is it already signed in. `AccountProviderArgs → SignInPrepare`. Windows: MSF. | frozen |
 | Command | `cli_install` | Settings and credentials. Install Claude Code, Codex or Ollama (progress on `jobs:progress`). `CliInstallArgs → JobAccepted`. Windows: MSF. | frozen |
 | Command | `account_signin_start` | Settings and credentials. Step 2 (Sign in): the CLI opens the browser; progress on `signin:progress`. `SignInStartArgs → SignInSession`. Windows: MSF. | frozen |

@@ -164,7 +164,7 @@ export function TopicLine({ bridge, topic: x, stop, merge, last, onContext }: { 
       </td>
       <td className="np-tnum">{x.calls}</td>
       <td className="np-tnum">{x.decisions}</td>
-      <td className="np-tnum">{x.open_items}</td>
+      <td className="np-tnum">{x.open_questions}</td>
       <td>{last}</td>
       <td>
         <IconButton icon="chevronRight" label={t("topics.open_topic", { name: x.name })} size="inline" onAction={open} />

@@ -13,7 +13,7 @@ import type { IconName } from "../../ui/icons";
 import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
 import { accountRowState, expiredNoteText, providerName, testResultText, toolName, usedByText, visibleTestLine, type AccountRowState } from "./account-rows";
-import { signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
+import { removeKeyKey, signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
 import { AccountSignInSheet } from "./AccountSignInSheet";
 import { useSignIn } from "./signin-store";
@@ -91,6 +91,8 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
 export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: KeyView; onRemove: () => void }) {
   const draft = useKeyDraft(bridge, view.provider);
   const stored = view.status.type === "configured";
+  // a refused removal is said here, never swallowed: the key is still stored (issue 1057)
+  const removeFailed = useWindow(bridge, (s) => s.commands[removeKeyKey(view.provider)]?.state) === "ERROR";
   const fieldId = view.provider === "anthropic" ? "fr-key-anthropic" : "fr-key-codex";
   const removeId = view.provider === "anthropic" ? "first-run-key-remove-anthropic" : "first-run-key-remove-codex";
   const returnFocus = useRef(false);
@@ -112,6 +114,7 @@ export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: 
         <div className="st-keyfield">
           <span className="st-cred__dots">{t("settings.keys.keychain")}</span>
           <PushButton id={removeId} label={t("settings.keys.remove_short")} size="small" onAction={() => { returnFocus.current = startedFrom(document, removeId); onRemove(); }} />
+          {removeFailed && <span className="st-row__err" role="alert">{t("settings.keys.remove_failed")}</span>}
         </div>
       ) : (
         <KeyField id={fieldId} label={t(KEY_NAME[view.provider])} placeholder={t(view.provider === "anthropic" ? "first_run.assistants.key_placeholder_anthropic" : "first_run.assistants.key_placeholder_codex")} draft={draft} verifiedText={t("settings.keys.keychain")} />

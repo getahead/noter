@@ -121,7 +121,7 @@ The decomposition assigns no new table here: account metadata uses existing sett
 3. [x] - `p1` - Publish verifying status; verify the candidate using the router and egress gate, without replacing the saved key until verification succeeds (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-verify`
 4. [x] - `p1` - Store the verified key in Keychain; store only status and verification time in settings through the change-log writer, never secret before/after values (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-store`
 5. [x] - `p1` - Recompute availability and emit `accounts:changed` with a new version; **RETURN** `AccountsView` with status only (M2, `cpt-noter-feature-core-llm-gate`) - `inst-key-return`
-6. [x] - `p1` - API: `api_key_remove { provider }` only from Settings removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
+6. [x] - `p1` - API: `api_key_remove { provider }` from Settings or the first-run Assistants step (owner, 21 Nov, #1057) removes its Keychain item, updates status and router availability, emits `accounts:changed` and **RETURN** `AccountsView` (M3) - `inst-key-remove`
 
 ### Prepare and install an account runtime
 

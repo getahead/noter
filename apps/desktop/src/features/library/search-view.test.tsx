@@ -66,7 +66,7 @@ describe("SearchView (cpt-noter-state-ui-library-search-topics-view)", () => {
   });
   it("a topic hit is one chip row with its counts and opens the thread; topics alone are counted, not 0 results", () => {
     const bridge = { act: vi.fn() } as never;
-    const topic = { id: "top_1", rev: 1, name: "Websocket notifications", aliases: [], calls: 6, decisions: 3, open_items: 1, last_seen: 1, merge_suggestion: { id: "top_2", name: "Other" } };
+    const topic = { id: "top_1", rev: 1, name: "Websocket notifications", aliases: [], calls: 6, decisions: 3, open_items: 4, open_questions: 1, last_seen: 1, merge_suggestion: { id: "top_2", name: "Other" } };
     const p = props(results({ topics: [topic] }), { bridge });
     const h = html(p);
     expect(h).toContain("Websocket notifications");

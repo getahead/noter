@@ -3467,7 +3467,13 @@ export type TopicRow = {
 	aliases: string[],
 	calls: number,
 	decisions: number,
+	/**
+	 *  Every open item of the topic: action items, open questions and risks, suggested ones
+	 *  included (rejected ones count nowhere).
+	 */
 	open_items: number,
+	/**  The open questions among them, for the **Open questions** column and thread header. */
+	open_questions: number,
 	last_seen: TimestampMs,
 	merge_suggestion: TopicChip | null,
 };
@@ -3698,7 +3704,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.18";
+export const CONTRACT_VERSION = "2.20";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3837,7 +3843,7 @@ export const COMMANDS = {
   update_install: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   accounts_get: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   api_key_set: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "first-run"], channel: false },
-  api_key_remove: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
+  api_key_remove: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "first-run"], channel: false },
   account_signin_prepare: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   cli_install: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_signin_start: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
