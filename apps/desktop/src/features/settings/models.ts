@@ -30,3 +30,11 @@ export function modelAction(b: Pick<ModelBundle, "state">): { action: DownloadAc
 
 /** The control key of a bundle's button. */
 export const modelKey = (name: string) => `models:${name}`;
+
+/** The capability each optional bundle adds, beside its download choice. */
+export function modelPurpose(b: Pick<ModelBundle, "name" | "required_for_capture">): MsgKey {
+  if (b.required_for_capture) return "first_run.models.required";
+  if (b.name.includes("large")) return "first_run.models.archive";
+  if (b.name.includes("wespeaker")) return "first_run.models.speakers";
+  return "first_run.models.search";
+}

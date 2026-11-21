@@ -809,6 +809,16 @@ async fn the_builtin_archive_installs_live_segments_through_the_core() {
 
     let run = trigger(&r.core, JobKind::ArchivePass, CALL);
     assert_eq!(settle(&r.core, &run).await.status, JobRunStatus::Succeeded);
+    assert!(
+        r.engine.commands().iter().any(|command| matches!(
+            command,
+            noter_protocol::engine::EngineCommand::OfflinePass {
+                backend: noter_protocol::engine::AsrBackend::WhisperTurbo,
+                ..
+            }
+        )),
+        "without the optional large model the real archive job requests turbo"
+    );
     assert_eq!(
         rows(
             &r.core,

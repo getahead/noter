@@ -180,7 +180,7 @@ final class WindowSizeTests: NoterTestCase {
         launch(fixture: "none")
         let wizard = window(around: "Setup steps")
         XCTAssertTrue(wizard.waitForExistence(timeout: 10), "an incomplete first launch opens setup without a menu action")
-        XCTAssertTrue(accessibilityTreeContains("Welcome to Noter", in: wizard), "fresh setup opens at Welcome")
+        XCTAssertTrue(waitUntil(10) { self.accessibilityTreeContains("Welcome to Noter", in: wizard) }, "fresh setup opens at Welcome after the web content is ready")
     }
 
     // @cpt-dod:cpt-noter-dod-ui-first-run-window:p1

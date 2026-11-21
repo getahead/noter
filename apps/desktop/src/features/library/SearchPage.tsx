@@ -1,3 +1,4 @@
+import { ModelDownloadNotice } from "../../ui/setup/model-download-notice";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "../../ui/primitives/link";
 import { Popover } from "../../ui/primitives/popover";
@@ -232,7 +233,7 @@ export function SearchPage({ query }: { query: string }) {
       onMore={(g) => setOpen(new Set(open).add(g))}
       onRetry={() => setAgain((n) => n + 1)}
       playback={playback}
-      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
+      bar={<><ModelDownloadNotice bridge={bridge} model="bge-m3" /><FilterBar state={fstate} lists={lists} onAction={onFilter} /></>}
       onClear={() => onFilter({ type: "clear" })}
       onAllLanguages={() => {
         // one state from every toggle: separate actions would each start from the same stale state

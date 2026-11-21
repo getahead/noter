@@ -8,6 +8,15 @@ use noter_protocol::ipc::Sink;
 use noter_protocol::{CallId, CoreError, ErrorCode, ErrorDetail};
 
 #[test]
+fn older_model_requests_and_snapshots_keep_the_recommended_selection() {
+    use noter_protocol::model::{ModelBundle, ModelsDownloadArgs};
+    let request: ModelsDownloadArgs = serde_json::from_str(r#"{"action":"start"}"#).unwrap();
+    assert_eq!(request.bundles, None);
+    let bundle: ModelBundle = serde_json::from_str(r#"{"name":"whisper-turbo","size_mb":1600,"done_mb":0,"state":"pending","required_for_capture":true}"#).unwrap();
+    assert!(bundle.selected);
+}
+
+#[test]
 fn core_error_takes_retryable_from_the_code() {
     let e = CoreError::new(ErrorCode::Offline, "no network");
     assert!(e.retryable);
