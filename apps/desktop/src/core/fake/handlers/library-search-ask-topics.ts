@@ -80,13 +80,14 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   call_types_list: (_a, { world }) => world.call_types,
   search: (a, { world }) => {
-    const q = a.query.toLowerCase();
+    const q = a.query.normalize("NFKC").toLowerCase().replace(/ё/g, "е").replace(/ß/g, "ss").trim().replace(/\s+/gu, " ");
     const terms = shared.searchTerms(a.query);
     const segs = world.transcripts.flatMap((t) => t.segments).filter((s) => shared.matchesTerms(s.text, terms));
     const items = world.items.filter((i) => shared.matchesTerms(i.text, terms));
     const callOf = (id: string) => shared.callRef(shared.call(world, id));
     return {
       query: a.query,
+      query_lang: /[\u0400-\u04ff]/u.test(q) ? "ru" : /[äöü]/u.test(q) ? "de" : /[a-z]/u.test(q) ? "en" : null,
       mode: { type: "hybrid" },
       calls: segs.map((s) => ({
         target: { type: "segment", span: { call_id: s.call_id, channel: s.channel, t0_ms: s.t0_ms, t1_ms: s.t1_ms } },
@@ -99,7 +100,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
         provenance: { type: "past_call", call: callOf(s.call_id), span: { call_id: s.call_id, channel: s.channel, t0_ms: s.t0_ms, t1_ms: s.t1_ms } },
         cross_language: false,
       })),
-      items: items.map((i) => ({ target: { type: "item", item_id: i.id }, title: i.text, snippet: i.text, highlights: [], lang: i.lang, strength: "strong", call: i.call, provenance: { type: "past_call", call: i.call, span: i.spans[0] }, cross_language: false })),
+      items: items.map((i) => ({ item_kind: i.kind, target: { type: "item", item_id: i.id }, title: i.text, snippet: i.text, highlights: [], lang: i.lang, strength: "strong", call: i.call, provenance: { type: "past_call", call: i.call, span: i.spans[0] }, cross_language: false })),
       documents: [],
       topics: world.topics.filter((t) => shared.matchesTerms(t.name, terms)),
       only_weak: false,
@@ -133,7 +134,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     const inScope = world.transcripts.filter((t) => !a.scope.call_id || t.call_id === a.scope.call_id).flatMap((t) => t.segments);
     if (!inScope.some((s) => shared.matchesTerms(s.text, terms))) {
       later(400, () => {
-        const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: "I could not find this in your calls.", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
+        const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, scope: a.scope, meta: null, rating: null, answer_md: "I could not find this in your calls.", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
         save(answer);
         fake.push(sub, { event: { type: "done", answer } });
         fake.closeChannel(sub);
@@ -151,7 +152,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       fake.push(sub, { event: { type: "citation", citation: cite } });
     });
     later(400 + words.length * 60 + 300, () => {
-      const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
+      const answer: Bindings.AskAnswer = { turn_id: turn, question: a.question, scope: a.scope, meta: null, rating: null, answer_md: run.text, citations: run.citations, found: true, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: shared.now() };
       save(answer);
       fake.push(sub, { event: { type: "done", answer } });
       fake.push(sub, { event: { type: "ended", reason: "call_stopped" } });
@@ -165,7 +166,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
     const run = runs?.get(a.turn_id);
     if (run) {
       run.timers.forEach((timer) => fake.cancelLater(timer));
-      const answer: Bindings.AskAnswer = { turn_id: a.turn_id, question: run.question, answer_md: run.text, citations: run.citations, found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: true, asked_at: shared.now() };
+      const answer: Bindings.AskAnswer = { turn_id: a.turn_id, question: run.question, scope: run.scope, meta: null, rating: null, answer_md: run.text, citations: run.citations, found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: true, asked_at: shared.now() };
       const world = fake.world;
       const existing = world.ask_threads.find((t) => t.id === run.thread);
       if (existing) existing.turns.push(answer);
@@ -176,6 +177,14 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
       runs?.delete(a.turn_id);
     }
     return shared.ack;
+  },
+  // @cpt-flow:cpt-noter-flow-core-retrieval-ask-threads:p1
+  ask_rate: (a, { world }) => {
+    const turn = world.ask_threads.flatMap((t) => t.turns).find((t) => t.turn_id === a.turn_id);
+    if (!turn) throw coreError("not_found", "Ask turn");
+    if (turn.stopped) throw coreError("invalid_input", "stopped turn");
+    turn.rating = a.rating ?? null;
+    return {};
   },
   ask_threads_list: (_a, { world }) => ({ threads: world.ask_threads.map((t) => ({ id: t.id, title: t.title, turns: t.turns.length, updated_at: t.turns.at(-1)?.asked_at ?? world.now })) }),
   ask_thread_get: (a, { world }) => {

@@ -163,6 +163,7 @@ fn person_row(p: &P, open: u32) -> PersonRow {
         aliases: vec![],
         is_you: p.you,
         voice_profile: p.voice,
+        voice_profile_stats: None,
         last_call_at: Some(ts(NOW)),
         open_items: open,
         you_owe: 0,
@@ -1898,10 +1899,17 @@ pub fn world() -> FakeWorld {
                 ..Default::default()
             },
             turns: vec![AskAnswer {
+                scope: Some(AskScope {
+                    include_documents: true,
+                    ..Default::default()
+                }),
+                meta: None,
+                rating: None,
                 turn_id: AskTurnId(s("turn_notif_1")),
                 question: s("What did we decide about drawer notifications?"),
                 answer_md: s("Drawer events go through the notification service [1]."),
                 citations: vec![Citation {
+                    lang: Some(Lang::En),
                     n: 1,
                     provenance: Provenance::PastCall {
                         call: backend.clone(),

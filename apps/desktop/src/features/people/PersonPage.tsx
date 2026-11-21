@@ -5,7 +5,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
 import type { CoreError, PersonPage as Page, PersonRow, UiPrefs } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { shortDay, t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Table } from "../../ui/primitives/table";
@@ -231,6 +231,11 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
             <dt>{t("person.voice")}</dt>
             <dd>
               <div>{p.voice_profile ? t("person.voice_on") : t("person.voice_off")}</div>
+              {p.voice_profile && p.voice_profile_stats && <div className="np-dim">
+                {p.voice_profile_stats.opted_in_at != null && <div>{t("person.voice_since", { date: shortDay(p.voice_profile_stats.opted_in_at, prefs) })}</div>}
+                <div>{t("person.voice_profiles", { count: p.voice_profile_stats.profiles })}</div>
+                <div>{t("person.voice_matched_calls", { count: p.voice_profile_stats.matched_calls })}</div>
+              </div>}
               <div className="pe-kvact">
                 {p.voice_profile ? <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>

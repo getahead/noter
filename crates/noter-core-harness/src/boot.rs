@@ -780,6 +780,10 @@ impl Harness {
             .call(WindowLabel::Main, "people_list", json!({}))
             .await?["people"]
             .clone();
+        w["topics"] = self
+            .call(WindowLabel::Main, "topics_list", json!({}))
+            .await?["topics"]
+            .clone();
         w["call_types"] = self
             .call(WindowLabel::Main, "call_types_list", json!({}))
             .await?;
@@ -800,6 +804,11 @@ impl Harness {
         // for bit, so comparing raw values would see every confidence as changed.
         let wanted = to_json(&parsed);
         let current = to_json(&typed(self.world_get().await?).map_err(crate::internal)?);
+        let topics_only = wanted
+            .as_object()
+            .into_iter()
+            .flatten()
+            .all(|(key, value)| key == "topics" || current.get(key) == Some(value));
         let mut refused = vec![];
         for (key, value) in wanted.as_object().into_iter().flatten() {
             if current.get(key) == Some(value)
@@ -816,6 +825,7 @@ impl Harness {
                         | "outputs"
                         | "today"
                         | "changes"
+                        | "topics"
                 )
             {
                 continue;
@@ -849,16 +859,20 @@ impl Harness {
             }
             v
         };
-        if accepted["people"] != wanted["people"] {
+        if !topics_only && accepted["people"] != wanted["people"] {
             self.seed_people(&wanted)?;
         }
-        if ["calls", "transcripts", "items", "outputs"]
-            .iter()
-            .any(|k| accepted[k] != wanted[k])
-            || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"])
+        if !topics_only
+            && (["calls", "transcripts", "items", "outputs"]
+                .iter()
+                .any(|k| accepted[k] != wanted[k])
+                || sans_folder(&accepted["call_details"]) != sans_folder(&wanted["call_details"]))
         {
             self.clear_calls()?;
             self.seed_calls(&wanted)?;
+        }
+        if current["topics"] != wanted["topics"] {
+            self.replace_topics(&parsed.topics)?;
         }
         if accepted["outputs"] != wanted["outputs"] {
             self.seed_sections(&parsed);
@@ -1103,6 +1117,7 @@ impl Controls for Harness {
             match name {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
+                "topic_centroids" => self.seed_topic_centroids(args),
                 "push" => self.push(args).await,
                 // `{}`: the next self-test waits for scenario events instead of its timed script.
                 "hold_next_self_test" => {

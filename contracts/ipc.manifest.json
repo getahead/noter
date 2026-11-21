@@ -996,6 +996,18 @@
       ]
     },
     {
+      "args": "AskRateArgs",
+      "channel": null,
+      "doc": "Set or clear feedback on a completed answer.",
+      "group": "library_and_ask",
+      "name": "ask_rate",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
       "args": "NoArgs",
       "channel": null,
       "doc": "",
@@ -2210,7 +2222,7 @@
       ]
     }
   ],
-  "contract_version": "2.17",
+  "contract_version": "2.18",
   "default_retryable": [
     "not_ready",
     "internal",

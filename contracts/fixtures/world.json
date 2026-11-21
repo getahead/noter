@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.17",
+    "contract_version": "2.18",
     "copilot": {
       "agents": [
         {
@@ -582,6 +582,7 @@
           "citations": [
             {
               "deleted": false,
+              "lang": "en",
               "n": 1,
               "provenance": {
                 "call": {
@@ -611,9 +612,21 @@
           ],
           "found": true,
           "keyword_only": false,
+          "meta": null,
           "only_weak_evidence": false,
           "question": "What did we decide about drawer notifications?",
+          "rating": null,
           "runtime": "claude_api_key",
+          "scope": {
+            "call_id": null,
+            "call_types": [],
+            "from": null,
+            "include_documents": true,
+            "people": [],
+            "preset": null,
+            "to": null,
+            "topic_id": null
+          },
           "sensitive_sources_skipped": 0,
           "stopped": false,
           "turn_id": "turn_notif_1"
@@ -2213,6 +2226,7 @@
       "role": "Team lead, frontend",
       "short_name": "You",
       "voice_profile": false,
+      "voice_profile_stats": null,
       "you_owe": 0
     },
     {
@@ -2230,6 +2244,7 @@
       "role": "Frontend developer",
       "short_name": "Anna K.",
       "voice_profile": true,
+      "voice_profile_stats": null,
       "you_owe": 0
     },
     {
@@ -2247,6 +2262,7 @@
       "role": "Product manager",
       "short_name": "Pavel",
       "voice_profile": false,
+      "voice_profile_stats": null,
       "you_owe": 0
     },
     {
@@ -2264,6 +2280,7 @@
       "role": "Backend lead",
       "short_name": "Dmitri S.",
       "voice_profile": true,
+      "voice_profile_stats": null,
       "you_owe": 0
     },
     {
@@ -2281,6 +2298,7 @@
       "role": "QA engineer",
       "short_name": "Oleg M.",
       "voice_profile": false,
+      "voice_profile_stats": null,
       "you_owe": 0
     },
     {
@@ -2298,6 +2316,7 @@
       "role": "Designer",
       "short_name": "Lena K.",
       "voice_profile": false,
+      "voice_profile_stats": null,
       "you_owe": 0
     }
   ],

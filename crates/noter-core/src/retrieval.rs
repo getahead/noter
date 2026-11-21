@@ -92,6 +92,7 @@ fn document_hit(p: noter_knowledge::Permitted) -> Hit {
         .split_once("\n\n")
         .map_or_else(|| p.text.clone(), |(_, body)| body.to_string());
     Hit {
+        item_kind: None,
         evidence: Evidence::Document {
             document_id: p.document_id.clone(),
             chunk_id: p.chunk_id.clone(),

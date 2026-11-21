@@ -21,6 +21,14 @@ const props = (o: Partial<PersonBodyProps> = {}): PersonBodyProps => ({
 const call = { id: "call_1", title: "Planning", started_at: 1_700_000_000_000, participants: [], languages: [], tags: [], call_type: "one_on_one", status: "ready", privacy: "normal", duration_s: 60 } as never;
 
 describe("cpt-noter-flow-ui-people-prepare", () => {
+  it("shows the recorded profile date, available profiles and distinct matched calls", () => {
+    const p = person({ voice_profile: true, voice_profile_stats: { opted_in_at: Date.UTC(2026, 9, 3, 12), profiles: 2, matched_calls: 28 } } as Partial<PersonRow>);
+    const h = renderToString(<Overview bridge={bridge} page={page({ person: p, calls: [call] })} prefs={undefined} />);
+    expect(h).toContain("On since Oct 3");
+    expect(h).toContain("2 profiles available");
+    expect(h).toContain("Matched in 28 calls");
+    expect(h).not.toContain("2 profiles matched");
+  });
   it("NO_CALLS: the person's first-call message, no blocks", () => {
     const h = renderToString(<PersonBody {...props()} />);
     expect(h).toContain("No calls with Anna K. yet");

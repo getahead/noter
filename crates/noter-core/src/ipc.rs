@@ -255,6 +255,15 @@ impl CoreApi for Core {
         self.stop_ask(args)
     }
 
+    // @cpt-flow:cpt-noter-flow-core-retrieval-ask-threads:p1
+    async fn ask_rate(&self, ctx: &CommandCtx, args: AskRateArgs) -> Result<Ack, CoreError> {
+        self.ready()?;
+        let mut meta = self.change_meta(ctx, "Rated an answer".into(), "ask_rate");
+        meta.undoable = false;
+        noter_retrieval::rate_turn(self.store(), meta, args)?;
+        Ok(Ack {})
+    }
+
     async fn ask_threads_list(
         &self,
         _ctx: &CommandCtx,

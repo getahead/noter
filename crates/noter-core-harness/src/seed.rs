@@ -1,6 +1,92 @@
 use super::*;
+use noter_protocol::TopicId;
 
 impl Harness {
+    // @cpt-algo:cpt-noter-algo-core-harness-boot:p1
+    /// Replace only the canonical topics; counts and suggestions remain core computations.
+    pub(super) fn replace_topics(&self, topics: &[TopicRow]) -> Result<(), CoreError> {
+        let mut db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        db.execute_batch("PRAGMA foreign_keys = ON")
+            .map_err(crate::internal)?;
+        let tx = db.transaction().map_err(crate::internal)?;
+        tx.execute("DELETE FROM topics", [])
+            .map_err(crate::internal)?;
+        for topic in topics {
+            tx.execute("INSERT INTO topics (id, rev, name, first_seen, last_seen) VALUES (?1, ?2, ?3, ?4, ?4)",
+                noter_db::rusqlite::params![topic.id.as_str(), topic.rev.0, topic.name, topic.last_seen.0]).map_err(crate::internal)?;
+            for alias in &topic.aliases {
+                tx.execute(
+                    "INSERT INTO topic_aliases (topic_id, alias) VALUES (?1, ?2)",
+                    noter_db::rusqlite::params![topic.id.as_str(), alias],
+                )
+                .map_err(crate::internal)?;
+            }
+        }
+        tx.execute(
+            "UPDATE items SET topic_id = NULL WHERE topic_id NOT IN (SELECT id FROM topics)",
+            [],
+        )
+        .map_err(crate::internal)?;
+        tx.commit().map_err(crate::internal)
+    }
+
+    // @cpt-algo:cpt-noter-algo-core-retrieval-ask-attach-topic:p1
+    /// Seed identical centroid inputs; the retrieval service computes suggestions and applies suppressions.
+    pub(super) fn seed_topic_centroids(&self, args: Value) -> Result<Value, CoreError> {
+        #[derive(serde::Deserialize)]
+        struct Args {
+            topic_ids: Vec<TopicId>,
+        }
+        let args: Args = serde_json::from_value(args).map_err(|_| {
+            CoreError::new(
+                ErrorCode::InvalidInput,
+                "topic_centroids needs { topic_ids }",
+            )
+        })?;
+        let ids: std::collections::BTreeSet<_> =
+            args.topic_ids.iter().map(|id| id.as_str()).collect();
+        if ids.len() < 2 || ids.len() != args.topic_ids.len() {
+            return Err(CoreError::new(
+                ErrorCode::InvalidInput,
+                "topic_ids must name at least two distinct topics",
+            ));
+        }
+        let mut db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        let tx = db.transaction().map_err(crate::internal)?;
+        for id in &ids {
+            let exists: bool = tx
+                .query_row(
+                    "SELECT EXISTS(SELECT 1 FROM topics WHERE id = ?1)",
+                    [id],
+                    |r| r.get(0),
+                )
+                .map_err(crate::internal)?;
+            if !exists {
+                return Err(CoreError::new(ErrorCode::NotFound, "no such topic"));
+            }
+        }
+        let mut vector = vec![0_f32; noter_retrieval::DIMS];
+        vector[0] = 1.0;
+        let blob: Vec<u8> = vector.iter().flat_map(|v| v.to_le_bytes()).collect();
+        for id in ids {
+            tx.execute(
+                "UPDATE topics SET centroid = ?2 WHERE id = ?1",
+                noter_db::rusqlite::params![id, blob],
+            )
+            .map_err(crate::internal)?;
+        }
+        tx.execute("DELETE FROM topic_suggestions", [])
+            .map_err(crate::internal)?;
+        tx.commit().map_err(crate::internal)?;
+        Ok(json!({}))
+    }
+
     /// The fixture's owned slices, through the core's own commands.
     pub(super) async fn seed(&self, w: &FakeWorld) -> Result<(), CoreError> {
         let wanted = to_json(w);

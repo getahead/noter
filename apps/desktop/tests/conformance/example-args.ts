@@ -85,6 +85,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   call_types_list: {},
   search: {"query": "noter", "filter": {}},
   ask_start: {"question": "noter", "scope": {}},
+  ask_rate: { turn_id: "turn_notif_1", rating: "helpful" },
   ask_stop: {"turn_id": "noter"},
   ask_threads_list: {},
   ask_thread_get: {"thread_id": "noter"},

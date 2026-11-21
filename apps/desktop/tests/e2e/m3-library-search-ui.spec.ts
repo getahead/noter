@@ -24,8 +24,7 @@ function topicWorld(w: World): void {
   for (const [item, id] of [["itm_notif", "top_ws"], ["itm_reconnect_q", "top_ws"], ["itm_replay", "top_notif"]] as const) {
     w.items.find((i) => i.id === item)!.topic = topic(id);
   }
-  // The core owns topics and their merge suggestions: harness.world_set refuses a changed `topics` slice. The Merge-suggested
-  // and No-topics tests wait for the fixture seed (techlead ask #7, Row 7) and fail on that state until it lands.
+  // The contract-batch stories separately exercise topic replacement and core-computed merge suggestions.
 }
 
 async function openMain(page: Page, key: string, heading: string, world: (w: World) => void = W.idle) {

@@ -12,6 +12,30 @@ use noter_protocol::fixtures::world;
 use noter_protocol::model::*;
 
 #[test]
+fn historical_answers_and_people_decode_without_new_read_metadata() {
+    let fixture = world();
+    let mut answer = serde_json::to_value(&fixture.ask_threads[0].turns[0]).unwrap();
+    for field in ["scope", "meta", "rating"] {
+        answer.as_object_mut().unwrap().remove(field);
+    }
+    answer["citations"][0]
+        .as_object_mut()
+        .unwrap()
+        .remove("lang");
+    let answer: AskAnswer = serde_json::from_value(answer).unwrap();
+    assert!(answer.scope.is_none() && answer.meta.is_none() && answer.rating.is_none());
+    assert!(answer.citations[0].lang.is_none());
+    assert!(answer.found);
+    let mut person = serde_json::to_value(&fixture.people[0]).unwrap();
+    person
+        .as_object_mut()
+        .unwrap()
+        .remove("voice_profile_stats");
+    let person: PersonRow = serde_json::from_value(person).unwrap();
+    assert!(person.voice_profile_stats.is_none());
+}
+
+#[test]
 fn every_call_has_one_detail_that_repeats_its_row() {
     let w = world();
     for call in &w.calls {

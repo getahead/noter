@@ -31,6 +31,14 @@ describe("AskPage (cpt-noter-flow-ui-ask-question)", () => {
 });
 
 describe("Answer (cpt-noter-state-ui-ask-turn)", () => {
+  it("shows measured work and the persisted rating on a completed not-found answer", () => {
+    const h = renderToString(<Answer bridge={bridge} view={view(done({ found: false, rating: "helpful", meta: { call_hits: 3, item_hits: 2, document_hits: 0, elapsed_ms: 120 } }))} />);
+    expect(h).toContain("3 transcript matches");
+    expect(h).toContain("2 item matches");
+    expect(h).toContain("120 ms");
+    expect(h).toContain('aria-pressed="true"');
+    expect(h).toContain("Not helpful");
+  });
   it("shows the status while nothing has streamed, then the escaped paragraphs", () => {
     expect(renderToString(<Answer bridge={bridge} view={view()} />)).toContain("Searching calls and documents…");
     const h = renderToString(<Answer bridge={bridge} view={view({ type: "delta", text: "<b>x</b>\n\ny" })} />);
@@ -79,9 +87,10 @@ describe("AskView (cpt-noter-dod-ui-ask-threads)", () => {
   it("offers Widen Scope on the last stored turn when it was not found under a narrowed scope", () => {
     const miss = (id: string, found: boolean) => ({ turn_id: id, question: `Q${id}`, answer_md: "", citations: [], found, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 }) as never;
     const turns = [miss("1", false), miss("2", false)];
-    const html = (narrowed: boolean) => renderToString(<AskView {...props} thread="a" turns={turns} narrowed={narrowed} onWiden={noop} />);
-    expect(html(true).split("Widen Scope").length - 1).toBe(1); // the last turn only
-    expect(html(false)).not.toContain("Widen Scope");
+    const stored = turns.map((a) => ({ ...(a as object), scope: { call_id: "c1" } })) as never;
+    const html = renderToString(<AskView {...props} thread="a" turns={stored} narrowed={false} onWiden={noop} />);
+    expect(html.split("Widen Scope").length - 1).toBe(1); // persisted scope survives a later toolbar choice
+    expect(renderToString(<AskView {...props} thread="a" turns={turns} narrowed onWiden={noop} />)).not.toContain("Widen Scope"); // unknown historical scopes stay unknown
   });
   it("keeps Widen Scope off the previous turn while a follow-up is answering", () => {
     const miss = { turn_id: "1", question: "Q1", answer_md: "", citations: [], found: false, runtime: "claude_api_key", answered_locally: false, sensitive_sources_skipped: 0, keyword_only: false, only_weak_evidence: false, stopped: false, asked_at: 0 } as never;

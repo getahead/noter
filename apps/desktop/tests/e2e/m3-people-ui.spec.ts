@@ -210,7 +210,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
 
 test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
   test("UI — happy path: Set Up Voice Profile… explains, Create Profile calls voice_profile_create once and says Voice profile created for Anna K.", async ({ page }) => {
-    await openPerson(page, /Anna K\./, noVoiceProfile);
+    const steer = await openPerson(page, /Anna K\./, noVoiceProfile);
     await button(page, "Set Up Voice Profile…").click();
     const sheet = page.getByRole("dialog", { name: "Set Up Voice Profile" });
     await expect(sheet).toContainText("Anna Kuznetsova");
@@ -221,6 +221,12 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
     await expect.poll(() => sent(page, "voice_profile_create")).toEqual([expect.objectContaining({ person_id: "per_anna" })]);
     await expect(page.getByText("Voice profile created for Anna K.")).toBeVisible();
     await expect(button(page, "Set Up Voice Profile…")).toHaveCount(0);
+    const person = await steer.invoke("person_get", { person_id: "per_anna" }) as import("../../src/core/bindings").PersonPage;
+    const stats = person.person.voice_profile_stats!;
+    expect(stats.opted_in_at).toEqual(expect.any(Number));
+    await expect(page.getByText(`${stats.profiles} ${stats.profiles === 1 ? "profile" : "profiles"} available`, { exact: true })).toBeVisible();
+    await expect(page.getByText(`Matched in ${stats.matched_calls} ${stats.matched_calls === 1 ? "call" : "calls"}`, { exact: true })).toBeVisible();
+    await expect(page.getByText(/^On since /)).toBeVisible();
   });
 
   test("UI — other path: Delete Profile… asks Delete Anna K.'s voice profile?; Cancel keeps it, Delete Profile calls voice_profile_delete and Set Up Voice Profile… comes back", async ({ page }) => {

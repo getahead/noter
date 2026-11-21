@@ -6,7 +6,7 @@ import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
 import { useAnnounce, type AnnounceEvent } from "../../app/a11y/announce";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallFilter, PlaybackState, SearchResults } from "../../core/bindings";
+import type { CallFilter, Lang, PlaybackState, SearchResults } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -35,6 +35,16 @@ export const keepLink = (to: { current: HTMLElement | null }) => (wrap: HTMLElem
 };
 
 export const resultCount = (r: SearchResults): number => r.calls.length + r.items.length + r.documents.length || Math.min(r.topics.length, 1);
+
+// @cpt-flow:cpt-noter-flow-ui-library-search-topics-search:p1
+export function crossLanguageCaption(r: SearchResults): string | null {
+  const code = (lang: Lang | null | undefined) => typeof lang === "string" ? lang : lang?.code;
+  const query = code(r.query_lang);
+  const languages = [...new Set(r.calls.filter((h) => h.cross_language).map((h) => code(h.lang)).filter((lang): lang is string => !!lang && lang !== query))];
+  if (!query || !languages.length) return null;
+  const name = (lang: string) => lang === "en" ? t("settings.general.lang_en") : lang === "ru" ? t("settings.general.lang_ru") : lang === "de" ? t("settings.general.lang_de") : lang.toUpperCase();
+  return t("search.cross_language_caption", { query: name(query), languages: new Intl.ListFormat("en", { type: "conjunction" }).format(languages.map(name)) });
+}
 
 // @cpt-algo:cpt-noter-algo-ui-library-search-topics-results:p1
 /** Each completed read is a new event, even when the count is unchanged; a superseded read stays silent. */
@@ -118,6 +128,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
           </span>
         </p>
         {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-mode */}
+        {crossLanguageCaption(r) && <p className="np-dim">{crossLanguageCaption(r)}</p>}
         {status === "WEAK_ONLY" && <InlineBanner banner={{ id: "search-weak-only", severity: "warning", text: t("search.weak_only", { query }) + (filtered ? ` ${t("search.filters_active", { count: Object.values(filter).filter((v) => (Array.isArray(v) ? v.length : v)).length })}.` : ""), actions: [...(filtered ? [clear] : []), ...(filter.languages?.length && onAllLanguages ? [{ label: t("search.all_languages"), onAction: onAllLanguages }] : []), ask] }} />}
         {topic && (
           <section data-region="LS-R3" aria-label={t("search.section.topic")}>

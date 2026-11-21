@@ -129,8 +129,8 @@ pub fn begin_turn(store: &Store, meta: ChangeMeta, t: NewTurn) -> Result<(), Cor
                 touch(tx, thread, Some(&scope), t.now)?;
             }
             tx.execute(
-                "INSERT INTO ask_turns (id, thread_id, question, asked_at) VALUES (?1, ?2, ?3, ?4)",
-                params![t.turn_id.as_str(), thread, t.question, t.now.0],
+                "INSERT INTO ask_turns (id, thread_id, question, asked_at, scope) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![t.turn_id.as_str(), thread, t.question, t.now.0, scope],
             )
             .map_err(internal)?;
             let field = if t.new_thread { "created" } else { "turns" };
@@ -184,6 +184,12 @@ pub fn finish_turn(
     now: TimestampMs,
 ) -> Result<(), CoreError> {
     let citations = serde_json::to_string(&answer.citations).map_err(internal)?;
+    let measured = answer
+        .meta
+        .as_ref()
+        .map(serde_json::to_string)
+        .transpose()
+        .map_err(internal)?;
     let runtime = serde_json::to_value(answer.runtime)
         .ok()
         .and_then(|v| v.as_str().map(String::from));
@@ -202,10 +208,12 @@ pub fn finish_turn(
             let n = tx
                 .execute(
                     "UPDATE ask_turns SET answer_md = ?2, citations = ?3, found = ?4, runtime = ?5,
-                         llm_run_id = ?6, sensitive_skipped = ?7, keyword_only = ?8, only_weak = ?9
+                         llm_run_id = ?6, sensitive_skipped = ?7, keyword_only = ?8, only_weak = ?9,
+                         meta = ?11
                      WHERE id = ?1 AND thread_id = ?10",
                     params![
-                        turn, md, citations, found, runtime, run, flags.0, flags.1, flags.2, thread
+                        turn, md, citations, found, runtime, run, flags.0, flags.1, flags.2,
+                        thread, measured
                     ],
                 )
                 .map_err(internal)?;
@@ -305,7 +313,7 @@ fn turns(c: &Connection, thread: &str) -> Db<Vec<AskAnswer>> {
     let rows = c
         .prepare(
             "SELECT id, question, answer_md, citations, found, runtime, sensitive_skipped,
-                    keyword_only, only_weak, asked_at
+                    keyword_only, only_weak, asked_at, scope, meta, rating
              FROM ask_turns WHERE thread_id = ?1 ORDER BY asked_at, rowid",
         )?
         .query_map([thread], |r| {
@@ -317,6 +325,39 @@ fn turns(c: &Connection, thread: &str) -> Db<Vec<AskAnswer>> {
             let answer_md: Option<String> = r.get(2)?;
             let found: Option<bool> = r.get(4)?;
             Ok(AskAnswer {
+                scope: r
+                    .get::<_, Option<String>>(10)?
+                    .map(|s| serde_json::from_str(&s))
+                    .transpose()
+                    .map_err(|e| {
+                        noter_db::rusqlite::Error::FromSqlConversionFailure(
+                            10,
+                            noter_db::rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?,
+                meta: r
+                    .get::<_, Option<String>>(11)?
+                    .map(|s| serde_json::from_str(&s))
+                    .transpose()
+                    .map_err(|e| {
+                        noter_db::rusqlite::Error::FromSqlConversionFailure(
+                            11,
+                            noter_db::rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?,
+                rating: r
+                    .get::<_, Option<String>>(12)?
+                    .map(|s| serde_json::from_value(serde_json::Value::String(s)))
+                    .transpose()
+                    .map_err(|e| {
+                        noter_db::rusqlite::Error::FromSqlConversionFailure(
+                            12,
+                            noter_db::rusqlite::types::Type::Text,
+                            Box::new(e),
+                        )
+                    })?,
                 turn_id: AskTurnId::new(r.get::<_, String>(0)?),
                 question: r.get(1)?,
                 // A stopped turn keeps its text and has no `found`; a running one has neither yet.
@@ -341,6 +382,39 @@ fn turns(c: &Connection, thread: &str) -> Db<Vec<AskAnswer>> {
             Ok(turn)
         })
         .collect()
+}
+
+// @cpt-flow:cpt-noter-flow-core-retrieval-ask-threads:p1
+/// Replace feedback only once a complete answer exists; stopped and running turns cannot be rated.
+pub fn rate_turn(store: &Store, meta: ChangeMeta, args: AskRateArgs) -> Result<(), CoreError> {
+    let rating = args.rating.map(|r| match r {
+        AskRating::Helpful => "helpful",
+        AskRating::NotHelpful => "not_helpful",
+    });
+    store
+        .write_with(meta, move |tx| {
+            let turn = args.turn_id.as_str();
+            let complete: Option<bool> = tx
+                .query_row(
+                    "SELECT found IS NOT NULL FROM ask_turns WHERE id = ?1",
+                    [turn],
+                    |r| r.get(0),
+                )
+                .optional()
+                .map_err(internal)?;
+            match complete {
+                None => return Err(not_found("Ask turn")),
+                Some(false) => return Err(invalid("turn_id", ValidationRule::OutOfRange)),
+                Some(true) => {}
+            }
+            tx.execute(
+                "UPDATE ask_turns SET rating = ?2 WHERE id = ?1",
+                params![turn, rating],
+            )
+            .map_err(internal)?;
+            Ok(((), vec![logged("ask_turn", turn, "rating")]))
+        })
+        .map(drop)
 }
 
 /// Whether the call or document a citation names is gone.
@@ -523,6 +597,7 @@ pub fn check_answer(
                 _ => None,
             };
             built = Some(Citation {
+                lang: hit.lang.clone(),
                 n: cited.n,
                 provenance: hit.provenance.clone(),
                 quote: hit.text.clone(),

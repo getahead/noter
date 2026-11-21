@@ -83,7 +83,7 @@ stories = [
 [M3]
 why = "Search, Ask, topics, people, knowledge sources, credentials and own accounts"
 commands = [
-  "search", "ask_start", "ask_stop", "ask_threads_list", "ask_thread_get", "ask_thread_delete",
+  "search", "ask_start", "ask_stop", "ask_rate", "ask_threads_list", "ask_thread_get", "ask_thread_delete",
   "ask_scope_presets", "topics_list", "topic_get", "topic_rename", "topics_merge", "topics_keep_separate",
   "people_list", "person_get", "person_create", "person_update", "people_merge", "person_delete",
   "voice_profile_create", "voice_profile_delete",

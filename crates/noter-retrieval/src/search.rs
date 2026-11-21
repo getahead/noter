@@ -53,6 +53,7 @@ pub fn search(
     let hit = |h: &Hit| search_hit(h, &found.terms, found.query_lang.as_ref());
     let results = SearchResults {
         query: query.to_owned(),
+        query_lang: found.query_lang.clone(),
         mode,
         calls: found.calls.iter().map(hit).collect(),
         items: found.items.iter().map(hit).collect(),
@@ -89,6 +90,7 @@ fn search_hit(h: &Hit, terms: &[String], query_lang: Option<&Lang>) -> SearchHit
     };
     SearchHit {
         target: h.target.clone(),
+        item_kind: h.item_kind,
         title: h.title.clone(),
         highlights: highlights(&snippet, terms)
             .into_iter()

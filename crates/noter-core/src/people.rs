@@ -184,7 +184,7 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
     let mut people: Vec<PersonRow> = c
         .prepare(&format!(
             "SELECT id, rev, display_name, short_name, email, role, org, is_you, voice_profile_optin,
-                    notes
+                    notes, optin_date
              FROM people{filter}"
         ))?
         .query_map(params_from_iter(only), |r| {
@@ -201,6 +201,9 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
                 aliases: vec![],
                 is_you: r.get(7)?,
                 voice_profile: r.get(8)?,
+                voice_profile_stats: if r.get::<_, bool>(8)? {
+                    Some(VoiceProfileStats { opted_in_at: r.get::<_, Option<i64>>(10)?.map(TimestampMs), profiles: 0, matched_calls: 0 })
+                } else { None },
                 last_call_at: None,
                 open_items: 0,
                 you_owe: 0,
@@ -214,6 +217,17 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
         ""
     };
     let mut aliases: HashMap<String, Vec<String>> = HashMap::new();
+    // @cpt-dod:cpt-noter-dod-core-people-profiles:p1
+    let mut profiles: HashMap<String, u32> = c
+        .prepare(&format!(
+            "SELECT person_id, count(*) FROM voice_profiles{person_filter} GROUP BY person_id"
+        ))?
+        .query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    let mut matched: HashMap<String, u32> = c.prepare(&format!(
+        "SELECT person_id, count(DISTINCT call_id) FROM speakers WHERE named_by = 'voice_profile' {} GROUP BY person_id",
+        if only.is_some() { "AND person_id = ?1" } else { "" }
+    ))?.query_map(params_from_iter(only), |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<_, _>>()?;
     for row in c
         .prepare(&format!(
             "SELECT person_id, alias FROM person_aliases{person_filter} ORDER BY rowid"
@@ -268,6 +282,10 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
         .collect::<Result<_, _>>()?;
     for p in &mut people {
         let id = p.id.as_str();
+        if let Some(stats) = &mut p.voice_profile_stats {
+            stats.profiles = profiles.remove(id).unwrap_or(0);
+            stats.matched_calls = matched.remove(id).unwrap_or(0);
+        }
         p.you_owe = if p.is_you {
             0
         } else {

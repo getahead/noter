@@ -604,6 +604,7 @@ fn calls_only_scope_leaves_documents_out() {
                 chunk_id: ChunkId::new("chk_doc"),
             };
             let doc = Hit {
+                item_kind: None,
                 evidence: Evidence::Document {
                     document_id: DocumentId::new("doc_1"),
                     chunk_id: ChunkId::new("chk_doc"),
@@ -664,6 +665,7 @@ fn hit(id: &str, call: &str, t0: u32, t1: u32) -> Hit {
         call_type: CallTypeId(String::from("planning")),
     };
     Hit {
+        item_kind: None,
         evidence: if id.starts_with("chk") {
             Evidence::Chunk(ChunkId::new(id))
         } else {
@@ -971,6 +973,10 @@ fn search_sections_explain_strength_and_validate_limits() {
     assert_eq!(p.wanted(), DEFAULT_LIMIT as usize);
     let r = run_search(&lib, &p, SearchMode::Hybrid);
     assert_eq!(r.query, "WebSockets");
+    let metadata = serde_json::to_value(&r).unwrap();
+    assert_eq!(metadata["query_lang"], "en");
+    assert_eq!(metadata["items"][0]["item_kind"], "decision");
+    assert!(metadata["calls"][0]["item_kind"].is_null());
     assert_eq!((r.calls.len(), r.items.len(), r.documents.len()), (2, 1, 0));
     assert!(!r.only_weak);
     assert_eq!(r.explain.normalized_query, "websockets");
@@ -1373,6 +1379,12 @@ fn ask_cites_sensitive_calls_only_on_the_mac() {
 
 fn answer(turn: &str, citations: Vec<Citation>, runtime: RuntimeChoice) -> AskAnswer {
     AskAnswer {
+        scope: Some(AskScope {
+            call_id: Some(CallId::new("call_a")),
+            ..AskScope::default()
+        }),
+        meta: None,
+        rating: None,
         turn_id: AskTurnId::new(turn),
         question: String::new(),
         answer_md: "Use WebSockets [1].".into(),
@@ -1544,10 +1556,17 @@ fn follow_up_rechecks_the_current_privacy_of_cited_documents() {
     )
     .unwrap();
     let first = AskAnswer {
+        scope: Some(AskScope {
+            call_id: Some(CallId::new("call_a")),
+            ..AskScope::default()
+        }),
+        meta: None,
+        rating: None,
         turn_id: AskTurnId::new("turn_1"),
         question: "Plan?".into(),
         answer_md: "Use the plan [1].".into(),
         citations: vec![Citation {
+            lang: None,
             n: 1,
             provenance: Provenance::Document {
                 source_id: SourceId::new("src_1"),
@@ -2376,6 +2395,30 @@ fn retrieval_upgrade_preserves_aliases_and_indexes_existing_chunks() {
         ids(&upgraded.find(query("sentinelxyz")).calls),
         ["chk_upgrade"]
     );
+}
+
+#[test]
+fn ask_metadata_upgrade_preserves_unknown_historical_scope_and_measurements() {
+    let lib = library_with_migrations(&MIGRATIONS[..6]);
+    lib.db.execute_batch("INSERT INTO ask_threads (id, title, scope, updated_at) VALUES ('ask_old', 'Old', '{\"call_id\":\"call_a\"}', 1);
+        INSERT INTO ask_turns (id, thread_id, question, answer_md, found, asked_at) VALUES ('old', 'ask_old', 'Q', 'Not found', 0, 1);").unwrap();
+    let path = lib.path();
+    drop(lib.db);
+    drop(lib.store);
+    let store = Store::open(
+        &path,
+        &[noter_db::MIGRATIONS, noter_core::MIGRATIONS, MIGRATIONS],
+    )
+    .unwrap();
+    let old = store
+        .read(|c| Ok(thread(c, &AskThreadId::new("ask_old"))))
+        .unwrap()
+        .unwrap();
+    assert_eq!(old.scope.call_id, Some(CallId::new("call_a")));
+    assert_eq!(old.turns[0].scope, None);
+    assert_eq!(old.turns[0].meta, None);
+    assert_eq!(old.turns[0].rating, None);
+    assert_eq!(old.turns[0].answer_md, "Not found");
 }
 
 // cpt-noter-algo-core-storage-migrate: the first retrieval migration backfills pre-existing core rows.

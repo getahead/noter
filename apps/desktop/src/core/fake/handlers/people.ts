@@ -106,11 +106,14 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   voice_profile_create: (a, { world }) => {
     const p = shared.person(world, a.person_id);
     p.voice_profile = true;
-    return { person_id: p.id, enabled: true, centroids: a.from_speaker ? 1 : 0, opted_in_at: shared.now() };
+    p.voice_profile_stats = { opted_in_at: shared.now(), profiles: a.from_speaker ? 1 : 0,
+      matched_calls: new Set(world.transcripts.flatMap((t) => t.speakers.filter((s) => s.label.type === "person" && s.label.person.id === p.id && s.named_by === "voice_profile").map(() => t.call_id))).size };
+    return { person_id: p.id, enabled: true, centroids: p.voice_profile_stats.profiles, opted_in_at: p.voice_profile_stats.opted_in_at };
   },
   voice_profile_delete: (a, { world }) => {
     const p = shared.person(world, a.person_id);
     p.voice_profile = false;
+    p.voice_profile_stats = null;
     return { person_id: p.id, enabled: false, centroids: 0, opted_in_at: null };
   },
 

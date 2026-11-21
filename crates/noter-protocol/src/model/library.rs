@@ -214,6 +214,9 @@ pub enum HitTarget {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SearchHit {
     pub target: HitTarget,
+    /// Stored kind for item targets; unknown for other evidence.
+    #[serde(default)]
+    pub item_kind: Option<crate::model::ItemKind>,
     pub title: String,
     pub snippet: String,
     pub highlights: Vec<TextRange>,
@@ -236,6 +239,9 @@ pub struct SearchExplain {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SearchResults {
     pub query: String,
+    /// The retrieval function's language estimate, absent when unknown.
+    #[serde(default)]
+    pub query_lang: Option<Lang>,
     pub mode: SearchMode,
     pub calls: Vec<SearchHit>,
     pub items: Vec<SearchHit>,
@@ -302,6 +308,9 @@ pub struct Citation {
     pub n: u16,
     pub provenance: Provenance,
     pub quote: String,
+    /// Original evidence language, absent when the source did not record one.
+    #[serde(default)]
+    pub lang: Option<Lang>,
     pub speaker: Option<PersonChip>,
     pub strength: MatchStrength,
     /// The cited call or document was deleted since.
@@ -312,6 +321,13 @@ pub struct Citation {
 pub struct AskAnswer {
     pub turn_id: AskTurnId,
     pub question: String,
+    /// The scope recorded for this turn; historical turns may not have one.
+    #[serde(default)]
+    pub scope: Option<AskScope>,
+    #[serde(default)]
+    pub meta: Option<AskMeta>,
+    #[serde(default)]
+    pub rating: Option<AskRating>,
     pub answer_md: String,
     pub citations: Vec<Citation>,
     /// `false` = "I could not find this in your calls"; never a guess.
@@ -325,6 +341,31 @@ pub struct AskAnswer {
     /// (empty when the stop came before the first of them), and `found` is `false`.
     pub stopped: bool,
     pub asked_at: TimestampMs,
+}
+
+/// Measured work for an answer, never inferred from its citations.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct AskMeta {
+    pub call_hits: u32,
+    pub item_hits: u32,
+    pub document_hits: u32,
+    /// Retrieval and answer preparation, measured with a monotonic clock.
+    pub elapsed_ms: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum AskRating {
+    Helpful,
+    NotHelpful,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct AskRateArgs {
+    pub turn_id: AskTurnId,
+    /// Null clears a previous rating.
+    #[serde(default)]
+    pub rating: Option<AskRating>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

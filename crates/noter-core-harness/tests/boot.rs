@@ -26,6 +26,101 @@ struct Runner {
     data_dir: PathBuf,
 }
 
+#[tokio::test]
+async fn dropping_topics_while_reseeding_calls_drops_item_links_too() {
+    let mut r = start().await;
+    let mut w = r.ok("main", "harness.world_get", json!({})).await;
+    w["topics"] = json!([]);
+    w["calls"][0]["title"] = json!("A changed fixture call");
+    r.ok("main", "harness.world_set", json!({"world": w})).await;
+    let linked: i64 = r
+        .core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT count(*) FROM items WHERE topic_id IS NOT NULL",
+                [],
+                |row| row.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(
+        linked, 0,
+        "a removed topic must not leave dangling item links"
+    );
+    r.finish().await;
+}
+
+#[tokio::test]
+async fn topics_slice_and_centroids_drive_real_core_library_states() {
+    let mut r = start().await;
+    let original = r.ok("main", "harness.world_get", json!({})).await;
+    let ids: Vec<Value> = original["topics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .take(2)
+        .map(|t| t["id"].clone())
+        .collect();
+    assert_eq!(ids.len(), 2);
+    for (args, expected) in [
+        (json!({}), "invalid_input"),
+        (json!({"topic_ids": [ids[0], ids[0]]}), "invalid_input"),
+        (json!({"topic_ids": [ids[0], "missing"]}), "not_found"),
+    ] {
+        assert_eq!(
+            r.code("main", "harness.topic_centroids", args).await,
+            expected
+        );
+    }
+    r.ok("main", "harness.topic_centroids", json!({"topic_ids": ids}))
+        .await;
+    let topics = r.ok("main", "topics_list", json!({})).await;
+    assert!(
+        topics["topics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|t| !t["merge_suggestion"].is_null()),
+        "{topics}"
+    );
+    r.ok(
+        "main",
+        "topics_keep_separate",
+        json!({"a": ids[0], "b": ids[1]}),
+    )
+    .await;
+    let topics = r.ok("main", "topics_list", json!({})).await;
+    assert!(topics["topics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|t| t["merge_suggestion"].is_null()));
+    let mut empty = r.ok("main", "harness.world_get", json!({})).await;
+    empty["topics"] = json!([]);
+    r.ok("main", "harness.world_set", json!({"world": empty}))
+        .await;
+    let got = r.ok("main", "harness.world_get", json!({})).await;
+    assert_eq!(got["topics"], json!([]));
+    assert_eq!(got["calls"], original["calls"]);
+    assert_eq!(
+        got["items"].as_array().unwrap().len(),
+        original["items"].as_array().unwrap().len()
+    );
+    let mut restored = got;
+    restored["topics"] = original["topics"].clone();
+    restored["topics"][0]["aliases"] = json!(["Former subject"]);
+    r.ok("main", "harness.world_set", json!({"world": restored}))
+        .await;
+    let read = r.ok("main", "topics_list", json!({})).await;
+    assert!(read["topics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|t| t["aliases"] == json!(["Former subject"])));
+    r.finish().await;
+}
+
 async fn start() -> Runner {
     start_with(Options {
         fixture: true,
