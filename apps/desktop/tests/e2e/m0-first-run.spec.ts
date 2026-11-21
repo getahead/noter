@@ -164,6 +164,31 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 });
 
 test.describe("cpt-noter-seq-first-run-download-models", () => {
+  test("optional selection persists across windows; Settings adds a skipped bundle later", async ({ scenario }) => {
+    await given(scenario, (w) => W.firstRun(w, { modelsReady: false }));
+    const fr = scenario.core("first-run");
+    const chosen = ok(await fr.modelsDownload({ action: "select", bundles: [] }));
+    const required = chosen.models.bundles.filter((b) => b.required_for_capture);
+    const optional = chosen.models.bundles.filter((b) => !b.required_for_capture);
+    expect(required).toHaveLength(1);
+    expect(optional).toHaveLength(3);
+    expect(required.every((b) => b.selected)).toBe(true);
+    expect(optional.every((b) => b.selected === false && b.state === "pending")).toBe(true);
+    expect(chosen.models.total_mb).toBe(required.reduce((sum, b) => sum + b.size_mb, 0));
+    const settings = scenario.core("settings");
+    expect(ok(await settings.setupStatus({})).models).toEqual(chosen.models);
+    ok(await fr.modelsDownload({ action: "start" }));
+    await until(async () => ok(await settings.setupStatus({})).models.bundles
+      .filter((b) => b.selected).every((b) => b.state === "ready"), "only required speech model downloads");
+    const more = [required[0]!.name, optional[0]!.name];
+    ok(await settings.modelsDownload({ action: "start", bundles: more }));
+    const done = await until(async () => {
+      const s = ok(await settings.setupStatus({}));
+      return s.models.bundles.filter((b) => b.selected).every((b) => b.state === "ready") && s;
+    }, "Settings adds one skipped model");
+    expect(done.models.done_mb).toBe(done.models.total_mb);
+    expect(done.models.bundles.filter((b) => b.selected === false).every((b) => b.state === "pending")).toBe(true);
+  });
   test("happy path: start the downloads, continue at once, self-test passes, Finish while the rest downloads", async ({ scenario }) => {
     await given(scenario, (w) => W.firstRun(w, { modelsReady: false }));
     const fr = scenario.core("first-run");

@@ -1242,7 +1242,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `perf_call` | Performance. `CallIdArgs → CallPerf`. Windows: M. | draft |
 | Command | `perf_brief` | Performance. Export the improvement brief or open it in Claude Code or Codex. `BriefArgs → BriefResult`. Windows: M. | draft |
 | Command | `setup_status` | First run and permissions. `NoArgs → SetupStatus`. Windows: MCRSF. | frozen |
-| Command | `models_download` | First run and permissions. `ModelsDownloadArgs → SetupStatus`. Windows: FS. | frozen |
+| Command | `models_download` | First run and permissions. `ModelsDownloadArgs → SetupStatus`. Optional `bundles` replaces the persisted selection; capture-required bundles always stay selected. `select` saves without downloading; other actions affect selected bundles only. Windows: FS. | frozen |
 | Command | `permission_request` | First run and permissions. Ask for a permission at the step that needs it (never mid-call). `PermissionArgs → PermissionRow`. Windows: FSM. | frozen |
 | Command + Channel | `self_test_run` | First run and permissions. Self-test: levels and a live line stream until passed or failed (10 s). `SelfTestArgs → SubscriptionHandle; Channel `SelfTestMsg``. Windows: FSM. | frozen |
 | Command | `setup_set_call_display` | First run and permissions. `CallDisplayArgs → SetupStatus`. Windows: FS. | frozen |

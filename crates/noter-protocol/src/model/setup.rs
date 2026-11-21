@@ -51,6 +51,13 @@ pub struct ModelBundle {
     pub state: BundleState,
     /// Needed for the self-test and capture.
     pub required_for_capture: bool,
+    /// Included in this download selection; omission in older snapshots means selected.
+    #[serde(default = "selected_by_default")]
+    pub selected: bool,
+}
+
+fn selected_by_default() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -110,6 +117,7 @@ pub struct SetupStatus {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum DownloadAction {
+    Select,
     Start,
     Pause,
     Resume,
@@ -119,6 +127,9 @@ pub enum DownloadAction {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct ModelsDownloadArgs {
     pub action: DownloadAction,
+    /// Replace the stored selection; omitted keeps it. Capture-required bundles stay selected.
+    #[serde(default)]
+    pub bundles: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

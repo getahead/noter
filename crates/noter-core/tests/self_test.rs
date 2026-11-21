@@ -956,6 +956,7 @@ async fn every_m0_write_leaves_one_change_row_per_record() {
         &fr,
         ModelsDownloadArgs {
             action: DownloadAction::Start,
+            bundles: None,
         },
     )
     .await

@@ -138,7 +138,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 **Actor**: Primary user
 
 **Success Scenarios**:
-- Happy path of `cpt-noter-seq-first-run-download-models`: the three bundles with size, progress and percentage, **About 2 GB** with **Pause**; **Continue** at once; downloads go on in the background with a ring on **Models** in the stepper
+- Happy path of `cpt-noter-seq-first-run-download-models`: the four bundles with selection, size, purpose, progress and percentage, the selected total with **Download**, **Pause**, **Resume** or **Models downloaded**; **Continue** at once; downloads go on in the background with a ring on **Models** in the stepper
 
 **Error Scenarios**:
 - Error — No connection: **Waiting for a connection — downloads resume automatically**
@@ -148,16 +148,16 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 - Error — Speech model not downloaded yet: the self-test shows **Waiting for the speech model · 62 %** and runs by itself once the model is in
 
 **Steps**:
-1. [x] - `p1` - UI: the Models step lists **Speech model · WhisperKit Large v3 Turbo** 1.5 GB, **Speaker model** 0.1 GB, **Search model** 0.4 GB - `inst-list-bundles`
-2. [x] - `p1` - API: `models_download` (start) unless the core already downloads them - `inst-api-download`
-3. [x] - `p1` - UI: each row follows `jobs:progress` with its percentage or **Ready**; the footer reads **About 2 GB** with **Pause** or **Resume** (`models_download` pause or resume) - `inst-progress`
+1. [x] - `p1` - UI: list the four manifest bundles with their actual sizes (MB below 1 GB): whisper-turbo is required and always selected; whisper-large-v3 (higher-accuracy archive), wespeaker (speaker recognition and voice profiles), and bge-m3 (meaning search and Ask retrieval) have checkboxes, initially on. Restore stored selection and explain that skipped models can be downloaded later in Settings - `inst-list-bundles`
+2. [x] - `p1` - API: checkbox changes call `models_download { action: select, bundles }`; **Download** explicitly starts the selection, so opening Welcome or Models does not download before the user chooses. Disable selection while downloading or verifying - `inst-api-download`
+3. [x] - `p1` - UI: each selected row follows setup progress with percentage or **Ready**; footer shows the current selected total, **Download** before starting, **Pause** while downloading, **Resume** while paused, and **Models downloaded** without Pause/Resume when every selected bundle is ready - `inst-progress`
 4. [x] - `p1` - **MATCH** the download state the core reports - `inst-match-download`
    - [x] - `p1` - **CASE** offline: the line **Waiting for a connection — downloads resume automatically**; nothing to do - `inst-case-offline`
    - [x] - `p1` - **CASE** disk short (`disk_full`): the error banner in FR-R2 **Needs 2.1 GB, 1.4 GB free** · **Try Again** (`models_download` again) - `inst-case-disk`
    - [x] - `p1` - **CASE** a bundle failed its check (`checksum_failed`): **Check failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-checksum`
    - [x] - `p1` - **CASE** a bundle's download failed for another reason (`failed`): **Download failed** · **Try Again** on that row, its bar stopped; the stepper marks **Models** with the error glyph - `inst-case-download-failed`
 5. [x] - `p1` - User clicks **Continue** at any time; the stepper shows the background ring on **Models** with **Downloading in the background · 64 %** - `inst-continue-bg`
-6. [x] - `p1` - UI: when every bundle is in, announce **Models downloaded** politely once - `inst-announce-done`
+6. [x] - `p1` - UI: when every selected bundle is in, announce **Models downloaded** politely once - `inst-announce-done`
 7. [x] - `p1` - **RETURN** the models downloading or ready, with setup going on - `inst-return-models`
 
 ### Run the audio self-test
@@ -252,7 +252,7 @@ Success criteria: a user with an external display reaches **Self-test passed** a
 2. [x] - `p1` - **FROM** CURRENT **TO** DONE **WHEN** the user continues and the step's work is complete - `inst-current-done`
 3. [x] - `p1` - **FROM** CURRENT **TO** SKIPPED **WHEN** the user clicks **Skip for Now** - `inst-current-skipped`
 4. [x] - `p1` - **FROM** CURRENT **TO** RUNNING_IN_BACKGROUND **WHEN** the user leaves **Models** while downloads continue - `inst-current-running`
-5. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every bundle is in - `inst-running-done`
+5. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** DONE **WHEN** every selected bundle is in - `inst-running-done`
 6. [x] - `p1` - **FROM** RUNNING_IN_BACKGROUND **TO** ERROR **WHEN** a bundle fails its check or its download fails (going offline is not an error) - `inst-running-error`
 7. [x] - `p1` - **FROM** SKIPPED **TO** CURRENT **WHEN** the user clicks it - `inst-skipped-current`
 8. [x] - `p1` - **FROM** ERROR **TO** CURRENT **WHEN** the user clicks it - `inst-error-current`
@@ -314,7 +314,7 @@ The system **MUST** render the first-run window FR-R1 to FR-R3 and its six steps
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-first-run-models`
 
-The system **MUST** show the three model bundles with progress, **Pause** and **Resume**, the no-connection line, the disk banner with **Try Again**, the per-row **Check failed** or **Download failed** with **Try Again**, and the background ring in the stepper.
+The system **MUST** show the four model bundles with stored optional selection, required whisper-turbo, selected totals and progress, **Download**, **Pause** and **Resume** only when applicable, the no-connection line, the disk banner with **Try Again**, per-row errors with **Try Again**, and the background ring in the stepper. Completion and errors in the stepper count only selected bundles. Unit tests cover selection and completion; real-core E2E covers `cpt-noter-seq-first-run-download-models`; native `test_cpt_noter_seq_first_run_complete_setup__fresh_launch_opens_setup_automatically` waits for rendered Welcome. `just gate` passes.
 
 **Implements**:
 - `cpt-noter-flow-ui-first-run-download-models`

@@ -215,6 +215,9 @@ pub(crate) struct Stored {
     /// System Audio Recording as the last short engine test (F1) inferred it.
     #[serde(default)]
     pub(crate) system_audio: Option<PermissionState>,
+    /// None preserves the original recommended selection (every manifest bundle).
+    #[serde(default)]
+    pub(crate) model_selection: Option<Vec<String>>,
 }
 
 impl Default for Stored {
@@ -229,6 +232,7 @@ impl Default for Stored {
                 .collect(),
             self_test: SelfTestState::NotRun,
             system_audio: None,
+            model_selection: None,
         }
     }
 }

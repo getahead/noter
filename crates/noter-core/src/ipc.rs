@@ -66,10 +66,12 @@ impl CoreApi for Core {
 
     async fn models_download(
         &self,
-        _ctx: &CommandCtx,
+        ctx: &CommandCtx,
         args: ModelsDownloadArgs,
     ) -> Result<SetupStatus, CoreError> {
-        self.download_models(args)
+        let result = self.download_models(ctx, args);
+        self.refresh_setup();
+        result
     }
 
     async fn audio_play(

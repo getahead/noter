@@ -390,7 +390,8 @@ impl Core {
             .clone()
             .unwrap_or_else(|| data_dir.join("models"));
         let audio_dir = models_dir.parent().unwrap_or(data_dir).join("audio");
-        let downloads = models::Downloads::load(deps.models.manifest(), models_dir);
+        let mut downloads = models::Downloads::load(deps.models.manifest(), models_dir);
+        downloads.select(first_run.stored.model_selection.as_deref());
         let engine =
             noter_engine_client::EngineClient::new(deps.engine.clone(), deps.engine_config.clone());
         let accounts = Arc::new(

@@ -181,6 +181,29 @@ describe("Hotkeys, Performance, Updates, Models", () => {
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("models_download"));
     expect(renderToString(<ModelsGroup bridge={bridge} />)).toContain("Download");
   });
+
+  it("shows a refused model download on its row", async () => {
+    await ready((w) => (w.app.setup.models.bundles[0]!.state = "pending"));
+    fake.failNext("models_download", "offline");
+    on(rendered(ModelsGroup, { bridge }), "Download")();
+    await vi.waitFor(() => expect(renderToString(<ModelsGroup bridge={bridge} />)).toContain("Download failed"));
+  });
+
+  it("downloads a skipped optional model without selecting the other skipped bundles", async () => {
+    await ready((w) => {
+      for (const b of w.app.setup.models.bundles) {
+        b.selected = b.required_for_capture;
+        if (!b.required_for_capture) b.state = "pending";
+      }
+    });
+    const seen = sentCommands(fake);
+    const bundles = fake.world.app.setup.models.bundles;
+    const optional = bundles.find((b) => !b.required_for_capture)!;
+    on(rendered(ModelsGroup, { bridge }), "Download")();
+    await vi.waitFor(() => expect(seen).toContainEqual(["models_download", {
+      action: "start", bundles: bundles.filter((b) => b.required_for_capture || b.name === optional.name).map((b) => b.name),
+    }]));
+  });
 });
 
 describe("glossary commands", () => {

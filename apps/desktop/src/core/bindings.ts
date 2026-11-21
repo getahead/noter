@@ -1243,7 +1243,7 @@ export type DisplayInfo = {
 /**  Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it. */
 export type DocumentId = string;
 
-export type DownloadAction = "start" | "pause" | "resume" | "retry";
+export type DownloadAction = "select" | "start" | "pause" | "resume" | "retry";
 
 /**  A duration in milliseconds. */
 export type DurationMs = number;
@@ -2188,6 +2188,8 @@ export type ModelBundle = {
 	state: BundleState,
 	/**  Needed for the self-test and capture. */
 	required_for_capture: boolean,
+	/**  Included in this download selection; omission in older snapshots means selected. */
+	selected?: boolean,
 };
 
 export type ModelOption = {
@@ -2199,6 +2201,8 @@ export type ModelOption = {
 
 export type ModelsDownloadArgs = {
 	action: DownloadAction,
+	/**  Replace the stored selection; omitted keeps it. Capture-required bundles stay selected. */
+	bundles?: string[] | null,
 };
 
 export type ModelsStatus = {
@@ -3657,7 +3661,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.16";
+export const CONTRACT_VERSION = "2.17";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

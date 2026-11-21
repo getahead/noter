@@ -106,10 +106,10 @@ Decision D14 (the App Group container from `noter-native`, passed to the engine 
 - A file that cannot be written while downloading: the bundle becomes `failed`, with `disk_full` only when the disk is full and `internal` otherwise (a folder macOS will not let the app write, such as an App Group container an ad-hoc build is not entitled to). Every bundle failure writes one `models` line to the local log: the bundle, a code (`write_failed`, `disk_full`, `http` with the status, `fetch_failed`, `checksum_failed`, `not_allowed`) and no path or URL.
 
 **Steps**:
-1. [x] - `p1` - API: `models_download { action: start }` from the First run or Settings window - `inst-download-call`
-2. [x] - `p1` - **IF** free disk is below the remaining size plus a margin, **RETURN** `disk_full` with `detail.needed_mb` - `inst-check-disk`
+1. [x] - `p1` - API: `models_download { action, bundles? }` from First run or Settings; an omitted selection keeps the stored selection (all bundles by default). Validate bundle names, always include capture-required bundles, and persist the selection without changing the settings revision. `select` changes only selection and never starts a download; refuse a changed selection while a download is running - `inst-download-call`
+2. [x] - `p1` - **IF** free disk is below the selected bundles' remaining size plus a margin, **RETURN** `disk_full` with `detail.needed_mb`; totals and progress count only selected bundles - `inst-check-disk`
 3. [x] - `p1` - Start `cpt-noter-algo-core-first-run-download-task` in the background (a setup task in M0; moved onto the job scheduler in M2) - `inst-start-task`
-4. [x] - `p1` - **RETURN** `SetupStatus` with the bundles `downloading` at once - `inst-return-started`
+4. [x] - `p1` - **RETURN** `SetupStatus` with selected unfinished bundles `downloading` at once; unselected bundles and their partial files stay untouched. Already-ready selections do not start another job - `inst-return-started`
 5. [x] - `p1` - **IF** `action` is `pause`, `resume` or `retry`, apply it to the task and **RETURN** the new `SetupStatus` - `inst-other-actions`
 
 ### Grant a permission

@@ -108,6 +108,43 @@ final class OfflineTests: XCTestCase {
 
     // MARK: offline_pass
 
+    func testInstalledTurboSupportsArchiveWithoutOptionalModelsAndDetectsLaterDownloads() throws {
+        let models = container.appendingPathComponent("models")
+        try FileManager.default.createDirectory(at: models.appendingPathComponent("whisper-turbo"), withIntermediateDirectories: true)
+        let work = LocalOfflineWork.installed(models: models)
+        XCTAssertTrue(work.available.contains(.archive), "required turbo supplies the archive fallback")
+        XCTAssertFalse(work.available.contains(.speaker))
+        XCTAssertFalse(work.available.contains(.text))
+        let lines = Lines()
+        let e = engine(lines, work: work)
+        _ = e.handle(speaker(2))
+        _ = e.handle(texts(3, ["hello"], out: nil))
+        XCTAssertEqual(refusal(lines, 2), "model_missing")
+        XCTAssertEqual(refusal(lines, 3), "model_missing")
+        for name in ["wespeaker", "bge-m3"] {
+            try FileManager.default.createDirectory(at: models.appendingPathComponent(name), withIntermediateDirectories: true)
+        }
+        XCTAssertTrue(work.available.contains(.speaker), "Settings download is usable without relaunch")
+        XCTAssertTrue(work.available.contains(.text))
+    }
+
+    func testTurboArchiveDecodesThroughTheSelectedFallbackAndKeepsLiveSpeakerLabels() throws {
+        try storeCall(in: session, seconds: 4, mic: [(0, 4)], sys: [(0, 4)])
+        let work = LocalOfflineWork(
+            decoder: { throw OfflineFailure(code: .modelMissing) },
+            turboDecoder: { FakeDecoder() })
+        let lines = Lines()
+        let command = offlinePass(7).replacingOccurrences(of: "whisper_large_v3", with: "whisper_turbo")
+        _ = engine(lines, work: work).handle(command)
+        XCTAssertNotNil(lines.waitFor("offline_done"))
+        let result = try JSONDecoder().decode(ArchiveResult.self, from: Data(contentsOf: session.appendingPathComponent("offline.json")))
+        XCTAssertEqual(result.backend, "whisper_turbo")
+        let others = result.segments.filter { $0.channel == .sys }
+        XCTAssertFalse(others.isEmpty)
+        XCTAssertTrue(others.allSatisfy { $0.speakerLabel == "spk_1" })
+        XCTAssertFalse(lines.types.contains("offline_failed"))
+    }
+
     func testAnArchivePassWithUnsafeOrMissingInputIsRefusedWithItsId() throws {
         let lines = Lines()
         let e = engine(lines, work: FakeOfflineModels().make())

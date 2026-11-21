@@ -34,6 +34,12 @@ afterEach(async () => {
 });
 
 describe("first-run window (cpt-noter-component-screen-first-run)", () => {
+  it("offers no Pause after all selected models are ready", async () => {
+    const html = await screen(at("models"));
+    expect(html).not.toContain(">Pause<");
+    expect(html).not.toContain(">Resume<");
+    expect(html).toContain("Models downloaded");
+  });
   it("is the three regions of FR-R1 to FR-R3 with the stepper, the step and the footer", async () => {
     const html = await screen(at("welcome"));
     expect(html).toContain('data-component="cpt-noter-component-screen-first-run" data-variant="step-1" data-state="welcome"');
@@ -62,10 +68,10 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
 
   it("lists the models with progress, About 2 GB and Pause; Continue is not disabled by the download", async () => {
     const html = await screen((w) => (W.firstRun(w, { modelsReady: false }), at("models")(w)));
-    expect(html).toContain("Noter downloads its speech, speaker and search models once.");
+    expect(html).toContain("Choose which models to download.");
     expect(html.match(/data-primitive="progress"/g)!.length).toBeGreaterThanOrEqual(3);
-    expect(html).toMatch(/About 2 GB|About \d+ GB/);
-    expect(html).toContain(">Pause<");
+    expect(html).toMatch(/About [\d.]+ GB/);
+    expect(html).toContain(">Download<");
     expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*><span>Continue/);
     expect(html).not.toContain("Waiting for a connection");
   });

@@ -29,14 +29,20 @@ const win = (page: Page) => page.locator('[data-component="cpt-noter-component-s
 const states: { id: string; world: (w: World) => void; ready?: (page: Page) => Promise<void> }[] = [
   { id: "welcome", world: (w) => (W.firstRun(w), at("welcome")(w)) },
   { id: "models", world: (w) => (downloading(w), at("models")(w), partway(w)) },
+  { id: "models-ready", world: (w) => (W.firstRun(w, { modelsReady: true }), at("models")(w)) },
+  { id: "models-choice", world: (w) => {
+    downloading(w);
+    at("models")(w);
+    for (const b of w.app.setup.models.bundles) b.selected = b.required_for_capture;
+    w.app.setup.models.total_mb = w.app.setup.models.bundles.filter((b) => b.selected).reduce((sum, b) => sum + b.size_mb, 0);
+  } },
   { id: "no-connection", world: (w) => (downloading(w), at("models")(w), (w.app.environment.online = false)) },
   {
     id: "disk",
-    // the bundles are under way, so the window does not start the downloads and clear the error before the capture
+    // A refused disk-space check leaves the choices available before any download starts.
     world: (w) => {
       downloading(w);
       at("models")(w);
-      w.app.setup.models.bundles.forEach((b) => Object.assign(b, { state: "downloading", done_mb: 0 }));
       w.app.setup.models.error = "disk_full";
       w.app.environment.disk_free_mb = 1400;
     },
@@ -47,7 +53,7 @@ const states: { id: string; world: (w: World) => void; ready?: (page: Page) => P
   },
   {
     id: "checksum",
-    // the other bundles are under way, so the window does not start the downloads again and the failed one stays failed
+    // One bundle failed its check while the other selected downloads continue.
     world: (w) => (downloading(w), at("models")(w), w.app.setup.models.bundles.forEach((b, i) => Object.assign(b, { state: i === 0 ? "checksum_failed" : "downloading", done_mb: 0 }))),
     ready: async (page) => {
       await expect(win(page).getByText("Check failed")).toBeVisible();
