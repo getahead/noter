@@ -2529,7 +2529,7 @@ Ask threads. Change from the PRD: new.
 
 **Constraints**: —
 
-**Additional info**: Turns in `ask_turns` (id, thread_id, question, answer_md, citations JSON, found, runtime, llm_run_id, asked_at, nullable per-turn scope JSON, nullable measured meta JSON, nullable helpful/not_helpful rating). Contract 2.16 preserves unknown historical metadata; citation language comes from stored evidence, and `ask_rate` replaces or clears completed-answer feedback.
+**Additional info**: Turns in `ask_turns` (id, thread_id, question, answer_md, citations JSON, found, runtime, llm_run_id, asked_at, nullable per-turn scope JSON, nullable measured meta JSON, nullable helpful/not_helpful rating). Contract 2.18 preserves unknown historical metadata; citation language comes from stored evidence, and `ask_rate` replaces or clears completed-answer feedback.
 
 **Example**:
 

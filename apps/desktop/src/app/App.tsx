@@ -1,4 +1,6 @@
 import "./app.css";
+import { useEffect } from "react";
+import { installNativeAccent } from "../styles/native-accent";
 import { CallWindow } from "../features/call-window/call-window";
 import { SettingsWindow } from "../features/settings/SettingsWindow";
 import { FirstRun } from "../features/first-run/first-run";
@@ -14,6 +16,8 @@ import { useWindow } from "./use-window";
 export function App({ bridge }: { bridge: Bridge }) {
   const status = useWindow(bridge, (s) => s.status);
   const error = useWindow(bridge, (s) => s.error);
+  const accent = useWindow(bridge, (s) => s.whole.environment?.native?.accent_rgb);
+  useEffect(() => accent ? installNativeAccent(accent) : undefined, [accent]);
   return (
     <div data-region="window" data-window={bridge.label} data-state={status.toLowerCase()} aria-busy={status === "LOADING"}>
       <LiveRegions />

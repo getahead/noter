@@ -165,6 +165,10 @@ fn the_environment_snapshot_smoke_test_reports_disk_and_displays() {
     let r = environment(Path::new("/"));
     assert!(r.disk_free_mb > 0);
     if cfg!(target_os = "macos") {
+        let native = r.native.as_ref().expect("macOS native presentation facts");
+        assert!(!native.os_version.is_empty());
+        assert!(std::path::Path::new(&native.app_path).is_absolute());
+        assert!(!native.app_name.is_empty());
         assert!(r.displays.iter().filter(|d| d.is_main).count() <= 1);
         assert!(r
             .displays

@@ -53,10 +53,11 @@ export function firstRunHandlers(fake: Core.FakeCore): Core.Handlers {
   permission_request: (a, { world, publish }) => {
     const row = world.app.setup.permissions.find((p) => p.kind === a.kind);
     if (!row) throw coreError("not_found");
-    if (row.state === "denied") throw coreError("permission_denied", "turn it on in System Settings", { type: "permission", kind: a.kind });
-    row.state = "granted";
+    if (a.kind === "system_audio" && row.state !== "granted" && !["idle", "stopped"].includes(world.app.capture.phase)) throw coreError("conflict", "an audio capture is already running");
+    if (row.state === "denied" && a.kind !== "system_audio") throw coreError("permission_denied", "turn it on in System Settings", { type: "permission", kind: a.kind });
+    row.state = a.kind === "system_audio" && row.state === "denied" ? "not_asked" : "granted";
     const env = world.app.environment.permissions.find((p) => p.kind === a.kind);
-    if (env) env.state = "granted";
+    if (env) env.state = row.state;
     if (a.kind === "notifications") world.app.environment.notifications = "authorized";
     publish("setup:changed");
     publish("env:changed");
@@ -70,6 +71,18 @@ export function firstRunHandlers(fake: Core.FakeCore): Core.Handlers {
     fake.openChannel(sub, "self_test_run", send as (m: unknown) => void);
     if (fake.holdSelfTest) {
       fake.holdSelfTest = false;
+      return { subscription_id: sub, last_seq: 0 };
+    }
+    // E2: an unasked or denied microphone fails after opening the stream, as in the real core.
+    if (world.app.setup.permissions.find((p) => p.kind === "microphone")?.state !== "granted") {
+      const reason = { type: "permission_missing", kind: "microphone" } as const;
+      fake.later(0, () => {
+        fake.push(sub, { event: { type: "failed", reason } });
+        world.app.setup.self_test = { type: "failed", reason };
+        world.app.setup.detection_enabled = false;
+        publish("setup:changed");
+        fake.closeChannel(sub, "call_stopped");
+      });
       return { subscription_id: sub, last_seq: 0 };
     }
     const at = (ms: number, event: Parameters<typeof fake.push<"self_test_run">>[1]["event"]) => fake.later(ms, () => fake.push(sub, { event }));

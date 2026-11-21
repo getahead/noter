@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { DEFAULT_RETRYABLE, ERROR_CODES, type CaptureState, type CommandName, type CoreError, type LevelsMsg, type TranscriptMsg, type WindowLabel } from "../../src/core/bindings";
+import { DEFAULT_RETRYABLE, ERROR_CODES, type CaptureState, type CommandName, type CoreError, type LevelsMsg, type SelfTestMsg, type TranscriptMsg, type WindowLabel } from "../../src/core/bindings";
 import { exercised, isFake } from "../support/core";
 import { ahead, ok, pending, refused, until } from "../support/results";
 import { openScenario, type Scenario } from "../support/scenario";
@@ -361,6 +361,29 @@ describe("snapshot, then stream (R23/R24)", () => {
     got.forEach((m, i) => expect(m.seq).toBe(i + 1));
     expect(got.at(-1)!.event.type).toBe("ended");
     expect(ok(await s.core("settings").setupStatus({})).self_test.type).toBe("passed");
+  });
+
+  it.each(["not_asked", "denied"] as const)("self-test: microphone %s fails without enabling detection (cpt-noter-seq-first-run-complete-setup)", async (microphone) => {
+    await s.change((w) => {
+      W.firstRun(w);
+      W.permission(w, "microphone", microphone);
+      w.settings.general.offer_to_record = true;
+    });
+    const core = s.core("first-run");
+    const before = ok(await core.setupStatus({}));
+    expect(before.models.bundles.filter((b) => b.required_for_capture).every((b) => b.state === "ready")).toBe(true);
+    expect(before.permissions.find((p) => p.kind === "system_audio")?.state).toBe("not_asked");
+    const got: SelfTestMsg[] = [];
+    const sub = ok(await core.selfTestRun({ play_clip: false }, (m) => got.push(m)));
+    await until(() => got.some((m) => m.event.type === "ended"), "the missing-microphone self-test to end");
+    expect(got.map((m) => m.event)).toEqual([
+      { type: "failed", reason: { type: "permission_missing", kind: "microphone" } },
+      { type: "ended", reason: "call_stopped" },
+    ]);
+    got.forEach((m, i) => expect(m.seq).toBe(sub.last_seq + i + 1));
+    const after = ok(await core.setupStatus({}));
+    expect(after.self_test).toEqual({ type: "failed", reason: { type: "permission_missing", kind: "microphone" } });
+    expect(after.detection_enabled).toBe(false);
   });
 
   it("self-test: refused with model_missing while the speech bundle is not ready (D-21), then it runs", async () => {

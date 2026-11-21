@@ -1,6 +1,7 @@
 // The first-run window (docs/features/ui/first-run.md, DESIGN › Screen — First-run wizard): FR-R1 the stepper,
 // FR-R2 the step, FR-R3 the footer. The wizard controller (wizard.ts) holds the state and sends the commands.
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { NativePermissionDetails } from "../../ui/setup/native-permission-details";
 import type { StoreApi } from "zustand/vanilla";
 
 import { useAnnounce } from "../../app/a11y/announce";
@@ -153,6 +154,7 @@ function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w:
   const status = useSelect(bridge.store, (s) => s.whole.setup!);
   const micDb = useSelect(bridge.store, (s) => s.streams.levels_subscribe?.data?.levels?.mic_db);
   const mic = rowStateFor("microphone", permissionState(status, "microphone"), w);
+  const native = useSelect(bridge.store, (s) => s.whole.environment?.native);
   return (
     <>
       <Title id="first_run.permissions.title" />
@@ -184,6 +186,7 @@ function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w:
         />
       </div>
       {/* @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-permissions-step */}
+      <NativePermissionDetails native={native} />
       <SelfTestPanel panel={w.panel} waitingPercent={speechPercent(status.models.bundles)} playClip={w.clip} onPlayClip={() => void wizard.runTest(true)} onRun={() => void wizard.runTest(false)} onOpenSettings={() => void wizard.openSettings("system_audio")} />
     </>
   );

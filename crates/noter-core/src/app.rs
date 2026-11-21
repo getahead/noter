@@ -174,6 +174,7 @@ pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
         },
         environment: EnvironmentState {
             version: v1,
+            native: None,
             displays: vec![],
             output_route: OutputRoute::Unknown,
             output_device: None,

@@ -217,6 +217,21 @@ async fn concurrent_self_test_is_rejected_without_opening_another_stream() {
         .await
         .unwrap_err();
     assert_eq!(error.code, ErrorCode::Conflict);
+    let error = r
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.code,
+        ErrorCode::Conflict,
+        "a permission probe cannot overlap the test"
+    );
 }
 
 async fn status(r: &Run) -> SetupStatus {
@@ -496,14 +511,14 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
         .iter()
         .any(|p| p.kind == PermissionKind::SystemAudio && p.state == PermissionState::Granted));
 
-    // Only digital zeros: the recording permission is off.
+    // Digital zeros do not establish whether permission is off.
     let dir = tempfile::tempdir().unwrap();
     let zeros = ScriptedEngine::new().with_default(Behaviour {
         self_test_failure: Some(EngineErrorCode::ZeroBuffers),
         ..Behaviour::default()
     });
     let r = open(dir.path(), zeros, PermissionState::Granted, None);
-    let err = r
+    let row = r
         .core
         .permission_request(
             &first_run(),
@@ -512,8 +527,82 @@ async fn the_system_audio_prompt_comes_from_a_short_engine_self_test() {
             },
         )
         .await
-        .unwrap_err();
-    assert_eq!(err.code, ErrorCode::PermissionDenied);
+        .unwrap();
+    assert_eq!(row.state, PermissionState::NotAsked);
+}
+
+// #1001: zeros can also mean that no other application is playing sound.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn silent_system_audio_is_unverified_and_can_be_rechecked() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(
+        dir.path(),
+        ScriptedEngine::new(),
+        PermissionState::Granted,
+        None,
+    );
+    r.engine.set_system_audio(PermissionState::Denied);
+    let args = PermissionArgs {
+        kind: PermissionKind::SystemAudio,
+    };
+    let row = r
+        .core
+        .permission_request(&first_run(), args.clone())
+        .await
+        .unwrap();
+    assert_eq!(
+        row.state,
+        PermissionState::NotAsked,
+        "silence is not a TCC answer"
+    );
+    run_to_end(&r, false).await;
+    assert_eq!(
+        system_audio_row(&status(&r).await),
+        PermissionState::NotAsked
+    );
+    r.engine.set_system_audio(PermissionState::Granted);
+    let row = r.core.permission_request(&first_run(), args).await.unwrap();
+    assert_eq!(
+        row.state,
+        PermissionState::Granted,
+        "an inconclusive attempt must be retryable"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn heard_system_audio_proves_access_even_when_the_probe_result_times_out() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(
+        dir.path(),
+        ScriptedEngine::new(),
+        PermissionState::Granted,
+        None,
+    );
+    r.engine.hold_next_self_test();
+    let core = r.core.clone();
+    let request = tokio::spawn(async move {
+        core.permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+    });
+    for _ in 0..500 {
+        if r.engine.inject(EngineEvent::SelfTestStream {
+            channel: AudioChannel::Sys,
+        }) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let row = tokio::time::timeout(Duration::from_secs(7), request)
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    assert_eq!(row.state, PermissionState::Granted);
 }
 
 /// A core whose events and Mac the test can see, with the microphone granted.
@@ -554,7 +643,7 @@ fn system_audio_row(s: &SetupStatus) -> PermissionState {
         .state
 }
 
-/// The re-check probes (D-19): the clip on, ended within about 3 s.
+/// Re-check probes listen for another application, for about 3 s.
 fn probes(engine: &ScriptedEngine) -> usize {
     engine
         .commands()
@@ -563,7 +652,7 @@ fn probes(engine: &ScriptedEngine) -> usize {
             matches!(
                 c,
                 EngineCommand::SelfTest {
-                    play_clip: true,
+                    play_clip: false,
                     timeout_ms: 3_000
                 }
             )
@@ -571,14 +660,14 @@ fn probes(engine: &ScriptedEngine) -> usize {
         .count()
 }
 
-/// A self-test that heard only zeros: the system-audio row reads denied.
-async fn denied_by_a_self_test(p: &Probing) {
+/// A self-test that heard only zeros leaves system-audio access unverified.
+async fn unverified_by_a_self_test(p: &Probing) {
     p.run.engine.set_system_audio(PermissionState::Denied);
     let (_, events) = run_to_end(&p.run, false).await;
     assert_eq!(failed(&events), Some(SelfTestFailure::ZeroBuffers));
     assert_eq!(
         system_audio_row(&status(&p.run).await),
-        PermissionState::Denied
+        PermissionState::NotAsked
     );
 }
 
@@ -600,13 +689,46 @@ async fn until_probes(p: &Probing, n: usize) {
     panic!("no probe");
 }
 
-/// D-19: back from System Settings, the core re-checks a denied system-audio row by playing
-/// the test clip; the row becomes granted, and a later self-test that hears only zeros wins.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn back_from_system_settings_the_core_rechecks_system_audio_with_the_clip() {
+async fn returning_from_settings_joins_an_existing_probe_without_starting_another() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
+    p.run.engine.hold_next_self_test();
+    p.events.0.lock().unwrap().clear();
+    p.run.core.app_activated();
+    let row = p
+        .run
+        .core
+        .permission_request(
+            &first_run(),
+            PermissionArgs {
+                kind: PermissionKind::SystemAudio,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(row.state, PermissionState::NotAsked);
+    for _ in 0..100 {
+        if p.run.engine.inject(EngineEvent::SelfTestResult {
+            passed: false,
+            failure: Some(EngineErrorCode::ZeroBuffers),
+            own_sounds_leak: false,
+        }) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    until_probes(&p, 1).await;
+    assert_eq!(probes(&p.run.engine), 1);
+}
+
+/// D-19: back from Settings the core listens again without playing excluded own sounds.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn back_from_system_settings_the_core_rechecks_system_audio_without_own_sounds() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    unverified_by_a_self_test(&p).await;
 
     p.run.engine.set_system_audio(PermissionState::Granted);
     p.events.0.lock().unwrap().clear();
@@ -627,17 +749,43 @@ async fn back_from_system_settings_the_core_rechecks_system_audio_with_the_clip(
     run_to_end(&p.run, false).await;
     assert_eq!(
         system_audio_row(&status(&p.run).await),
-        PermissionState::Denied
+        PermissionState::NotAsked
     );
 }
 
-/// Still off: the row stays denied, and `setup:changed` still ends the check (the UI leaves
-/// Checking…); a second activation right after does not probe again.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
+async fn activation_rechecks_unverified_audio_after_a_capture_has_stopped() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
+    let mut capture = p
+        .run
+        .core
+        .app_snapshot(&first_run(), NoArgs {})
+        .await
+        .unwrap()
+        .capture;
+    capture.phase = CapturePhase::Stopped;
+    noter_core::testing::seed_capture(&p.run.core, capture)
+        .await
+        .unwrap();
+    p.run.engine.set_system_audio(PermissionState::Granted);
+    p.events.0.lock().unwrap().clear();
+    p.run.core.app_activated();
+    until_probes(&p, 1).await;
+    assert_eq!(
+        system_audio_row(&status(&p.run).await),
+        PermissionState::Granted
+    );
+}
+
+/// Still silent: the row stays unverified, and `setup:changed` still ends the check (the UI leaves
+/// Checking…); a second activation right after does not probe again.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_recheck_that_still_hears_nothing_keeps_the_row_unverified_and_says_so() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    unverified_by_a_self_test(&p).await;
 
     p.events.0.lock().unwrap().clear();
     p.run.core.app_activated();
@@ -647,7 +795,7 @@ async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
     assert_eq!(probes(&p.run.engine), 1, "once per activation");
     assert_eq!(
         system_audio_row(&status(&p.run).await),
-        PermissionState::Denied
+        PermissionState::NotAsked
     );
     assert!(p
         .events
@@ -662,7 +810,7 @@ async fn a_recheck_that_still_hears_nothing_keeps_the_row_denied_and_says_so() {
 async fn until_probes_waits_for_the_recheck_completion_event() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
     p.events.0.lock().unwrap().clear();
     let reached = Arc::new(tokio::sync::Notify::new());
     let (release, wait) = std::sync::mpsc::channel();
@@ -689,10 +837,10 @@ async fn until_probes_waits_for_the_recheck_completion_event() {
 
 /// The native permission-change notice re-checks too.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn the_native_change_notice_rechecks_a_denied_system_audio_row() {
+async fn the_native_change_notice_rechecks_unverified_system_audio() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
     p.run.engine.set_system_audio(PermissionState::Granted);
     p.events.0.lock().unwrap().clear();
     (p.mac.changed.lock().unwrap().as_ref().unwrap())(EnvironmentReading::default());
@@ -703,17 +851,17 @@ async fn the_native_change_notice_rechecks_a_denied_system_audio_row() {
     );
 }
 
-/// No probe unless the row reads denied during first run: not before it was ever checked,
+/// No probe unless first run has an inconclusive attempt: not before it was ever checked,
 /// and not once setup is complete (Settings leaves it to Run Test).
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn no_recheck_unless_first_run_shows_system_audio_denied() {
+async fn no_recheck_without_an_attempt_or_after_setup() {
     let dir = tempfile::tempdir().unwrap();
     let p = open_probing(dir.path(), ScriptedEngine::new());
     p.run.core.app_activated();
     assert!(!noter_core::testing::system_audio_probing(&p.run.core));
     assert_eq!(probes(&p.run.engine), 0, "not asked yet");
 
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
     for step in [
         SetupStep::Welcome,
         SetupStep::Models,
@@ -825,7 +973,7 @@ async fn every_m0_write_leaves_one_change_row_per_record() {
     .await
     .unwrap();
     wrote("permission_request", 1);
-    denied_by_a_self_test(&p).await;
+    unverified_by_a_self_test(&p).await;
     wrote("self_test_run", 1);
     p.run.engine.set_system_audio(PermissionState::Granted);
     p.events.0.lock().unwrap().clear();

@@ -265,9 +265,13 @@ pub(crate) fn load(store: &Store, settings: &Settings) -> Result<State, CoreErro
             e => Err(e),
         })
     })?;
-    let stored = row
+    let mut stored: Stored = row
         .and_then(|v| serde_json::from_str(&v).ok())
         .unwrap_or_default();
+    // Old builds inferred denial from zeros; no persisted denial proves this running copy is denied.
+    if stored.system_audio == Some(PermissionState::Denied) {
+        stored.system_audio = None;
+    }
     Ok(State {
         stored,
         self_test_running: false,
@@ -299,7 +303,7 @@ pub fn detection(offer_to_record: bool, self_test: &SelfTestState) -> (bool, boo
 }
 
 /// System Audio Recording cannot be queried: hearing it means granted, even if the microphone
-/// stayed silent; system-audio zeros mean off, otherwise use the short test's inference (F1).
+/// stayed silent. Silence alone cannot establish denial.
 // @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
 pub(crate) fn system_audio(stored: &Stored) -> PermissionState {
     // The newest finding wins: a probe or prompt after the self-test, until the next self-test.
@@ -309,13 +313,19 @@ pub(crate) fn system_audio(stored: &Stored) -> PermissionState {
     match &stored.self_test {
         SelfTestState::Passed { .. }
         | SelfTestState::Failed {
+            reason: SelfTestFailure::OwnSoundsLeak,
+        }
+        | SelfTestState::Failed {
             reason:
                 SelfTestFailure::OneStreamSilent {
                     channel: AudioChannel::Mic,
                 },
         } => PermissionState::Granted,
         SelfTestState::Failed {
-            reason: SelfTestFailure::ZeroBuffers,
+            reason:
+                SelfTestFailure::PermissionMissing {
+                    kind: PermissionKind::SystemAudio,
+                },
         } => PermissionState::Denied,
         _ => PermissionState::NotAsked,
     }
@@ -440,6 +450,7 @@ impl Core {
         let mut app = self.app();
         let next = EnvironmentState {
             version: app.environment.version,
+            native: reading.native,
             displays: reading.displays,
             output_route,
             output_device,
@@ -719,7 +730,7 @@ impl Core {
         } else {
             self.deps.native.permission(kind)
         };
-        let state = if current == PermissionState::Denied
+        let state = if (kind != PermissionKind::SystemAudio && current == PermissionState::Denied)
             || (kind == PermissionKind::SystemAudio && current == PermissionState::Granted)
         {
             current
@@ -727,9 +738,31 @@ impl Core {
             // @cpt-begin:cpt-noter-flow-core-first-run-permission:p1:inst-system-audio
             // Decision F1: the engine opens the tap briefly (macOS prompts); what it heard is
             // the inference until a full self-test decides.
+            {
+                let mut fr = lock(&self.first_run);
+                if fr.probing {
+                    return Ok(PermissionRow {
+                        kind,
+                        state: current,
+                    });
+                }
+                if fr.self_test_running
+                    || !matches!(
+                        self.app().capture.phase,
+                        CapturePhase::Idle | CapturePhase::Stopped
+                    )
+                {
+                    return Err(CoreError::new(
+                        ErrorCode::Conflict,
+                        "an audio test or capture is already running",
+                    ));
+                }
+                fr.probing = true;
+            }
             let heard = self.prompt_system_audio().await;
             let mut fr = lock(&self.first_run);
-            if heard != PermissionState::NotAsked && fr.stored.system_audio != Some(heard) {
+            fr.probing = false;
+            if let Some(heard) = heard.filter(|heard| fr.stored.system_audio != Some(*heard)) {
                 let mut stored = fr.stored.clone();
                 stored.system_audio = Some(heard);
                 if self

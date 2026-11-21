@@ -143,6 +143,7 @@ impl ScriptedNative {
             }
         }
         state.1 = EnvironmentReading {
+            native: env.native.clone(),
             displays: env.displays.clone(),
             output_device: env.output_device.clone(),
             output_route: env.output_route,

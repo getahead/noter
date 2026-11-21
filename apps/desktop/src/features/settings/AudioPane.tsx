@@ -7,6 +7,7 @@ import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { saveSection, useRowErrors } from "./actions";
+import { NativePermissionDetails } from "../../ui/setup/native-permission-details";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Group, Row } from "./form";
@@ -39,6 +40,7 @@ export function registerSystemAudioReturn(bridge: Bridge, pending: { current: bo
 export function AudioPane({ bridge, settings }: PaneProps) {
   const { audio } = settings;
   const device = useWindow(bridge, (s) => s.whole.environment?.output_device);
+  const native = useWindow(bridge, (s) => s.whole.environment?.native);
   const permissions = useWindow(bridge, (s) => s.whole.setup?.permissions);
   const [selfTest, setSelfTest] = useState(false);
   const recheckPermission = useRef(false);
@@ -74,6 +76,7 @@ export function AudioPane({ bridge, settings }: PaneProps) {
       <Group title={t("settings.audio.permissions")}>
         <PermissionCheckRow id="mic" variant="status" label={t("permission.mic")} state={rowState("microphone", permissions)} onAllow={() => void bridge.act("permission:microphone", "permission_request", () => bridge.core.permissionRequest({ kind: "microphone" }))} onOpenSettings={() => void bridge.core.openExternal({ target: { type: "system_settings", permission: "microphone" } })} />
         <PermissionCheckRow id="sys" variant="status" label={t("permission.sys")} state={rowState("system_audio", permissions)} onOpenSettings={() => { recheckPermission.current = true; void bridge.core.openExternal({ target: { type: "system_settings", permission: "system_audio" } }); }} />
+        <NativePermissionDetails native={native} />
         <Row label={t("settings.audio.self_test")} note={t("settings.audio.self_test_note")}>
           {/* @cpt-begin:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-selftest */}
           <PushButton label={t("settings.general.run_self_test")} onAction={() => setSelfTest(true)} />

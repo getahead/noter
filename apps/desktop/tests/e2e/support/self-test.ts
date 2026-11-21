@@ -9,14 +9,17 @@ const permissionRow = (page: Page, name: string) => page.locator('[data-componen
 export async function confirmSystemAudio(page: Page): Promise<void> {
   const sys = permissionRow(page, "System audio recording");
   const open = sys.getByRole("button", { name: "Open System Settings…" });
-  await expect(sys).toContainText(/Granted|not allowed/);
+  await expect(sys).toContainText(/Granted|not allowed|Not verified yet/);
   if (await open.count()) {
     await open.click();
     await page.evaluate(() => void dispatchEvent(new Event("focus")));
   }
   await expect(sys).toContainText("Granted", { timeout: 15_000 });
-  // This meter inserts a row and moves Run Test; wait before placing the pointer.
-  await expect(permissionRow(page, "Microphone").getByRole("meter", { name: "Microphone level" })).toBeVisible();
+  // The granted row reserves meter space before a call/self-test publishes levels.
+  // Wait for that layout before placing the pointer; idle real cores emit no samples.
+  const mic = permissionRow(page, "Microphone");
+  await expect(mic).toContainText("Granted");
+  await expect(mic.locator(".fr-perm__meter")).toBeAttached();
 }
 
 /** Start through the UI and wait for the core's response, rather than its command log entry. */

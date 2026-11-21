@@ -12,18 +12,22 @@ const fold = (panel: SelfTestPanel, ...events: SelfTestEvent[]) => events.reduce
 const running = (exclude = true) => runSelfTest(initialSelfTestPanel("IDLE", exclude), true);
 
 describe("selfTestNext (cpt-noter-state-ui-first-run-self-test)", () => {
+  it("names a missing microphone instead of blaming the unverified system-audio tap", () => {
+    const panel = applySelfTestEvent(running(), { type: "failed", reason: { type: "permission_missing", kind: "microphone" } });
+    expect(panel).toMatchObject({ state: "FAILED", failure: "self_test.mic_missing", runEnabled: true });
+  });
   const table: [SelfTestState, SelfTestInput, SelfTestState][] = [
     ["IDLE", { type: "run", modelReady: false }, "WAITING_FOR_MODEL"],
     ["IDLE", { type: "run", modelReady: true }, "RUNNING"],
     ["FAILED", { type: "run", modelReady: true }, "RUNNING"],
     ["WAITING_FOR_MODEL", { type: "model_arrived" }, "RUNNING"],
     ["IDLE", { type: "system_audio", state: "denied" }, "PERMISSION_MISSING"],
-    ["IDLE", { type: "system_audio", state: "not_asked" }, "PERMISSION_MISSING"],
+    ["IDLE", { type: "system_audio", state: "not_asked" }, "IDLE"],
     ["PERMISSION_MISSING", { type: "system_audio", state: "granted" }, "IDLE"],
     ["RUNNING", core({ type: "passed" }), "PASSED"],
     ["RUNNING", core({ type: "failed", reason: { type: "one_stream_silent", channel: "sys" } }), "FAILED"],
     ["RUNNING", core({ type: "failed", reason: { type: "timed_out" } }), "FAILED"],
-    ["RUNNING", core({ type: "failed", reason: { type: "zero_buffers" } }), "PERMISSION_MISSING"],
+    ["RUNNING", core({ type: "failed", reason: { type: "zero_buffers" } }), "FAILED"],
     ["RUNNING", core({ type: "failed", reason: { type: "own_sounds_leak" } }), "PASSED"],
     ["RUNNING", core({ type: "failed", reason: { type: "model_missing" } }), "WAITING_FOR_MODEL"],
     ["RUNNING", core({ type: "failed", reason: { type: "permission_missing", kind: "system_audio" } }), "PERMISSION_MISSING"],
@@ -103,10 +107,10 @@ describe("applySelfTestEvent (cpt-noter-algo-ui-first-run-self-test-result)", ()
     expect(runSelfTest(leaked, true)).toMatchObject({ state: "RUNNING", ownSounds: "pending" });
   });
 
-  it("treats zero buffers as a missing System Audio Recording permission", () => {
+  it("keeps a silent system-audio test inconclusive and retryable", () => {
     const p = fold(running(), { type: "failed", reason: { type: "zero_buffers" } }, { type: "ended", reason: "call_stopped" });
-    expect(p).toMatchObject({ state: "PERMISSION_MISSING", failure: null, runEnabled: false });
-    expect(selfTestNext(p.state, { type: "system_audio", state: "granted" })).toBe("IDLE");
+    expect(p).toMatchObject({ state: "FAILED", failure: "self_test.sys_unverified", runEnabled: true });
+    expect(selfTestNext(p.state, { type: "system_audio", state: "granted" })).toBe("FAILED");
     expect(t(SYSTEM_AUDIO_MISSING)).toBe("System audio recording is not allowed yet.");
   });
 

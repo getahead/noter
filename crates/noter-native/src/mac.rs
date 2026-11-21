@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use block2::{DynBlock, RcBlock};
 use noter_protocol::model::{
-    CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputDeviceInfo, OutputRoute,
+    CalendarEventRef, DisplayInfo, NativeEnvironment, NavTarget, NotificationAuth,
+    OutputDeviceInfo, OutputRoute,
 };
 use noter_protocol::{CalendarEventId, DisplayId, PermissionKind, PermissionState, TimestampMs};
 use objc2::rc::Retained;
@@ -17,7 +18,7 @@ use objc2::{define_class, msg_send, ClassType, MainThreadMarker};
 use objc2_app_kit::{
     NSAccessibilityAnnouncementKey, NSAccessibilityAnnouncementRequestedNotification,
     NSAccessibilityNotificationUserInfoKey, NSAccessibilityPostNotificationWithUserInfo,
-    NSAccessibilityPriorityKey, NSApplication, NSScreen,
+    NSAccessibilityPriorityKey, NSApplication, NSColor, NSColorSpace, NSScreen,
 };
 use objc2_av_foundation::{AVCaptureDevice, AVMediaTypeAudio};
 use objc2_core_audio::{
@@ -34,7 +35,8 @@ use objc2_core_graphics::{
 };
 use objc2_event_kit::{EKEntityType, EKEventStore};
 use objc2_foundation::{
-    NSBundle, NSDate, NSDictionary, NSError, NSFileManager, NSNumber, NSOperationQueue, NSString,
+    NSBundle, NSDate, NSDictionary, NSError, NSFileManager, NSNumber, NSOperationQueue,
+    NSProcessInfo, NSString,
 };
 use objc2_security::SecTask;
 use objc2_service_management::SMAppService;
@@ -220,6 +222,7 @@ fn default_browser() -> Option<String> {
 pub fn environment(storage: &Path) -> Reading {
     let (output_device, output_route) = output();
     Reading {
+        native: native_environment(),
         displays: displays(),
         output_device,
         output_route,
@@ -229,6 +232,38 @@ pub fn environment(storage: &Path) -> Reading {
         online: online(),
         disk_free_mb: disk_free_mb(storage),
     }
+}
+
+// @cpt-algo:cpt-noter-algo-core-first-run-status:p1
+fn native_environment() -> Option<NativeEnvironment> {
+    // NSColor may use any color space; component access is valid only after conversion.
+    let color =
+        NSColor::controlAccentColor().colorUsingColorSpace(&NSColorSpace::sRGBColorSpace())?;
+    let byte = |c: f64| (c.clamp(0.0, 1.0) * 255.0).round() as u8;
+    let bundle = NSBundle::mainBundle();
+    let app_path = if bundle.bundlePath().to_string().ends_with(".app") {
+        bundle.bundlePath().to_string()
+    } else {
+        std::env::current_exe().ok()?.display().to_string()
+    };
+    let name = bundle
+        .objectForInfoDictionaryKey(&NSString::from_str("CFBundleDisplayName"))
+        .and_then(|value| value.downcast::<NSString>().ok())
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| "Noter".into());
+    Some(NativeEnvironment {
+        accent_rgb: [
+            byte(color.redComponent()),
+            byte(color.greenComponent()),
+            byte(color.blueComponent()),
+        ],
+        app_name: name,
+        bundle_id: bundle.bundleIdentifier().map(|id| id.to_string()),
+        app_path,
+        os_version: NSProcessInfo::processInfo()
+            .operatingSystemVersionString()
+            .to_string(),
+    })
 }
 
 #[link(name = "ColorSync", kind = "framework")]

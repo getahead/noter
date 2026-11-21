@@ -2222,7 +2222,7 @@
       ]
     }
   ],
-  "contract_version": "2.16",
+  "contract_version": "2.18",
   "default_retryable": [
     "not_ready",
     "internal",
