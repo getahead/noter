@@ -1,9 +1,13 @@
-.td { display: flex; flex-direction: column; gap: var(--space-6); padding: 16px 24px; max-width: 1180px; }
-.td-h { margin: 0; font: 600 15px/20px var(--font); }
+/* the content pane already insets 20/24 (MW-R4); Today adds none of its own */
+.td { display: flex; flex-direction: column; gap: var(--space-6); max-width: 1180px; }
+.td-h { margin: 0; font: 600 13px/18px var(--font); }
+.td-h .np-dim, .td-done .np-disc .np-dim { font-weight: 400; }
 .td-empty { color: var(--label-2); margin: 0; }
 .td-review { display: grid; gap: 6px; padding: 10px 14px; border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--info-tint); }
 .td-review__links { display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .td-props { padding: 4px 12px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
+.td-list { padding: 4px 12px; }
+.td-proposals > .np-link { justify-self: start; }
 .td-prop { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--sep); }
 .td-prop:first-child { border-top: 0; }
 .td-prop__text { flex: 1 1 auto; min-width: 0; }
@@ -13,13 +17,12 @@
 .td-skel { height: 96px; border-radius: 8px; background: var(--sel-unemph); }
 .td-live, .td-recbtn { border-radius: var(--r-capsule); }
 .td-recbtn > .np-ic { color: var(--rec); }
-.td-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); min-width: 0; }
+.td-card { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; min-width: 0; }
 .td-card[data-state="collapsed"] { padding-block: 6px; }
-.td-card[data-state="live"] { border-color: var(--rec); box-shadow: inset 3px 0 0 var(--rec); }
+.td-card[data-state="live"] { box-shadow: inset 3px 0 0 var(--rec); }
 .td-card__head { display: flex; align-items: center; gap: 8px; }
 .td-card__time { display: inline-flex; align-items: center; gap: 6px; color: var(--label-2); min-width: 64px; font-variant-numeric: tabular-nums; }
-.td-card__title { flex: 1; margin: 0; font: 600 15px/20px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.td-card__recording { display: flex; align-items: center; gap: 4px; }
+.td-card__title { flex: 1; margin: 0; font: 600 13px/18px var(--font); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .td-card__elapsed { font-variant-numeric: tabular-nums; }
 .td-card__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--label-2); padding-left: 72px; font-size: 12px; }
 .td-card__local { display: inline-flex; align-items: center; gap: 3px; font: 600 11px/16px var(--font); color: var(--label-2); border: 1px solid var(--ctrl-border-soft); border-radius: var(--r-tag); padding: 0 5px; }
