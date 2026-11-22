@@ -259,9 +259,66 @@ pub fn terminate_after_load<R: Runtime>(webview: &Webview<R>) {
     });
 }
 
+/// With `NOTER_TEST_STALL_FIRST_LOAD_FILE` and `NOTER_TEST_STALL_FIRST_LOAD_WINDOW` (a window
+/// label), stops that window's web process as soon as it exists, before its first page commits:
+/// the CI runner's first-frame hang on a panel (#1123, #1160), when WebKit has no page to reload
+/// yet. "stalled" is written into the file once it is stopped before the commit, "committed" if
+/// the page got there first (the test then fails: it proved nothing). The watch must load the
+/// page again in a new process.
+pub fn stall_first_load<R: Runtime>(window: &tauri::WebviewWindow<R>) {
+    let Some(file) = std::env::var_os("NOTER_TEST_STALL_FIRST_LOAD_FILE").map(PathBuf::from) else {
+        return;
+    };
+    if std::env::var("NOTER_TEST_STALL_FIRST_LOAD_WINDOW")
+        .ok()
+        .as_deref()
+        != Some(window.label())
+    {
+        return;
+    }
+    let window = window.clone();
+    std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + STALL_ASK_WINDOW;
+        while std::time::Instant::now() < deadline {
+            let (sent, outcome) = std::sync::mpsc::channel();
+            let _ = window.with_webview(move |platform| {
+                let stopped = stop_content_process(platform.inner());
+                let _ = sent.send(stopped.then(|| page_committed(platform.inner())));
+            });
+            match outcome.recv() {
+                Ok(Some(committed)) => {
+                    let _ = std::fs::write(&file, if committed { "committed" } else { "stalled" });
+                    return;
+                }
+                Ok(None) => std::thread::sleep(std::time::Duration::from_millis(1)),
+                Err(_) => return,
+            }
+        }
+    });
+}
+
+/// Whether the web view has committed a page: its back-forward list has a current item.
+fn page_committed(webview: *mut std::ffi::c_void) -> bool {
+    use objc2::msg_send;
+    use objc2::runtime::AnyObject;
+    // SAFETY: `webview` is the WKWebView Tauri hands to `with_webview`, used on the main thread;
+    // `backForwardList` returns a WKBackForwardList and `currentItem` an item or nil.
+    unsafe {
+        let Some(webview) = (webview as *const AnyObject).as_ref() else {
+            return false;
+        };
+        let list: *mut AnyObject = msg_send![webview, backForwardList];
+        let Some(list) = list.as_ref() else {
+            return false;
+        };
+        let item: *mut AnyObject = msg_send![list, currentItem];
+        !item.is_null()
+    }
+}
+
 /// shortcut: private WebKit API (WKWebViewPrivate `_webProcessIdentifier`), debug builds only: a
-/// test has no other way to find the web view's content process.
-fn stop_content_process(webview: *mut std::ffi::c_void) {
+/// test has no other way to find the web view's content process. Returns whether it stopped one.
+fn stop_content_process(webview: *mut std::ffi::c_void) -> bool {
     use objc2::msg_send;
     use objc2::runtime::AnyObject;
     // SAFETY: `webview` is the WKWebView Tauri hands to `with_webview`, used on the main thread;
@@ -270,11 +327,11 @@ fn stop_content_process(webview: *mut std::ffi::c_void) {
         Some(webview) => unsafe { msg_send![webview, _webProcessIdentifier] },
         None => 0,
     };
-    if pid > 0 {
-        let _ = std::process::Command::new("kill")
+    pid > 0
+        && std::process::Command::new("kill")
             .args(["-STOP", &pid.to_string()])
-            .status();
-    }
+            .status()
+            .is_ok_and(|status| status.success())
 }
 
 #[cfg(test)]

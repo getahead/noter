@@ -20,6 +20,39 @@ final class WebViewRecoveryTests: NoterTestCase {
         XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call page did not recover")
     }
 
+    /// A panel's web process can hang before its first page commits (#1160, #1123): WebKit then has no page to reload,
+    /// and a reload after the restart left the panel blank in a fresh process. The debug hook stops the panel's web
+    /// process the moment it exists and writes "stalled" (or "committed" when the page got there first). The watch
+    /// restarts it after 10 s and must load the page again.
+    private func stallFirstLoad(of window: String) -> URL {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("noter-first-load-\(UUID().uuidString)")
+        app.launchEnvironment["NOTER_TEST_STALL_FIRST_LOAD_FILE"] = file.path
+        app.launchEnvironment["NOTER_TEST_STALL_FIRST_LOAD_WINDOW"] = window
+        addTeardownBlock { try? FileManager.default.removeItem(at: file) }
+        return file
+    }
+
+    private func expectStalled(_ file: URL, file source: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertTrue(waitUntil(10) { (try? String(contentsOf: file, encoding: .utf8)) != nil }, "the hook did not stall the first load", file: source, line: line)
+        XCTAssertEqual(try? String(contentsOf: file, encoding: .utf8), "stalled", "the page committed before its process stopped", file: source, line: line)
+    }
+
+    func test_cpt_noter_seq_floating_panel_hide_and_reopen__a_first_load_stalled_before_commit_recovers() {
+        let stalled = stallFirstLoad(of: "call-screen")
+        launch()
+        press("n")
+        expectStalled(stalled)
+        // The watch restarts the page 10 s after the window was made, then the page loads in a few seconds.
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call page did not load in its new web process")
+    }
+
+    func test_cpt_noter_seq_record_prompt_start_recording__a_first_load_stalled_before_commit_recovers() {
+        let stalled = stallFirstLoad(of: "record-prompt")
+        launch("detected")
+        expectStalled(stalled)
+        XCTAssertTrue(recordPrompt.waitForExistence(timeout: 30), "the record prompt did not load in its new web process")
+    }
+
     func test_cpt_noter_seq_call_screen_recover_capture__a_stalled_page_reloads_in_a_new_web_process() {
         let stalled = FileManager.default.temporaryDirectory.appendingPathComponent("noter-stalled-\(UUID().uuidString)")
         app.launchEnvironment["NOTER_TEST_STALL_FILE"] = stalled.path

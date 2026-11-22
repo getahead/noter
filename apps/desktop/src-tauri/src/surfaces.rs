@@ -308,6 +308,8 @@ fn window<R: Runtime>(app: &AppHandle<R>, label: WindowLabel) -> Option<WebviewW
         _ => builder,
     };
     let window = builder.build().ok()?;
+    #[cfg(all(debug_assertions, feature = "test-hooks"))]
+    crate::test_hooks::stall_first_load(&window);
     if let Some(watch) = app.try_state::<crate::webview_watch::Watch>() {
         crate::webview_watch::lock(&watch).created(label.as_str(), std::time::Instant::now());
     }
