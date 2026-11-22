@@ -233,7 +233,7 @@ final class CaptureSession: @unchecked Sendable {
     private var db: [Channel: Float] = [.mic: -160, .sys: -160]
     private var resampled: [Channel: Resampled] = [:]
     private var zeros = ZeroRun()
-    private var meetingAppPlaying = false
+    private var outputPlaying = false
     /// The live transcript of this call, fed the 16 kHz audio in call time.
     let asr: LiveASR
     /// After a restart: the call ms where the crashed engine's audio ends in the ring.
@@ -288,7 +288,7 @@ final class CaptureSession: @unchecked Sendable {
     }
 
     /// Whether a meeting app plays now: exact zeros on the system channel then mean no permission.
-    func meetingApp(_ playing: Bool) { lock.withLock { meetingAppPlaying = playing } }
+    func outputPlaying(_ playing: Bool) { lock.withLock { outputPlaying = playing } }
 
     /// After a restart, decodes again what the crashed engine heard but never confirmed: the
     /// ring's tail after its last pause, in call time, then confirmed (no hypotheses).
@@ -327,7 +327,7 @@ final class CaptureSession: @unchecked Sendable {
             if chunk.channel == .sys,
                 let fact = zeros.feed(
                     zeros: !chunk.samples.isEmpty && chunk.samples.allSatisfy { $0 == 0 },
-                    atMs: spanStart + (spanSamples[.sys] ?? 0) * 1000 / CaptureRing.rate, meetingApp: meetingAppPlaying)
+                    atMs: spanStart + (spanSamples[.sys] ?? 0) * 1000 / CaptureRing.rate, playing: outputPlaying)
             {
                 events.append(.systemAudioSilent(callId: callId, sinceMs: fact.sinceMs, confidence: fact.confidence))
             }
