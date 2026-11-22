@@ -236,6 +236,13 @@ function AudioStorage({ wizard, w }: { wizard: Wizard; w: WizardState }) {
       <p className="fr-hint">
         <Msg id="first_run.storage.hint" />
       </p>
+      {/* issue 1161: asked here, registered by the core only when setup finishes with it on */}
+      <div className="fr-row fr-row--login">
+        <Checkbox id="fr-login" label={t("first_run.storage.login")} checked={w.launchAtLogin} onAction={(launchAtLogin) => wizard.choose({ launchAtLogin })} />
+      </div>
+      <p className="fr-hint">
+        <Msg id="first_run.storage.login_hint" />
+      </p>
     </>
   );
 }

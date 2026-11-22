@@ -575,34 +575,77 @@ async fn the_environment_comes_from_native_readings_and_changes_are_broadcast() 
     assert!(snap2.environment.version.0 > snap.environment.version.0);
 }
 
-#[tokio::test]
-async fn the_login_item_follows_launch_at_login() {
-    let dir = tempfile::tempdir().unwrap();
-    let s = open(dir.path());
-    let start = s.native.login.lock().unwrap().clone();
-    assert_eq!(start.len(), 1, "applied once at start");
+async fn set_launch_at_login(s: &Setup, on: bool) {
     let settings = s.core.settings_get(&first_run(), NoArgs {}).await.unwrap();
     let mut general = settings.general.clone();
-    general.launch_at_login = !general.launch_at_login;
-    let ctx = CommandCtx {
-        caller: Caller::Window {
-            label: WindowLabel::Settings,
-        },
-    };
+    general.launch_at_login = on;
     s.core
         .settings_update(
-            &ctx,
+            &first_run(),
             SettingsUpdateArgs {
                 rev: settings.rev,
-                section: SettingsSection::General(general.clone()),
+                section: SettingsSection::General(general),
             },
         )
         .await
         .unwrap();
-    assert_eq!(
-        s.native.login.lock().unwrap().last(),
-        Some(&general.launch_at_login)
+}
+
+async fn finish_setup(s: &Setup) {
+    for step in [
+        SetupStep::Welcome,
+        SetupStep::Models,
+        SetupStep::Permissions,
+        SetupStep::CallDisplay,
+        SetupStep::AudioStorage,
+        SetupStep::Assistants,
+    ] {
+        s.core
+            .setup_set_step(
+                &first_run(),
+                StepArgs {
+                    step,
+                    state: StepState::Done,
+                },
+            )
+            .await
+            .unwrap();
+    }
+}
+
+#[tokio::test]
+// issue 1161: first launch registers no login item; finishing setup with the box on does.
+async fn the_login_item_waits_for_setup_to_finish_then_follows_launch_at_login() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    let login = || s.native.login.lock().unwrap().clone();
+    assert!(login().is_empty(), "first launch registers nothing");
+    set_launch_at_login(&s, false).await;
+    set_launch_at_login(&s, true).await;
+    assert!(
+        login().is_empty(),
+        "the wizard's checkbox only records the choice"
     );
+    finish_setup(&s).await;
+    assert_eq!(login(), vec![true], "finishing setup with it on registers");
+    set_launch_at_login(&s, false).await;
+    assert_eq!(login().last(), Some(&false), "Settings follows after setup");
+    drop(s);
+    let again = open(dir.path());
+    assert_eq!(
+        again.native.login.lock().unwrap().clone(),
+        vec![false],
+        "a finished setup reconciles at launch"
+    );
+}
+
+#[tokio::test]
+async fn finishing_setup_with_launch_at_login_off_registers_nothing() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path());
+    set_launch_at_login(&s, false).await;
+    finish_setup(&s).await;
+    assert!(s.native.login.lock().unwrap().iter().all(|on| !on));
 }
 
 #[test]

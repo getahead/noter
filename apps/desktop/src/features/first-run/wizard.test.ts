@@ -352,6 +352,21 @@ describe("createWizard", () => {
     expect(bridge.store.getState().commands.settings_get?.state).toBe("DONE");
   });
 
+  it("starts Launch Noter at login on and saves the box with the Audio storage step (issue 1161)", async () => {
+    fake = new FakeCore({ window: "first-run" });
+    fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("audio_storage")(w)));
+    bridge = createBridge("first-run", fake);
+    await bridge.open();
+    wizard = createWizard(bridge, () => {});
+    stop = wizard.start();
+    await settle(0);
+    expect(state().launchAtLogin).toBe(true);
+    wizard.choose({ launchAtLogin: false });
+    await wizard.continue();
+    expect(state().current).toBe("assistants");
+    expect(fake.world.settings.general.launch_at_login).toBe(false);
+  });
+
   it("saves nothing from the defaults while the stored settings could not be read", async () => {
     fake = new FakeCore({ window: "first-run" });
     fake.setWorld((w) => (W.firstRun(w, { modelsReady: true }), at("audio_storage")(w)));

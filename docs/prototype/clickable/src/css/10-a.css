@@ -202,6 +202,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .fr-st__clip { display: flex; align-items: center; gap: 10px; }
 .fr-st__hint { font-size: 11px; color: var(--label-3); line-height: 14px; }
 .fr-row { display: flex; align-items: center; gap: 10px; }
+.fr-row--login { margin-top: 16px; }
 .fr-dp { display: grid; gap: 14px; }
 .fr-dp__draw { position: relative; height: 132px; width: 384px; max-width: 100%; }
 .fr-dp__screen { position: absolute; border: 1px solid var(--ctrl-border-soft); border-radius: var(--r-control); background: var(--sel-unemph); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--label-2); cursor: pointer; padding: 4px; }

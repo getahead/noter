@@ -252,7 +252,7 @@ Decision D14 (the shared folder passed to the engine and to `models/`, with `not
 
 - [x] `p2` - **ID**: `cpt-noter-algo-core-first-run-login-item`
 
-**Input**: `GeneralSettings.launch_at_login` after a settings change.
+**Input**: `GeneralSettings.launch_at_login` once setup is finished: when the last step is marked done or skipped, after each settings change from then on, and at each launch. Before setup finishes nothing is registered: first launch never adds a login item, and the first-run checkbox **Launch Noter at login** only records the choice (owner, #1161).
 
 **Output**: The login item registered or unregistered with SMAppService.
 

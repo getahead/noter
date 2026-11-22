@@ -145,6 +145,34 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     }
   });
 
+  test("UI — other path: Launch Noter at login is on by default on Audio storage, and Finish with it off keeps it off in Settings (issue 1161)", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", {
+      world: (w) => {
+        W.firstRun(w);
+        audioGranted(w);
+        w.app.setup.self_test = { type: "passed", at: Date.now() };
+        w.app.setup.detection_enabled = true; // what the core switches on after a pass
+        for (const s of w.app.setup.steps) if (["welcome", "models", "permissions", "call_display"].includes(s.step)) s.state = "done";
+      },
+    });
+
+    await expect(step(page, "Audio storage")).toHaveAttribute("aria-current", "step");
+    const login = page.getByRole("checkbox", { name: "Launch Noter at login" });
+    await expect(login).toBeChecked();
+    await expect(stepBody(page)).toContainText("You can change this later in Settings › General.");
+    await stepBody(page).locator(".np-check").filter({ hasText: "Launch Noter at login" }).click();
+    await expect(login).not.toBeChecked();
+    await button(page, "Continue").click();
+    await expect(step(page, "Assistants")).toHaveAttribute("aria-current", "step");
+    const update = (await sent(page, "settings_update")).at(-1) as { section?: { section: string; value: { launch_at_login: boolean } } } | undefined;
+    expect(update?.section).toMatchObject({ section: "general", value: { launch_at_login: false } });
+    await button(page, "Finish").click();
+    expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
+    // Settings › General › Launch at login reads the same setting
+    const settings = (await steer.invoke("settings_get", {}, "settings")) as { general: { launch_at_login: boolean } };
+    expect(settings.general.launch_at_login).toBe(false);
+  });
+
   test("UI — error path: Microphone not allowed — Open System Settings…, turn Noter on, Granted", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), W.permission(w, "microphone", "denied")) });
     const mic = permissionRow(page, "Microphone");

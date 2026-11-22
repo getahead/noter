@@ -284,6 +284,15 @@ pub(crate) fn load(store: &Store, settings: &Settings) -> Result<State, CoreErro
 }
 
 // @cpt-algo:cpt-noter-algo-core-first-run-detection-rule:p1
+/// Every step done or skipped. The login item waits for it: first launch registers nothing,
+/// finishing setup applies the wizard's "Launch Noter at login" choice (issue 1161).
+fn finished(stored: &Stored) -> bool {
+    stored
+        .steps
+        .iter()
+        .all(|r| matches!(r.state, StepState::Done | StepState::Skipped))
+}
+
 /// Whether call detection runs, and whether `SetupIncomplete` belongs in the degraded set.
 /// It never affects `capture_start` (O1).
 pub fn detection(offer_to_record: bool, self_test: &SelfTestState) -> (bool, bool) {
@@ -352,8 +361,10 @@ impl Core {
             accounts.refresh_accounts().await;
             accounts.accounts_read.send_replace(true);
         });
-        let launch = lock(&self.settings).general.launch_at_login;
-        self.apply_login_item(launch);
+        if finished(&lock(&self.first_run).stored) {
+            let launch = lock(&self.settings).general.launch_at_login;
+            self.apply_login_item(launch);
+        }
         self.environment_changed(self.deps.native.environment());
         self.start_capture();
         self.start_playback();
@@ -393,12 +404,14 @@ impl Core {
     pub(crate) fn settings_section_changed(&self, section: &SettingsSection) {
         match section {
             SettingsSection::General(g) => {
-                let self_test = {
+                let (self_test, finished) = {
                     let mut fr = lock(&self.first_run);
                     fr.offer_to_record = g.offer_to_record;
-                    fr.stored.self_test.clone()
+                    (fr.stored.self_test.clone(), finished(&fr.stored))
                 };
-                self.apply_login_item(g.launch_at_login);
+                if finished {
+                    self.apply_login_item(g.launch_at_login);
+                }
                 // The engine hears the new detection rule (settings never calls first run back).
                 let (on, _) = detection(g.offer_to_record, &self_test);
                 if let Some(core) = self.this() {
@@ -538,10 +551,7 @@ impl Core {
         };
         // @cpt-begin:cpt-noter-algo-core-first-run-status:p1:inst-build-setup
         let (detection_enabled, incomplete) = detection(offer, &stored.self_test);
-        let complete = stored
-            .steps
-            .iter()
-            .all(|r| matches!(r.state, StepState::Done | StepState::Skipped));
+        let complete = finished(&stored);
         let permissions = self.permission_rows(&stored);
         let models = lock(&self.downloads).status();
         let next = SetupStatus {
@@ -666,8 +676,13 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-first-run-self-test:p1:inst-st-skipped
         // @cpt-end:cpt-noter-flow-core-first-run-choices:p2:inst-choice-call
         self.store_setup(ctx, &state.stored, &stored, "setup_set_step")?;
+        let done = finished(&stored);
         state.stored = stored;
         drop(state);
+        if done {
+            let launch = lock(&self.settings).general.launch_at_login;
+            self.apply_login_item(launch);
+        }
         // @cpt-begin:cpt-noter-flow-core-first-run-choices:p2:inst-recompute
         // @cpt-begin:cpt-noter-flow-core-first-run-choices:p2:inst-return-choice
         Ok(self.setup_now())

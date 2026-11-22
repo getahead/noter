@@ -431,7 +431,9 @@
           { value: '7', label: '7 days' }, { value: '90', label: '90 days' }, { value: 'forever', label: 'Forever' },
           { value: 'never', label: 'Never store audio', note: 'Replay and the archive pass are not available' },
         ], L.retention, { label: 'Audio retention', bind: 'local.firstrun.retention' })}
-        <p class="fr-hint">You can change this later in Settings › Privacy › Audio retention.</p>`;
+        <p class="fr-hint">You can change this later in Settings › Privacy › Audio retention.</p>
+        <div class="fr-row fr-row--login">${P.checkbox('Launch Noter at login', L.launchAtLogin !== false, { id: 'fr-login', bind: 'local.firstrun.launchAtLogin' })}</div>
+        <p class="fr-hint">Noter waits in the menu bar so it can offer to record when a call starts. You can change this later in Settings › General.</p>`;
       default: {
         const noAssist = L.ollama === 'missing' && L.keyState.anthropic !== 'stored' && L.keyState.codex !== 'stored' && !(NP.auth && (NP.auth.signedIn('claude') || NP.auth.signedIn('chatgpt')));
         return html`${title('Assistants')}
