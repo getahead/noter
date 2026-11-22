@@ -103,6 +103,8 @@ pub(crate) struct Session {
     pub confirmed: bool,
     /// Wakes the task that waits for the browser when the session is cancelled.
     pub stop: Arc<Notify>,
+    /// The login's input for a pasted code (Claude only; issue 1136).
+    pub paste: Option<noter_llm::CodeSink>,
 }
 
 struct State {
@@ -290,6 +292,17 @@ impl Accounts {
     }
 
     /// The provider whose active session is `id`.
+    /// The pasted-code input of the session `id`: `None` when no such session is active, `Some(None)`
+    /// when its login takes no code.
+    pub(crate) fn session_paste(
+        &self,
+        id: &SignInSessionId,
+    ) -> Option<Option<noter_llm::CodeSink>> {
+        let state = lock(&self.state);
+        let found = state.sessions.values().find(|s| s.id == *id);
+        found.map(|s| s.paste.clone())
+    }
+
     pub(crate) fn session_provider(&self, id: &SignInSessionId) -> Option<AccountProvider> {
         let state = lock(&self.state);
         let found = state.sessions.iter().find(|(_, s)| s.id == *id);

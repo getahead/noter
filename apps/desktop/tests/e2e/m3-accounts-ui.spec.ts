@@ -1,6 +1,6 @@
 // M3 — own-account sign-in and key removal (docs/features/ui/accounts.md). Stories `cpt-noter-seq-settings-sign-in-account`,
 // `cpt-noter-seq-first-run-connect-assistant` (the account and no-assistant paths; the key paths are m2-accounts-key-ui) and the
-// Remove… part of `cpt-noter-seq-settings-replace-api-key`. Commands: account_signin_prepare, account_signin_start, account_signin_cancel,
+// Remove… part of `cpt-noter-seq-settings-replace-api-key`. Commands: account_signin_prepare, account_signin_start, account_signin_cancel, account_signin_code,
 // account_use_existing, account_bind_agents, account_test, account_sign_out, api_key_remove, cli_install. Written before the sheets exist
 // (tests first). The scripted account CLIs (`harness.account_cli`) exist only in the real core, so these run there only
 // (tests/conformance/m3-stories-credentials.test.ts drives the same steps at the contract). Never assert a code or key by value
@@ -74,6 +74,22 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await expect(row(page, "Your Claude account")).toContainText("Signed in");
     await expect(row(page, "Your Claude account")).toContainText("ann@example.com");
     await expect(row(page, "Your ChatGPT account")).toContainText("Not signed in"); // independent of the other provider
+  });
+
+  test("other path: the page shows a code — pasted into Send Code, the login finishes and Check follows (#1136)", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { login: { hold: true } });
+    await openModels(page);
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your Claude account/);
+    await dlg.getByRole("checkbox").click({ force: true });
+    await button(dlg, "Continue in Browser").click();
+    await expect(dlg).toContainText("If the page shows a code, paste it here");
+    await dlg.getByRole("textbox", { name: "Code from the page" }).fill("PASTED-CODE-1");
+    await button(dlg, "Send Code").click();
+    const [pasted] = await sent(page, "account_signin_code");
+    expect(pasted).toMatchObject({ code: "PASTED-CODE-1" });
+    await expect(dlg).toContainText("ann@example.com"); // the held login finished on the code
   });
 
   test("other path: Claude Code already signed in — Use This Account goes straight to Check, no browser", async ({ page }) => {

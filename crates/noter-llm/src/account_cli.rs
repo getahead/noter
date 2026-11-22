@@ -74,7 +74,13 @@ pub struct LoginStart {
     pub url: String,
     pub code: Option<String>,
     pub done: BoxFuture<'static, LoginOutcome>,
+    /// Where a code the provider's page shows goes, for a login that asks for one (Claude's
+    /// fallback page: "Paste code here if prompted"; issue 1136). The code is never logged.
+    pub paste: Option<CodeSink>,
 }
+
+/// A login's input for pasted codes; closes with the login.
+pub type CodeSink = tokio::sync::mpsc::UnboundedSender<String>;
 
 pub trait AccountCli: Send + Sync {
     fn status(&self, tool: CliTool) -> BoxFuture<'_, CliStatus>;
@@ -299,11 +305,14 @@ impl AccountCli for ScriptedAccountCli {
             let outcome = script.login.clone();
             let identity = script.login_identity.clone();
             let release = this.release.clone();
+            // A pasted code finishes a held sign-in, as the real login does once it reads one.
+            let (paste, mut pasted) = tokio::sync::mpsc::unbounded_channel::<String>();
             let done: BoxFuture<'static, LoginOutcome> = Box::pin(async move {
                 if outcome.hold {
                     tokio::select! {
                         () = this.cancel_of(provider).notified() => return LoginOutcome::Cancelled,
                         () = release[usize::from(provider == AccountProvider::Chatgpt)].notified() => {}
+                        Some(_) = pasted.recv() => lock(&this.state).log.push(format!("code:{provider:?}")),
                     }
                 }
                 tokio::select! {
@@ -324,6 +333,7 @@ impl AccountCli for ScriptedAccountCli {
                 url: script.login.url,
                 code: script.login.code,
                 done,
+                paste: (provider == AccountProvider::Claude).then_some(paste),
             })
         })
     }

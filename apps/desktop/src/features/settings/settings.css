@@ -126,6 +126,9 @@
 .f-code { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--r-card); background: var(--sel-unemph); }
 .f-code__val { font-size: 18px; letter-spacing: .12em; font-weight: 600; color: var(--label); }
 .f-links { display: flex; gap: 16px; }
+.f-paste { margin-top: 12px; display: grid; gap: 6px; }
+.f-paste__row { display: flex; gap: 8px; align-items: flex-start; }
+.f-paste__row > :first-child { flex: 1; min-width: 0; }
 .f-chks { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .f-chk { display: flex; gap: 10px; align-items: center; color: var(--label-2); }
 .f-chk.is-done { color: var(--label); }

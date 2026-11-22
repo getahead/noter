@@ -269,6 +269,7 @@ impl Core {
             expires_at,
             confirmed: args.personal_use_confirmed,
             stop: Arc::new(Notify::new()),
+            paste: login.paste,
         };
         self.accounts.begin(provider, pending.clone());
         self.signin_progress(
@@ -441,6 +442,38 @@ impl Core {
         Ok(self.refresh_accounts().await)
     }
     // @cpt-end:cpt-noter-flow-core-credentials-privacy-signin:p1:inst-signin-cancel
+
+    /// `account_signin_code`: the code Claude's fallback page shows, for the login waiting on it
+    /// (issue 1136). It goes to the CLI and nowhere else: never logged, never stored.
+    pub(crate) fn signin_code(
+        &self,
+        session_id: &SignInSessionId,
+        code: &str,
+    ) -> Result<(), CoreError> {
+        let code = code.trim();
+        if code.is_empty() {
+            return Err(noter_protocol::invalid(
+                "code",
+                noter_protocol::error::ValidationRule::Required,
+            ));
+        }
+        // one line of printable text: anything else is not what the page shows
+        if code.len() > 512 || code.chars().any(char::is_control) {
+            return Err(noter_protocol::invalid(
+                "code",
+                noter_protocol::error::ValidationRule::InvalidFormat,
+            ));
+        }
+        let gone = || CoreError::new(ErrorCode::NotFound, format!("sign-in {session_id}"));
+        let paste = self.accounts.session_paste(session_id).ok_or_else(gone)?;
+        let paste = paste.ok_or_else(|| {
+            noter_protocol::invalid(
+                "session_id",
+                noter_protocol::error::ValidationRule::InvalidFormat,
+            )
+        })?;
+        paste.send(code.to_owned()).map_err(|_| gone())
+    }
 
     pub(crate) async fn use_existing(
         &self,

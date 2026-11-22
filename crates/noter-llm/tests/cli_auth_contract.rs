@@ -34,6 +34,10 @@ case "$*" in
   'auth status') state=$(cat {d}/state); cat {f}/claude-2.1.325/auth-status-$state.stdout
     [ "$state" = signed-in ] ;;
   'auth login --claudeai') echo $$ > {d}/pid; cat {f}/claude-2.1.325/auth-login.stdout
+    # "Paste code here if prompted >": a pasted line finishes the login like the browser does
+    # fd 3 keeps the login's stdin: dash (Linux /bin/sh) points a background job's stdin at /dev/null
+    exec 3<&0
+    (read -r code <&3 && printf '%s' "$code" > {d}/pasted && touch {d}/release) >/dev/null &
     while [ ! -e {d}/release ]; do sleep 0.05; done; echo signed-in > {d}/state ;;
   'auth logout') echo signed-out > {d}/state; echo 'Successfully logged out from your Anthropic account.' ;;
   *) exit 2 ;;
@@ -269,4 +273,39 @@ async fn sign_out_in_the_cli_runs_each_tools_own_logout() {
     let calls = fake.calls();
     assert!(calls.contains("claude auth logout"), "{calls}");
     assert!(calls.contains("codex logout"), "{calls}");
+}
+
+#[tokio::test]
+// issue 1136: the fallback page's code goes to the login's stdin, as Claude Code reads it.
+async fn a_code_pasted_into_a_claude_login_reaches_the_cli_and_finishes_it() {
+    let fake = Fake::new();
+    let accounts = fake.accounts();
+    let start = tokio::time::timeout(
+        Duration::from_secs(5),
+        accounts.login(AccountProvider::Claude),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let paste = start
+        .paste
+        .clone()
+        .expect("Claude's login takes a pasted code");
+    paste.send("abc123#state".into()).unwrap();
+    match tokio::time::timeout(Duration::from_secs(5), start.done)
+        .await
+        .unwrap()
+    {
+        LoginOutcome::SignedIn(who) => assert_eq!(who.email, "user@example.com"),
+        other => panic!("{other:?}"),
+    }
+    assert_eq!(
+        std::fs::read_to_string(fake.path("pasted")).unwrap(),
+        "abc123#state"
+    );
+    let codex = accounts.login(AccountProvider::Chatgpt).await.unwrap();
+    assert!(
+        codex.paste.is_none(),
+        "Codex's device sign-in takes no pasted code"
+    );
 }

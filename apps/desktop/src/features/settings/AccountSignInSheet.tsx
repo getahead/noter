@@ -14,6 +14,7 @@ import { Link } from "../../ui/primitives/link";
 import { Progress } from "../../ui/primitives/progress";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
+import { TextField } from "../../ui/primitives/text-field";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { providerName, toolName } from "./account-rows";
 import { canContinue, secondsLeft, sheetOpen, stepIndex, type SignIn } from "./signin-session";
@@ -49,6 +50,33 @@ function Stepper({ s }: { s: SignIn }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** The code from Claude's page to the waiting login (trimmed); whether the core took it. */
+export async function sendSignInCode(bridge: Bridge, sessionId: string, code: string): Promise<boolean> {
+  const r = await bridge.act("account_signin_code", "account_signin_code", () => bridge.core.accountSigninCode({ session_id: sessionId, code: code.trim() }), { screen: "settings" });
+  return r.status === "ok";
+}
+
+/** **If the page shows a code, paste it here** · **Send Code**: the code goes to the login, never to the log. */
+export function PasteCode({ bridge, sessionId }: { bridge: Bridge; sessionId: string }) {
+  const [code, setCode] = useState("");
+  const [state, setState] = useState<"idle" | "sending" | "sent" | "failed">("idle");
+  const send = async () => {
+    if (!code.trim()) return;
+    setState("sending");
+    setState((await sendSignInCode(bridge, sessionId, code)) ? "sent" : "failed");
+  };
+  return (
+    <div className="f-paste">
+      <div className="np-dim">{t("signin.paste_hint")}</div>
+      <div className="f-paste__row">
+        <TextField value={code} ariaLabel={t("signin.paste_label")} mono invalid={state === "failed"} message={state === "failed" ? t("signin.paste_failed") : undefined} onChange={(v) => (setCode(v), setState("idle"))} onEnter={() => void send()} />
+        <PushButton label={t("signin.paste_send")} size="small" disabled={!code.trim() || state === "sending"} onAction={() => void send()} />
+      </div>
+      {state === "sent" && <div className="np-dim" role="status">{t("signin.paste_sent")}</div>}
+    </div>
   );
 }
 
@@ -244,6 +272,8 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
               <Link label={t("signin.open_again")} onAction={reopen} />
               <Link label={t("signin.copy_link")} onAction={() => copy("link", s.session!.url)} />
             </div>
+            {/* Claude's fallback page ends on a code for the login (issue 1136) */}
+            {provider === "claude" && <PasteCode bridge={bridge} sessionId={s.session.id} />}
           </>
         ) : (
           <div className="np-dim">{t("signin.recovered")}</div>
