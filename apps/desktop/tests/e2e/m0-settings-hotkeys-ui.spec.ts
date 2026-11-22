@@ -171,6 +171,14 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await page.getByRole("navigation", { name: "Settings panes" }).getByText("Hotkeys", { exact: true }).click();
     await expect(bar).toHaveText("Hotkeys");
   });
+  test("UI — design — #1121 Bottleneck thresholds are a Status · When p95 is above table", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Performance", { exact: true }).click();
+    const table = page.getByRole("table", { name: "Bottleneck thresholds" });
+    await expect(table.getByRole("columnheader")).toHaveText(["Status", "When p95 is above"]);
+    await expect(table.getByRole("row", { name: /Near/ }).getByRole("spinbutton", { name: "Near" })).toHaveValue(/^\d+$/);
+    await expect(table.getByRole("row", { name: /Over/ })).toContainText("% of budget");
+  });
   test("UI — design — #1121 Privacy's In force is a plain secondary line with the mode indicator, not a tag", async ({ page }) => {
     await openWindow(page, "settings", {});
     await page.getByRole("navigation", { name: "Settings panes" }).getByText("Privacy", { exact: true }).click();

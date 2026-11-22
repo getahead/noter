@@ -515,6 +515,8 @@ export const en = {
   "settings.perf.near": "Near",
   "settings.perf.over": "Over",
   "settings.perf.of_budget": "% of budget",
+  "settings.perf.col_status": "Status",
+  "settings.perf.col_when": "When p95 is above",
   "settings.perf.note": "The thresholds drive the Performance screen.",
   "settings.updates.version": "Version",
   "settings.updates.channel": "Channel",
