@@ -141,3 +141,8 @@
 .f-bind__h { font-weight: 600; }
 .f-bind__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
 .st-cred__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* Output devices: one row per device with its route and, when not identified, Treat as headphones */
+.st-devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.st-device { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-device__name { min-width: 0; }

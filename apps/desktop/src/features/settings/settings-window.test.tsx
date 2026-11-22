@@ -205,10 +205,10 @@ describe("panes", () => {
     expect(html).toContain("Restart Now");
   });
 
-  it("Audio: the current output can be marked as headphones; the backends and own sounds save", async () => {
-    await ready((w) => (w.app.environment.output_device = { uid: "uid-1", name: "AirPods Pro" } as never));
+  it("Audio: a not-identified output device can be treated as headphones; the backends and own sounds save", async () => {
+    await ready((w) => (w.app.environment.output_devices = [{ uid: "uid-1", name: "AirPods Pro", route: "unknown", marked_headphones: false }]));
     const tree = rendered(AudioPane, { bridge, settings: stored() });
-    control(tree, "Treat AirPods Pro as headphones")(true);
+    control(tree, "Treat as headphones")(true);
     control(tree, "Exclude Noter’s own sounds")(false);
     control(tree, "Live transcription")("parakeet_tdt_v3");
     await vi.waitFor(() => {

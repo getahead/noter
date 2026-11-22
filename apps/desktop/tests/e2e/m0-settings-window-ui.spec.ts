@@ -165,3 +165,75 @@ test.describe("cpt-noter-seq-settings-check-privacy", () => {
     await expect.poll(async () => sent(page, "open_external")).toContainEqual({ target: { type: "system_settings", permission: "screen_recording" } });
   });
 });
+
+// Settings controls DESIGN 3.2 lists that the panes lacked (#1125-#1131): Microphone with a level meter, one row per
+// output device with Treat as headphones, Languages, Show latency and Text size, Stages sampled, the release notes link
+// and the model bundle status. The devices are the fixture world's.
+const openPane = async (page: Page, name: string) => {
+  await openWindow(page, "settings");
+  await panes(page).getByRole("option").filter({ hasText: name }).click();
+};
+const lastSection = async (page: Page, section: string) => {
+  const updates = (await sent(page, "settings_update")).map((a) => a.section as { section: string; value: Record<string, unknown> });
+  return updates.filter((u) => u.section === section).at(-1)?.value;
+};
+
+test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
+  test("UI — Audio & Transcription: Microphone lists the inputs with a level meter; choosing one saves mic_device", async ({ page }) => {
+    await openPane(page, "Audio & Transcription");
+    const mic = pane(page).getByRole("combobox", { name: "Microphone" });
+    await expect(mic.locator("option")).toHaveText(["System Default (MacBook Pro Microphone)", "MacBook Pro Microphone", "Studio Display Microphone"]);
+    await expect(pane(page).getByRole("meter", { name: "Microphone level" })).toBeVisible();
+    await mic.selectOption({ label: "Studio Display Microphone" });
+    await expect.poll(async () => (await lastSection(page, "audio"))?.mic_device).toBe("StudioDisplayMicrophone");
+  });
+
+  test("UI — Audio & Transcription: one row per output device with its route; Treat as headphones on a not-identified one", async ({ page }) => {
+    await openPane(page, "Audio & Transcription");
+    const outputs = pane(page).getByRole("group", { name: "Output devices" });
+    await expect(outputs.getByRole("listitem")).toHaveText([/External Headphones.*Headphones/, /MacBook Pro Speakers.*Speakers/, /USB-C DAC.*Headphones/, /Living Room.*Not identified/]);
+    const living = outputs.getByRole("listitem").filter({ hasText: "Living Room" });
+    await living.getByText("Treat as headphones", { exact: true }).click(); // the label is the checkbox’s hit area
+    await expect.poll(async () => ((await lastSection(page, "audio"))?.output as { headphones_devices: string[] } | undefined)?.headphones_devices).toContain("AirPlay-LivingRoom");
+    await expect(living).toContainText("Headphones");
+    await expect(outputs.getByRole("listitem").filter({ hasText: "MacBook Pro Speakers" }).getByRole("checkbox")).toHaveCount(0);
+  });
+
+  test("UI — Audio & Transcription: Languages English, Russian and German, all on; unchecking German saves the rest", async ({ page }) => {
+    await openPane(page, "Audio & Transcription");
+    const languages = pane(page).getByRole("group", { name: "Languages" });
+    for (const name of ["English", "Russian", "German"]) await expect(languages.getByRole("checkbox", { name })).toBeChecked();
+    await languages.getByText("German", { exact: true }).click();
+    await expect.poll(async () => (await lastSection(page, "audio"))?.languages).toEqual(["en", "ru"]);
+  });
+
+  test("UI — Call Screen & Menu Bar: Show latency off by default and Text size 100 %; both save", async ({ page }) => {
+    await openPane(page, "Call Screen & Menu Bar");
+    const latency = pane(page).getByRole("switch", { name: "Show latency" });
+    await expect(latency).not.toBeChecked();
+    await latency.click({ force: true }); // the switch draws over its native input; it flips once the core answers
+    await expect.poll(async () => (await lastSection(page, "call_screen"))?.show_latency).toBe(true);
+    await expect(latency).toBeChecked();
+    const size = pane(page).getByRole("spinbutton", { name: "Text size" });
+    await expect(size).toHaveValue("100");
+    await size.fill("125");
+    await size.press("Enter");
+    await expect.poll(async () => (await lastSection(page, "call_screen"))?.text_size_pct).toBe(125);
+  });
+
+  test("UI — Performance: Stages sampled, one checkbox per stage, all on; unchecking Retrieval saves the others", async ({ page }) => {
+    await openPane(page, "Performance");
+    const stages = pane(page).getByRole("group", { name: "Stages sampled" });
+    await expect(stages.getByRole("checkbox")).toHaveCount(6);
+    for (const name of ["Confirmed text", "Signals", "Retrieval", "Claude first token", "Cards streamed and validated", "Merge across agents"]) await expect(stages.getByRole("checkbox", { name })).toBeChecked();
+    await stages.getByText("Retrieval", { exact: true }).click();
+    await expect.poll(async () => (await lastSection(page, "performance"))?.sampled_stages).toEqual(["confirmed_text", "signals", "first_token", "full_card", "merge"]);
+  });
+
+  test("UI — Updates: Release notes opens this version's notes; Model bundle reads Speech models · up to date", async ({ page }) => {
+    await openPane(page, "Updates");
+    await pane(page).getByRole("link", { name: /Release notes/ }).click();
+    await expect.poll(async () => ((await sent(page, "open_external")).at(-1)?.target as { url?: string } | undefined)?.url).toMatch(/^https:\/\/github\.com\/getahead\/noter\/releases(\/tag\/v\d[\w.-]*)?$/); // a development build has no release of its own
+    await expect(pane(page)).toContainText("Speech models · up to date");
+  });
+});

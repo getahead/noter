@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+import type { Lang, OutputRoute } from "../../core/bindings";
+import { dbToLevel } from "../first-run/self-test";
+import { LevelMeter } from "../../ui/primitives/level-meter";
+
 import { useWindow } from "../../app/use-window";
 import { applySnapshot } from "../../app/store/window-store";
 import type { Bridge } from "../../app/bridge/bridge";
@@ -37,27 +41,68 @@ export function registerSystemAudioReturn(bridge: Bridge, pending: { current: bo
 }
 
 // @cpt-dod:cpt-noter-dod-ui-settings-window:p1
+const LANGUAGES: { lang: Lang; key: "settings.audio.lang_en" | "settings.audio.lang_ru" | "settings.audio.lang_de" }[] = [
+  { lang: "en", key: "settings.audio.lang_en" },
+  { lang: "ru", key: "settings.audio.lang_ru" },
+  { lang: "de", key: "settings.audio.lang_de" },
+];
+const ROUTE: Record<OutputRoute, "settings.audio.route_headphones" | "settings.audio.route_speakers" | "settings.audio.route_unknown"> = {
+  headphones: "settings.audio.route_headphones",
+  speakers: "settings.audio.route_speakers",
+  unknown: "settings.audio.route_unknown",
+};
+
+/** Microphone (DESIGN 3.2): the inputs the core reports, the system default first, with the live input level. */
+function MicrophoneRow({ bridge, value, error, onChange }: { bridge: Bridge; value: string | null; error: string | null; onChange: (uid: string | null) => void }) {
+  const inputs = useWindow(bridge, (s) => s.whole.environment?.input_devices) ?? [];
+  const micDb = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels?.mic_db);
+  // the meter listens while the pane is open, as first run's does
+  useEffect(() => {
+    void bridge.subscribe("levels_subscribe", { call_id: null }, { not_implemented: "unavailable" });
+    return () => void bridge.unsubscribe("levels_subscribe");
+  }, [bridge]);
+  const fallback = inputs.find((d) => d.is_default)?.name ?? "";
+  const options = [{ value: "", label: t("settings.audio.mic_default", { device: fallback }) }, ...inputs.map((d) => ({ value: d.uid, label: d.name }))];
+  return (
+    <Row label={t("settings.audio.microphone")} error={error}>
+      <PopupButton options={options} value={value ?? ""} label={t("settings.audio.microphone")} onAction={(v) => onChange(v || null)} />
+      <LevelMeter level={dbToLevel(micDb ?? null)} label={t("settings.audio.mic_level")} />
+    </Row>
+  );
+}
+
 export function AudioPane({ bridge, settings }: PaneProps) {
   const { audio } = settings;
-  const device = useWindow(bridge, (s) => s.whole.environment?.output_device);
+  const outputs = useWindow(bridge, (s) => s.whole.environment?.output_devices) ?? [];
   const native = useWindow(bridge, (s) => s.whole.environment?.native);
   const permissions = useWindow(bridge, (s) => s.whole.setup?.permissions);
   const [selfTest, setSelfTest] = useState(false);
   const recheckPermission = useRef(false);
   useEffect(() => registerSystemAudioReturn(bridge, recheckPermission), [bridge]);
   const rowError = useRowErrors(bridge);
-  const headphones = device ? audio.output.headphones_devices.includes(device.uid) : false;
   const save = (edits: Partial<typeof audio>) => void saveSection(bridge, "audio", edits);
   return (
     <>
       <Group title={t("settings.audio.input_output")}>
-        {device && (
-          <Row label={t("settings.audio.output")} error={rowError("audio", "output.headphones_devices")} note={t("settings.audio.headphones_note")}>
-            <Checkbox
-              label={t("settings.audio.headphones", { device: device.name })}
-              checked={headphones}
-              onAction={(on) => void saveSection(bridge, "audio", (current) => ({ output: { headphones_devices: on ? [...current.output.headphones_devices, device.uid] : current.output.headphones_devices.filter((u) => u !== device.uid) } }))}
-            />
+        <MicrophoneRow bridge={bridge} value={audio.mic_device ?? null} error={rowError("audio", "mic_device")} onChange={(mic_device) => save({ mic_device })} />
+        {outputs.length > 0 && (
+          <Row label={t("settings.audio.outputs")} error={rowError("audio", "output.headphones_devices")} note={t("settings.audio.outputs_note")}>
+            <ul className="st-devices" role="group" aria-label={t("settings.audio.outputs")}>
+              {outputs.map((d) => (
+                <li key={d.uid} className="st-device">
+                  <span className="st-device__name">{d.name}</span>
+                  <span className="np-dim">{t(ROUTE[d.route])}</span>
+                  {/* only a device Noter can't identify, or one already marked, can be treated as headphones (PM-65) */}
+                  {(d.route === "unknown" || d.marked_headphones) && (
+                    <Checkbox
+                      label={t("settings.audio.treat_headphones")}
+                      checked={d.marked_headphones}
+                      onAction={(on) => void saveSection(bridge, "audio", (current) => ({ output: { headphones_devices: on ? [...current.output.headphones_devices, d.uid] : current.output.headphones_devices.filter((u) => u !== d.uid) } }))}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
           </Row>
         )}
         <Row note={t("settings.audio.exclude_note")} error={rowError("audio", "exclude_own_sounds")}>
@@ -70,6 +115,18 @@ export function AudioPane({ bridge, settings }: PaneProps) {
         </Row>
         <Row label={t("settings.audio.archive")} error={rowError("audio", "offline_backend")}>
           <PopupButton options={BACKENDS} value={audio.offline_backend} label={t("settings.audio.archive")} onAction={(v) => save({ offline_backend: v as typeof audio.offline_backend })} />
+        </Row>
+        <Row label={t("settings.audio.languages")} error={rowError("audio", "languages")} note={t("settings.audio.languages_note")}>
+          <div className="st-checks" role="group" aria-label={t("settings.audio.languages")}>
+            {LANGUAGES.map(({ lang, key }) => (
+              <Checkbox
+                key={key}
+                label={t(key)}
+                checked={(audio.languages ?? []).includes(lang)}
+                onAction={(on) => void saveSection(bridge, "audio", (current) => ({ languages: LANGUAGES.map((l) => l.lang).filter((l) => (l === lang ? on : (current.languages ?? []).includes(l))) }))}
+              />
+            ))}
+          </div>
         </Row>
       </Group>
       <GlossaryGroup bridge={bridge} />
