@@ -248,11 +248,11 @@ describe("cpt-noter-seq-call-page-share-outputs", () => {
       expect(existsSync(done.path)).toBe(true);
       const files = readdirSync(done.path);
       expect(files).toHaveLength(done.files);
-      expect(files.some((f) => f.endsWith(".md"))).toBe(true);
-      expect(files.some((f) => f.endsWith("-mic.m4a"))).toBe(true);
-      const summary = readFileSync(`${done.path}/${files.find((f) => f.endsWith(".md"))}`, "utf8");
+      // PRD › Export and portability (#1146): the call's folder, its files by name
+      expect(files).toEqual(expect.arrayContaining(["call.json", "summary.md", "transcript.md", "transcript.srt", "transcript.json", "mic.m4a"]));
+      const summary = readFileSync(`${done.path}/summary.md`, "utf8");
       expect(summary).toContain("Backend and QA aligned on the websocket notifications.");
-      const transcript = JSON.parse(readFileSync(`${done.path}/${files.find((f) => f.endsWith(".json"))}`, "utf8")) as Array<{ text: string }>;
+      const transcript = JSON.parse(readFileSync(`${done.path}/transcript.json`, "utf8")) as Array<{ text: string }>;
       expect(transcript).toEqual(expect.arrayContaining([expect.objectContaining({ text: "Can we keep serving reads while it rebuilds?" })]));
     }
   });
