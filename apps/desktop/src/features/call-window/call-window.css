@@ -21,6 +21,9 @@
 }
 .cw-win--floating.is-collapsed {
   height: 56px;
+  /* throwaway #1144: changes one baseline so the bot must commit it */
+  outline: 2px solid red;
+  outline-offset: -2px;
 }
 
 /* ---------------- Call screen (dedicated) ---------------- */
