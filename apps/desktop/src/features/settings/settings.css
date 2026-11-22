@@ -149,4 +149,8 @@
 .st-device__name { font-weight: 600; }
 .st-devices { width: 100%; }
 /* Microphone: the level meter beside the pop-up */
-.st-mic { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.st-mic { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; max-width: 100%; }
+/* a long input name ("System Default (MacBook Pro Microphone)") tail-truncates; the menu and the help tag keep it whole */
+.st-mic .np-popup { max-width: 200px; min-width: 0; flex: 0 1 auto; }
+.st-mic .np-popup select { max-width: 100%; text-overflow: ellipsis; }
+.st-mic .np-meter { flex: none; }
