@@ -37,6 +37,9 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
       open_questions: world.items.filter((i) => i.kind === "open_question" && i.status === "open" && calls.some((c) => c.id === i.call.id)),
       topics: world.topics.filter((topic) => topicIds.has(topic.id)),
       talk_share: world.settings.privacy.behaviour_metrics ? 0.31 : null,
+      // PE-R5 Languages and the PE-R1 cadence, as the core reads them (#1152)
+      languages: languagesOf(world, p.id),
+      cadence: p.is_you ? null : cadenceOf(calls.map((c) => [c.started_at, c.participants.filter((x) => !x.is_you).length] as [number, number])),
     };
   },
   person_create: (a, { world, emit }) => {
@@ -123,4 +126,30 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   },
 
   };
+}
+
+/** Speaking time per language of the person's lines, largest first. */
+function languagesOf(world: Core.World, personId: string): Bindings.LanguageShare[] {
+  const ms = new Map<string, { lang: Bindings.Lang; ms: number }>();
+  for (const tr of world.transcripts)
+    for (const g of tr.segments)
+      if (g.lang && g.speaker.label.type === "person" && g.speaker.label.person.id === personId) {
+        const key = typeof g.lang === "string" ? g.lang : g.lang.code;
+        const e = ms.get(key) ?? { lang: g.lang, ms: 0 };
+        e.ms += g.t1_ms - g.t0_ms;
+        ms.set(key, e);
+      }
+  const total = [...ms.values()].reduce((n, e) => n + e.ms, 0);
+  return total ? [...ms.values()].sort((a, b) => b.ms - a.ms).map((e) => ({ lang: e.lang, share: e.ms / total })) : [];
+}
+
+/** 1:1 when most calls had only them; the usual gap (median) between three or more calls. */
+function cadenceOf(calls: [number, number][]): Bindings.Cadence | null {
+  const DAY = 86_400_000;
+  const one_on_one = calls.filter(([, others]) => others === 1).length * 2 > calls.length;
+  const starts = calls.map(([at]) => at).sort((a, b) => a - b);
+  const gaps = starts.slice(1).map((at, i) => Math.round((at - starts[i]!) / DAY)).sort((a, b) => a - b);
+  const mid = starts.length >= 3 ? gaps[Math.floor(gaps.length / 2)]! : -1;
+  const every: Bindings.CadenceEvery | null = mid >= 6 && mid <= 8 ? "weekly" : mid >= 13 && mid <= 15 ? "every_two_weeks" : mid >= 27 && mid <= 33 ? "monthly" : null;
+  return one_on_one || every ? { one_on_one, every } : null;
 }

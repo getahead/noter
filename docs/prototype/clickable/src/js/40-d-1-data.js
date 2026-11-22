@@ -159,7 +159,7 @@
 
   /* People list facts */
   D.peopleFacts = {
-    'p-anna': { theirOpen: 3, youOwe: 1, lastCall: 'Today', sub: 'Frontend · 31 calls since Sep · 1:1 weekly', langs: 'Russian 71 % · English 26 % · German 3 %', voiceSince: '3 Oct', voiceDetail: '2 profiles matched in 28 calls' },
+    'p-anna': { theirOpen: 3, youOwe: 1, lastCall: 'Today', sub: 'Frontend · 31 calls since Sep · 1:1 weekly', langs: 'Russian 71 % · English 26 % · German 3 %', voiceSince: '3 Oct', voiceDetail: '2 profiles · matched in 28 calls' },
     'p-dmitri': { theirOpen: 2, youOwe: 1, lastCall: 'Today', sub: 'Backend lead · 18 calls since Sep', langs: 'Russian 64 % · English 36 %', voiceSince: '28 Sep', voiceDetail: '1 profile matched in 15 calls' },
     'p-pavel': { theirOpen: 1, youOwe: 2, lastCall: 'Today', sub: 'Product manager · 22 calls since Sep', langs: 'English 90 % · Russian 10 %' },
     'p-oleg': { theirOpen: 2, youOwe: 0, lastCall: '6 Oct', sub: 'QA engineer · 9 calls since Sep', langs: 'Russian 88 % · English 12 %' },

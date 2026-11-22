@@ -5,7 +5,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
 import { useWindow } from "../../app/use-window";
 import type { CoreError, PersonPage as Page, PersonRow, UiPrefs } from "../../core/bindings";
-import { shortDay, t } from "../../i18n/format";
+import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Table } from "../../ui/primitives/table";
@@ -13,6 +13,7 @@ import { HistoryTimeline } from "../history/HistoryTimeline";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
 import { TopicChip } from "../../ui/primitives/topic-chip";
+import { languagesLine, voiceLine } from "./person-lines";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
 import { afterVoiceAlert, afterVoiceChange } from "./focus-return";
@@ -197,6 +198,7 @@ const Block = ({ region, title, count, children }: { region: string; title: stri
 export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDeleteVoice }: { bridge: Bridge; page: Page; prefs: UiPrefs | undefined; onShowAll?: () => void; onSetUpVoice?: () => void; onDeleteVoice?: () => void }) {
   const p: PersonRow = page.person;
   const names = useMemo(() => [...new Set([p.short_name, ...p.aliases])].join(", "), [p]);
+  const languages = languagesLine(page.languages ?? []);
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-person
   if (!page.calls.length)
     return (
@@ -232,16 +234,17 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
           <dl className="np-kv pe-identity">
             <dt>{t("person.voice")}</dt>
             <dd>
-              <div>{p.voice_profile ? t("person.voice_on") : t("person.voice_off")}</div>
-              {p.voice_profile && p.voice_profile_stats && <div className="np-dim">
-                {p.voice_profile_stats.opted_in_at != null && <div>{t("person.voice_since", { date: shortDay(p.voice_profile_stats.opted_in_at, prefs) })}</div>}
-                <div>{t("person.voice_profiles", { count: p.voice_profile_stats.profiles })}</div>
-                <div>{t("person.voice_matched_calls", { count: p.voice_profile_stats.matched_calls })}</div>
-              </div>}
+              <div>{!p.voice_profile ? t("person.voice_off") : p.voice_profile_stats ? voiceLine(p.voice_profile_stats, prefs) : t("person.voice_on")}</div>
               <div className="pe-kvact">
                 {p.voice_profile ? <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>
+            {languages && (
+              <>
+                <dt>{t("person.languages")}</dt>
+                <dd>{languages}</dd>
+              </>
+            )}
             {/* @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-fields */}
             <dt>{t("person.names")}</dt>
             <dd>{names}</dd>

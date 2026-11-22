@@ -396,6 +396,71 @@ fn talk_share(c: &Connection, person_id: &str) -> Db<Option<f32>> {
         .map(|(own, all)| (own as f64 / all as f64) as f32))
 }
 
+/// The languages of a person's transcribed lines by speaking time, largest first; one pass per
+/// call (the archive pass once there is one).
+fn languages_of(c: &Connection, person_id: &str) -> Db<Vec<LanguageShare>> {
+    let rows: Vec<(String, i64)> = c
+        .prepare(
+            "SELECT g.lang, sum(g.t1_ms - g.t0_ms) FROM segments g
+             JOIN speakers s ON s.id = g.speaker_id
+             WHERE s.person_id = ?1 AND g.lang IS NOT NULL
+               AND s.pass = (CASE WHEN EXISTS
+                     (SELECT 1 FROM speakers a WHERE a.call_id = s.call_id AND a.pass = 'archive')
+                     THEN 'archive' ELSE 'live' END)
+             GROUP BY g.lang ORDER BY 2 DESC, 1",
+        )?
+        .query_map([person_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+        .collect::<Result<_, _>>()?;
+    let total: i64 = rows.iter().map(|(_, ms)| ms).sum();
+    if total <= 0 {
+        return Ok(vec![]);
+    }
+    Ok(rows
+        .into_iter()
+        .map(|(lang, ms)| LanguageShare {
+            lang: crate::library::lang_of(lang),
+            share: (ms as f64 / total as f64) as f32,
+        })
+        .collect())
+}
+
+/// Each call of the person, oldest first: when it started and how many people other than You
+/// took part (1 is a 1:1).
+fn meetings_of(c: &Connection, person_id: &str) -> Db<Vec<(i64, u32)>> {
+    c.prepare(
+        "SELECT c.started_at, (SELECT count(*) FROM call_participants o WHERE o.call_id = c.id
+                 AND o.person_id NOT IN (SELECT id FROM people WHERE is_you = 1))
+         FROM calls c
+         WHERE c.id IN (SELECT call_id FROM call_participants WHERE person_id = ?1)
+         ORDER BY c.started_at",
+    )?
+    .query_map([person_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+    .collect()
+}
+
+/// "1:1 weekly": 1:1 when most calls had only them; the usual gap from the median of the gaps
+/// between at least three calls (6–8 days weekly, 13–15 every two weeks, 27–33 monthly).
+fn cadence(calls: &[(i64, u32)]) -> Option<Cadence> {
+    const DAY_MS: i64 = 86_400_000;
+    let one_on_one = calls.iter().filter(|(_, others)| *others == 1).count() * 2 > calls.len();
+    let every = (calls.len() >= 3)
+        .then(|| {
+            let mut gaps: Vec<i64> = calls
+                .windows(2)
+                .map(|w| ((w[1].0 - w[0].0) as f64 / DAY_MS as f64).round() as i64)
+                .collect();
+            gaps.sort_unstable();
+            match gaps[gaps.len() / 2] {
+                6..=8 => Some(CadenceEvery::Weekly),
+                13..=15 => Some(CadenceEvery::EveryTwoWeeks),
+                27..=33 => Some(CadenceEvery::Monthly),
+                _ => None,
+            }
+        })
+        .flatten();
+    (one_on_one || every.is_some()).then_some(Cadence { one_on_one, every })
+}
+
 /// Trimmed, blanks dropped, one spelling per normalized form (the first).
 fn clean_aliases(aliases: &[String]) -> Vec<(String, String)> {
     let mut seen = BTreeSet::new();
@@ -634,6 +699,13 @@ impl Core {
             // @cpt-begin:cpt-noter-algo-core-people-page:p1:inst-page-metrics
             let talk_share = if metrics { talk_share(c, &id)? } else { None };
             // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-metrics
+            // PE-R5 Languages and the PE-R1 cadence (issue 1152)
+            let languages = languages_of(c, &id)?;
+            let cadence = if person.is_you {
+                None
+            } else {
+                cadence(&meetings_of(c, &id)?)
+            };
             Ok(Some((
                 person,
                 ids,
@@ -642,14 +714,25 @@ impl Core {
                 open_questions,
                 topics,
                 talk_share,
+                languages,
+                cadence,
             )))
         })?;
         // @cpt-end:cpt-noter-flow-core-people-read:p1:inst-read-page
         // @cpt-begin:cpt-noter-flow-core-people-read:p1:inst-read-return
         // @cpt-begin:cpt-noter-algo-core-people-page:p1:inst-page-empty
         // @cpt-begin:cpt-noter-algo-core-people-page:p1:inst-page-return
-        let (person, ids, owns_open, you_owe, open_questions, topics, talk_share) =
-            page.ok_or_else(not_found)?;
+        let (
+            person,
+            ids,
+            owns_open,
+            you_owe,
+            open_questions,
+            topics,
+            talk_share,
+            languages,
+            cadence,
+        ) = page.ok_or_else(not_found)?;
         let mut calls = Vec::with_capacity(ids.len());
         for id in &ids {
             calls.extend(self.call_row(id)?);
@@ -662,8 +745,8 @@ impl Core {
             open_questions,
             topics,
             talk_share,
-            languages: vec![],
-            cadence: None,
+            languages,
+            cadence,
         })
         // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-return
         // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-empty
@@ -1176,4 +1259,39 @@ fn merge_tx(
     // The transaction commits when `write_with` returns; an error above drops it, so nothing moved.
     Ok(((touched, source.to_string(), target.to_string()), log))
     // @cpt-end:cpt-noter-algo-core-people-merge:p1:inst-merge-commit
+}
+
+#[cfg(test)]
+mod cadence_tests {
+    use super::*;
+
+    const DAY: i64 = 86_400_000;
+
+    fn calls(gaps: &[i64], others: u32) -> Vec<(i64, u32)> {
+        let mut at = 0;
+        let mut out = vec![(0, others)];
+        for g in gaps {
+            at += g * DAY;
+            out.push((at, others));
+        }
+        out
+    }
+
+    #[test]
+    fn the_cadence_reads_the_usual_gap_and_whether_it_is_a_1_1() {
+        let every = |gaps: &[i64]| cadence(&calls(gaps, 3)).and_then(|c| c.every);
+        assert_eq!(every(&[7, 7]), Some(CadenceEvery::Weekly));
+        assert_eq!(every(&[14, 13, 15]), Some(CadenceEvery::EveryTwoWeeks));
+        assert_eq!(every(&[30, 31]), Some(CadenceEvery::Monthly));
+        assert_eq!(every(&[3, 40]), None, "no usual gap");
+        assert_eq!(every(&[7]), None, "two calls are no pattern");
+        assert_eq!(
+            cadence(&calls(&[2], 1)),
+            Some(Cadence {
+                one_on_one: true,
+                every: None
+            })
+        );
+        assert_eq!(cadence(&[]), None);
+    }
 }
