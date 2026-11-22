@@ -288,11 +288,11 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {owner}
           {text}
         </div>
+        {/* the evidence is the timestamp chip, then the due text and tags (action item row › Anatomy) */}
         <div className="it-row__line2">
-          {due}
-          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, it.spans[0]!, "main-window-shell")} />}
-          {tags}
           {prov}
+          {due}
+          {tags}
         </div>
         {question}
         {error}

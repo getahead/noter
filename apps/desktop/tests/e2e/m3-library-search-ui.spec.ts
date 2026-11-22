@@ -310,3 +310,16 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
       }
     });
 });
+
+// Design fixes against the prototype of record (Search results).
+test.describe("cpt-noter-seq-library-search-calls", () => {
+  test("UI — design — #1117 a transcript hit carries its timestamp chip instead of 'Open at this moment'", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "notification service");
+    await expect(page.locator('[data-component="cpt-noter-component-ui-search-result-row"]').first()).toBeVisible();
+    const segments = page.locator('[data-component="cpt-noter-component-ui-search-result-row"][data-target="segment"]');
+    await expect(segments.first()).toBeVisible();
+    await expect(segments.first().locator('[data-component="cpt-noter-component-ui-provenance-chip"]')).toHaveText(/^\d{2}:\d{2}:\d{2}\s?↗$/);
+    await expect(segments.first().getByText("Open at this moment")).toHaveCount(0);
+  });
+});

@@ -7,6 +7,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { Badge } from "../../ui/primitives/badge";
 import { KIND_KEY } from "../items/kind";
 import { Link } from "../../ui/primitives/link";
+import { ProvenanceChip } from "../items/ProvenanceChip";
 import { openSpan } from "../items/evidence";
 import { segments } from "./search-model";
 
@@ -68,7 +69,7 @@ export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit
     }
   };
   return (
-    <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
+    <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-target={hit.target.type} data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
       {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}
       {hit.target.type === "item" && hit.item_kind && Object.hasOwn(KIND_KEY, hit.item_kind) && <Badge kind="kind" text={t(KIND_KEY[hit.item_kind])} />}
       {/* @cpt-begin:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
@@ -81,7 +82,8 @@ export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit
       <span className="lb-hit__go">
       {span && <IconButton icon={playing ? "pause" : "play"} label={t(playing ? "playback.pause" : "transcript.play")} size="inline" onAction={play} />}
       {note && <span className="np-dim" role="status">{t(note)}</span>}
-      <Link label={t("search.open")} onAction={go} />
+      {/* a transcript hit opens at its moment from the timestamp chip, as in the prototype; other hits keep the link */}
+      {span ? <ProvenanceChip bridge={bridge} span={span} /> : <Link label={t("search.open")} onAction={go} />}
       </span>
     </li>
   );

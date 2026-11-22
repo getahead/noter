@@ -42,7 +42,16 @@ describe("SearchResultRow actions", () => {
     return act;
   };
   it("opens a span at its moment, a document through open_external, an item or summary at its call", () => {
-    expect(press(row({ type: "segment", span: { call_id: "c1", t0_ms: 0, t1_ms: 1 } })).mock.calls[0]![1]).toBe("window_navigate");
+    // a transcript hit has no Open link (#1117): its timestamp chip opens it, and Return on the row does too
+    const seg = row({ type: "segment", span: { call_id: "c1", t0_ms: 0, t1_ms: 1 } });
+    const act = vi.fn().mockResolvedValue({ status: "ok" });
+    const tree = rendered(SearchResultRow, { bridge: { act, core: { windowNavigate: vi.fn() } } as never, hit: seg });
+    expect(() => find(tree, (p) => p.label === "Open at this moment")).toThrow();
+    find(tree, (p) => p.span !== undefined && p.bridge !== undefined);
+    const li = { key: "Enter", preventDefault: vi.fn() } as Record<string, unknown>;
+    li.target = li.currentTarget = {};
+    (tree.props.onKeyDown as (e: unknown) => void)(li);
+    expect(act.mock.calls[0]![1]).toBe("window_navigate");
     expect(press(row({ type: "document", document_id: "d", chunk_id: "k" })).mock.calls[0]![1]).toBe("open_external");
     expect(press(row({ type: "item", item_id: "i" })).mock.calls[0]![1]).toBe("window_navigate");
     expect(press(row({ type: "item", item_id: "i" }, null)).mock.calls.length).toBe(0);

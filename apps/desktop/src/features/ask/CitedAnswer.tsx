@@ -1,5 +1,5 @@
 // A turn's answer with its [n] references and the sources they point at (AK-R3 answer, cpt-noter-dod-ui-ask-citations).
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import type { Citation, TimeSpan } from "../../core/bindings";
@@ -15,7 +15,7 @@ const COPIED_MS = 2000;
 
 // @cpt-component:cpt-noter-component-ui-cited-answer:p1
 // @cpt-dod:cpt-noter-dod-ui-ask-citations:p1
-export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay }: { bridge: Bridge; text: string; citations: Citation[]; live: boolean; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void }) {
+export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay, extra }: { bridge: Bridge; text: string; citations: Citation[]; live: boolean; onAskAgain?: () => void; onPlay?: (span: TimeSpan) => void; /** Drawn after Copy with Citations on its row (the answer's thumbs). */ extra?: ReactNode }) {
   const [focus, setFocus] = useState<number | null>(null);
   const rows = useRef(new Map<number, HTMLLIElement>());
   const origin = useRef<HTMLElement | null>(null); // the superscript that sent focus to a row: ⇧Tab goes back to it
@@ -80,6 +80,7 @@ export function CitedAnswer({ bridge, text, citations, live, onAskAgain, onPlay 
             onAction={() => void copyTurn({ answer_md: text, citations }, (s) => navigator.clipboard.writeText(s)).then(setCopy)}
           />
           {/* @cpt-end:cpt-noter-flow-ui-ask-follow-up-copy:p1:inst-copy */}
+          {extra}
           <span role="status" className="ak-live">{copy === "copied" ? t("ask.copied_status") : ""}</span>
         </div>
       )}
