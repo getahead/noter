@@ -3,6 +3,7 @@
 // the Copilot flag off state (M1). One tree and one store for both layouts: the core places, shows, hides and
 // keys the panel and sends `window:call`; the window renders the layout it names and sends wanted state.
 import "./call-window.css";
+import { foldOrder, useHeaderFold } from "./header-fold";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 
@@ -181,6 +182,12 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   }, [announce, cap, noticeSpoken]);
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-store-capture
   // @cpt-end:cpt-noter-flow-ui-call-window-recover-capture:p1:inst-announce-failure
+
+  // FP-R1: the title keeps 8 em; Move to Display 2, Collapse and the shield move into More, in that order, when it can't (issue 1186)
+  const fpTitle = useRef<HTMLSpanElement>(null);
+  const fpOrder = foldOrder(displays > 1);
+  const fpFold = useHeaderFold(fpTitle, fpOrder.length, [cw?.text_size_pct, displays, cw?.layout, cw?.collapsed, cap?.phase]); // re-measured when the panel appears
+  const fpFolded = new Set(fpOrder.slice(0, fpFold));
 
   if (!cap || !cw || !callId) return null;
   const view = windowState(cw, presenting, cap);
@@ -549,15 +556,24 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
           <>
             <header className="fp-r1" data-region="FP-R1" aria-label={t("cw.panel_header")} onDoubleClick={onHeaderDouble}>
               <RecordingIndicator variant="dot" status={status} />
-              <span className="fp-title" title={title}>
+              <span className="fp-title" title={title} ref={fpTitle}>
                 {title}
               </span>
               <span className="np-tnum fp-clock">{clock}</span>
-              {shareGlyph}
-              {twoDisplays && <IconButton icon="displays" label={t("cw.move_display")} size="inline" onAction={() => setLayout("auto")} />}
+              {!fpFolded.has("shield") && shareGlyph}
+              {twoDisplays && !fpFolded.has("move") && <IconButton icon="displays" label={t("cw.move_display")} size="inline" onAction={() => setLayout("auto")} />}
               {hideForPresenting}
-              <MoreMenu items={moreItems} size="inline" />
-              <IconButton icon="chevronUp" label={t("cw.collapse")} size="inline" onAction={() => collapse(true)} />
+              {/* folded controls become items of More (Move to Display 2 is already there as Open Call Screen) */}
+              <MoreMenu
+                items={[
+                  ...(fpFolded.has("collapse") ? [{ label: t("cw.collapse"), onSelect: () => collapse(true) }] : []),
+                  ...(fpFolded.has("shield") ? [{ label: t("cw.share_glyph"), disabled: true }] : []),
+                  ...(fpFolded.size ? [{ divider: true } as MenuItem] : []),
+                  ...moreItems,
+                ]}
+                size="inline"
+              />
+              {!fpFolded.has("collapse") && <IconButton icon="chevronUp" label={t("cw.collapse")} size="inline" onAction={() => collapse(true)} />}
               {/* @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-return-reopen */}
               <IconButton icon="x" label={t("cw.hide")} help={t("cw.hide_help")} size="inline" onAction={hide} />
               {/* @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-return-reopen */}

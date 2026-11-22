@@ -611,13 +611,26 @@ test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
 // buttons) scales like CS-R1; the status strip keeps its size in both layouts.
 test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
   test("Text size scales the floating panel's header like the call screen's", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 800 }); // the prototype's floating panel width
     await startLive(page, (w) => (still(w), void Object.assign(w.settings.call_screen, { text_size_pct: 150 })));
     await coreWindow(page, { layout: "floating" });
     await expect(floating(page)).toBeVisible();
     const fpHeader = floating(page).locator('[data-region="FP-R1"]');
     await expect(fpHeader).toHaveCSS("zoom", "1.5");
     await expect(floating(page).locator('[data-region="FP-R5"]')).toHaveCSS("zoom", "1.5");
-    // nothing overlaps at 150 %: the title truncates first and every header button stays inside the panel
+    // the title keeps at least 8 em (coordinator decision): controls fold into More, Move to Display 2 first, then
+    // Collapse, then the shield; Hide for Presenting, More and × never move
+    const title = fpHeader.locator(".fp-title");
+    await expect.poll(() => title.evaluate((el) => el.clientWidth / parseFloat(getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(8);
+    for (const name of ["Hide Noter for Presenting", "More", "Hide"]) await expect(fpHeader.getByRole("button", { name, exact: true })).toBeVisible();
+    await expect(fpHeader.getByRole("button", { name: "Move to Display 2" })).toHaveCount(0);
+    const collapseIn = await fpHeader.getByRole("button", { name: "Collapse Panel" }).count();
+    const shieldIn = await fpHeader.locator(".cw-shield").count();
+    expect(collapseIn <= shieldIn).toBe(true); // Collapse leaves before the shield does
+    await fpHeader.getByRole("button", { name: "More", exact: true }).click();
+    if (!collapseIn) await expect(page.getByRole("menuitem", { name: "Collapse Panel" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    // nothing overlaps at 150 %: every header button stays inside the panel
     const panel = (await floating(page).boundingBox())!;
     for (const b of await fpHeader.getByRole("button").all()) {
       const box = (await b.boundingBox())!;
