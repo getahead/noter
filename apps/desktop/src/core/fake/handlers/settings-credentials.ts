@@ -17,9 +17,24 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
       const m = sec.value.card_keys.modifiers;
       if (!m.control && !m.option && !m.command) throw coreError("invalid_input", "card keys need a modifier", { type: "validation", field: "card_keys.modifiers", rule: "no_modifier" });
     }
+    if (sec.section === "call_screen" && sec.value.text_size_pct !== undefined && (sec.value.text_size_pct < 85 || sec.value.text_size_pct > 150)) throw coreError("invalid_input", "text size", { type: "validation", field: "text_size_pct", rule: "out_of_range" });
     if (sec.section === "audio") sec.value.retention_next_run_deletes = world.settings.audio.retention_next_run_deletes;
     (world.settings as unknown as Record<string, unknown>)[sec.section] = sec.value;
     world.settings.rev += 1;
+    if (sec.section === "audio") {
+      // as the core does: a device marked as headphones reads as headphones in Output devices
+      const marked = sec.value.output.headphones_devices;
+      const env = world.app.environment;
+      for (const d of env.output_devices ?? []) {
+        const was = d.marked_headphones;
+        d.marked_headphones = marked.includes(d.uid);
+        if (d.marked_headphones) d.route = "headphones";
+        else if (was) d.route = "unknown";
+      }
+      if (env.output_device) env.output_device.marked_headphones = marked.includes(env.output_device.uid);
+      env.version += 1;
+      publish("env:changed");
+    }
     if (sec.section === "general") {
       world.app.setup.detection_enabled = sec.value.offer_to_record && world.app.setup.self_test.type === "passed";
       publish("setup:changed");

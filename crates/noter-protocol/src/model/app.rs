@@ -91,6 +91,12 @@ pub struct EnvironmentState {
     /// The current audio output device, so Settings can offer to mark it as headphones
     /// (`AudioOutputSettings.headphones_devices`).
     pub output_device: Option<OutputDeviceInfo>,
+    /// Every audio input device, for Settings › Microphone.
+    #[serde(default)]
+    pub input_devices: Vec<InputDeviceInfo>,
+    /// Every audio output device with the route Noter detects, for Settings › Output devices.
+    #[serde(default)]
+    pub output_devices: Vec<OutputDeviceRow>,
     pub permissions: Vec<PermissionRow>,
     /// macOS notification authorization, read from `UNUserNotificationCenter` settings.
     pub notifications: NotificationAuth,
@@ -142,6 +148,29 @@ pub struct OutputDeviceInfo {
     pub uid: String,
     pub name: String,
     /// The user marked this device as headphones.
+    pub marked_headphones: bool,
+}
+
+/// An audio input device (Settings › Microphone).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct InputDeviceInfo {
+    /// Core Audio device UID, the value of `AudioSettings.mic_device`.
+    pub uid: String,
+    pub name: String,
+    /// The system default input.
+    pub is_default: bool,
+}
+
+/// An audio output device with its detected route (Settings › Output devices, PM-65).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct OutputDeviceRow {
+    /// Core Audio device UID.
+    pub uid: String,
+    pub name: String,
+    /// What Noter detects: headphones, speakers or not identified (`unknown`); a device the user
+    /// marked as headphones reads `headphones`.
+    pub route: OutputRoute,
+    /// The user marked this device as headphones (`AudioOutputSettings.headphones_devices`).
     pub marked_headphones: bool,
 }
 

@@ -562,6 +562,7 @@ fn settings() -> Settings {
             retention: AudioRetention::Days30,
             retention_next_run_deletes: 2,
             mic_device: None,
+            languages: default_languages(),
         },
         privacy: PrivacySettings {
             mode: PrivacyMode::CloudRedacted,
@@ -593,6 +594,8 @@ fn settings() -> Settings {
             display_id: Some(DisplayId(s("dsp_studio"))),
             layout: CallLayoutPreference::Auto,
             open_automatically: true,
+            show_latency: false,
+            text_size_pct: default_text_size_pct(),
         },
         menu_bar: MenuBarSettings {
             title: MenuBarTitle::None,
@@ -1648,6 +1651,44 @@ pub fn world() -> FakeWorld {
                 name: s("External Headphones"),
                 marked_headphones: false,
             }),
+            input_devices: vec![
+                InputDeviceInfo {
+                    uid: s("BuiltInMicrophoneDevice"),
+                    name: s("MacBook Pro Microphone"),
+                    is_default: true,
+                },
+                InputDeviceInfo {
+                    uid: s("StudioDisplayMicrophone"),
+                    name: s("Studio Display Microphone"),
+                    is_default: false,
+                },
+            ],
+            output_devices: vec![
+                OutputDeviceRow {
+                    uid: s("BuiltInHeadphoneOutputDevice"),
+                    name: s("External Headphones"),
+                    route: OutputRoute::Headphones,
+                    marked_headphones: false,
+                },
+                OutputDeviceRow {
+                    uid: s("BuiltInSpeakerDevice"),
+                    name: s("MacBook Pro Speakers"),
+                    route: OutputRoute::Speakers,
+                    marked_headphones: false,
+                },
+                OutputDeviceRow {
+                    uid: s("BuiltInHeadphoneOutputDevice-USB-DAC-4F2A"),
+                    name: s("USB-C DAC"),
+                    route: OutputRoute::Headphones,
+                    marked_headphones: true,
+                },
+                OutputDeviceRow {
+                    uid: s("AirPlay-LivingRoom"),
+                    name: s("Living Room"),
+                    route: OutputRoute::Unknown,
+                    marked_headphones: false,
+                },
+            ],
             permissions: permissions(),
             notifications: NotificationAuth::NotDetermined,
             online: true,

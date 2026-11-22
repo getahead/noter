@@ -44,6 +44,7 @@ pub fn default_settings() -> Settings {
             retention: AudioRetention::Days30,
             retention_next_run_deletes: 0,
             mic_device: None,
+            languages: noter_protocol::model::default_languages(),
         },
         privacy: PrivacySettings {
             mode: PrivacyMode::CloudRedacted,
@@ -68,6 +69,8 @@ pub fn default_settings() -> Settings {
             display_id: None,
             layout: CallLayoutPreference::Auto,
             open_automatically: true,
+            show_latency: false,
+            text_size_pct: noter_protocol::model::default_text_size_pct(),
         },
         menu_bar: MenuBarSettings {
             title: MenuBarTitle::None,
@@ -202,6 +205,9 @@ pub(crate) fn check(section: &SettingsSection) -> Result<(), CoreError> {
             if !(c.default_cap_usd.is_finite() && c.default_cap_usd >= 0.0) {
                 return Err(invalid("default_cap_usd", ValidationRule::OutOfRange));
             }
+        }
+        SettingsSection::CallScreen(c) if !(85..=150).contains(&c.text_size_pct) => {
+            return Err(invalid("text_size_pct", ValidationRule::OutOfRange));
         }
         SettingsSection::Performance(p) if p.near_pct >= p.over_pct => {
             return Err(invalid("over_pct", ValidationRule::OutOfRange));

@@ -432,6 +432,11 @@ export type AudioSettings = {
 	retention_next_run_deletes: number,
 	/**  `null` = system default input. */
 	mic_device?: string | null,
+	/**
+	 *  The languages the engine's language identification picks among, from the next call
+	 *  (Settings › Audio & Transcription › Languages).
+	 */
+	languages?: Lang[],
 };
 
 export type AudioStorageArgs = {
@@ -708,6 +713,10 @@ export type CallScreenSettings = {
 	display_id?: DisplayId | null,
 	layout: CallLayoutPreference,
 	open_automatically: boolean,
+	/**  The call screen's latency line (**Hypothesis 1.4 s · confirmed 3.1 s**); off by default. */
+	show_latency?: boolean,
+	/**  Call screen text size, 85 to 150 % (D57). */
+	text_size_pct?: number,
 };
 
 export type CallSort = "newest" | "oldest" | "longest" | "title";
@@ -1308,6 +1317,10 @@ export type EnvironmentState = {
 	 *  (`AudioOutputSettings.headphones_devices`).
 	 */
 	output_device: OutputDeviceInfo | null,
+	/**  Every audio input device, for Settings › Microphone. */
+	input_devices?: InputDeviceInfo[],
+	/**  Every audio output device with the route Noter detects, for Settings › Output devices. */
+	output_devices?: OutputDeviceRow[],
 	permissions: PermissionRow[],
 	/**  macOS notification authorization, read from `UNUserNotificationCenter` settings. */
 	notifications: NotificationAuth,
@@ -1854,6 +1867,15 @@ export type IgnoredApp = {
 	app_name: string,
 };
 
+/**  An audio input device (Settings › Microphone). */
+export type InputDeviceInfo = {
+	/**  Core Audio device UID, the value of `AudioSettings.mic_device`. */
+	uid: string,
+	name: string,
+	/**  The system default input. */
+	is_default: boolean,
+};
+
 export type ItemCreateArgs = {
 	call_id: CallId,
 	kind: ItemKind,
@@ -2347,6 +2369,20 @@ export type OutputDeviceInfo = {
 	uid: string,
 	name: string,
 	/**  The user marked this device as headphones. */
+	marked_headphones: boolean,
+};
+
+/**  An audio output device with its detected route (Settings › Output devices, PM-65). */
+export type OutputDeviceRow = {
+	/**  Core Audio device UID. */
+	uid: string,
+	name: string,
+	/**
+	 *  What Noter detects: headphones, speakers or not identified (`unknown`); a device the user
+	 *  marked as headphones reads `headphones`.
+	 */
+	route: OutputRoute,
+	/**  The user marked this device as headphones (`AudioOutputSettings.headphones_devices`). */
 	marked_headphones: boolean,
 };
 
@@ -3704,7 +3740,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.20";
+export const CONTRACT_VERSION = "2.24";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

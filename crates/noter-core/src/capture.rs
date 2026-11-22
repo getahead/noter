@@ -484,7 +484,8 @@ impl Core {
             store_audio: audio.retention != AudioRetention::NeverStore,
             mic_device_uid: audio.mic_device,
             exclude_bundle_ids: vec![],
-            languages: vec![],
+            // Settings › Languages, read at each session start ("apply from the next call").
+            languages: audio.languages,
             backend: backend(audio.live_backend),
             glossary: entries(&self.glossary()?),
             speaker_priors: vec![],
