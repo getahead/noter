@@ -58,3 +58,11 @@
 .np-prov:disabled { color: var(--label-3); cursor: default; }
 .np-prov.is-gone { color: var(--label-3); }
 .np-prov__error { color: var(--error); font-size: 12px; }
+
+/* the call at the end of a compact row: the first part to give way (prototype .it-row--compact .it-row__call) */
+.it-row__call { flex: 0 100 auto; min-width: 4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.it-row--compact .it-row__call > .np-link, .pc-item--compact .it-row__call > .np-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.it-row__glyph { display: inline-flex; flex: none; color: var(--label-2); }
+.pc-item--compact { flex-wrap: nowrap; padding: 4px 0; min-width: 0; }
+.pc-item--compact .pc-item__text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-item--compact > :not(.pc-item__text):not(.it-row__call), .pc-item--compact .np-prov, .pc-item--compact .np-badge { flex: none; white-space: nowrap; }

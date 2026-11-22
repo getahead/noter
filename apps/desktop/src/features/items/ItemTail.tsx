@@ -1,5 +1,6 @@
 // What follows a decision, question or risk in the Summary view: its provenance time, the review buttons while it is
 // suggested (Edit opens the Item inspector) and the (i) button. Registered in the section's seam (`register.tsx`).
+import type { ReactNode } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import { elementId } from "../../app/element-id";
 import type { ItemView } from "../../core/bindings";
@@ -14,13 +15,14 @@ import { patchLocal, useLocal } from "./local";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";
 
-export function ItemTail({ bridge, item }: { bridge: Bridge; item: ItemView }) {
+export function ItemTail({ bridge, item, afterTime }: { bridge: Bridge; item: ItemView; afterTime?: ReactNode }) {
   const it = useItem(bridge, item);
   const local = useLocal(it.id);
   const inspect = slots.inspect ? () => slots.inspect!(bridge, it.id) : null;
   return (
     <>
       {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
+      {afterTime}
       {local.outcome && (
         <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} actionAriaLabel={local.outcome.target ? `${t("items.undo")}: ${it.text}` : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
       )}
