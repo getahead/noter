@@ -149,7 +149,16 @@ fn the_environment_snapshot_smoke_test_reports_disk_and_displays() {
     assert!(r.disk_free_mb > 0);
     if cfg!(target_os = "macos") {
         let native = r.native.as_ref().expect("macOS native presentation facts");
-        assert!(!native.os_version.is_empty());
+        // the bare version the UI writes after "macOS" ("26.6"), not "Version 26.6 (Build …)"
+        let parts: Vec<&str> = native.os_version.split('.').collect();
+        assert!((2..=3).contains(&parts.len()), "{:?}", native.os_version);
+        assert!(
+            parts
+                .iter()
+                .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit())),
+            "{:?}",
+            native.os_version
+        );
         assert!(std::path::Path::new(&native.app_path).is_absolute());
         assert!(!native.app_name.is_empty());
         assert!(r.displays.iter().filter(|d| d.is_main).count() <= 1);

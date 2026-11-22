@@ -39,11 +39,12 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
   test("UI — native accent and running-copy facts update through the environment bridge", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: (w) => {
       W.firstRun(w);
-      w.app.environment.native = { accent_rgb: [0, 122, 255], app_name: "Noter", bundle_id: "ai.noter", app_path: "/tmp/Debug/Noter.app", os_version: "Version 27.2" };
+      w.app.environment.native = { accent_rgb: [0, 122, 255], app_name: "Noter", bundle_id: "ai.noter", app_path: "/tmp/Debug/Noter.app", os_version: "27.2" };
     } });
     const details = page.locator('[data-region="running-copy"]');
     await expect(details).toContainText("/tmp/Debug/Noter.app");
-    await expect(details).toContainText("Version 27.2");
+    await expect(details).toContainText("macOS 27.2 · Core Audio process tap");
+    await expect(page.locator('[data-region="FR-R3"]')).toContainText("macOS 27.2 · Core Audio process tap");
     const accent = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--accent-text"));
     await expect.poll(accent).toMatch(/^#/);
     await expect(page.locator("html")).toHaveAttribute("data-native-accent");
