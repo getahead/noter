@@ -6,6 +6,9 @@
     <!-- @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1 -->
     <key>NSMicrophoneUsageDescription</key>
     <string>Noter records your microphone to transcribe your calls on this Mac.</string>
+    <!-- macOS attributes the engine's System Audio Recording request to this app (#1140). -->
+    <key>NSAudioCaptureUsageDescription</key>
+    <string>Noter records the other people on the call to transcribe them on this Mac.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Noter reads your calendar to show today's meetings and detect upcoming calls.</string>
     <key>NSAppleEventsUsageDescription</key>

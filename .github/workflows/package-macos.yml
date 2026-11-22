@@ -112,6 +112,9 @@ jobs:
       - name: Build the app bundle and DMG
         run: pnpm --dir apps/desktop exec tauri build --target aarch64-apple-darwin --bundles app,dmg
 
+      - name: Built app permissions (usage strings, entitlements, engine signature)
+        run: scripts/ci/check-app-bundle.sh "$(find target apps/desktop/src-tauri/target -type d -path '*aarch64-apple-darwin/release/bundle/macos/Noter.app' 2>/dev/null | head -1)"
+
       - name: Collect the packages
         id: collect
         env:
