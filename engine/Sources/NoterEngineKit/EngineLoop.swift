@@ -14,12 +14,17 @@ public final class EngineLoop: @unchecked Sendable {
     private let encoder: (URL) throws -> AudioEncoder
     let selfTests = DispatchQueue(label: "ai.noter.engine.self-test")
     private let decoder = JSONDecoder()
+    /// `receive`'s own, on the stdin thread, while `decoder` works on the commands queue.
+    private let peek = JSONDecoder()
     private let player: Player
     /// The speech model, loaded on first use; nil without one installed.
     let model: ModelCache?
     /// Above builds and other background work: the live transcript is what the user watches.
     let asrQueue = DispatchQueue(label: "ai.noter.engine.asr", qos: .userInitiated)
     private let stops = DispatchQueue(label: "ai.noter.engine.stop")
+    /// Every command but `ping`, in arrival order, off the stdin thread: opening the streams can
+    /// wait on macOS's permission prompts, and `pong` must not wait with it (#1167).
+    private let commands = DispatchQueue(label: "ai.noter.engine.commands")
     private let processes: @Sendable () -> [ProcessAudio]
     /// The offline models (archive decode, embeddings); nil refuses offline commands.
     let offline: LocalOfflineWork?
@@ -101,6 +106,23 @@ public final class EngineLoop: @unchecked Sendable {
                 protocolVersion: engineProtocolVersion, engineVersion: engineVersion, models: models,
                 sandboxed: sandboxed))
     }
+
+    /// Takes one stdin line: `ping` is answered at once, `shutdown` after the commands before
+    /// it, anything else on the commands queue. Returns false after `shutdown`.
+    public func receive(_ line: String) -> Bool {
+        if let command = try? peek.decode(EngineCommandLine.self, from: Data(line.utf8)) {
+            switch command.cmd {
+            case .ping: return handle(line)
+            case .shutdown: return commands.sync { handle(line) }
+            default: break
+            }
+        }
+        commands.async { _ = self.handle(line) }
+        return true
+    }
+
+    /// Waits for the commands received so far.
+    public func flushCommands() { commands.sync {} }
 
     /// Handles one stdin line. Returns false after `shutdown`.
     public func handle(_ line: String) -> Bool {

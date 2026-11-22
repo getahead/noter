@@ -31,17 +31,30 @@ impl Clock for TestClock {
     }
 }
 
-/// A Mac with this much room on the disk.
+/// A Mac with this much room on the disk and this microphone permission; it records each
+/// prompt it shows and whether the engine had been asked to start a session by then.
 struct Mac {
     disk_free_mb: u32,
+    microphone: PermissionState,
+    engine: ScriptedEngine,
+    asked: Mutex<Vec<(PermissionKind, bool)>>,
 }
 
 impl NativeServices for Mac {
-    fn permission(&self, _: PermissionKind) -> PermissionState {
-        PermissionState::NotAsked
+    fn permission(&self, kind: PermissionKind) -> PermissionState {
+        match kind {
+            PermissionKind::Microphone => self.microphone,
+            _ => PermissionState::NotAsked,
+        }
     }
-    fn request_permission(&self, _: PermissionKind) -> BoxFuture<'_, PermissionState> {
-        Box::pin(async { PermissionState::NotAsked })
+    fn request_permission(&self, kind: PermissionKind) -> BoxFuture<'_, PermissionState> {
+        let started = self
+            .engine
+            .commands()
+            .iter()
+            .any(|c| matches!(c, EngineCommand::StartSession(_)));
+        self.asked.lock().unwrap().push((kind, started));
+        Box::pin(async { PermissionState::Granted })
     }
     fn environment(&self) -> EnvironmentReading {
         EnvironmentReading {
@@ -119,6 +132,7 @@ impl Surfaces for Shown {
 struct Rig {
     core: Arc<Core>,
     engine: ScriptedEngine,
+    mac: Arc<Mac>,
     clock: Arc<TestClock>,
     events: Arc<Events>,
     shown: Arc<Shown>,
@@ -135,6 +149,7 @@ struct Setup {
     then: Vec<Behaviour>,
     /// The self-test passed before this launch (setup done: detection is on from the start).
     self_test_passed: bool,
+    microphone: PermissionState,
 }
 
 impl Default for Setup {
@@ -146,6 +161,7 @@ impl Default for Setup {
             first_launch_fails: false,
             then: Vec::new(),
             self_test_passed: false,
+            microphone: PermissionState::NotAsked,
         }
     }
 }
@@ -175,10 +191,14 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
     let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
     let events = Arc::new(Events::default());
     let shown = Arc::new(Shown::default());
+    let mac = Arc::new(Mac {
+        disk_free_mb: setup.disk_free_mb,
+        microphone: setup.microphone,
+        engine: engine.clone(),
+        asked: Mutex::new(Vec::new()),
+    });
     let deps = CoreDeps {
-        native: Arc::new(Mac {
-            disk_free_mb: setup.disk_free_mb,
-        }),
+        native: mac.clone(),
         engine: launcher,
         models: Arc::new(Whisper),
         surfaces: shown.clone(),
@@ -197,6 +217,7 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
     Rig {
         core,
         engine,
+        mac,
         clock,
         events,
         shown,
@@ -491,6 +512,32 @@ async fn a_start_creates_the_call_and_records_once_the_engine_session_started() 
         versions.len() >= 2 && versions.windows(2).all(|w| w[0] < w[1]),
         "{versions:?}"
     );
+}
+
+/// #1167: the first Record asks for the microphone from the app before the engine opens its
+/// streams, so macOS's prompt never waits inside `start_session`. A known answer is not asked.
+#[tokio::test(start_paused = true)]
+async fn the_microphone_is_asked_before_the_engine_starts_the_session() {
+    for (microphone, asked) in [
+        (
+            PermissionState::NotAsked,
+            vec![(PermissionKind::Microphone, false)],
+        ),
+        (PermissionState::Granted, vec![]),
+        (PermissionState::Denied, vec![]),
+    ] {
+        let r = rig_with(Setup {
+            microphone,
+            ..Setup::default()
+        });
+        r.core
+            .capture_start(&main_window(), start_args())
+            .await
+            .unwrap();
+        r.sent(|c| matches!(c, EngineCommand::StartSession(_)))
+            .await;
+        assert_eq!(*r.mac.asked.lock().unwrap(), asked, "{microphone:?}");
+    }
 }
 
 #[tokio::test(start_paused = true)]

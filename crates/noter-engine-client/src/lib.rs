@@ -47,6 +47,10 @@ pub struct Config {
     pub restart_backoff: Duration,
     /// How long a command waits for its `ack` or `error` before the engine is pinged.
     pub command_timeout: Duration,
+    /// How long `start_session` may wait for its `ack`: opening the microphone and the system
+    /// audio tap can show macOS's permission prompts, which wait for the user (#1167). The
+    /// liveness pings still end an engine that stops answering meanwhile.
+    pub permission_timeout: Duration,
     /// How often the liveness task pings a ready engine.
     pub liveness_interval: Duration,
 }
@@ -61,6 +65,7 @@ impl Default for Config {
             failed_start_window: Duration::from_secs(60),
             restart_backoff: Duration::from_millis(500),
             command_timeout: Duration::from_secs(10),
+            permission_timeout: Duration::from_secs(180),
             liveness_interval: Duration::from_secs(5),
         }
     }
@@ -379,6 +384,10 @@ impl<L: EngineLauncher> EngineClient<L> {
         self.ensure_ready()
             .await
             .map_err(|_| CommandError::Unavailable)?;
+        let wait = match cmd {
+            EngineCommand::StartSession(_) => self.inner.config.permission_timeout,
+            _ => self.inner.config.command_timeout,
+        };
         let id = self.next_id();
         let (tx, rx) = oneshot::channel();
         {
@@ -396,7 +405,7 @@ impl<L: EngineLauncher> EngineClient<L> {
                 return Err(CommandError::Unavailable);
             }
         }
-        match timeout(self.inner.config.command_timeout, rx).await {
+        match timeout(wait, rx).await {
             Ok(reply) => reply.unwrap_or(Err(CommandError::Unavailable)),
             Err(_) => {
                 // No reply in time: a missed ping ends this engine and restarts it.

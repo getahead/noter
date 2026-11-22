@@ -665,3 +665,38 @@ final class CaptureTests: XCTestCase {
             lines.events.filter { $0["type"] as? String == "ack" }.compactMap { $0["cmd_id"] as? Int }, [1, 2, 3, 4])
     }
 }
+
+/// #1167: opening the streams at the first Record shows macOS's Microphone and System Audio
+/// prompts and blocks until the user answers. The engine must keep answering `ping`
+/// meanwhile, or the supervisor ends it and the recording is lost.
+final class PermissionPromptTests: XCTestCase {
+    /// A source whose `start` waits like the taps behind a TCC prompt.
+    final class PromptSource: AudioSource, @unchecked Sendable {
+        let answered = DispatchSemaphore(value: 0)
+        func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws { answered.wait() }
+        func stop() {}
+        func observeDevices(_ handler: @escaping @Sendable (DeviceChange) -> Void) {}
+    }
+
+    func testPingIsAnsweredWhileAStartWaitsForThePermissionPrompt() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("noter-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let (lines, source) = (Lines(), PromptSource())
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: [], sandboxed: false,
+            container: root, source: { _ in source })
+        let start = #"{"id":1,"cmd":{"type":"start_session","call_id":"call_1","session_dir":"audio/call_1","store_audio":false,"mic_device_uid":null,"exclude_bundle_ids":[],"languages":["en"],"backend":"whisper_turbo","glossary":[],"speaker_priors":[],"enrolled_embeddings_path":null,"resume_from_ms":null}}"#
+        let reader = DispatchQueue(label: "test.stdin")
+        reader.async {
+            _ = e.receive(start)
+            _ = e.receive(#"{"id":2,"cmd":{"type":"ping"}}"#)
+        }
+        let deadline = Date().addingTimeInterval(2)
+        while !lines.types.contains("pong"), Date() < deadline { usleep(10_000) }
+        XCTAssertEqual(lines.types, ["pong"], "pong while the prompt is open, before the start's ack")
+        source.answered.signal()
+        e.flushCommands()
+        XCTAssertEqual(lines.types, ["pong", "ack", "session_started"])
+        XCTAssertFalse(e.receive(#"{"id":3,"cmd":{"type":"shutdown"}}"#), "shutdown still ends the loop")
+    }
+}
