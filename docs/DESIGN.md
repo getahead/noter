@@ -1231,7 +1231,7 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 │ ✓ Welcome                   │ participants from whatever app plays them.                                │
 │ ✓ Models                    │                                                                           │
 │ 3 Permissions               │ ✓ Microphone · MacBook Pro Microphone · granted        ▂▃▅▆▃▂ Hearing you │
-│ 4 Call display              │ ! System audio recording · not allowed yet        [Open System Settings…] │
+│ 4 Call display              │ ! System audio recording · Not verified yet       [Open System Settings…] │
 │ 5 Audio storage             │   How to allow it: System Settings › Privacy & Security › …               │
 │ 6 Assistants                │ ┌─ Self-test ──────────────────────────────────────────────────────────┐  │
 │                             │ │ You     ▂▃▅▆▅▃▂▁▁▁          Others  ▁▁▁▁▁▁▁▁▁▁                       │  │
@@ -1288,7 +1288,8 @@ The first-run wizard gets the Mac ready before the first real call, so that no p
 | Speech model not ready | FR-R2, self-test | **Waiting for the speech model · 62 %**; **Run Test** waits | D64 | `cpt-noter-seq-first-run-download-models` (Error — Speech model not downloaded yet) |
 | Permission not asked | FR-R2, **Microphone** row | **Allow…** | PRD › Security, privacy and permissions | `cpt-noter-seq-first-run-complete-setup` (Happy path) |
 | Microphone denied | FR-R2, **Microphone** row | **Microphone · not allowed** with **Open System Settings…**; **Hearing you** beside the meter once Noter is allowed | PRD › Security, privacy and permissions | `cpt-noter-seq-first-run-complete-setup` (Error — Microphone not allowed) |
-| Permission missing | FR-R2, **System audio recording** row | **System audio recording · not allowed yet** with **Open System Settings…** and the how-to line | PRD › Security, privacy and permissions | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
+| System audio not verified | FR-R2, **System audio recording** row | **System audio recording · Not verified yet** with **Open System Settings…** and the how-to line: macOS gives apps no way to read this permission before the first capture, so the row says so until the self-test (or a capture) finds out; **Run Test** stays available | PRD › Security, privacy and permissions; #1115 | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
+| Permission missing | FR-R2, **System audio recording** row and the self-test | After a test (or a capture) hears only silent buffers while the permission is unverified: **System audio recording · not allowed yet**, and the self-test shows **System audio recording is not allowed yet.** with **Open System Settings…**; **Run Test** stays available for after it is allowed | PRD › Security, privacy and permissions; #1115 | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
 | Back from System Settings | FR-R2, the permission row | A small spinner and **Checking…** while Noter reads the permission again, then **Granted**; the self-test's **System audio recording is not allowed yet.** line goes away | PM-59 | `cpt-noter-seq-first-run-complete-setup` (Error — System audio not allowed) |
 | Self-test passed | FR-R2, self-test | **Self-test passed** above **System audio arrives**, **Your microphone arrives**, **Both streams line up** and **Noter's own sounds stay out of the recording**, announced politely | D66, D99 | `cpt-noter-seq-first-run-complete-setup` (Happy path) |
 | One stream silent | FR-R2, self-test | **We hear your microphone but not system audio. Play any sound in another app and try again.** | D66 | `cpt-noter-seq-first-run-complete-setup` (Error — Self-test hears only one stream) |
@@ -8366,7 +8367,7 @@ Noter asks for Microphone and System Audio Recording in first run, one at a time
 **States**
 
 - not asked: info icon and **Not allowed yet**, with **Allow…** (microphone).
-- missing: warning icon and **not allowed yet**, with **Open System Settings…** and the how-to line; system audio starts here, because macOS has no prompt for it.
+- missing: warning icon and **not allowed yet**, with **Open System Settings…** and the how-to line; system audio starts here, because macOS has no prompt for it, and reads **Not verified yet** until the self-test or a capture shows the permission is withheld (macOS cannot report it earlier).
 - checking: small spinner and **Checking…**, with no action, after **Open System Settings…** while Noter reads the permission again.
 - granted: success check and **Granted**; the microphone row shows its meter.
 - denied: warning icon and **not allowed**, with **Open System Settings…** and the how-to line.
@@ -8463,7 +8464,7 @@ The self-test proves that the microphone and the system audio both arrive and li
 - exclusion off: the fourth line reads **Noter's own sounds are recorded. Replay while recording stays off. Change this in Settings › Audio & Transcription.** with an info icon; this is information, and the test still passes.
 - exclusion check failed: warning icon and **Noter's own sounds reached the recording. Replay while recording stays off until this passes.**; the test still passes for call detection.
 - failed: warning icon and **We hear your microphone but not system audio. Play any sound in another app and try again.**; **Run Test** runs it again.
-- permission missing: meters at zero, **Play Test Clip** and **Run Test** dimmed; the line **System audio recording is not allowed yet.** with **Open System Settings…**.
+- permission missing: meters at zero, **Play Test Clip** and **Run Test** dimmed; the line **System audio recording is not allowed yet.** with **Open System Settings…**. The same line also follows a test that heard only silent buffers while the permission was unverified; there **Run Test** stays available.
 - clipping: the last meter segment in the warning colour with its text.
 
 **Content rules**

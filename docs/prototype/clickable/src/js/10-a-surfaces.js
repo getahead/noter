@@ -305,7 +305,8 @@
     { id: 'speech-wait', label: 'Speech model not ready' },
     { id: 'perm-not-asked', label: 'Permission not asked' },
     { id: 'mic-denied', label: 'Microphone denied' },
-    { id: 'sys-missing', label: 'System audio permission missing' },
+    { id: 'sys-missing', label: 'System audio not verified yet' },
+    { id: 'sys-refused', label: 'System audio withheld (after the self-test)' },
     { id: 'passed', label: 'Self-test passed' },
     { id: 'one-silent', label: 'One stream silent' },
     { id: 'skipped', label: 'Self-test skipped' },
@@ -338,6 +339,7 @@
         case 'perm-not-asked': at(2); break;
         case 'mic-denied': at(2); L.perms = { mic: 'denied', sys: 'missing' }; break;
         case 'sys-missing': at(2); L.perms = { mic: 'granted', sys: 'missing' }; break;
+        case 'sys-refused': at(2); L.perms = { mic: 'granted', sys: 'refused' }; break;
         case 'passed': at(2); grant(); L.models.speech = 100; NP.local('selftest-fr').state = 'passed'; break;
         case 'one-silent': at(2); grant(); L.models.speech = 100; NP.local('selftest-fr').state = 'failed'; break;
         case 'skipped': at(3); L.marks[2] = 'skipped'; L.models.speech = 100; break;
@@ -408,14 +410,14 @@
         </div>`;
       case 2: {
         const speechReady = L.models.speech >= 100;
-        const stState = NP.local('selftest-fr').state || (L.perms.sys !== 'granted' ? 'permission-missing' : !speechReady ? 'waiting' : 'idle');
+        const stState = NP.local('selftest-fr').state || (L.perms.sys === 'refused' || L.perms.sys === 'denied' ? 'permission-missing' : !speechReady ? 'waiting' : 'idle');
         return html`${title('Microphone and system audio')}
         <p class="fr-p">Noter captures your voice from the microphone and the other participants from whatever app plays them.</p>
         <div class="fr-perms">
           ${C.permissionCheckRow({ id: 'mic', label: 'Microphone', status: L.perms.mic, detail: 'MacBook Pro Microphone', why: 'Records your side of the call.' }, { variant: 'setup' })}
           ${C.permissionCheckRow({ id: 'sys', label: 'System audio recording', status: L.perms.sys, why: 'Records the other participants from the call app.', howto: 'How to allow it: System Settings › Privacy & Security › Screen & System Audio Recording › System Audio Recording Only › turn on Noter.' }, { variant: 'setup' })}
         </div>
-        ${NP.local('selftest-fr').state ? C.selfTestPanel({ variant: 'wizard', key: 'fr' }) : C.selfTestPanel({ variant: 'wizard', key: 'fr', state: stState })}`;
+        ${NP.local('selftest-fr').state ? C.selfTestPanel({ variant: 'wizard', key: 'fr' }) : C.selfTestPanel({ variant: 'wizard', key: 'fr', state: stState, retry: L.perms.sys === 'refused' /* after a test found it withheld: Run Test again once allowed */ })}`;
       }
       case 3: return html`${title('Call display')}
         <p class="fr-p">Choose where the call screen opens. Noter remembers the display, not its position, so it finds it again after you reconnect.</p>
