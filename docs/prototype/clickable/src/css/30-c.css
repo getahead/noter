@@ -58,7 +58,10 @@
 .it-row--compact .it-row__due, .it-row--compact .np-badge, .it-row--compact .np-prov { flex: none; }
 /* a compact row stays on one line: the meta truncates and the text keeps a minimum width (#1093) */
 .it-row--compact .it-row__text { min-width: 4em; }
-.it-row--compact .it-row__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
+/* the call link gives way first, the meta keeps at least a word, and the line clips so nothing paints outside the column */
+.it-row--compact .it-row__line { overflow: hidden; }
+.it-row--compact .it-row__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 5em; }
+.it-row--compact .it-row__call { flex: 0 100 auto; min-width: 4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .it-row__call { flex: none; font-size: 12px; }
 .it-row__outcome { padding: 2px 0 0 24px; }
 .it-row.is-outcome { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--sep); }
