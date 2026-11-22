@@ -40,6 +40,7 @@ describe("Topics page (cpt-noter-flow-ui-library-search-topics-topic)", () => {
   it("lists the topics with counts, a merge glyph for a suggestion, and one Tab stop", async () => {
     await ready();
     const h = body();
+    expect(h).toMatch(/aria-sort="descending"[^>]*>Last discussed<svg class="np-ic np-th__sort"/); // newest first: Last discussed ⌄ (#1085)
     expect(h).toContain("Websocket notifications");
     expect(h).toContain('data-state="merge-suggested"');
     expect(h).toContain("Merge suggested");

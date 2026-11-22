@@ -10,6 +10,7 @@ import { Toggle } from "../../ui/primitives/toggle";
 import { openPrivacySettings, setCallType, setSensitive } from "./actions";
 import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
+import { LanguageTag } from "../transcript/labels";
 import { deleteAudio } from "./share-actions";
 import { TagsField } from "./TagsField";
 import { PushButton } from "../../ui/primitives/push-button";
@@ -52,6 +53,9 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
             <dd key={`${r.label}-d`}>
               {r.label === t("callpage.info.type") && types.length ? (
                 <PopupButton variant="inline" label={r.label} value={call.call_type} options={types.map((x) => ({ value: x.id, label: x.label }))} onAction={(v) => void setCallType(bridge, call.id, call.rev, v)} />
+              ) : r.label === t("callpage.info.languages") ? (
+                // the call's languages as language tags, as in the Calls table
+                call.languages.map((l) => <LanguageTag key={typeof l === "string" ? l : l.code} lang={l} variant="call" />)
               ) : (
                 r.value
               )}

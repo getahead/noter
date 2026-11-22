@@ -8,7 +8,7 @@
 .pc-play { position: sticky; bottom: -40px; }
 .pc-info { display: grid; gap: 0; font-size: 13px; }
 .pc-info dl { margin: 0; }
-.pc-info__head { display: flex; align-items: center; gap: 6px; padding: 12px 14px 8px; position: sticky; top: 0; background: var(--content-bg); z-index: 2; }
+.pc-info__head { display: flex; align-items: center; gap: 6px; padding: 12px 40px 8px 14px; position: sticky; top: 0; background: var(--content-bg); z-index: 2; }
 .pc-info__sec { padding: 10px 14px; border-top: 1px solid var(--sep); display: grid; gap: 8px; justify-items: start; }
 .pc-info__sec .np-kv { width: 100%; }
 .pc-info__h { font: 600 11px/14px var(--font); color: var(--label-3); margin-top: 4px; }

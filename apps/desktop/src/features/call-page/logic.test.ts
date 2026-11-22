@@ -72,8 +72,9 @@ describe("subtitle", () => {
   it("has no trailing separator for a call with no participants yet", () => {
     expect(subtitleOf(row({ participants: [] }), NOW, PREFS)).toBe("Today 10:00 · 52 min");
   });
-  it("names another day by its date", () => {
-    expect(subtitleOf(row({ started_at: Date.UTC(2026, 9, 20, 9, 30) }), NOW, PREFS)).toMatch(/^Oct 20, 2026, 09:30 · 52 min/);
+  it("names another day by its short weekday and month, without the year or 'at' (#1081)", () => {
+    expect(subtitleOf(row({ started_at: Date.UTC(2026, 9, 20, 9, 30) }), NOW, PREFS)).toMatch(/^Tue, Oct 20 09:30 · 52 min/);
+    expect(subtitleOf(row({ started_at: Date.UTC(2025, 9, 20, 9, 30) }), NOW, PREFS)).toMatch(/^Mon, Oct 20, 2025 09:30 · 52 min/);
   });
 });
 
@@ -85,6 +86,8 @@ describe("callInfo (PC-R4)", () => {
     expect(i.call.find((r) => r.label === "Type")!.value).toBe("Planning");
     expect(i.call.find((r) => r.label === "App")!.value).toBe("Zoom");
     expect(i.call.find((r) => r.label === "Length")!.value).toBe("52 min");
+    expect(i.call.find((r) => r.label === "When")!.value).toMatch(/^Today · \d{2}:\d{2}$/); // Call info's When: **Today · 10:00** (#1081)
+    expect(callInfo(row({ started_at: Date.UTC(2026, 9, 20, 9, 30) }), { audio_not_stored: false }, NOW, PREFS, "x").call.find((r) => r.label === "When")!.value).toBe("Tue, Oct 20 · 09:30");
     expect(i.call.find((r) => r.label === "Languages")!.value).toBe("EN, RU");
     expect(i.sensitive).toBe(false);
   });

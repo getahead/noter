@@ -270,3 +270,22 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     ]);
   });
 });
+
+// Design fixes against the prototype of record (Main window › Topics and People, State ▾ Normal).
+test.describe("cpt-noter-seq-library-follow-topic", () => {
+  test("UI — design — #1085 the page title shows no focus ring after navigation", async ({ page }) => {
+    await openCalls(page);
+    await page.keyboard.press("Meta+Digit5");
+    const title = page.getByRole("heading", { name: "Topics", level: 1 });
+    await expect(title).toBeVisible();
+    await expect(title).toHaveCSS("outline-style", "none");
+    // the table shows its true order: newest first, so Last discussed ⌄ (owner decision, 22 Nov)
+    const last = page.getByRole("columnheader", { name: "Last discussed" });
+    await expect(last).toHaveAttribute("aria-sort", "descending");
+    await expect(last.locator(".np-th__sort")).toBeVisible();
+    await page.keyboard.press("Meta+Digit4");
+    const name = page.getByRole("columnheader", { name: "Name" });
+    await expect(name).toHaveAttribute("aria-sort", "ascending");
+    await expect(name.locator(".np-th__sort")).toBeVisible();
+  });
+});
