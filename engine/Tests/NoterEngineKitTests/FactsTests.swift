@@ -75,6 +75,19 @@ final class DetectorTests: XCTestCase {
         _ = d.update([app("com.apple.speech.speechsynthesisd", output: true)])
         XCTAssertFalse(d.outputPlaying, "an app the user excluded is not heard on purpose")
     }
+
+    // cpt-noter-seq-call-screen-recover-capture — #1196: say/afplay (no bundle id) count as playing, never as a call or a source
+    func testAProcessWithoutABundlePlayingCountsOnlyForSilenceDetection() {
+        // issue 1196: `say` and `afplay` play from processes Core Audio gives no bundle id
+        var d = Detector()
+        d.rule(enabled: true, known: [zoom])
+        let cli = ProcessAudio(pid: 42, bundleId: "", name: "say", output: true, input: true)
+        d.startSession(callId: "call_1", current: [], excluded: [])
+        XCTAssertEqual(d.update([cli]), [], "no app to name: neither a detected call nor a new audio source")
+        XCTAssertTrue(d.outputPlaying)
+        XCTAssertEqual(d.update([]), [])
+        XCTAssertFalse(d.outputPlaying)
+    }
 }
 
 final class ZeroRunTests: XCTestCase {

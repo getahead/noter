@@ -65,9 +65,11 @@ public struct Detector: Sendable {
     // @cpt-begin:cpt-noter-flow-core-engine-capture-detect:p1:inst-emit-facts
     public mutating func update(_ processes: [ProcessAudio]) -> [EngineEvent] {
         var events: [EngineEvent] = []
-        let byApp = Dictionary(grouping: processes) { owner($0.bundleId) }
+        // a process without a bundle (`say`, `afplay`) has no app to name or exclude: it only counts as playing (#1196)
+        let byApp = Dictionary(grouping: processes.filter { !$0.bundleId.isEmpty }) { owner($0.bundleId) }
         func main(_ id: String) -> ProcessAudio? { byApp[id].flatMap { ps in ps.first { $0.bundleId == id } ?? ps.first } }
-        outputPlaying = byApp.contains { id, ps in !Exclusion.matches(id, excluded) && ps.contains(where: \.output) }
+        outputPlaying = processes.contains { $0.bundleId.isEmpty && $0.output }
+            || byApp.contains { id, ps in !Exclusion.matches(id, excluded) && ps.contains(where: \.output) }
         if enabled {
             for id in known {
                 let ps = byApp[id] ?? []
@@ -136,9 +138,8 @@ public enum ProcessWatcher {
         let me = [getpid(), getppid()]
         return LiveAudioSource.processObjects().compactMap { object in
             let (output, input) = (flag(object, kAudioProcessPropertyIsRunningOutput), flag(object, kAudioProcessPropertyIsRunningInput))
-            guard output || input, let bundleId = LiveAudioSource.string(object, kAudioProcessPropertyBundleID), !bundleId.isEmpty,
-                let pid = pid(object), !me.contains(pid)
-            else { return nil }
+            guard output || input, let pid = pid(object), !me.contains(pid) else { return nil }
+            let bundleId = LiveAudioSource.string(object, kAudioProcessPropertyBundleID) ?? ""
             let name = NSRunningApplication(processIdentifier: pid)?.localizedName ?? bundleId
             return ProcessAudio(pid: pid, bundleId: bundleId, name: name, output: output, input: input)
         }
