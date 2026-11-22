@@ -44,7 +44,7 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.call.auto_open")} error={rowError("call_screen", "open_automatically")} note={t("settings.call.auto_open_note")}>
           <Toggle on={call.open_automatically} ariaLabel={t("settings.call.auto_open")} onAction={(open_automatically) => void saveSection(bridge, "call_screen", { open_automatically })} />
         </Row>
-        <Row label={t("settings.call.latency")} error={rowError("call_screen", "show_latency")} note={t("settings.call.latency_note")}>
+        <Row label={t("settings.call.latency")} error={rowError("call_screen", "show_latency")}>
           <Toggle on={call.show_latency ?? false} size="small" ariaLabel={t("settings.call.latency")} onAction={(show_latency) => void saveSection(bridge, "call_screen", { show_latency })} />
         </Row>
         <Row label={t("settings.call.text_size")} error={rowError("call_screen", "text_size_pct")}>

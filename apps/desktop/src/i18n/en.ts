@@ -502,7 +502,6 @@ export const en = {
   "settings.call.auto_open_note":
     "Opens the call window when recording starts, and moves it to a display that connects during the call.",
   "settings.call.latency": "Show latency",
-  "settings.call.latency_note": "Shows Hypothesis and confirmed delays on the call screen.",
   "settings.call.text_size": "Text size",
   "settings.call.menu_bar": "Menu bar",
   "settings.call.menu_title": "Menu bar title",
@@ -743,7 +742,7 @@ export const en = {
   "settings.audio.mic_default": "System Default ({device})",
   "settings.audio.mic_level": "Microphone level",
   "settings.audio.outputs": "Output devices",
-  "settings.audio.outputs_note": "Replay during a call needs headphones; mark a device Noter can't identify.",
+  "settings.audio.outputs_note": "Replay while recording works only on headphones. Speakers never replay while you record.",
   "settings.audio.route_headphones": "Headphones",
   "settings.audio.route_speakers": "Speakers",
   "settings.audio.route_unknown": "Not identified",

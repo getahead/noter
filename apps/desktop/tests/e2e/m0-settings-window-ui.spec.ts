@@ -191,12 +191,14 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
   test("UI — Audio & Transcription: one row per output device with its route; Treat as headphones on a not-identified one", async ({ page }) => {
     await openPane(page, "Audio & Transcription");
     const outputs = pane(page).getByRole("group", { name: "Output devices" });
-    await expect(outputs.getByRole("listitem")).toHaveText([/External Headphones.*Headphones/, /MacBook Pro Speakers.*Speakers/, /USB-C DAC.*Headphones/, /Living Room.*Not identified/]);
+    await expect(outputs.getByRole("listitem")).toHaveText([/External Headphones.*Headphones/, /MacBook Pro Speakers.*Speakers/, /USB-C DAC.*Not identified/, /Living Room.*Not identified/]); // a marked device keeps Not identified, box ticked
     const living = outputs.getByRole("listitem").filter({ hasText: "Living Room" });
     await living.getByText("Treat as headphones", { exact: true }).click(); // the label is the checkbox’s hit area
     await expect.poll(async () => ((await lastSection(page, "audio"))?.output as { headphones_devices: string[] } | undefined)?.headphones_devices).toContain("AirPlay-LivingRoom");
-    await expect(living).toContainText("Headphones");
+    await expect(living.getByRole("checkbox", { name: "Treat as headphones" })).toBeChecked();
+    await expect(living).toContainText("Not identified");
     await expect(outputs.getByRole("listitem").filter({ hasText: "MacBook Pro Speakers" }).getByRole("checkbox")).toHaveCount(0);
+    await expect(outputs.getByRole("listitem").filter({ hasText: "External Headphones" }).getByRole("checkbox")).toHaveCount(0);
   });
 
   test("UI — Audio & Transcription: Languages English, Russian and German, all on; unchecking German saves the rest", async ({ page }) => {

@@ -48,9 +48,6 @@ export function UpdatesPane({ bridge, settings }: PaneProps) {
           <span className="np-tnum">{t("settings.updates.version_value", { version: version ?? "" })}</span>
           {version && <Link label={t("settings.updates.release_notes")} external onAction={() => void bridge.core.openExternal({ target: { type: "url", url: releaseNotesUrl(version) } })} />}
         </Row>
-        <Row label={t("settings.updates.models")}>
-          <span>{t(modelsLine(bundles))}</span>
-        </Row>
         <Row label={t("settings.updates.channel")} error={rowError("updates", "channel")}>
           <PopupButton options={CHANNEL} value={u.channel} label={t("settings.updates.channel")} onAction={(v) => void saveSection(bridge, "updates", { channel: v as typeof u.channel })} />
         </Row>
@@ -69,6 +66,9 @@ export function UpdatesPane({ bridge, settings }: PaneProps) {
           />
           {checked === "current" && <InlineStatus text={t("settings.updates.up_to_date")} variant="trailing" onExpire={() => setChecked(null)} />}
           {checked === "failed" && <InlineStatus text={t("settings.updates.check_failed")} variant="trailing" onExpire={() => setChecked(null)} />}
+        </Row>
+        <Row label={t("settings.updates.models")}>
+          <span>{t(modelsLine(bundles))}</span>
         </Row>
       </Group>
     </>

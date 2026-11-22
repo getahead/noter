@@ -53,7 +53,7 @@ const ROUTE: Record<OutputRoute, "settings.audio.route_headphones" | "settings.a
 };
 
 /** Microphone (DESIGN 3.2): the inputs the core reports, the system default first, with the live input level. */
-function MicrophoneRow({ bridge, value, error, onChange }: { bridge: Bridge; value: string | null; error: string | null; onChange: (uid: string | null) => void }) {
+export function MicrophoneRow({ bridge, value, error, onChange }: { bridge: Bridge; value: string | null; error: string | null; onChange: (uid: string | null) => void }) {
   const inputs = useWindow(bridge, (s) => s.whole.environment?.input_devices) ?? [];
   const micDb = useWindow(bridge, (s) => s.streams.levels_subscribe?.data?.levels?.mic_db);
   // the meter listens while the pane is open, as first run's does
@@ -65,8 +65,10 @@ function MicrophoneRow({ bridge, value, error, onChange }: { bridge: Bridge; val
   const options = [{ value: "", label: t("settings.audio.mic_default", { device: fallback }) }, ...inputs.map((d) => ({ value: d.uid, label: d.name }))];
   return (
     <Row label={t("settings.audio.microphone")} error={error}>
-      <PopupButton options={options} value={value ?? ""} label={t("settings.audio.microphone")} onAction={(v) => onChange(v || null)} />
-      <LevelMeter level={dbToLevel(micDb ?? null)} label={t("settings.audio.mic_level")} />
+      <span className="st-mic">
+        <PopupButton options={options} value={value ?? ""} label={t("settings.audio.microphone")} onAction={(v) => onChange(v || null)} />
+        <LevelMeter level={dbToLevel(micDb ?? null)} label={t("settings.audio.mic_level")} />
+      </span>
     </Row>
   );
 }
@@ -86,14 +88,16 @@ export function AudioPane({ bridge, settings }: PaneProps) {
       <Group title={t("settings.audio.input_output")}>
         <MicrophoneRow bridge={bridge} value={audio.mic_device ?? null} error={rowError("audio", "mic_device")} onChange={(mic_device) => save({ mic_device })} />
         {outputs.length > 0 && (
-          <Row label={t("settings.audio.outputs")} error={rowError("audio", "output.headphones_devices")} note={t("settings.audio.outputs_note")}>
+          <Row label={t("settings.audio.outputs")} stack error={rowError("audio", "output.headphones_devices")} note={t("settings.audio.outputs_note")}>
             <ul className="st-devices" role="group" aria-label={t("settings.audio.outputs")}>
-              {outputs.map((d) => (
+              {outputs.map((d) => {
+                // a device the user marked is still one Noter could not identify: it keeps "Not identified" with the box ticked (PM-65)
+                const unidentified = d.route === "unknown" || d.marked_headphones;
+                return (
                 <li key={d.uid} className="st-device">
                   <span className="st-device__name">{d.name}</span>
-                  <span className="np-dim">{t(ROUTE[d.route])}</span>
-                  {/* only a device Noter can't identify, or one already marked, can be treated as headphones (PM-65) */}
-                  {(d.route === "unknown" || d.marked_headphones) && (
+                  <span className="np-dim">{t(ROUTE[unidentified ? "unknown" : d.route])}</span>
+                  {unidentified && (
                     <Checkbox
                       label={t("settings.audio.treat_headphones")}
                       checked={d.marked_headphones}
@@ -101,7 +105,8 @@ export function AudioPane({ bridge, settings }: PaneProps) {
                     />
                   )}
                 </li>
-              ))}
+                );
+              })}
             </ul>
           </Row>
         )}
