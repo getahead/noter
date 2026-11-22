@@ -52,6 +52,16 @@ final class HandoffTests: NoterTestCase {
 
     private var addMapping: XCUIElement { app.buttons["Add Mapping…"].firstMatch }
     private var choose: XCUIElement { app.buttons["Choose…"].firstMatch }
+    /// The sheet's default button (the drawer's opener is "Add Mapping…").
+    private var saveMapping: XCUIElement { app.buttons["Add Mapping"].firstMatch }
+    /// Choose… only fills Folder (#1066); the sheet's Add Mapping saves and closes it.
+    private func chooseAndAdd(file: StaticString = #filePath, line: UInt = #line) {
+        choose.click()
+        XCTAssertFalse(choose.waitForNonExistence(timeout: 2), "Choose… fills the folder and keeps the sheet — \(screen())", file: file, line: line)
+        XCTAssertTrue(waitUntil(10) { self.saveMapping.isEnabled }, "Add Mapping is enabled once a folder is chosen — \(screen())", file: file, line: line)
+        saveMapping.click()
+        XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "Add Mapping saves the chosen folder and closes the sheet", file: file, line: line)
+    }
     private var openButton: XCUIElement { app.buttons["Open in Claude Code"].firstMatch }
 
     /// Maps the unmapped project through Add Mapping… (the folder panel answers with `makeRepo()`), leaving a usable drawer.
@@ -59,8 +69,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "Add Mapping… — \(screen())", file: file, line: line)
         addMapping.click()
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())", file: file, line: line)
-        choose.click()
-        XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the chosen folder saves the mapping", file: file, line: line)
+        chooseAndAdd(file: file, line: line)
         XCTAssertTrue(openButton.waitForExistence(timeout: 10), file: file, line: line)
     }
 
@@ -129,8 +138,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertFalse(openButton.isEnabled, "Open waits for a repository")
         addMapping.click()
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Add Mapping… opens the sheet")
-        choose.click()
-        XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the folder the panel chose saves the mapping and closes the sheet")
+        chooseAndAdd()
         XCTAssertTrue(openButton.waitForExistence(timeout: 10))
         XCTAssertTrue(openButton.isEnabled, "Open is available once the project is mapped")
     }
@@ -144,8 +152,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())")
         choose.click()
         XCTAssertFalse(choose.waitForNonExistence(timeout: 3), "a cancelled panel keeps the sheet and its draft")
-        choose.click()
-        XCTAssertTrue(choose.waitForNonExistence(timeout: 10), "the second panel answer chose the folder")
+        chooseAndAdd()
     }
 
     func test_copy_prompt_marks_the_item_handed_off() {
@@ -155,8 +162,7 @@ final class HandoffTests: NoterTestCase {
         XCTAssertTrue(addMapping.waitForExistence(timeout: 10), "Add Mapping… — \(screen())")
         addMapping.click()
         XCTAssertTrue(choose.waitForExistence(timeout: 5), "Choose… — \(screen())")
-        choose.click()
-        XCTAssertTrue(choose.waitForNonExistence(timeout: 10))
+        chooseAndAdd()
         let copy = app.buttons["Copy Prompt"].firstMatch
         XCTAssertTrue(copy.waitForExistence(timeout: 10))
         copy.click()
