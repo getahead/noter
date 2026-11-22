@@ -118,6 +118,8 @@ export function CallsView(p: CallsViewProps) {
             tags={[...new Set(chosen.flatMap((c) => c.tags))]}
             onRemoveTag={p.onRemoveTag}
             onExport={p.onExport}
+            // issue 1053: calls still recording have nothing to export yet, as the toolbar's Export… says
+            exportDisabled={chosen.length > 0 && chosen.every((c) => c.status === "recording" || c.status === "paused")}
           />
         </div>
       )}
@@ -286,6 +288,7 @@ export function ContextMenu({
   tags = [],
   onRemoveTag,
   onExport,
+  exportDisabled = false,
 }: {
   onClose: () => void;
   single: CallRow | null;
@@ -296,6 +299,7 @@ export function ContextMenu({
   tags?: string[];
   onRemoveTag?: (tag: string) => void;
   onExport?: () => void;
+  exportDisabled?: boolean;
 }) {
   useEffect(() => {
     document.addEventListener("pointerdown", onClose);
@@ -317,7 +321,7 @@ export function ContextMenu({
           // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
           ...(onRemoveTag ? (tags.length ? [{ header: t("library.remove_tag") }, ...tags.map((tag) => ({ label: tag, onSelect: run(() => onRemoveTag(tag)) }))] : [{ label: t("library.remove_tag"), disabled: true }]) : []),
           // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
-          ...(onExport ? [{ label: t("library.export"), kbd: "⌘E", onSelect: run(onExport) }] : []),
+          ...(onExport ? [{ label: t("library.export"), kbd: "⌘E", disabled: exportDisabled, onSelect: run(onExport) }] : []),
           { divider: true },
           {
             label: t("library.menu.delete"),
