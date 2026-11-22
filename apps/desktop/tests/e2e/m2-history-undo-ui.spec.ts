@@ -106,6 +106,21 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
   });
 });
 
+test.describe("cpt-noter-seq-call-page-review-outputs", () => {
+  // #1065: the meta line names the record and the field in words, never an internal id or a column name
+  test("cpt-noter-seq-call-page-review-outputs — a reviewed item's change names the item and Review, not its id or review_state", async ({ page }) => {
+    await openCall(page, "summary");
+    await page.locator(ROW).filter({ hasText: "Ship drawer events behind a flag" }).getByRole("button", { name: "Edit" }).click();
+    const inspector = page.locator(INSPECTOR);
+    await inspector.getByRole("button", { name: "Accept" }).click();
+    await inspector.getByRole("tab", { name: "History" }).click();
+    const meta = inspector.locator(CHANGE).first().locator(".pc-chg__meta");
+    await expect(meta).toHaveText(/^Ship drawer events behind a flag › Review/);
+    await expect(meta).not.toContainText("itm_");
+    await expect(meta).not.toContainText("review_state");
+  });
+});
+
 test.describe("cpt-noter-seq-call-page-check-evidence", () => {
   test("UI — Other — Item History: an accepted decision lists its change in the inspector's History, with no export control", async ({ page }) => {
     await openCall(page, "summary");

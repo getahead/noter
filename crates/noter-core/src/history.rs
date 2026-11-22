@@ -287,6 +287,15 @@ fn select_sql(filter: &str, tail: &str) -> String {
                 CASE c.entity_type
                     WHEN 'call' THEN cl.title
                     WHEN 'glossary' THEN g.term
+                    WHEN 'item' THEN (SELECT text FROM items WHERE id = c.entity_id)
+                    WHEN 'topic' THEN (SELECT name FROM topics WHERE id = c.entity_id)
+                    WHEN 'person' THEN (SELECT display_name FROM people WHERE id = c.entity_id)
+                    WHEN 'speaker' THEN (SELECT label FROM speakers WHERE id = c.entity_id)
+                    WHEN 'summary' THEN (SELECT CASE kind WHEN 'summary' THEN 'Summary' WHEN 'decisions' THEN 'Decisions'
+                                           WHEN 'action_items' THEN 'Action items' WHEN 'open_questions' THEN 'Open questions'
+                                           WHEN 'per_participant' THEN 'Per participant' WHEN 'role_reviews' THEN 'Role reviews'
+                                           WHEN 'risks' THEN 'Risks' ELSE 'Extras' END
+                                         FROM summaries WHERE id = c.entity_id)
                 END
          FROM changes c
          LEFT JOIN jobs j ON c.actor = 'job:' || j.id

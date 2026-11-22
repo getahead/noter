@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ChangeRow, UiPrefs } from "../../core/bindings";
-import { actorLabel, groupByDay, historyKey, historyState, jobsOf, readHistoryPages, sameTarget, undoTarget } from "./history";
+import { actorLabel, fieldLabel, groupByDay, historyKey, historyState, jobsOf, readHistoryPages, sameTarget, undoTarget } from "./history";
 
 const prefs: UiPrefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" };
 const NOW = Date.UTC(2026, 10, 5, 12);
@@ -61,5 +61,13 @@ describe("history (cpt-noter-flow-ui-history-undo-read)", () => {
     expect(actorLabel(row("a", 1))).toBe("you");
     expect(actorLabel(row("a", 1, { actor: { type: "job", job_id: "j", name: "Reconcile" } }))).toBe("job: Reconcile");
     expect(actorLabel(row("a", 1, { actor: { type: "model", llm_run_id: "r", runtime: "claude_account", model: "m" } }))).toBe("model: Claude Code");
+  });
+
+  // #1065
+  it("names a field in words and leaves out one it has no words for", () => {
+    expect(fieldLabel("review_state")).toBe("Review");
+    expect(fieldLabel("current_version_id")).toBe("Version");
+    expect(fieldLabel("cleanup_progress")).toBeUndefined();
+    expect(fieldLabel(null)).toBeUndefined();
   });
 });

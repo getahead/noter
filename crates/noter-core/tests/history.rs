@@ -977,3 +977,41 @@ async fn model_bookkeeping_rows_stay_out_of_history_and_export() {
     );
     assert!(!text.contains("Model run"));
 }
+
+// #1065: a changed item is named by its text, never by its id
+#[tokio::test]
+async fn history_names_a_changed_item_by_its_text() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core, &["call_a"]);
+    core.store()
+        .insert_batch(vec![row(
+            "items",
+            &[
+                ("id", json!("itm_a")),
+                ("rev", json!(1)),
+                ("call_id", json!("call_a")),
+                ("kind", json!("decision")),
+                ("text", json!("Ship drawer events behind a flag")),
+                ("lang", json!("en")),
+                ("status", json!("open")),
+                ("review_state", json!("suggested")),
+                ("created_by", json!("llm")),
+            ],
+        )])
+        .unwrap();
+    let accept = Mutation {
+        entity_type: "item",
+        table: "items",
+        id: "itm_a".into(),
+        base_rev: None,
+        bump_rev: true,
+        values: vec![("review_state", json!("accepted"))],
+    };
+    core.store().write(accept, meta("Accepted")).unwrap();
+
+    let page = history(&core, list_args(HistoryTarget::All)).await;
+    let change = &page.rows[0];
+    assert_eq!(change.entity.kind, EntityKind::Item);
+    assert_eq!(change.entity.label, "Ship drawer events behind a flag");
+}

@@ -7,7 +7,7 @@ import { DiffView } from "../../ui/diff/DiffView";
 import { Badge } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
 import { runtimeLabel } from "../call-page/outputs-logic";
-import { actorLabel } from "./history";
+import { actorLabel, fieldLabel } from "./history";
 
 export interface ChangeRowProps {
   row: Change;
@@ -27,7 +27,9 @@ export function ChangeRow({ row, prefs, busy, onReverse, tabIndex = -1 }: Change
   const canUndo = row.status === "applied" && row.undoable;
   const canRedo = undone && row.redoable;
   const canDiff = row.before !== null && row.after !== null;
-  const meta = [row.entity.label, row.field, row.actor.type === "model" && `${runtimeLabel(row.actor.runtime)} · ${row.actor.model}`].filter(Boolean).join(" · ");
+  // the target as DESIGN writes it (**Call info › Tags**), then the model run
+  const target = [row.entity.label, fieldLabel(row.field)].filter(Boolean).join(" › ");
+  const meta = [target, row.actor.type === "model" && `${runtimeLabel(row.actor.runtime)} · ${row.actor.model}`].filter(Boolean).join(" · ");
   const onKey = (e: KeyboardEvent) => {
     if (e.target !== e.currentTarget || e.metaKey || e.ctrlKey || e.altKey || e.code !== "KeyU") return;
     e.preventDefault();
