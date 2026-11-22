@@ -2694,7 +2694,8 @@ async fn the_scripted_folder_panel_answers_a_folder_under_the_data_dir_and_the_c
         path.starts_with(data["path"].as_str().unwrap()) && path.is_dir(),
         "{path:?}"
     );
-    assert_eq!(shown["files"], 2);
+    // call.json and the transcript as Markdown, SRT and JSON (#1146)
+    assert_eq!(shown["files"], 4);
     r.finish().await;
 }
 

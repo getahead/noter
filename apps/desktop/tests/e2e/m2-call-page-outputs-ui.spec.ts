@@ -4,6 +4,9 @@
 // cpt-noter-seq-notifications-open-outputs (every path; the macOS notification itself is native, XCUITest
 // test_cpt_noter_seq_notifications_open_outputs). Written before the screens exist (tests first): they fail until the
 // feature lands. Starting states: support/outputs-world.ts. Copy and labels are DESIGN's, never adjusted to the markup.
+import fs from "node:fs";
+import path from "node:path";
+
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
@@ -356,6 +359,33 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     await expect(toolbar(page)).toContainText(/Exported to .+/);
     await page.getByRole("button", { name: "Show in Finder" }).click();
     await expect.poll(() => sent(page, "open_external")).toEqual([{ target: { type: "reveal_in_finder", path: expect.any(String) } }]);
+  });
+
+  // #1146: PRD › Export and portability — the folder is the call's own ("<title> <day> <month>"), with call.json,
+  // summary.md and the transcript as Markdown, SRT and JSON. The real core writes it; the fake has no files.
+  test("UI — other path: Export to a folder writes the PRD folder: call.json, summary.md, transcript.md, SRT and JSON", async ({ page }) => {
+    const { call } = await O.openOutputs(page, "written");
+    await openReady(page, call);
+    await shortcutsReady(page);
+    await page.keyboard.press("Meta+KeyE");
+    const sheet = page.getByRole("dialog", { name: /Export/ });
+    await sheet.getByText("Transcript", { exact: true }).click();
+    await sheet.getByRole("button", { name: "Export…" }).click();
+    await expect(toolbar(page)).toContainText(/Exported to .+/);
+    if (!H.REAL) return; // the folder is written by the real core; the fake has no files
+    await expect(toolbar(page)).toContainText(/Exported to .+ \d{1,2} [A-Z][a-z]{2}/);
+    await page.getByRole("button", { name: "Show in Finder" }).click();
+    await expect.poll(() => sent(page, "open_external")).toHaveLength(1);
+    const [{ target }] = (await sent(page, "open_external")) as Array<{ target: { path: string } }>;
+    const folder = target.path;
+    expect(path.basename(folder)).toMatch(/ \d{1,2} [A-Z][a-z]{2}$/); // DESIGN 2467: Save As **Planning 16 Oct**
+    expect(fs.readdirSync(folder).sort()).toEqual(["call.json", "summary.md", "transcript.json", "transcript.md", "transcript.srt"]);
+    const meta = JSON.parse(fs.readFileSync(path.join(folder, "call.json"), "utf8")) as { call: { id: string; title: string; participants: unknown[] }; items: unknown[] };
+    expect(meta.call.id).toBe(call);
+    expect(Array.isArray(meta.call.participants)).toBe(true);
+    expect(meta.items.length).toBeGreaterThan(0);
+    expect(fs.readFileSync(path.join(folder, "summary.md"), "utf8")).toMatch(/^# /); // says which call it is (#1053)
+    expect(fs.readFileSync(path.join(folder, "transcript.srt"), "utf8")).toMatch(/^1\n\d{2}:\d{2}:\d{2},\d{3} --> /);
   });
 
   test("UI — other path: Export needs one content checkbox, and a cancelled save panel leaves no Exported status", async ({ page }) => {

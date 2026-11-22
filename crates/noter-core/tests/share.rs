@@ -19,16 +19,18 @@ struct Native {
     answer: Option<PathBuf>,
     clipboard: Mutex<Vec<ClipboardText>>,
     folder_asked: Mutex<Vec<SaveKind>>,
+    suggested: Mutex<Vec<String>>,
     clipboard_fails: bool,
 }
 
 impl NativeOps for Native {
     fn save_panel<'a>(
         &'a self,
-        _: &'a str,
+        name: &'a str,
         kind: SaveKind,
     ) -> noter_core::BoxFuture<'a, Option<PathBuf>> {
         self.folder_asked.lock().unwrap().push(kind);
+        self.suggested.lock().unwrap().push(name.to_owned());
         Box::pin(async move { self.answer.clone() })
     }
 
@@ -61,6 +63,7 @@ fn open_with(dir: &Path, answer: Option<PathBuf>, clipboard_fails: bool) -> (Cor
         answer,
         clipboard: Mutex::default(),
         folder_asked: Mutex::default(),
+        suggested: Mutex::default(),
         clipboard_fails,
     });
     let deps = CoreDeps {
@@ -300,8 +303,8 @@ async fn markdown_copy_and_export_escape_owner_markup() {
         let result = export(&core, &["call_a"], (true, false, false))
             .await
             .unwrap();
-        assert_eq!(result.files, 1);
-        let markdown = std::fs::read_to_string(out.join(&names(&out)[0])).unwrap();
+        assert_eq!(result.files, 2); // call.json and summary.md
+        let markdown = std::fs::read_to_string(out.join("summary.md")).unwrap();
         assert!(markdown.contains(&expected), "{markdown}");
         assert!(!markdown.contains(owner), "{markdown}");
     }
@@ -456,61 +459,137 @@ async fn export_cancelled_writes_nothing_and_asks_for_a_folder() {
     assert_eq!(*native.folder_asked.lock().unwrap(), vec![SaveKind::Folder]);
 }
 
+// cpt-noter-seq-call-page-share-outputs (Other — Export to a folder) — #1146: PRD › Export and
+// portability: a folder per call with call.json, summary.md, transcript.md, SRT and JSON, audio
 #[tokio::test]
-async fn export_writes_one_file_per_kind_per_call_and_reports_the_count() {
+async fn export_of_one_call_writes_the_prd_folder_named_after_the_call() {
     let dir = tempfile::tempdir().unwrap();
-    let out = dir.path().join("out");
-    std::fs::create_dir_all(&out).unwrap();
-    let (core, _) = open(dir.path(), Some(out.clone()));
+    let out = dir.path().join("Call call_a 14 Oct");
+    let (core, native) = open(dir.path(), Some(out.clone()));
     world(&core);
     let r = export(&core, &["call_a"], (true, true, false))
         .await
         .unwrap();
-    assert_eq!((r.path.as_str(), r.files), (out.to_str().unwrap(), 3));
-    let files = names(&out);
-    assert_eq!(files.len(), 3, "{files:?}");
-    let md = files.iter().find(|f| f.ends_with(".md")).unwrap();
-    let text = std::fs::read_to_string(out.join(md)).unwrap();
-    assert!(
-        text.contains("Use Rust") && !text.contains("Rejected risk"),
-        "{text}"
+    // the save panel suggests the call's own folder: "<title> <day> <month>" (DESIGN 2467)
+    assert_eq!(
+        *native.suggested.lock().unwrap(),
+        vec!["Call call_a 14 Oct"]
     );
-    let srt = files.iter().find(|f| f.ends_with(".srt")).unwrap();
-    let srt = std::fs::read_to_string(out.join(srt)).unwrap();
+    assert_eq!((r.path.as_str(), r.files), (out.to_str().unwrap(), 5));
+    assert_eq!(
+        names(&out),
+        [
+            "call.json",
+            "summary.md",
+            "transcript.json",
+            "transcript.md",
+            "transcript.srt"
+        ]
+    );
+    let call: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("call.json")).unwrap()).unwrap();
+    assert_eq!(call["call"]["id"], "call_a");
+    assert_eq!(call["call"]["title"], "Call call_a");
+    assert!(call["call"]["participants"].is_array(), "{call}");
+    let items: Vec<&str> = call["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|i| i["text"].as_str().unwrap())
+        .collect();
+    assert!(
+        items.contains(&"Use Rust") && !items.contains(&"Rejected risk"),
+        "{items:?}"
+    );
+    let summary = std::fs::read_to_string(out.join("summary.md")).unwrap();
+    assert!(
+        summary.starts_with("# Call call\\_a\n") && summary.contains("Use Rust"),
+        "{summary}"
+    );
+    let transcript = std::fs::read_to_string(out.join("transcript.md")).unwrap();
+    assert!(transcript.starts_with("# Call call\\_a\n"), "{transcript}");
+    assert!(
+        transcript.contains("00:00:01") && transcript.contains("Hello there"),
+        "{transcript}"
+    );
+    let srt = std::fs::read_to_string(out.join("transcript.srt")).unwrap();
     assert!(
         srt.contains("1\n00:00:01,000 --> 00:00:04,500\n") && srt.contains("Hello there"),
         "{srt}"
     );
-    let json = files.iter().find(|f| f.ends_with(".json")).unwrap();
     let json: Value =
-        serde_json::from_str(&std::fs::read_to_string(out.join(json)).unwrap()).unwrap();
+        serde_json::from_str(&std::fs::read_to_string(out.join("transcript.json")).unwrap())
+            .unwrap();
     assert_eq!(json.as_array().unwrap().len(), 2);
 }
 
+// #1146: call.json identifies the call in every export; its items follow Summary and items
 #[tokio::test]
-async fn export_streams_transcripts_for_each_selected_call() {
+async fn a_transcript_only_export_still_has_call_json_without_items() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");
-    std::fs::create_dir_all(&out).unwrap();
     let (core, _) = open(dir.path(), Some(out.clone()));
     world(&core);
+    let r = export(&core, &["call_a"], (false, true, false))
+        .await
+        .unwrap();
+    assert_eq!(r.files, 4);
+    assert!(!names(&out).contains(&"summary.md".to_owned()));
+    let call: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("call.json")).unwrap()).unwrap();
+    assert_eq!(call["items"], json!([]));
+}
 
+// cpt-noter-seq-library-filter-calls (Happy path, steps 4–7) — #1146: several calls, a folder each
+#[tokio::test]
+async fn export_of_several_calls_writes_one_folder_per_call() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("Noter export");
+    let (core, native) = open(dir.path(), Some(out.clone()));
+    world(&core);
     let result = export(&core, &["call_a", "call_sens"], (false, true, false))
         .await
         .unwrap();
+    assert_eq!(*native.suggested.lock().unwrap(), vec!["Noter export"]);
+    assert_eq!(result.path, out.to_str().unwrap());
+    assert_eq!(names(&out), ["Call call_a 14 Oct", "Call call_sens 14 Oct"]);
+    assert_eq!(result.files, 8);
+    assert!(names(&out.join("Call call_sens 14 Oct")).contains(&"call.json".to_owned()));
+}
 
-    assert_eq!(result.files, 4);
-    let files = names(&out);
-    assert_eq!(files.len(), 4, "{files:?}");
-    assert!(files.iter().any(|name| name.contains("call_a")));
-    assert!(files.iter().any(|name| name.contains("call_sens")));
+// #1146: two calls with the same title and day do not share a folder
+#[tokio::test]
+async fn calls_with_the_same_name_get_numbered_folders() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let (core, _) = open(dir.path(), Some(out.clone()));
+    world(&core);
+    let titled = |id: &str| {
+        let mut c = call(id, "normal", "ready", 0);
+        for (k, v) in &mut c.values {
+            if *k == "title" {
+                *v = json!("Sync / QA: weekly");
+            }
+        }
+        c
+    };
+    core.store()
+        .insert_batch(vec![titled("call_x"), titled("call_y")])
+        .unwrap();
+    export(&core, &["call_x", "call_y"], (false, true, false))
+        .await
+        .unwrap();
+    // a slash or colon cannot name a macOS folder in Finder
+    assert_eq!(
+        names(&out),
+        ["Sync - QA- weekly 14 Oct", "Sync - QA- weekly 14 Oct 2"]
+    );
 }
 
 #[tokio::test]
 async fn export_scope_keeps_every_format_inside_the_selection() {
     let dir = tempfile::tempdir().unwrap();
     let out = dir.path().join("out");
-    std::fs::create_dir_all(&out).unwrap();
     let (core, _) = open(dir.path(), Some(out.clone()));
     world(&core);
     let r = core
@@ -532,12 +611,15 @@ async fn export_scope_keeps_every_format_inside_the_selection() {
         )
         .await
         .unwrap();
-    assert_eq!(r.files, 1);
-    let text = std::fs::read_to_string(out.join(&names(&out)[0])).unwrap();
+    assert_eq!(r.files, 2);
+    let text = std::fs::read_to_string(out.join("summary.md")).unwrap();
     assert!(
         text.contains("Use Rust") && !text.contains("Ship"),
         "{text}"
     );
+    let call: Value =
+        serde_json::from_str(&std::fs::read_to_string(out.join("call.json")).unwrap()).unwrap();
+    assert_eq!(call["items"].as_array().unwrap().len(), 1, "{call}");
 }
 
 #[tokio::test]
@@ -569,9 +651,9 @@ async fn export_copies_the_audio_files_that_are_kept() {
     let r = export(&core, &["call_a"], (false, false, true))
         .await
         .unwrap();
-    assert_eq!(r.files, 2);
-    let files = names(&out);
-    assert!(files.iter().all(|f| f.ends_with(".m4a")), "{files:?}");
+    assert_eq!(r.files, 3);
+    // the audio as recorded, beside call.json; never the private transcript.jsonl
+    assert_eq!(names(&out), ["call.json", "mic.m4a", "sys.m4a"]);
 }
 
 #[tokio::test]
@@ -623,11 +705,7 @@ async fn exported_markdown_opens_with_the_call_title_date_and_participants() {
     export(&core, &["call_a"], (true, false, false))
         .await
         .unwrap();
-    let md = names(&out)
-        .into_iter()
-        .find(|f| f.ends_with(".md"))
-        .unwrap();
-    let text = std::fs::read_to_string(out.join(md)).unwrap();
+    let text = std::fs::read_to_string(out.join("summary.md")).unwrap();
     // a pasted export says which call it is (issue 1053)
     assert!(
         text.starts_with("# Call call\\_a\n\n2026-10-14 · Dana Ito\n\n"),

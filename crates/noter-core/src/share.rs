@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use noter_db::rusqlite::OptionalExtension;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
-use noter_protocol::{CallId, CoreError, ErrorCode};
+use noter_protocol::{CallId, CoreError, ErrorCode, TimestampMs};
 
 use crate::settings::invalid;
 use crate::speakers::speaker_name;
@@ -356,31 +356,40 @@ fn html(blocks: &[Block]) -> String {
 /// What a share or export needs of the `calls` row.
 struct Facts {
     title: String,
+    started_at: i64,
     audio_kept: bool,
 }
 
-/// A file of an export: its name, and its text or the audio file it copies.
+/// One call of an export: its folder (empty when the chosen folder is the call's own) and what
+/// goes in it (PRD › Export and portability).
 struct ExportCall {
     id: CallId,
-    base: String,
+    dir: String,
     markdown: bool,
     transcript: bool,
     audio: Vec<(String, PathBuf)>,
 }
 
+/// A file of an export, written into `dir` under the chosen folder.
 enum ExportPayload {
+    /// `call.json`: the call as the Library shows it (metadata, participants) and its items.
+    CallJson { dir: String, json: Vec<u8> },
+    /// `summary.md`.
     Markdown {
-        name: String,
+        dir: String,
         /// Title, date and participants: a pasted export says which call it is (issue 1053).
         header: String,
         outputs: CallOutputs,
         scope: ShareScope,
     },
+    /// `transcript.md`, `transcript.srt` and `transcript.json`.
     Transcript {
+        dir: String,
         call_id: CallId,
-        base: String,
+        header: String,
     },
     Audio {
+        dir: String,
         name: String,
         from: PathBuf,
     },
@@ -397,22 +406,72 @@ fn export_io_error(error: std::io::Error) -> CoreError {
     )
 }
 
-fn slug(title: &str, id: &str) -> String {
-    let words: String = title
+const MONTHS: [&str; 12] = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+/// A call's export folder, as the save panel suggests it: "<title> <day> <month>" ("Planning 16
+/// Oct", DESIGN 2467), from the local date of `local_ms`. Finder cannot name a folder with `/`
+/// or `:`, and a leading dot would hide it.
+fn folder_name(title: &str, id: &str, local_ms: i64) -> String {
+    let date = crate::history::date_of(local_ms);
+    let (month, day) = (&date[5..7], &date[8..10]);
+    let month = MONTHS[month.parse::<usize>().unwrap_or(1).clamp(1, 12) - 1];
+    let day = day.trim_start_matches('0');
+    let title: String = title
         .chars()
         .map(|c| {
-            if c.is_alphanumeric() {
-                c.to_ascii_lowercase()
-            } else {
+            if matches!(c, '/' | ':') || c.is_control() {
                 '-'
+            } else {
+                c
             }
         })
+        .take(80)
         .collect();
-    let words: Vec<&str> = words.split('-').filter(|w| !w.is_empty()).collect();
+    let title = title.trim().trim_start_matches('.').trim();
+    let title = if title.is_empty() { id } else { title };
+    format!("{title} {day} {month}")
+}
+
+/// `00:01:02` of a call time.
+fn clock(ms: u32) -> String {
     format!(
-        "{}-{id}",
-        words.join("-").chars().take(40).collect::<String>()
+        "{:02}:{:02}:{:02}",
+        ms / 3_600_000,
+        ms / 60_000 % 60,
+        ms / 1000 % 60
     )
+}
+
+/// `transcript.md`: the header, then each line with its time and speaker.
+fn transcript_md(header: &str, segments: &[SegmentView]) -> String {
+    let esc = |t: &str| escape(t, "\\`*_[]<>#");
+    segments.iter().fold(header.to_owned(), |mut out, s| {
+        out += &format!(
+            "**{} {}:** {}\n\n",
+            clock(s.t0_ms.0),
+            esc(&speaker_name(&s.speaker.label)),
+            esc(&s.text)
+        );
+        out
+    })
+}
+
+/// The items an export carries: those its Markdown renders (ready sections in scope, chosen
+/// items, never a rejected one).
+fn scoped_items(outputs: &CallOutputs, scope: &ShareScope) -> Vec<ItemView> {
+    outputs
+        .sections
+        .iter()
+        .filter(|s| scope.sections.is_empty() || scope.sections.contains(&s.kind))
+        .filter(|s| s.state == SectionState::Ready)
+        .flat_map(|s| s.items.iter())
+        .filter(|i| i.review != ReviewState::Rejected)
+        .filter(|i| scope.item_ids.is_empty() || scope.item_ids.contains(&i.id))
+        .filter(|i| scope.include_unreviewed || i.review != ReviewState::Suggested)
+        .cloned()
+        .collect()
 }
 
 /// `00:01:02,500`.
@@ -448,28 +507,46 @@ fn write_payload(
     folder: &Path,
     payload: ExportPayload,
 ) -> Result<u32, CoreError> {
+    let into = |dir: &str| {
+        let dir = folder.join(dir);
+        std::fs::create_dir_all(&dir).map_err(export_io_error)?;
+        Ok::<_, CoreError>(dir)
+    };
     match payload {
+        ExportPayload::CallJson { dir, json } => {
+            std::fs::write(into(&dir)?.join("call.json"), json).map_err(export_io_error)?;
+            Ok(1)
+        }
         ExportPayload::Markdown {
-            name,
+            dir,
             header,
             outputs,
             scope,
         } => {
             let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
-            std::fs::write(folder.join(name), header + &shared.markdown)
+            std::fs::write(into(&dir)?.join("summary.md"), header + &shared.markdown)
                 .map_err(export_io_error)?;
             Ok(1)
         }
-        ExportPayload::Transcript { call_id, base } => {
+        ExportPayload::Transcript {
+            dir,
+            call_id,
+            header,
+        } => {
             let segments = store.read(|c| segments_of(c, &call_id, None))?;
             let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
-            std::fs::write(folder.join(format!("{base}.srt")), srt(&segments))
-                .map_err(export_io_error)?;
-            std::fs::write(folder.join(format!("{base}.json")), json).map_err(export_io_error)?;
-            Ok(2)
+            let dir = into(&dir)?;
+            for (name, text) in [
+                ("transcript.md", transcript_md(&header, &segments)),
+                ("transcript.srt", srt(&segments)),
+                ("transcript.json", json),
+            ] {
+                std::fs::write(dir.join(name), text).map_err(export_io_error)?;
+            }
+            Ok(3)
         }
-        ExportPayload::Audio { name, from } => {
-            std::fs::copy(from, folder.join(name)).map_err(export_io_error)?;
+        ExportPayload::Audio { dir, name, from } => {
+            std::fs::copy(from, into(&dir)?.join(name)).map_err(export_io_error)?;
             Ok(1)
         }
     }
@@ -503,12 +580,14 @@ impl Core {
         self.store()
             .read(|c| {
                 c.query_row(
-                    "SELECT title, audio_deleted, audio_not_stored FROM calls WHERE id = ?1",
+                    "SELECT title, started_at, audio_deleted, audio_not_stored FROM calls \
+                     WHERE id = ?1",
                     [id],
                     |r| {
                         Ok(Facts {
                             title: r.get(0)?,
-                            audio_kept: r.get::<_, i64>(1)? == 0 && r.get::<_, i64>(2)? == 0,
+                            started_at: r.get(1)?,
+                            audio_kept: r.get::<_, i64>(2)? == 0 && r.get::<_, i64>(3)? == 0,
                         })
                     },
                 )
@@ -600,9 +679,29 @@ impl Core {
             include_unreviewed: true,
         });
         let mut calls = Vec::with_capacity(args.call_ids.len());
+        let mut taken = std::collections::HashMap::<String, u32>::new();
+        let one = args.call_ids.len() == 1;
+        let mut suggested = "Noter export".to_owned();
         for id in &args.call_ids {
             let facts = self.call_facts(id.as_str())?;
-            let base = slug(&facts.title, id.as_str());
+            let offset = self
+                .deps
+                .native
+                .utc_offset_minutes(TimestampMs(facts.started_at));
+            let local = facts.started_at + i64::from(offset) * 60_000;
+            let mut name = folder_name(&facts.title, id.as_str(), local);
+            let n = taken.entry(name.clone()).or_default();
+            *n += 1;
+            if *n > 1 {
+                name = format!("{name} {n}");
+            }
+            // One call: the chosen folder is the call's own; several: a folder each inside it.
+            let dir = if one {
+                suggested = name;
+                String::new()
+            } else {
+                name
+            };
             // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-request
             // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
             if want.audio && !facts.audio_kept {
@@ -626,13 +725,13 @@ impl Core {
                         .join(id.as_str())
                         .join(format!("{track}.m4a"));
                     if from.is_file() {
-                        audio.push((track.into(), from));
+                        audio.push((format!("{track}.m4a"), from));
                     }
                 }
             }
             calls.push(ExportCall {
                 id: id.clone(),
-                base,
+                dir,
                 markdown: want.summary_and_items,
                 transcript: args.scope.is_none() && want.transcript,
                 audio,
@@ -643,7 +742,7 @@ impl Core {
         let panel = self
             .deps
             .native_ops
-            .save_panel("Noter export", SaveKind::Folder)
+            .save_panel(&suggested, SaveKind::Folder)
             .await;
         let Some(folder) = panel else {
             return Err(CoreError::new(ErrorCode::Cancelled, "export cancelled"));
@@ -666,35 +765,51 @@ impl Core {
         let mut failed = None;
         for call in calls {
             let send = async {
+                let stopped = |_| internal("the export writer stopped");
+                let outputs = self.outputs_for_share(&call.id)?;
+                let header = self
+                    .store()
+                    .read(|c| markdown_header(c, call.id.as_str()))?;
+                let row = self.call_row(call.id.as_str())?.ok_or_else(not_found)?;
+                let items = if call.markdown {
+                    scoped_items(&outputs, &scope)
+                } else {
+                    vec![]
+                };
+                let json = serde_json::json!({ "call": row, "items": items });
+                tx.send(ExportPayload::CallJson {
+                    dir: call.dir.clone(),
+                    json: serde_json::to_vec_pretty(&json).map_err(internal)?,
+                })
+                .await
+                .map_err(stopped)?;
                 if call.markdown {
-                    let outputs = self.outputs_for_share(&call.id)?;
-                    let header = self
-                        .store()
-                        .read(|c| markdown_header(c, call.id.as_str()))?;
                     tx.send(ExportPayload::Markdown {
-                        name: format!("{}.md", call.base),
-                        header,
+                        dir: call.dir.clone(),
+                        header: header.clone(),
                         outputs,
                         scope: scope.clone(),
                     })
                     .await
-                    .map_err(|_| internal("the export writer stopped"))?;
+                    .map_err(stopped)?;
                 }
                 if call.transcript {
                     tx.send(ExportPayload::Transcript {
+                        dir: call.dir.clone(),
                         call_id: call.id.clone(),
-                        base: call.base.clone(),
+                        header,
                     })
                     .await
-                    .map_err(|_| internal("the export writer stopped"))?;
+                    .map_err(stopped)?;
                 }
-                for (track, from) in call.audio {
+                for (name, from) in call.audio {
                     tx.send(ExportPayload::Audio {
-                        name: format!("{}-{track}.m4a", call.base),
+                        dir: call.dir.clone(),
+                        name,
                         from,
                     })
                     .await
-                    .map_err(|_| internal("the export writer stopped"))?;
+                    .map_err(stopped)?;
                 }
                 Ok::<_, CoreError>(())
             }
@@ -822,6 +937,20 @@ mod tests {
             item("itm_2", "Rejected idea", ReviewState::Rejected),
         ];
         outputs(vec![summary, actions])
+    }
+
+    #[test]
+    fn a_folder_is_named_title_day_month_and_finder_safe() {
+        // 2026-01-05 and 2026-12-31 UTC
+        let (jan, dec) = (1_767_571_200_000, 1_798_675_200_000);
+        assert_eq!(folder_name("Planning", "call_p", jan), "Planning 5 Jan");
+        assert_eq!(folder_name("a/b: c", "call_p", dec), "a-b- c 31 Dec");
+        assert_eq!(folder_name("  .hidden ", "call_p", jan), "hidden 5 Jan");
+        assert_eq!(folder_name(" ", "call_p", jan), "call_p 5 Jan");
+        assert_eq!(
+            folder_name(&"x".repeat(200), "c", jan).len(),
+            80 + " 5 Jan".len()
+        );
     }
 
     #[test]
