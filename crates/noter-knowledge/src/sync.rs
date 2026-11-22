@@ -778,7 +778,8 @@ async fn embed<L: EngineLauncher>(
     if chunks.is_empty() {
         return Ok(out);
     }
-    std::fs::create_dir_all(env.container.join("knowledge")).map_err(|_| unavailable())?;
+    std::fs::create_dir_all(env.container.join("engine-io/knowledge"))
+        .map_err(|_| unavailable())?;
     for batch in chunks.chunks(EMBED_BATCH) {
         let id = ulid::Ulid::generate();
         let texts = batch.iter().map(|c| c.text.clone()).collect();
@@ -787,7 +788,7 @@ async fn embed<L: EngineLauncher>(
             .embed_texts(
                 format!("emb_{id}"),
                 texts,
-                Some(format!("knowledge/embed-{id}.f32")),
+                Some(format!("engine-io/knowledge/embed-{id}.f32")),
             )
             .await
             .map_err(|_| unavailable())?;

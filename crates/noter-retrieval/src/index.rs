@@ -29,7 +29,7 @@ impl<L: EngineLauncher> Embedder for EngineClient<L> {
         Box::pin(async move {
             let id = ulid::Ulid::generate();
             // One text comes back inline; a batch through a file in the container.
-            let out = (texts.len() != 1).then(|| format!("index/embed-{id}.f32"));
+            let out = (texts.len() != 1).then(|| format!("engine-io/index/embed-{id}.f32"));
             let wanted = texts.len();
             let rows = self
                 .embed_texts(format!("emb_{id}"), texts, out)

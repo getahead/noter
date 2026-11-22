@@ -97,6 +97,22 @@ final class OfflineTests: XCTestCase {
         }
     }
 
+    /// #1173: the data folder also holds the database and the logs (ADR-0004), so a path must
+    /// stay under audio/, models/ or engine-io/, after resolving symlinks too.
+    func testOnlyAudioModelsAndEngineIOAreReachable() throws {
+        for ok in ["audio/call_1/x.json", "models/whisper-turbo/config.json", "engine-io/index/e.f32"] {
+            XCTAssertNotNil(ContainerPath.resolve(ok, in: container), ok)
+        }
+        for bad in ["noter.db", "noter.db-wal", "logs/noter.log", "index/e.f32", "knowledge/e.f32", "skills/x", "audio", "engine-io"] {
+            XCTAssertNil(ContainerPath.resolve(bad, in: container), bad)
+        }
+        try Data("db".utf8).write(to: container.appendingPathComponent("noter.db"))
+        try FileManager.default.createDirectory(at: container.appendingPathComponent("audio"), withIntermediateDirectories: true)
+        try FileManager.default.createSymbolicLink(
+            at: container.appendingPathComponent("audio/db"), withDestinationURL: container.appendingPathComponent("noter.db"))
+        XCTAssertNil(ContainerPath.resolve("audio/db", in: container), "a link from audio/ to the database")
+    }
+
     func testASymlinkOutOfTheContainerIsRefused() throws {
         let outside = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: outside, withIntermediateDirectories: true)

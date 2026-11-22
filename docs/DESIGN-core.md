@@ -583,7 +583,7 @@ Crate `noter-engine-client`, with no Tauri dependency. Spawns the sidecar (`note
 
 ##### Responsibility boundaries
 
-Does not interpret segments beyond routing them; does not persist. Never gives the engine a network path or a database path; every path it sends is relative to the data folder.
+Does not interpret segments beyond routing them; does not persist. Never gives the engine a network path or a database path; every path it sends is relative to the data folder and lies under `audio/`, `models/` or `engine-io/`.
 
 ##### Related components (by ID)
 
@@ -1040,7 +1040,7 @@ Swift 6 executable, unsandboxed (ADR-0004), signed in the Swift build with its o
 
 ##### Responsibility boundaries
 
-No network, no database, no knowledge of people or items. It reads and writes only inside the data folder, checking every path before it opens a file. It reports facts; the core decides.
+No network, no database, no knowledge of people or items. It reads and writes only under `audio/`, `models/` and `engine-io/` in the data folder, never `noter.db` or `logs/` beside them, checking every path (symlinks resolved) before it opens a file (#1173). It reports facts; the core decides.
 
 ##### Related components (by ID)
 

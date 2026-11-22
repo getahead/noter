@@ -388,6 +388,47 @@ async fn a_done_without_a_complete_result_file_fails() {
     assert!(pass(&c, "audio/call_1/r.json").await.is_ok());
 }
 
+/// #1173: the data folder also holds the database and the logs (ADR-0004): only audio/,
+/// models/ and engine-io/ may be named, and a result read back must really lie under one.
+#[tokio::test(start_paused = true)]
+async fn only_audio_models_and_engine_io_are_sent_to_the_engine() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = engine(dir.path());
+    let c = client(&engine);
+    for bad in [
+        "noter.db",
+        "noter.db-wal",
+        "logs/noter.log",
+        "index/e.f32",
+        "knowledge/e.f32",
+    ] {
+        let r = pass(&c, bad).await;
+        assert!(matches!(r, Err(OfflineError::UnsafePath(_))), "{bad:?}");
+        let r = c.embed_texts("t".into(), texts(2), Some(bad.into())).await;
+        assert!(matches!(r, Err(OfflineError::UnsafePath(_))), "{bad:?}");
+    }
+    assert_eq!(offline_cmds(&engine), 0);
+}
+
+#[cfg(unix)]
+#[tokio::test(start_paused = true)]
+async fn a_result_linked_to_the_database_is_not_read() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), "noter.db", EMPTY);
+    std::fs::create_dir_all(dir.path().join("audio/call_1")).unwrap();
+    std::os::unix::fs::symlink(
+        dir.path().join("noter.db"),
+        dir.path().join("audio/call_1/r.json"),
+    )
+    .unwrap();
+    let engine = scripted(
+        dir.path(),
+        r#"{"on": "offline_pass", "after_ms": 10, "event": {"type": "offline_done", "call_id": "call_1", "result_path": "audio/call_1/r.json"}}"#,
+    );
+    let r = pass(&client(&engine), "audio/call_1/r.json").await;
+    assert!(matches!(r, Err(OfflineError::BadResult(_))), "{r:?}");
+}
+
 #[cfg(unix)]
 #[tokio::test(start_paused = true)]
 async fn a_result_behind_a_symlink_out_of_the_container_fails() {

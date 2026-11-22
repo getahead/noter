@@ -73,6 +73,8 @@ enum Vectors {
         // @cpt-begin:cpt-noter-algo-core-engine-offline-vectors:p1:inst-vector-file
         var data = Data(capacity: rows.reduce(0) { $0 + $1.count } * 4)
         for v in rows.joined() { withUnsafeBytes(of: v.bitPattern.littleEndian) { data.append(contentsOf: $0) } }
+        // The folder under engine-io/ may be new; the path was checked by ContainerPath first.
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
         // @cpt-end:cpt-noter-algo-core-engine-offline-vectors:p1:inst-vector-file
     }

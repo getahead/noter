@@ -97,7 +97,7 @@ The live transcript can improve after the call without losing the user's speaker
 
 **Steps**:
 1. [x] - `p1` - Supervisor verifies the scheduler permits archive work and sends `offline_pass { call_id, session_dir, result_path, constraints_path, backend }`; use whisper-turbo when optional whisper-large-v3 is absent - `inst-archive-request`
-2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside the data folder - `inst-archive-paths`
+2. [x] - `p1` - Engine validates container-relative input and output paths and constraints before opening files; reject traversal or paths outside `audio/`, `models/` and `engine-io/` in the data folder - `inst-archive-paths`
 3. [x] - `p1` - Acknowledge the command id, then run `cpt-noter-algo-core-engine-offline-decode` at low priority with the requested archive backend - `inst-archive-start`
 4. [x] - `p1` - Emit `offline_progress { call_id, progress }` as work advances; if capture starts, yield at the next diarization-window boundary and resume after capture ends - `inst-archive-progress`
 5. [x] - `p1` - Write the completed archive result and referenced word timings before emitting `offline_done { call_id, result_path }` - `inst-archive-complete`
