@@ -279,9 +279,17 @@ impl<L: EngineLauncher> Drop for Guard<'_, L> {
     }
 }
 
-/// A container-relative path: no root, no empty, `.` or `..` segment, no NUL.
+/// The folders the engine may be sent to. The data folder also holds `noter.db` and `logs/`
+/// (ADR-0004), which never reach the engine (#1173).
+const ROOTS: [&str; 3] = ["audio", "models", "engine-io"];
+
+/// A container-relative path under one of [`ROOTS`]: no root, no empty, `.` or `..` segment,
+/// no NUL.
 fn relative(rel: &str) -> Result<&str, OfflineError> {
+    let mut segments = rel.split('/');
     let safe = !rel.contains('\0')
+        && segments.next().is_some_and(|root| ROOTS.contains(&root))
+        && rel.contains('/')
         && rel
             .split('/')
             .all(|s| !s.is_empty() && s != "." && s != "..");
@@ -292,12 +300,17 @@ fn relative(rel: &str) -> Result<&str, OfflineError> {
     }
 }
 
-/// Reads a file the engine wrote, after checking it really is inside the container.
+/// Reads a file the engine wrote, after checking it really is inside its root folder.
 fn read_inside(root: &Path, rel: &str) -> Result<Vec<u8>, OfflineError> {
     let bad = |why: &str| OfflineError::BadResult(format!("{rel}: {why}"));
-    let path = root.join(relative(rel).map_err(|_| bad("not container-relative"))?);
+    let rel = relative(rel).map_err(|_| bad("not container-relative"))?;
+    let path = root.join(rel);
     let real = path.canonicalize().map_err(|_| bad("missing"))?;
-    let root = root.canonicalize().map_err(|_| bad("no container"))?;
+    let top = rel.split('/').next().unwrap_or_default();
+    let root = root
+        .canonicalize()
+        .map_err(|_| bad("no container"))?
+        .join(top);
     if !real.starts_with(&root) {
         return Err(bad("outside the container"));
     }

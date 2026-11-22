@@ -50,15 +50,21 @@ public enum OfflineModel: Sendable {
 
 /// Paths the core sends are relative to the data folder and must stay inside it.
 public enum ContainerPath {
+    /// The folders the engine may touch. The data folder also holds `noter.db` and `logs/`
+    /// (ADR-0004), which the engine must never reach (#1173).
+    public static let roots = ["audio", "models", "engine-io"]
+
     /// The file `relative` names in `container`, or nil for an absolute path, an empty, `.` or
-    /// `..` segment, a NUL, or a symlink leading out of the container.
+    /// `..` segment, a NUL, a path outside `roots`, or a symlink leading out of its root.
     public static func resolve(_ relative: String, in container: URL) -> URL? {
         let segments = relative.split(separator: "/", omittingEmptySubsequences: false)
-        guard !relative.contains("\u{0}"), segments.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
+        guard !relative.contains("\u{0}"), segments.count > 1, roots.contains(String(segments[0])),
+            segments.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." })
+        else {
             return nil
         }
         let url = container.appendingPathComponent(relative)
-        guard real(url).hasPrefix(real(container) + "/") else { return nil }
+        guard real(url).hasPrefix(real(container) + "/" + segments[0] + "/") else { return nil }
         return url
     }
 
