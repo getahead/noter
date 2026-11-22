@@ -1491,6 +1491,7 @@ export const en = {
   "search.count_weak": { one: "{count} result, only weak matches", other: "{count} results, only weak matches" },
   "library.export": "Export…",
   "library.export_hint": "Select calls to export",
+  "library.export_recording": "Nothing to export yet: the selected calls are still recording",
   "tags.added": "Added “{tag}”",
   "tags.removed": "Removed “{tag}”",
   "audio.delete": "Delete Audio Now…",

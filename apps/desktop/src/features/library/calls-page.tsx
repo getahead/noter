@@ -156,7 +156,12 @@ export function CallsPage() {
   }, [order]);
   useEffect(() => void (memory = { state, selection }), [state, selection]);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-export
-  useEffect(() => exportStore.setIds(selection.ids), [selection.ids]);
+  // a selection of calls still recording has nothing to export yet (issue 1053)
+  const recordingOnly = useMemo(() => {
+    const picked = state.rows.filter((r) => selected.has(r.id));
+    return picked.length > 0 && picked.every((r) => r.status === "recording" || r.status === "paused");
+  }, [state.rows, selected]);
+  useEffect(() => exportStore.setIds(selection.ids, recordingOnly), [selection.ids, recordingOnly]);
   useEffect(() => () => exportStore.setIds([]), []);
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-export
   // a record the core changed replaces its row, a call it removed leaves the list

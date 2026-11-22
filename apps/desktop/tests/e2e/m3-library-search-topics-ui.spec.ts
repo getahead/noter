@@ -41,6 +41,20 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await expect(page.getByRole("dialog")).toContainText(/Summary and items/);
   });
 
+  // #1053: a call still recording has nothing to export yet; Export… says so instead of opening a sheet the core refuses
+  test("UI — other path: Export… stays disabled while only calls still recording are selected, with the reason", async ({ page }) => {
+    await openCalls(page, () => {}); // the fixture world: the planning call is still recording
+    const rows = page.locator(ROW);
+    await rows.filter({ hasText: W.LIVE_TITLE }).click();
+    const exportButton = button(page, "Export…");
+    await expect(exportButton).toBeDisabled();
+    await expect(exportButton).toHaveAccessibleDescription("Nothing to export yet: the selected calls are still recording");
+    await page.keyboard.press("Meta+KeyE");
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await rows.filter({ hasNotText: W.LIVE_TITLE }).first().click({ modifiers: ["Meta"] });
+    await expect(exportButton).toBeEnabled(); // a finished call in the selection can be exported
+  });
+
   test("UI — empty path: filters that match nothing show No calls match these filters, Clear Filters brings every call back", async ({ page }) => {
     await openCalls(page);
     await button(page, /^People/).click();

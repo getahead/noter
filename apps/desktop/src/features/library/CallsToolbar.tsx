@@ -9,6 +9,9 @@ import { useHead } from "./topics-head";
 /** The Calls toolbar (LC-R1): the shell's toolbar plus Export…, disabled with its help tag until calls are selected. */
 export function CallsToolbar({ route, base }: PageToolbarProps) {
   const ids = useSyncExternalStore(exportStore.subscribe, exportStore.get, exportStore.get);
+  const recording = useSyncExternalStore(exportStore.subscribe, exportStore.isRecordingOnly, exportStore.isRecordingOnly);
+  // no selection, or only calls still recording (nothing to export yet, issue 1053): disabled with the reason
+  const why = !ids.length ? t("library.export_hint") : recording ? t("library.export_recording") : undefined;
   const head = useHead();
   // LS-R1: Search results with its count; the query stays in the shell's search field
   if (route.key.startsWith("search:")) return <MainToolbar {...base} region="LS-R1" title={t("search.title")} subtitle={head.subtitle ?? undefined} />;
@@ -22,7 +25,7 @@ export function CallsToolbar({ route, base }: PageToolbarProps) {
       trailing={
         <>
           {base.trailing}
-          <PushButton label={t("library.export")} size="small" disabled={!ids.length} help={ids.length ? undefined : t("library.export_hint")} shortcut="Meta+E" onAction={exportStore.run} />
+          <PushButton label={t("library.export")} size="small" disabled={!!why} help={why} shortcut="Meta+E" onAction={exportStore.run} />
         </>
       }
     />

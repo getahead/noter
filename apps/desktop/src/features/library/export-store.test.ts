@@ -19,4 +19,20 @@ describe("exportStore", () => {
     exportStore.setOpener(null);
     exportStore.setIds([]);
   });
+
+  // #1053: a selection of calls still recording has nothing to export yet
+  it("opens nothing for a selection of calls still recording, and says so", () => {
+    const open = vi.fn();
+    exportStore.setOpener(open);
+    exportStore.setIds(["live"], true);
+    expect(exportStore.isRecordingOnly()).toBe(true);
+    exportStore.run();
+    expect(open).not.toHaveBeenCalled();
+    exportStore.setIds(["live", "past"], false);
+    expect(exportStore.isRecordingOnly()).toBe(false);
+    exportStore.run();
+    expect(open).toHaveBeenCalledWith(["live", "past"]);
+    exportStore.setOpener(null);
+    exportStore.setIds([]);
+  });
 });
