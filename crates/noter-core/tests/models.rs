@@ -985,6 +985,7 @@ fn three_files(bad: Option<&str>) -> Bundles {
     )
 }
 
+// cpt-noter-seq-first-run-download-models: a restart after an offline pause keeps it paused.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn a_bundle_of_files_resumes_the_half_done_file_and_keeps_the_verified_ones() {
     let dir = tempfile::tempdir().unwrap();
@@ -1009,6 +1010,9 @@ async fn a_bundle_of_files_resumes_the_half_done_file_and_keeps_the_verified_one
         640
     );
     assert!(!dir.path().join("models/whisper-turbo").exists());
+    // The bundle reads Paused a moment before its job run ends; a run still Running at quit is
+    // re-run by the restart reconcile, which resumes the download (#1188).
+    wait_for_model_run_to_stop(&s.core).await;
     // A restart reads the half-done bundle as paused.
     drop(s);
     let s = open(dir.path(), three_files(None), 90_000);
