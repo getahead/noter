@@ -109,13 +109,13 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect(unnamed.getByText("Speaker 3")).toHaveCount(0);
   });
 
-  test("UI — other path: Speaker 3 unnamed in two calls shows the calls and names this call only", async ({ page }) => {
+  test("UI — other path: Speaker 3 unnamed in two calls is named in this call only, one row per call", async ({ page }) => {
     await openPeople(page, (w) => (W.idle(w), recurring(w, 2)));
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await unnamed.getByRole("button", { name: "Name…" }).first().click();
     const pop = page.getByRole("dialog", { name: "Name Speaker 3" });
-    await expect(pop).toContainText(/Speaker 3 · 2 calls · last on/);
-    await expect(pop).toContainText("Names Speaker 3 in this call only. Naming it in every call at once isn’t supported yet.");
+    await expect(pop).toContainText("Names Speaker 3 in this call as one change you can undo.");
+    await expect(pop).not.toContainText(/calls · last on/); // one row per call: no cross-call line (#1151)
     await pop.getByRole("combobox", { name: "Name…" }).fill("Dmitri");
     await pop.getByRole("option", { name: /Dmitri Sokolov/ }).click();
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toHaveLength(1); // one call, never one change for the group

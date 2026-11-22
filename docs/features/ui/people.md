@@ -124,8 +124,7 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 6. [x] - `p1` - User types “Дима” and chooses Dmitri, or New Person “Lena”… followed by Create and Name - `inst-pick`
 7. [x] - `p1` - **IF** naming only the returned call's speaker - `inst-if-single`
    1. [x] - `p1` - Reuse Speakers: `transcript_rename_speaker` with call id, speaker id and existing or new person; consume its change id and refresh People - `inst-name-single`
-8. [x] - `p1` - **IF** the design's recurring speaker spans several calls - `inst-if-batch`
-   1. [x] - `p1` - Keep the intended batch preview and flag the missing cross-call identity/atomic mutation contract; do not merge equal speaker numbers from different calls - `inst-batch-gap`
+8. [x] - `p1` - A speaker number shared with other calls is still one row per call: the footnote reads **Names Speaker 2 in this call as one change you can undo.**, with no cross-call preview, and equal speaker numbers from different calls are never merged (owner #1151) - `inst-batch-gap`
 9. [x] - `p1` - User chooses Undo on a successful change or in the Person History; shared history calls `change_undo` and refreshes names and unnamed rows - `inst-undo`
 10. [x] - `p1` - **RETURN** core-confirmed People rows; no profile is created by naming - `inst-return-name`
 

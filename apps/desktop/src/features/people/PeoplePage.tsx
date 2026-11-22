@@ -88,7 +88,7 @@ export function PeoplePage() {
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
       <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
-      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} all={state.read?.unnamed ?? []} prefs={prefs} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => ((named.current = true), void list.load())} />}
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => ((named.current = true), void list.load())} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.flatMap((id) => rows.find((p) => p.id === id) ?? []), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
