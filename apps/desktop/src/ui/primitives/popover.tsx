@@ -1,6 +1,7 @@
 // popover of the prototype's floating layer (src/js/05-shell.js, positioned as 00-core.js positionFloating does):
 // opens under its anchor, Esc or a click outside closes it, focus moves in and returns to the anchor.
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { base, zoomFactor } from "./attrs";
 import { focusInside } from "./sheet";
 import { closeOnEscape, dismissPopover } from "./popover-escape";
@@ -77,7 +78,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
   }, [placed]); // once per opening
   useEffect(() => closeOnOutside(ref, anchor, onClose), [anchor, onClose]);
   useEffect(() => ref.current ? closeOnEscape(onClose, ref.current) : undefined, [onClose]);
-  return (
+  const pop = (
     <div
       ref={ref}
       className="np-pop"
@@ -92,4 +93,16 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
       {children}
     </div>
   );
+  const root = zoomedRegionRoot(anchor);
+  return root ? createPortal(pop, root) : pop;
+}
+
+/** The window root when `anchor` sits in a region Text size zooms (the call window's header and transcript): a popover
+ *  there is drawn at the root, so it keeps system size and is placed in the window's coordinates (#1190). Anywhere
+ *  else it stays in place, inside its sheet's focus trap. */
+export function zoomedRegionRoot(anchor: HTMLElement | null): Element | null {
+  const root = anchor?.closest?.(".np-win");
+  if (!root) return null;
+  for (let e = anchor!.parentElement; e && e !== root; e = e.parentElement) if ((parseFloat(getComputedStyle(e).zoom) || 1) !== 1) return root;
+  return null;
 }

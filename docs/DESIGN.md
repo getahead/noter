@@ -1716,7 +1716,7 @@ The call screen is the dedicated layout of the call window on a second display. 
 - The right column takes 34 % of the display width, clamped to 420–720 (640 at 1920); on displays narrower than 1280 the speaker column narrows to 96.
 - Portrait displays stack the cards on top (up to half the height), the transcript below and the strip at the bottom.
 - The Wide, Medium and Narrow content widths belong to the main window; the call screen follows its display.
-- ⌘+, ⌘− and ⌘0, while the panel is key, scale the text from 85 to 150 %, remembered per display (D57).
+- ⌘+, ⌘− and ⌘0, while the panel is key, scale the text from 85 to 150 %, remembered per display (D57). Menus and popovers opened from the call window keep system size and stay inside the window (#1190).
 - Display unplugged: the same window switches to the floating layout and keeps cards, held cards, pins and the transcript position (D1).
 - Copilot flag off: CS-R4 is absent, the transcript fills the width, and CS-R5 drops the budget, **2 Pinned** and **Catch Me Up** (D9).
 - German text about 30 % longer:

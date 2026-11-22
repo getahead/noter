@@ -1,6 +1,7 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { closeOnEscape, closeOnOutside, measure, placeFloating, Popover, returnFocus } from "./popover";
+import { rendered } from "../testing";
+import { closeOnEscape, closeOnOutside, measure, placeFloating, Popover, returnFocus, zoomedRegionRoot } from "./popover";
 
 describe("Popover (cpt-noter-dod-ui-primitives-controls)", () => {
   it("renders the prototype's popover as a dialog", () => {
@@ -216,5 +217,30 @@ describe("stacked popover Escape", () => {
       expect(close).not.toHaveBeenCalled();
       expect(cancel).not.toHaveBeenCalled();
     } finally { remove(); }
+  });
+});
+
+describe("a popover in a region Text size zooms (#1190)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  // window root > zoomed header > button
+  const tree = (zoom: string) => {
+    const root = { parentElement: null, nodeType: 1 }; // an element node, as createPortal checks
+    const header = { parentElement: root, zoom };
+    const anchor = { parentElement: header, closest: (s: string) => (s === ".np-win" ? root : null) } as unknown as HTMLElement;
+    vi.stubGlobal("getComputedStyle", (e: { zoom?: string }) => ({ zoom: e.zoom ?? "1" }));
+    return { root, anchor };
+  };
+
+  it("is drawn at the window root, at system size, when its anchor sits in a zoomed region", () => {
+    const { root, anchor } = tree("1.5");
+    expect(zoomedRegionRoot(anchor)).toBe(root);
+    const out = rendered(Popover, { anchor, onClose: () => {} }) as unknown as { containerInfo?: unknown };
+    expect(out.containerInfo).toBe(root); // a portal into the root
+  });
+
+  it("stays in place anywhere else, inside its sheet's focus trap", () => {
+    expect(zoomedRegionRoot(tree("1").anchor)).toBeNull();
+    expect(zoomedRegionRoot({ closest: () => null } as unknown as HTMLElement)).toBeNull();
+    expect(zoomedRegionRoot(null)).toBeNull();
   });
 });
