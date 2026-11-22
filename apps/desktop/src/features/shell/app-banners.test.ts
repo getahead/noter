@@ -27,6 +27,13 @@ describe("appBanners", () => {
     expect(appBanners({}, actions())).toEqual([]);
   });
 
+  // cpt-noter-seq-first-run-complete-setup — #1122: Continue past the test (not Skip for Now) finishes setup with the test not run: detection is off too
+  it("shows the self-test banner for a test never run once setup is finished, not while it is still open", () => {
+    const steps = (state: string) => ({ self_test: { type: "not_run" }, steps: [{ step: "welcome", state: "done" }, { step: "permissions", state }] }) as never;
+    expect(appBanners({ setup: steps("done") }, actions())[0]).toMatchObject({ id: "self-test" });
+    expect(appBanners({ setup: steps("todo") }, actions())).toEqual([]);
+  });
+
   it("derives the self-test banner from a skipped or failed test, with its two actions", () => {
     const a = actions();
     for (const type of ["skipped", "failed"]) {
