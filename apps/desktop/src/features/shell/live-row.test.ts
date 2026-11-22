@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { elapsedSeconds, isLive, shortTitle } from "./live-row";
+import { elapsedSeconds, isLive, receivedAtOf, shortTitle } from "./live-row";
 
 describe("live row", () => {
   it("shows for recording and paused only", () => {
@@ -21,5 +21,21 @@ describe("live row", () => {
     expect(shortTitle(null)).toBe("");
     expect(shortTitle("1:1 with Anna")).toBe("1:1 with Anna");
     expect(shortTitle("10:30 standup")).toBe("10:30 standup");
+  });
+});
+
+// cpt-noter-seq-today-review-before-call (Return to a live call, #1039): a clock mounted later keeps the arrival time
+describe("receivedAtOf", () => {
+  it("stamps a capture version once, when it is first seen, for every clock in the window", () => {
+    vi.useFakeTimers({ now: 1_000 });
+    expect(receivedAtOf({ version: 7 })).toBe(1_000);
+    vi.setSystemTime(61_000);
+    expect(receivedAtOf({ version: 7 }), "Today mounted a minute later").toBe(1_000);
+    expect(receivedAtOf({ version: 8 })).toBe(61_000);
+    expect(receivedAtOf(undefined)).toBe(61_000);
+    vi.setSystemTime(90_000);
+    expect(receivedAtOf(undefined), "no state yet").toBe(90_000);
+    expect(receivedAtOf({ version: 8 }), "a clock with no state yet left the stamp alone").toBe(61_000);
+    vi.useRealTimers();
   });
 });

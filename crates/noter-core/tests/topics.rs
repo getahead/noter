@@ -163,6 +163,16 @@ async fn post_call_items_join_topics_and_the_threads_group_them_by_call() {
         (decided.calls, decided.decisions, decided.open_items),
         (2, 2, 4)
     );
+    // #1046: the Open questions column counts open questions only, not every open item.
+    assert_eq!(
+        i64::from(decided.open_questions),
+        count(
+            &core,
+            "SELECT count(*) FROM items WHERE kind = 'open_question' AND status = 'open'
+             AND review_state != 'rejected'"
+        )
+    );
+    assert!(decided.open_questions < decided.open_items);
     assert_eq!(decided.last_seen, TimestampMs(NOW - 2 * HOUR));
     assert!(!events.topics().is_empty());
     // Their items have vectors now, and their chips name the topic.

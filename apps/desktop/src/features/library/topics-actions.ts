@@ -21,6 +21,7 @@ export async function renameTopic(bridge: Bridge, topic: TopicRow, name: string,
   const res = await bridge.act("topic_rename", "topic_rename", () => bridge.core.topicRename({ topic_id: topic.id, rev: topic.rev, name: clean }), { screen: "library-topics", entity: "topic" });
   if (res.status === "ok") {
     holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t("topics.renamed", { from: topic.name, to: res.data.topic.name }), refresh });
+    refresh(); // the page that asked shows the new name at once (issue 1047)
     return { type: "renamed", topic: res.data.topic };
   }
   const d = res.error.detail;

@@ -6,6 +6,9 @@ import { holdUndo } from "../history/undo";
 export const MAX_TAG = 32;
 
 /** The typed tag, or why it cannot be one: blank or over 32 characters is refused, never trimmed or truncated silently. */
+/** The tags in a draft: a comma separates them, even one that reached the text without its key (pasted, typed by automation; issue 1049). */
+export const tagsIn = (text: string): string[] => text.split(",").map((part) => part.trim()).filter(Boolean);
+
 export function checkTag(text: string): { tag: string } | { error: "tags.empty" | "tags.long" } {
   const tag = text.trim();
   return !tag ? { error: "tags.empty" } : [...tag].length > MAX_TAG ? { error: "tags.long" } : { tag };
@@ -18,7 +21,7 @@ export async function tagCalls(bridge: Bridge, ids: string[], add: string[], rem
   if (r.status !== "ok") return r;
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tags-set
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-result
-  const message = add.length ? t("tags.tagged_n", { count: ids.length, tag: add[0]! }) : t("tags.removed_n", { count: ids.length, tag: remove[0]! });
+  const message = add.length ? t("tags.tagged_n", { count: ids.length, tag: add.join("”, “") }) : t("tags.removed_n", { count: ids.length, tag: remove[0]! });
   holdUndo({ target: r.data.batch_id ? { type: "batch", batch_id: r.data.batch_id } : { type: "change", change_id: r.data.change_id }, message });
   r.data.calls.forEach((call) => bridge.store.setState((st) => applyRecord(st, "call", { call })));
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-result

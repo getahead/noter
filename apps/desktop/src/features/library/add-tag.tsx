@@ -3,19 +3,21 @@ import { t } from "../../i18n/format";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
-import { checkTag } from "./tags";
+import { checkTag, tagsIn } from "./tags";
 
 /** Add Tag… for the selected calls: Return, comma or Add Tag commits; a refused tag keeps the draft and says why. */
-export function AddTagPopover({ anchor, count, inUse, onAdd, onClose }: { anchor: HTMLElement | null; count: number; inUse: string[]; onAdd: (tag: string) => Promise<boolean>; onClose: () => void }) {
+export function AddTagPopover({ anchor, count, inUse, onAdd, onClose }: { anchor: HTMLElement | null; count: number; inUse: string[]; onAdd: (tags: string[]) => Promise<boolean>; onClose: () => void }) {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const commit = async (text: string) => {
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-commit-tag
-    const c = checkTag(text);
-    if ("error" in c) return setError(t(c.error));
+    // every tag of the draft in one write: one strip, one Undo (issue 1054)
+    const checked = (tagsIn(text).length ? tagsIn(text) : [text]).map(checkTag);
+    const bad = checked.find((c) => "error" in c);
+    if (bad && "error" in bad) return setError(t(bad.error));
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-commit-tag
     // the draft stays when the write fails, for an explicit retry
-    if (await onAdd(c.tag)) onClose();
+    if (await onAdd(checked.map((c) => (c as { tag: string }).tag))) onClose();
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-if-write-fails
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-tag-error
     else setError(t("tags.failed"));

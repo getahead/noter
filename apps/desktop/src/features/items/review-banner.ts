@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
+import type { ItemView } from "../../core/bindings";
 import { useWindow } from "../../app/use-window";
 import { t } from "../../i18n/format";
 import type { Banner } from "../../ui/feedback/inline-banner";
@@ -42,9 +43,18 @@ export function applyPendingReview(bridge: Bridge, callId: string): boolean {
 }
 
 // @cpt-flow:cpt-noter-flow-ui-items-review:p1
-/** The banner for `callId`, or null with nothing to review; opening a call reads its items. */
-export function useReviewBanner(bridge: Bridge, callId: string): Banner | null {
-  const waiting = useWindow(bridge, (s) => Object.values(s.entities.item).filter((i) => i.call.id === callId && i.review === "suggested").length);
+/** The banner for `callId`, or null with nothing to review; opening a call reads its items. `listed`: the items the
+ *  call's sections list now, each counted in its newer copy (store or section), as the share menu counts them, so a
+ *  suggestion a Regenerate replaced, or an older copy of one reviewed since, is never counted (issue 1063). */
+export function useReviewBanner(bridge: Bridge, callId: string, listed?: readonly ItemView[]): Banner | null {
+  const waiting = useWindow(bridge, (s) =>
+    listed
+      ? listed.filter((item) => {
+          const held = s.entities.item[item.id];
+          return (held && held.rev >= item.rev ? held : item).review === "suggested";
+        }).length
+      : Object.values(s.entities.item).filter((i) => i.call.id === callId && i.review === "suggested").length,
+  );
   useEffect(() => {
     let frame = 0;
     let tries = 0;

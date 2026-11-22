@@ -42,7 +42,7 @@ public final class EngineLoop: @unchecked Sendable {
 
     /// `models` are the installed model folders; `source` opens the audio for a session or, given
     /// nil, a self-test (the live taps, or WAV files in file mode and tests); `container` is the
-    /// App Group container sessions write into; `now` gives epoch milliseconds; `play` plays the
+    /// data folder sessions write into; `now` gives epoch milliseconds; `play` plays the
     /// self-test's clip; `player` replays stored audio; `processes` lists the processes playing or
     /// recording now (`ProcessWatcher.snapshot` live); `transcriber` loads the live speech model;
     /// `offline` runs the archive pass and the embeddings.
@@ -170,7 +170,7 @@ public final class EngineLoop: @unchecked Sendable {
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-start-session
         offline?.releaseArchive()
         do {
-            guard let container else { throw LiveAudioSource.Failure(description: "no App Group container") }
+            guard let container else { throw LiveAudioSource.Failure(description: "no data folder") }
             // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
             guard let audio = source(start) else { throw LiveAudioSource.Failure(description: "no audio source") }
             let fileModeRing = (audio is FileAudioSource)

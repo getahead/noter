@@ -3,7 +3,9 @@
 use std::time::Duration;
 
 use noter_engine_client::scripted::{Behaviour, ScriptedEngine};
-use noter_engine_client::{CommandError, Config, EngineClient, EngineState, ProcessLauncher};
+use noter_engine_client::{
+    CommandError, Config, EngineClient, EngineLauncher, EngineState, ProcessLauncher,
+};
 use noter_protocol::engine::{EngineCommand, EngineErrorCode, EngineEvent};
 use noter_protocol::{AudioChannel, ErrorCode};
 
@@ -313,11 +315,19 @@ async fn shutdown_stops_without_a_restart() {
 
 #[tokio::test]
 async fn the_process_launcher_spawns_a_real_engine_over_stdio() {
-    // A stand-in engine: announce ready, then swallow commands until stdin closes.
-    let ready = r#"{"seq":1,"at":0,"event":{"type":"ready","protocol_version":"2.0","engine_version":"sh","models":[],"sandboxed":false}}"#;
+    // A stand-in engine: announce ready with the data folder it was given (ADR-0004) as its
+    // version, then swallow commands until stdin closes.
+    let ready = r#"{"seq":1,"at":0,"event":{"type":"ready","protocol_version":"2.0","engine_version":"%s","models":[],"sandboxed":false}}"#;
     let launcher = ProcessLauncher::new("/bin/sh")
-        .args(["-c", &format!("echo '{ready}'; cat > /dev/null")])
-        .app_group("/tmp/noter-app-group");
+        .args([
+            "-c",
+            &format!("printf '{ready}\\n' \"$NOTER_DATA_DIR\"; cat > /dev/null"),
+        ])
+        .data_dir("/tmp/noter-data");
+    assert_eq!(
+        launcher.container(),
+        Some(std::path::PathBuf::from("/tmp/noter-data"))
+    );
     let c = EngineClient::new(
         launcher,
         Config {
@@ -326,7 +336,7 @@ async fn the_process_launcher_spawns_a_real_engine_over_stdio() {
         },
     );
     let info = c.ensure_ready().await.unwrap();
-    assert_eq!(info.engine_version, "sh");
+    assert_eq!(info.engine_version, "/tmp/noter-data");
     c.shutdown().await;
     assert_eq!(c.state(), EngineState::Stopped);
 }

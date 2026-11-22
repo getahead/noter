@@ -203,6 +203,24 @@ pub fn update_app_menu_context<R: Runtime>(app: &AppHandle<R>, payload: &str) {
     quit::update_context_menu(app, payload);
 }
 
+/// The call panel's close button hides it through the core, as **Hide** does (capture goes on).
+/// A panel is never destroyed: dropping its web view after tauri-nspanel converted the window makes
+/// WebKit remove a window observer that is not registered there, and that NSException, thrown inside
+/// tao's run-loop observer, aborts the app (#1083).
+// @cpt-begin:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+pub(super) fn call_window_close_requested<R: Runtime>(app: &AppHandle<R>) {
+    let Some(core) = core_of(app) else { return };
+    let ctx = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::CallScreen,
+        },
+    };
+    tauri::async_runtime::spawn(async move {
+        let _ = dispatch_and_record(&core, &ctx, "window_hide_call", json!({})).await;
+    });
+}
+// @cpt-end:cpt-noter-flow-core-native-surfaces-call-window:p1:inst-layout-commands
+
 pub(super) fn main_window_will_hide<R: Runtime>(app: &AppHandle<R>) {
     if let Some(surfaces) = app.try_state::<Arc<TauriSurfaces<R>>>() {
         surfaces.main_hidden.store(true, Ordering::Relaxed);

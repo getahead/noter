@@ -350,7 +350,8 @@ fn topics_of(c: &Connection, person_id: &str) -> Db<Vec<TopicRow>> {
     c.prepare(&format!(
         "SELECT t.id, t.rev, t.name, t.last_seen, count(DISTINCT i.call_id),
                 coalesce(sum(i.kind = 'decision'), 0),
-                coalesce(sum(i.kind != 'decision' AND i.status IN ('open', 'carried')), 0)
+                coalesce(sum(i.kind != 'decision' AND i.status IN ('open', 'carried')), 0),
+                coalesce(sum(i.kind = 'open_question' AND i.status IN ('open', 'carried')), 0)
          FROM topics t JOIN items i ON i.topic_id = t.id
          WHERE i.call_id IN ({THEIR_CALLS})
          GROUP BY t.id ORDER BY t.last_seen DESC, t.id"
@@ -364,6 +365,7 @@ fn topics_of(c: &Connection, person_id: &str) -> Db<Vec<TopicRow>> {
             calls: r.get(4)?,
             decisions: r.get(5)?,
             open_items: r.get(6)?,
+            open_questions: r.get(7)?,
             last_seen: TimestampMs(r.get(3)?),
             merge_suggestion: None,
         })

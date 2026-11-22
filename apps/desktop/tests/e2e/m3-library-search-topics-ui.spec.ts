@@ -59,6 +59,36 @@ test.describe("cpt-noter-seq-library-filter-calls", () => {
     await expect(page.getByText(/No tags yet\. Add tags in a call.s Call info\./)).toBeVisible();
   });
 
+  test("UI — #1054: Add Tag… with “release, hotfix” adds both tags in one call_tags_set, the strip names both and one Undo takes both back", async ({ page }) => {
+    await openCalls(page);
+    const rows = page.locator(ROW);
+    await rows.first().click();
+    await rows.nth(1).click({ modifiers: ["Meta"] });
+    await rows.first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Add Tag…" }).click();
+    const pop = page.getByRole("dialog", { name: "Add tag to 2 calls" });
+    await pop.getByRole("searchbox", { name: "Add tag…" }).fill("release, hotfix");
+    await page.keyboard.press("Enter");
+    expect(await sent(page, "call_tags_set")).toEqual([expect.objectContaining({ add: ["release", "hotfix"] })]);
+    await expect(page.getByText("Tagged 2 calls “release”, “hotfix”")).toBeVisible();
+    // a row shows its first tags and folds the rest into a "+N" chip named by them
+    const tagged = (tag: string) => rows.filter({ has: page.getByText(tag, { exact: true }).or(page.getByTitle(tag, { exact: true })) });
+    await expect(tagged("release")).toHaveCount(2);
+    await expect(tagged("hotfix")).toHaveCount(2);
+    await button(page, "Undo").click();
+    expect(await sent(page, "change_undo")).toHaveLength(1);
+    await expect(tagged("release")).toHaveCount(0);
+    await expect(tagged("hotfix")).toHaveCount(0);
+  });
+
+  test("UI — #1055: the Type column names call types as DESIGN writes them (Cross-team), the same as the Type filter", async ({ page }) => {
+    await openCalls(page);
+    await expect(page.locator(ROW).filter({ hasText: "Backend sync" }).locator(".lb-crow__type")).toHaveText("Cross-team");
+    await button(page, /^Type/).click();
+    await expect(page.getByRole("checkbox", { name: "Cross-team" })).toBeAttached();
+    await expect(page.getByRole("checkbox", { name: "1:1" })).toBeAttached();
+  });
+
   test("UI — other path: Add Tag… on two selected calls tags both with one call_tags_set, shows Tagged 2 calls “release” · Undo, # offers release and filters to the tagged calls", async ({ page }) => {
     await openCalls(page);
     const rows = page.locator(ROW);

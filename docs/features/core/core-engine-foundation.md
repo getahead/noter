@@ -46,7 +46,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-Two halves that only work together. In Swift, the `engine/` package builds `noter-engine`: a sandboxed executable with audio input and the App Group, no network, whose protocol types are generated from `contracts/engine.schema.json`. In Rust, crate `noter-engine-client` spawns it with `tokio::process`, checks the protocol version on `ready`, writes commands, reads events on a dedicated task, detects `seq` gaps, correlates `ack` and `error` with command ids and restarts a dead engine. In M0 the engine can do the handshake, `ping`, `shutdown`, `set_detection` and the first-run `self_test`, and runs in file mode for tests. Capture and live ASR are M1. The Q4 sandbox-attribution half of the PRD › Roadmap week-one spike is recorded here; the owner moved the latency half to M1 week one through the real capture pipeline alongside Q7 (20 Oct 2026).
+Two halves that only work together. In Swift, the `engine/` package builds `noter-engine`: an executable with audio input, no network (unsandboxed since ADR-0004), whose protocol types are generated from `contracts/engine.schema.json`. In Rust, crate `noter-engine-client` spawns it with `tokio::process`, checks the protocol version on `ready`, writes commands, reads events on a dedicated task, detects `seq` gaps, correlates `ack` and `error` with command ids and restarts a dead engine. In M0 the engine can do the handshake, `ping`, `shutdown`, `set_detection` and the first-run `self_test`, and runs in file mode for tests. Capture and live ASR are M1. The Q4 sandbox-attribution half of the PRD › Roadmap week-one spike is recorded here; the owner moved the latency half to M1 week one through the real capture pipeline alongside Q7 (20 Oct 2026).
 
 > **File-mode clarification (14 Nov 2026).** File-mode replay uses the same `EngineLoop` session and live ASR pipeline as capture. It reads aligned 100 ms WAV windows, emits the normal session and transcript events for `call_file`, sources levels from the capture feed, and ends with `session_stopped` carrying the generated timeline path.
 
@@ -92,8 +92,8 @@ First run needs a self-test that proves both streams arrive, and everything afte
 - No `ready` within the start timeout: the process is killed and counted as a failed start.
 
 **Steps**:
-1. [x] - `p1` - Resolve the engine path (bundle, or `NOTER_ENGINE_PATH` in development) and the App Group container - `inst-resolve`
-2. [x] - `p1` - Spawn with `tokio::process`, stdin and stdout piped, stderr to the log; pass the App Group container; never a database or network path - `inst-spawn`
+1. [x] - `p1` - Resolve the engine path (bundle, or `NOTER_ENGINE_PATH` in development) and the data folder - `inst-resolve`
+2. [x] - `p1` - Spawn with `tokio::process`, stdin and stdout piped, stderr to the log; pass the data folder as `NOTER_DATA_DIR`; never a database or network path - `inst-spawn`
 3. [x] - `p1` - Start the reader task with `cpt-noter-algo-core-engine-foundation-read-events` - `inst-reader`
 4. [x] - `p1` - Wait for `ready { protocol_version, engine_version, models, sandboxed }` - `inst-wait-ready`
 5. [x] - `p1` - **IF** the major of `protocol_version` differs from `ENGINE_PROTOCOL_VERSION` - `inst-if-major`
@@ -253,17 +253,17 @@ The system **MUST** provide `noter-engine-client` without a Tauri dependency: sp
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-foundation-offline`
 
-The system **MUST** sign the engine in the Swift build with its own entitlements (App Sandbox, audio input, App Group `<TEAMID>.ai.noter`, no network) and Info.plist, ship it through `bundle.macOS.files` so the Tauri bundler does not re-sign it, and keep every path the supervisor sends relative to the App Group container; the architecture check finds no network entitlement in any engine entitlements file.
+The system **MUST** sign the engine in the Swift build with its own entitlements (audio input under the hardened runtime; no App Sandbox, no App Group and no network since ADR-0004) and Info.plist, ship it through `bundle.macOS.files` so the Tauri bundler does not re-sign it, and keep every path the supervisor sends relative to the data folder it passes as `NOTER_DATA_DIR`; the architecture check finds no network entitlement in any engine entitlements file.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-foundation-start`
 
-**Decision E1 (Teamlead, 18 Oct 2026; resolved by the owner, 20 Oct 2026)**: Q4 decided B (DESIGN-core, PR #110): Noter.app is unsandboxed and the engine keeps its own App Sandbox with no network entitlement, which is the offline guarantee. Source evidence: `engine/Resources/noter-engine.entitlements`, `bundle.macOS.files` (PR #107), `just arch`, and the built-binary check `scripts/ci/check-engine-signature.sh` (PR #111, merged and green on main).
+**Decision E1 (Teamlead, 18 Oct 2026; resolved by the owner, 20 Oct 2026)**: Q4 decided B (DESIGN-core, PR #110): Noter.app is unsandboxed and the engine keeps its own App Sandbox with no network entitlement, which was the offline guarantee until `cpt-noter-adr-0004-no-app-group-unsandboxed-engine` (21 Nov 2026) dropped the engine's sandbox and App Group for ad-hoc signed releases; the guarantee is now the CI checks. Source evidence: `engine/Resources/noter-engine.entitlements`, `bundle.macOS.files` (PR #107), `just arch`, and the built-binary check `scripts/ci/check-engine-signature.sh` (PR #111, merged and green on main).
 
 **Constraints**: `cpt-noter-constraint-core-engine-offline`
 
 **Touches**:
-- Entities: engine entitlements, App Group container layout (`audio/`, `models/`, `engine-io/`, capture ring)
+- Entities: engine entitlements, data folder layout (`audio/`, `models/`, `engine-io/`, capture ring)
 
 ### Week-one decisions recorded
 

@@ -10,6 +10,7 @@ import * as W from "../support/world-presets";
 import { coreReady, openWindow } from "./support/app";
 import { banner, body, navigate, openSummary, section, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
+import * as H from "./support/handoff-world";
 import * as O from "./support/outputs-world";
 
 const toolbar = (page: Page) => page.locator('[data-region="PC-R1"]');
@@ -57,6 +58,19 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     await expect(summary.getByText("Saved")).toBeVisible(); // 2 s
     await summary.getByRole("button", { name: /Version/ }).click();
     await expect(menu(page)).toContainText(/Your Edit · \d{1,2}:\d{2}/);
+  });
+
+  test("UI — #1051: a summary written days after the call reads its delay in days, hours and minutes", async ({ page }) => {
+    const LATE = ((2 * 24 + 3) * 60 + 4) * 60_000; // 2 days, 3 hr, 4 min
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        const call = w.calls.find((c) => c.id === W.PAST_CALL)!;
+        for (const s of O.outputsOf(w).sections) s.writer = { ...s.writer!, generated_at: call.started_at + call.duration_ms + LATE };
+      },
+    });
+    await openReady(page);
+    await expect(section(page, "Summary")).toContainText("Summary · English · Claude Code · 2 days, 3 hr, 4 min after the call");
   });
 
   test("UI — happy path: Esc discards the draft and the saved text stays", async ({ page }) => {
@@ -300,6 +314,26 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     // the menu never opens, so nothing above waits for the invoke: poll until the core has been asked
     await expect.poll(() => sent(page, "share_copy")).toEqual([expect.objectContaining({ call_id: call, format: "slack" })]);
     await expect(share(page)).toContainText("Copied for Slack");
+  });
+
+  test("UI — #1052: an action item closed by evidence is shared ticked, saying it was closed by evidence, never as an open to-do", async ({ page }) => {
+    const steer = await openWindow(page, "main", {
+      world: (w) => {
+        const evidence = structuredClone(w.items.find((i) => i.id === "itm_token")!.closed_by); // the fixture's Jira evidence, before written() replaces the call's items
+        O.written(w);
+        const token = O.sectionOf(w, "action_items").items.find((i) => i.text === "Rotate the staging Jira token")!;
+        for (const i of [token, w.items.find((x) => x.id === token.id)!]) Object.assign(i, { status: "closed_by_evidence", closed_by: evidence });
+      },
+    });
+    await openReady(page, W.PAST_CALL);
+    await share(page).click();
+    await menu(page).getByRole("menuitem", { name: "Copy for Slack" }).click();
+    await expect(share(page)).toContainText("Copied for Slack");
+    await expect.poll(() => sent(page, "share_copy")).toHaveLength(1);
+    if (!H.REAL) return; // the shared text is rendered by the real core only; its clipboard write is in the harness's native log
+    const copied = ((await H.nativeLog(steer)) as unknown as { clipboard: Array<{ markdown: string }> }).clipboard.at(-1)!;
+    const line = copied.markdown.split("\n").find((l) => l.includes("Rotate the staging Jira token"));
+    expect(line).toMatch(/^- \[x\] Rotate the staging Jira token — .*closed by evidence/);
   });
 
   test("UI — other path: Export to a folder — ⌘E, the sheet with Scope: Whole call, tick Transcript, Export…, Exported to <path> with Show in Finder", async ({ page }) => {

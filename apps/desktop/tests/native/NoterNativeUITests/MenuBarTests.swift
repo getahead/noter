@@ -79,6 +79,26 @@ final class MenuBarTests: NoterTestCase {
         assertItems(["Continue Recording"], in: openMenu())
     }
 
+    // #1041: the app's Call menu dims Pause and Mark Moment once nothing records, as the status menu leaves them out
+    func test_cpt_noter_seq_menu_bar_control_recording__app_call_menu_dims_pause_and_mark_after_stop() {
+        launch("idle")
+        startRecording()
+        closeMenu()
+        let callMenu = app.menuBars.menuBarItems["Call"]
+        callMenu.click()
+        let recording = callMenu.menus.firstMatch
+        XCTAssertTrue(recording.menuItems["Pause"].waitForExistence(timeout: 10) && recording.menuItems["Pause"].isEnabled, "Pause is enabled while recording")
+        XCTAssertTrue(recording.menuItems["Mark Moment"].isEnabled, "Mark Moment is enabled while recording")
+        recording.menuItems["Stop Recording"].click()
+        XCTAssertTrue(waitUntil(10) { statusItem.label == "Noter, not recording" }, "Stop Recording ends the capture")
+        callMenu.click()
+        let stopped = callMenu.menus.firstMatch
+        XCTAssertTrue(stopped.menuItems["Pause"].waitForExistence(timeout: 5))
+        XCTAssertTrue(waitUntil(5) { !stopped.menuItems["Pause"].isEnabled }, "nothing records, so there is nothing to pause")
+        XCTAssertFalse(stopped.menuItems["Mark Moment"].isEnabled, "nothing records, so there is nothing to mark")
+        app.typeKey(.escape, modifierFlags: [])
+    }
+
     func test_cpt_noter_seq_menu_bar_control_recording__paused_for_5_min() {
         // Core tests prove the deadline; the native test proves the real menu at that deadline.
         launch("paused-5-min")

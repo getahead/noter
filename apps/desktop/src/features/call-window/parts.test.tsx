@@ -95,6 +95,16 @@ describe("CallStatusStrip (cpt-noter-component-ui-call-status-strip)", () => {
     expect(stopped).toContain("Stopped");
   });
 
+  // cpt-noter-seq-menu-bar-control-recording, #1042 (owner, 21 Nov): nothing can be marked while paused, as in the menu bar
+  it("dims Mark Moment while paused, in both variants", () => {
+    const disabled = (variant: "dedicated" | "compact", status: "recording" | "paused") =>
+      (button(rendered(CallStatusStrip, stripProps({ variant, status })), "Mark Moment") as unknown as { disabled?: boolean }).disabled ?? false;
+    for (const variant of ["dedicated", "compact"] as const) {
+      expect(disabled(variant, "recording")).toBe(false);
+      expect(disabled(variant, "paused")).toBe(true);
+    }
+  });
+
   it("compact: Mark Moment and a ⋯ menu with Pause or Resume, Stop Recording, or Try Again", () => {
     const p = stripProps({ variant: "compact", feedback: { text: "Saved", variant: "blind" } });
     const tree = rendered(CallStatusStrip, p);

@@ -1492,6 +1492,7 @@ pub fn world() -> FakeWorld {
             calls: 6,
             decisions: 3,
             open_items: 2,
+            open_questions: 1,
             last_seen: ts(NOW),
             merge_suggestion: None,
         },
@@ -1503,6 +1504,7 @@ pub fn world() -> FakeWorld {
             calls: 4,
             decisions: 2,
             open_items: 1,
+            open_questions: 0,
             last_seen: ts(NOW),
             merge_suggestion: Some(TopicChip {
                 id: TopicId(s("top_notif")),
@@ -1517,6 +1519,7 @@ pub fn world() -> FakeWorld {
             calls: 5,
             decisions: 2,
             open_items: 1,
+            open_questions: 1,
             last_seen: backend.started_at,
             merge_suggestion: None,
         },
@@ -1855,20 +1858,21 @@ pub fn world() -> FakeWorld {
             }],
         },
         call_types: CallTypeList {
+            // DESIGN's names, as the core labels them (issue 1055)
             call_types: [
-                "one_on_one",
-                "standup",
-                "planning",
-                "retro",
-                "cross_team",
-                "vendor",
-                "interview",
-                "incident",
+                ("one_on_one", "1:1"),
+                ("standup", "Standup"),
+                ("planning", "Planning"),
+                ("retro", "Retro"),
+                ("cross_team", "Cross-team"),
+                ("vendor", "Vendor"),
+                ("interview", "Interview"),
+                ("incident", "Incident"),
             ]
             .iter()
-            .map(|t| CallTypeInfo {
+            .map(|(t, label)| CallTypeInfo {
                 id: ct(t),
-                label: t.replace('_', " "),
+                label: (*label).into(),
                 builtin: true,
                 skill_path: format!("skills/{t}/SKILL.md"),
             })

@@ -1042,8 +1042,8 @@ impl CoreApi for Core {
         _args: StorageMoveArgs,
     ) -> Result<JobAccepted, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-credentials-privacy-storage:p1:inst-storage-guard
-        // Q4 (20 Oct): the app stays unsandboxed and the engine sandboxed, so the move does not
-        // ship (TL-29).
+        // Q4: ADR-0004 unsandboxed the engine, so a move is now possible, but it stays a draft
+        // outside this milestone (TL-29).
         Err(CoreError::new(ErrorCode::NotImplemented, "storage_move"))
         // @cpt-end:cpt-noter-flow-core-credentials-privacy-storage:p1:inst-storage-guard
     }

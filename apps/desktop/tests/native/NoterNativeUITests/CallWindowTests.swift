@@ -33,6 +33,19 @@ final class CallWindowTests: NoterTestCase {
         XCTAssertTrue(waitUntil(3) { self.other.state == .runningForeground }, "no click on the call window moves focus from the call app")
     }
 
+    // #1083: the call panel's close button aborted the app ("Rust cannot catch foreign exceptions")
+    func test_cpt_noter_seq_floating_panel_hide_and_reopen__close_button_hides_and_app_keeps_running() {
+        launch()
+        hotkey("n")
+        XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the call window")
+        XCTAssertTrue(callWindow.buttons["Hide"].waitForExistence(timeout: 30), "the call window has loaded its page")
+        callWindow.buttons[XCUIIdentifierCloseWindow].click()
+        XCTAssertTrue(callWindow.waitForNonExistence(timeout: 5), "the close button hides the call window")
+        XCTAssertFalse(waitUntil(3) { self.app.state == .notRunning }, "closing the call window keeps Noter running")
+        hotkey("n")
+        XCTAssertTrue(callWindow.waitForExistence(timeout: 5), "⌃⌥⌘N shows the hidden call window again")
+    }
+
     func test_hide_for_presenting_hides_and_restores_main_and_call_windows() {
         launch()
         step("open the call window") { press("n") }

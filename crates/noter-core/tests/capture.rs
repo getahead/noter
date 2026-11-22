@@ -1274,22 +1274,23 @@ async fn a_live_call_can_be_made_sensitive_but_not_turned_back() {
 async fn start_pause_mark_and_stop_work_from_the_menu_bar() {
     let r = rig();
     let call_id = r.recording_from(&menu_bar()).await;
-    r.core
-        .capture_set_paused(
-            &menu_bar(),
-            CapturePauseArgs {
-                call_id: call_id.clone(),
-                paused: true,
-            },
-        )
-        .await
-        .unwrap();
+    // marked before the pause: a paused call has nothing to mark (#1042)
     r.core
         .capture_mark_moment(
             &menu_bar(),
             MarkMomentArgs {
                 call_id: call_id.clone(),
                 note: None,
+            },
+        )
+        .await
+        .unwrap();
+    r.core
+        .capture_set_paused(
+            &menu_bar(),
+            CapturePauseArgs {
+                call_id: call_id.clone(),
+                paused: true,
             },
         )
         .await
@@ -3719,4 +3720,114 @@ async fn continue_recording_cancels_the_calls_pipeline_and_the_next_stop_queues_
     assert_ne!(runs[0].id, runs[1].id);
     assert_eq!(runs[1].status, JobRunStatus::Running);
     assert_eq!(r.core.capture_guard().borrow().resumed_call, None);
+}
+
+// cpt-noter-seq-menu-bar-control-recording, #1040: windows showing the call (Call info › Processing) replace its row from entity:changed.
+#[tokio::test]
+async fn pause_and_resume_send_the_call_row_with_its_new_status() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let last_status = || {
+        r.events
+            .snapshot()
+            .into_iter()
+            .filter(|(name, v)| *name == event_names::ENTITY_CHANGED && v["type"] == "call")
+            .map(|(_, v)| v["call"]["status"].clone())
+            .next_back()
+    };
+    for (paused, status) in [(true, "paused"), (false, "recording")] {
+        let args = CapturePauseArgs {
+            call_id: call_id.clone(),
+            paused,
+        };
+        r.core
+            .capture_set_paused(&main_window(), args)
+            .await
+            .unwrap();
+        assert_eq!(last_status(), Some(Value::from(status)));
+    }
+}
+
+// cpt-noter-seq-menu-bar-control-recording, #1042, owner decision 21 Nov: pause drops the audio, so nothing can be marked while paused.
+#[tokio::test(start_paused = true)]
+async fn no_moment_can_be_marked_while_paused() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let pause = |paused| CapturePauseArgs {
+        call_id: call_id.clone(),
+        paused,
+    };
+    let mark = || MarkMomentArgs {
+        call_id: call_id.clone(),
+        note: None,
+    };
+    r.core
+        .capture_set_paused(&main_window(), pause(true))
+        .await
+        .unwrap();
+    assert_eq!(
+        code(r.core.capture_mark_moment(&main_window(), mark()).await),
+        ErrorCode::NotRecording
+    );
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM marks"), 0);
+    r.core
+        .capture_set_paused(&main_window(), pause(false))
+        .await
+        .unwrap();
+    r.core
+        .capture_mark_moment(&main_window(), mark())
+        .await
+        .unwrap();
+}
+
+// cpt-noter-seq-menu-bar-control-recording, #1043: every capture state while recording carries the running total, so a clock counting from
+// the latest version never falls back to the last pause or resume.
+#[tokio::test(start_paused = true)]
+async fn a_capture_change_while_recording_keeps_the_recorded_time_current() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.advance(60_000);
+    let state = r
+        .core
+        .capture_set_sensitive(
+            &main_window(),
+            SensitiveArgs {
+                call_id: call_id.clone(),
+                sensitive: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(state.recorded_ms, DurationMs(60_000));
+    r.advance(30_000);
+    let paused = r
+        .core
+        .capture_set_paused(
+            &main_window(),
+            CapturePauseArgs {
+                call_id,
+                paused: true,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        paused.recorded_ms,
+        DurationMs(90_000),
+        "never counted twice"
+    );
+}
+
+// cpt-noter-seq-menu-bar-control-recording, #1048: a window that reads the snapshot late (a reload) gets the time recorded up to now.
+#[tokio::test(start_paused = true)]
+async fn a_snapshot_read_mid_recording_carries_the_time_recorded_so_far() {
+    let r = rig();
+    r.recording().await;
+    r.advance(74_000);
+    let snapshot = r
+        .core
+        .app_snapshot(&main_window(), NoArgs {})
+        .await
+        .unwrap();
+    assert_eq!(snapshot.capture.recorded_ms, DurationMs(74_000));
 }

@@ -64,6 +64,10 @@ fn line_of(item: &ItemView) -> Line {
     if item.review == ReviewState::Suggested {
         facts.push("Not reviewed".into());
     }
+    // Closed work never comes back as a to-do in what is shared, and says why (issue 1052).
+    if item.status == ItemStatus::ClosedByEvidence {
+        facts.push("closed by evidence".into());
+    }
     // shortcut: no deep-link scheme is registered yet, so evidence links are `noter://` URLs the
     // app will own; point them at the registered handler when the scheme lands.
     let links = item
@@ -79,7 +83,10 @@ fn line_of(item: &ItemView) -> Line {
         .collect();
     Line {
         text: item.text.clone(),
-        check: (item.kind == ItemKind::ActionItem).then_some(item.status == ItemStatus::Done),
+        check: (item.kind == ItemKind::ActionItem).then_some(matches!(
+            item.status,
+            ItemStatus::Done | ItemStatus::ClosedByEvidence
+        )),
         facts,
         links,
     }
@@ -802,6 +809,22 @@ mod tests {
             r.text
         );
         assert_eq!((r.sections, r.items, r.unreviewed), (2, 1, 0));
+    }
+
+    // #1052: an item closed by evidence is shared as closed, saying why, never as an open to-do
+    #[test]
+    fn an_item_closed_by_evidence_is_shared_ticked_with_why() {
+        let mut closed = item("i", "Rotate the token", ReviewState::Accepted);
+        closed.status = ItemStatus::ClosedByEvidence;
+        let line = line_of(&closed);
+        assert_eq!(line.check, Some(true));
+        assert!(
+            line.facts.iter().any(|f| f == "closed by evidence"),
+            "{:?}",
+            line.facts
+        );
+        let open = line_of(&item("j", "Open one", ReviewState::Accepted));
+        assert_eq!(open.check, Some(false));
     }
 
     #[test]

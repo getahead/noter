@@ -30,7 +30,7 @@ async function ready() {
   await bridge.open();
   return fake;
 }
-const row = (o: Partial<TopicRow> = {}): TopicRow => ({ id: "t1", rev: 1, name: "Websocket notifications", aliases: [], calls: 3, decisions: 2, open_items: 1, last_seen: Date.UTC(2026, 9, 5, 12), merge_suggestion: null, ...o });
+const row = (o: Partial<TopicRow> = {}): TopicRow => ({ id: "t1", rev: 1, name: "Websocket notifications", aliases: [], calls: 3, decisions: 2, open_items: 1, open_questions: 1, last_seen: Date.UTC(2026, 9, 5, 12), merge_suggestion: null, ...o });
 const body = (o: Partial<Parameters<typeof TopicsBody>[0]> = {}) => {
   const topics = [row(), row({ id: "t2", name: "Notification service", merge_suggestion: { id: "t1", name: "Websocket notifications" } })];
   return renderToString(<TopicsBody bridge={bridge} status="READY" retry={() => {}} topics={topics} shown={topics} names={new Map(topics.map((x) => [x.id, x.name]))} words="" {...o} />);
@@ -195,6 +195,14 @@ describe("small page helpers", () => {
     expect(register.mock.calls.map((c) => c[0])).toEqual(["topic-rename", "topic-merge"]);
     const ref = { current: null as string | null };
     expect([claim(ref, "a"), claim(ref, "a"), claim(ref, "b")]).toEqual([true, false, true]);
+  });
+  // #1045: the › button sits inside the clickable row; its click must not also reach the row (two pushes, two Backs)
+  it("the › button opens the topic once: its cell keeps the click from the row", () => {
+    const tr = rendered(TopicLine, { bridge: {} as never, topic: { id: "t", name: "T" } as never, stop: true, merge: null, last: "—" });
+    const cell = find(tr, (p, type) => type === "td" && JSON.stringify(Object.keys(p)).includes("onClick"));
+    const stop = vi.fn();
+    (cell.props.onClick as (e: unknown) => void)({ stopPropagation: stop });
+    expect(stop).toHaveBeenCalled();
   });
   it("a Topics row opens its menu from the keyboard (Menu key, ⇧F10) at the row, and from the mouse where it was clicked", () => {
     const onContext = vi.fn();

@@ -133,7 +133,7 @@ pub struct CoreDeps {
     pub models: Arc<dyn ModelSource>,
     /// Downloaded app updates (`tauri-plugin-updater` in the app).
     pub updater: Arc<dyn Updater>,
-    /// Where model bundles go (the App Group container's `models/`); `<data>/models` if unset.
+    /// Where model bundles go (the data folder's `models/`); `<data>/models` if unset.
     pub models_dir: Option<std::path::PathBuf>,
     /// Starts the engine (`ProcessLauncher` in the app, a scripted engine in the harness, S12).
     pub engine: Arc<dyn noter_engine_client::EngineLauncher>,
@@ -255,11 +255,13 @@ pub struct Core {
     presenting_transition: Mutex<()>,
     /// The capture phase as last published, for commands that wait on the engine.
     capture_phase: tokio::sync::watch::Sender<CapturePhase>,
+    /// When the capture state was last published (clock ms), to keep `recorded_ms` current.
+    capture_stamp: std::sync::atomic::AtomicI64,
     /// The call the main window reports it shows (`window_report_view`).
     viewed: Mutex<Option<CallId>>,
     /// Notifications waiting for the call to end, one per call.
     held: Mutex<Vec<Notification>>,
-    /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the App Group container).
+    /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the data folder).
     audio_dir: std::path::PathBuf,
     /// Replay state, `playback:state`.
     playback: playback::Playback,
@@ -467,6 +469,7 @@ impl Core {
             windows: Mutex::new(surfaces::Windows::default()),
             presenting_transition: Mutex::new(()),
             capture_phase: tokio::sync::watch::channel(CapturePhase::Idle).0,
+            capture_stamp: std::sync::atomic::AtomicI64::new(0),
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
             audio_dir,

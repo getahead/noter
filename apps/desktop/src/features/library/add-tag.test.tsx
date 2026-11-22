@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { find, rendered } from "../../ui/testing";
 import { AddTagPopover } from "./add-tag";
 
-const setup = (onAdd: (t: string) => Promise<boolean>) => {
+const setup = (onAdd: (t: string[]) => Promise<boolean>) => {
   const onClose = vi.fn();
   const tree = rendered(AddTagPopover, { anchor: null, count: 3, inUse: ["release", "hotfix"], onAdd, onClose });
   const field = find(tree, (p) => typeof p.onAddToken === "function");
@@ -21,11 +21,19 @@ describe("AddTagPopover (cpt-noter-flow-ui-library-search-topics-filter-tag)", (
     const { onClose, field, button } = setup(onAdd);
     (field.props.onAddToken as (v: string) => void)("release");
     await tick();
-    expect(onAdd).toHaveBeenCalledWith("release");
+    expect(onAdd).toHaveBeenCalledWith(["release"]);
     expect(onClose).toHaveBeenCalledTimes(1);
     (button.props.onAction as () => void)();
     await tick();
     expect(onAdd).toHaveBeenCalledTimes(1); // the empty draft is refused, not sent
+  });
+  // #1054: "a, b" is two tags in one write, so one strip names both and one Undo removes both
+  it("sends every tag of a comma-separated draft in one write", async () => {
+    const onAdd = vi.fn().mockResolvedValue(true);
+    const { field } = setup(onAdd);
+    (field.props.onAddToken as (v: string) => void)("sprint-42, retro ,, ");
+    await tick();
+    expect(onAdd.mock.calls).toEqual([[["sprint-42", "retro"]]]);
   });
   it("refuses a blank or a 33-character tag without calling the core", async () => {
     const onAdd = vi.fn().mockResolvedValue(true);

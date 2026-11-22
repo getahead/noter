@@ -622,7 +622,7 @@ impl Core {
             .emit(event_names::OUTPUTS_PROGRESS, to_json(&progress));
     }
 
-    fn publish_call_row(&self, call: &CallId) {
+    pub(crate) fn publish_call_row(&self, call: &CallId) {
         if let Ok(Some(call)) = self.call_row(call.as_str()) {
             self.emit_entity_changed(&EntityChanged::Call { call });
         }

@@ -723,7 +723,7 @@
             "description": "Resume from the capture ring's write position after an engine restart in the same call."
           },
           "session_dir": {
-            "description": "`audio/<call_id>/`, relative to the App Group container.",
+            "description": "`audio/<call_id>/`, relative to the data folder.",
             "type": "string"
           },
           "speaker_priors": {

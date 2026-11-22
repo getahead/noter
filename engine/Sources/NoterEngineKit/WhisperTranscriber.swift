@@ -1,6 +1,6 @@
-// The live speech model: WhisperKit Turbo from the App Group `models/whisper-turbo` folder, which
+// The live speech model: WhisperKit Turbo from the data folder's `models/whisper-turbo` folder, which
 // the core downloads (pinned by `scripts/models/manifest.json`, the tokenizer included: the
-// sandboxed engine has no network, so nothing may be fetched at load).
+// engine never touches the network, so nothing may be fetched at load).
 // shortcut: not exercised by the CI tests (no model on the runner); the M1 week-one runbook's
 // part C runs it on a real call.
 

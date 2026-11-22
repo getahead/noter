@@ -8,6 +8,8 @@ mod alert_keys;
 pub mod e2e_log;
 mod keychain;
 mod native;
+#[cfg(target_os = "macos")]
+mod objc_exceptions;
 pub mod surfaces;
 #[cfg(target_os = "macos")]
 mod termination;
@@ -87,6 +89,16 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                     surfaces.save_frames();
                 }
             }
+            // A panel is never closed (#1083): the call panel hides through the core, and the
+            // record prompt has no close button.
+            WindowEvent::CloseRequested { api, .. }
+                if window_label(window.label()).is_some_and(surfaces::is_panel) =>
+            {
+                api.prevent_close();
+                if window.label() == WindowLabel::CallScreen.as_str() {
+                    surfaces::call_window_close_requested(window.app_handle());
+                }
+            }
             WindowEvent::Destroyed => {
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
                 surfaces::update_activation_for_visible_windows(window.app_handle());
@@ -131,6 +143,8 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
 /// Runs the app: opens the core on Application Support once the app exists (its hotkeys need the
 /// global-shortcut plugin), serves the windows, shuts the core down on exit.
 pub fn run() {
+    #[cfg(target_os = "macos")]
+    objc_exceptions::install();
     let events = Arc::new(TauriEvents::default());
     let app = builder(tauri::Builder::default())
         .plugin(tauri_plugin_dialog::init())
@@ -190,10 +204,8 @@ pub fn run() {
             }));
             let shortcuts = Arc::new(TauriShortcuts(app.handle().clone()));
             let updater = Arc::new(updater::TauriUpdater::new(app.handle().clone()));
-            // D14: the shared App Group container, or the data folder in unsigned development.
-            let group = noter_core::default_data_dir()
-                .map(|dir| noter_native::app_group_container().unwrap_or(dir))
-                .unwrap_or_default();
+            // D14 (ADR-0004): app, core and engine share the data folder; no App Group.
+            let group = noter_core::default_data_dir().unwrap_or_default();
             let surfaces = surfaces::TauriSurfaces::new(app.handle().clone(), group.clone());
             app.manage(surfaces.clone());
             surfaces.restore_main_window();
@@ -281,7 +293,7 @@ fn boot<R: Runtime>(
         .ok()
         .and_then(|exe| Some(exe.parent()?.join("noter-engine")))
         .unwrap_or_else(|| "noter-engine".into());
-    let engine = ProcessLauncher::from_env(bundled).app_group(&group);
+    let engine = ProcessLauncher::from_env(bundled).data_dir(&group);
     // The app's version (this crate's, as tauri.conf.json), for app_snapshot.
     let accounts = account_cli();
     let deps = CoreDeps {

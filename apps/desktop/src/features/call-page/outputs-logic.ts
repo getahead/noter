@@ -2,7 +2,7 @@
 // the store or draws.
 import type { CallOutputs, CallRow, ItemView, OutputSection, OutputsProgress, RuntimeChoice, SectionKind, UiPrefs, VersionMeta } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
-import { clock, t } from "../../i18n/format";
+import { clock, duration, t } from "../../i18n/format";
 
 // @cpt-algo:cpt-noter-algo-ui-call-page-outputs-project:p1
 /** PRD order of the sections the Summary view shows; role reviews belong to the M4 view. */
@@ -76,7 +76,8 @@ export function metaLine(s: OutputSection, call: Pick<CallRow, "started_at" | "d
   // shortcut: the contract carries no language for a section, so the line names the interface language; use the writer's output language once it has one
   const language = t("outputs.language");
   const after = Math.round(Math.max(0, w.generated_at - call.started_at - call.duration_ms) / 1000);
-  const time = after < 60 ? t("outputs.s", { s: String(after) }) : t("outputs.min_s", { m: String(Math.floor(after / 60)), s: String(after % 60) });
+  // past an hour, hours and days (an old call regenerated): never thousands of minutes (issue 1051)
+  const time = after < 60 ? t("outputs.s", { s: String(after) }) : after < 3600 ? t("outputs.min_s", { m: String(Math.floor(after / 60)), s: String(after % 60) }) : duration(after);
   return [heading, language, runtimeLabel(w.runtime), t("outputs.after_call", { time })].filter(Boolean).join(" · ");
 }
 

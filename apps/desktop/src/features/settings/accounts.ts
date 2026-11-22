@@ -21,9 +21,12 @@ export function setKey(bridge: Bridge, provider: KeyProvider, key: string) {
 }
 
 /** `api_key_remove` (an M3 command; the fake core serves it in M2): the slice is replaced only by the core's answer. */
+/** The command key of a key removal, for the row that shows its failure. */
+export const removeKeyKey = (provider: KeyProvider) => `key:remove:${provider}`;
+
 export function removeKey(bridge: Bridge, provider: KeyProvider) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-remove
-  return bridge.act(`key:remove:${provider}`, "api_key_remove", () => bridge.core.apiKeyRemove({ provider }), { slice: "accounts" });
+  return bridge.act(removeKeyKey(provider), "api_key_remove", () => bridge.core.apiKeyRemove({ provider }), { slice: "accounts" });
   // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-remove
 }
 

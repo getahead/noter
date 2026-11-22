@@ -2665,7 +2665,6 @@ dependencies = [
  "objc2-core-graphics",
  "objc2-event-kit",
  "objc2-foundation",
- "objc2-security",
  "objc2-service-management",
  "objc2-user-notifications",
  "serde_json",
@@ -3100,8 +3099,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "709fe137109bd1e8b5a99390f77a7d8b2961dafc1a1c5db8f2e60329ad6d895a"
 dependencies = [
  "bitflags 2.13.2",
- "block2",
- "libc",
  "objc2",
  "objc2-core-foundation",
 ]

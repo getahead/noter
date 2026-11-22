@@ -314,10 +314,35 @@ impl Core {
         self.app().capture.clone()
     }
 
+    /// The capture state as a window reads it now: while recording, `recorded_ms` includes the
+    /// time since the state was published, so a window opened or reloaded late counts from
+    /// the right total (issue 1048).
+    pub(crate) fn capture_for_reader(&self, mut c: CaptureState) -> CaptureState {
+        if c.phase == CapturePhase::Recording {
+            let since = self.capture_stamp.load(std::sync::atomic::Ordering::SeqCst);
+            let more = u32::try_from((self.deps.clock.now().0 - since).max(0)).unwrap_or(u32::MAX);
+            c.recorded_ms = DurationMs(c.recorded_ms.0.saturating_add(more));
+        }
+        c
+    }
+
     /// Changes the capture state and sends it whole with the next version.
     pub(crate) fn set_capture(&self, change: impl FnOnce(&mut CaptureState)) -> CaptureState {
+        let now = self.deps.clock.now().0;
         let mut app = self.app();
+        let (phase, recorded) = (app.capture.phase, app.capture.recorded_ms);
         change(&mut app.capture);
+        // Clocks count from each new version, so a change that leaves a recording call recording
+        // carries the time recorded since the last publish (issue 1043); pause, resume and stop
+        // set `recorded_ms` themselves.
+        let since = self
+            .capture_stamp
+            .swap(now, std::sync::atomic::Ordering::SeqCst);
+        let still = phase == CapturePhase::Recording && app.capture.phase == phase;
+        if still && app.capture.recorded_ms == recorded {
+            let more = u32::try_from((now - since).max(0)).unwrap_or(u32::MAX);
+            app.capture.recorded_ms = DurationMs(recorded.0.saturating_add(more));
+        }
         let state = self.publish(event_names::CAPTURE_STATE, &mut app.capture);
         self.capture_phase.send_replace(state.phase);
         self.feed_guard(state.phase);
@@ -409,6 +434,8 @@ impl Core {
         if sensitivity_changed {
             self.refresh_run_privacy(lock(&self.settings).privacy.mode);
         }
+        // Windows showing the call (Call info › Processing) replace its row from entity:changed.
+        self.publish_call_row(call_id);
         Ok(())
     }
 
@@ -714,7 +741,9 @@ impl Core {
 
     pub(crate) async fn mark_moment(&self, args: MarkMomentArgs) -> Result<MarkView, CoreError> {
         let session = self.capture.lock().await;
-        if !live(&self.capture_now(), &args.call_id) {
+        let state = self.capture_now();
+        // Pause drops the audio, so a paused call has no moment to mark (owner, 21 Nov, issue 1042).
+        if !live(&state, &args.call_id) || state.phase == CapturePhase::Paused {
             return Err(not_recording());
         }
         // @cpt-begin:cpt-noter-flow-core-capture-session-pause-mark:p1:inst-insert-mark
@@ -1199,11 +1228,6 @@ impl Core {
         self.write_call(ctx, &args.call_id, "Changed sensitivity", !running, values)?;
         // @cpt-end:cpt-noter-flow-core-capture-session-sensitive:p2:inst-write-sensitive
         // @cpt-begin:cpt-noter-flow-core-capture-session-sensitive:p2:inst-return-sensitive
-        // The call exists (checked above) and the write committed.
-        let call_id = args.call_id.clone();
-        if let Ok(detail) = self.get_call(CallIdArgs { call_id }) {
-            self.emit_entity_changed(&EntityChanged::Call { call: detail.call });
-        }
         if !current || state.sensitive == args.sensitive {
             return Ok(state);
         }

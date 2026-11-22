@@ -422,7 +422,7 @@ impl Harness {
         // result, so their events stay off the wire (`seeding` is cleared before `Ok`).
         let seeding = Arc::new(AtomicBool::new(true));
         // The self-test takes a moment, so a window can watch it and a scenario can push into it.
-        // The data folder stands in for the App Group container: the offline pass and the
+        // The data folder is the engine's folder too: the offline pass and the
         // embeddings write their built-in answers there.
         let engine = ScriptedEngine::new()
             .with_default(Behaviour {

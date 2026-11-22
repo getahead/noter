@@ -6,7 +6,7 @@
   "build": {
     "devUrl": "http://127.0.0.1:5173",
     "frontendDist": "../dist",
-    "beforeBuildCommand": "pnpm exec vite build && TEAM_ID=${APPLE_TEAM_ID:-TEAMID} SIGN_IDENTITY=${APPLE_SIGNING_IDENTITY:--} ../../engine/scripts/sign.sh"
+    "beforeBuildCommand": "pnpm exec vite build && SIGN_IDENTITY=${APPLE_SIGNING_IDENTITY:--} ../../engine/scripts/sign.sh"
   },
   "app": {
     "macOSPrivateApi": true,

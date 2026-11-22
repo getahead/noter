@@ -1,5 +1,5 @@
 // Capturing a call (`cpt-noter-flow-core-engine-capture-session`): both channels at 16 kHz into
-// the capture ring, a memory-mapped file in the App Group container that outlives a crashed
+// the capture ring, a memory-mapped file in the data folder that outlives a crashed
 // engine; into crash-safe AAC-LC parts when the call stores audio, remuxed to `mic.m4a` and
 // `sys.m4a` on stop; and `timeline.json`, which keeps the call's gaps in call time.
 
@@ -248,7 +248,7 @@ final class CaptureSession: @unchecked Sendable {
         // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
         relative = start.sessionDir.hasSuffix("/") ? String(start.sessionDir.dropLast()) : start.sessionDir
         guard let sessionDir = ContainerPath.resolve(relative, in: container) else {
-            throw LiveAudioSource.Failure(description: "session directory must stay inside the App Group container")
+            throw LiveAudioSource.Failure(description: "session directory must stay inside the data folder")
         }
         dir = sessionDir
         // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams

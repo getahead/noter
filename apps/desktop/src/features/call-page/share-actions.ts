@@ -46,7 +46,7 @@ export async function setTags(bridge: Bridge, callId: string, add: string[], rem
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-set
   const r = await bridge.act(`tags:set:${callId}`, "call_tags_set", () => bridge.core.callTagsSet({ call_ids: [callId], add, remove }));
   if (r.status !== "ok") return r;
-  const message = add.length ? t("tags.added", { tag: add[0]! }) : t("tags.removed", { tag: remove[0]! });
+  const message = add.length ? t("tags.added", { tag: add.join("”, “") }) : t("tags.removed", { tag: remove[0]! });
   holdUndo({ target: r.data.batch_id ? { type: "batch", batch_id: r.data.batch_id } : { type: "change", change_id: r.data.change_id }, message });
   // the call row comes back with its tags; nothing else is read again
   bridge.store.setState((st) => applyRecord(st, "call", { call: r.data.calls[0] }));

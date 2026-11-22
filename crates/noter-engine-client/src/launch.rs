@@ -28,8 +28,8 @@ pub type LaunchFuture<'a> = Pin<Box<dyn Future<Output = io::Result<EngineIo>> + 
 pub trait EngineLauncher: Send + Sync + 'static {
     fn launch(&self) -> LaunchFuture<'_>;
 
-    /// The App Group container its engines share with the core, where offline results and
-    /// embedding files are written; `None` refuses offline requests.
+    /// The data folder its engines share with the core, where offline results and embedding
+    /// files are written; `None` refuses offline requests.
     fn container(&self) -> Option<PathBuf> {
         None
     }
@@ -50,7 +50,7 @@ impl<T: EngineLauncher + ?Sized> EngineLauncher for Arc<T> {
 pub struct ProcessLauncher {
     program: PathBuf,
     args: Vec<OsString>,
-    app_group: Option<PathBuf>,
+    data_dir: Option<PathBuf>,
     stderr_lines: Arc<AtomicU64>,
 }
 
@@ -59,7 +59,7 @@ impl ProcessLauncher {
         Self {
             program: program.into(),
             args: Vec::new(),
-            app_group: None,
+            data_dir: None,
             stderr_lines: Arc::new(AtomicU64::new(0)),
         }
     }
@@ -81,10 +81,10 @@ impl ProcessLauncher {
         dev_override.unwrap_or_else(|| bundled.into())
     }
 
-    /// The App Group container the app and the sandboxed engine share; every path the
-    /// supervisor sends is relative to it.
-    pub fn app_group(mut self, dir: impl Into<PathBuf>) -> Self {
-        self.app_group = Some(dir.into());
+    /// The data folder the app and the engine share (`~/Library/Application Support/Noter`,
+    /// ADR-0004); every path the supervisor sends is relative to it.
+    pub fn data_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.data_dir = Some(dir.into());
         self
     }
     // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-resolve
@@ -108,7 +108,7 @@ impl EngineLauncher for ProcessLauncher {
     // @cpt-end:cpt-noter-flow-core-engine-foundation-start:p1:inst-spawn
 
     fn container(&self) -> Option<PathBuf> {
-        self.app_group.clone()
+        self.data_dir.clone()
     }
 }
 
@@ -122,9 +122,9 @@ impl ProcessLauncher {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .kill_on_drop(true);
-        if let Some(dir) = &self.app_group {
+        if let Some(dir) = &self.data_dir {
             // @cpt-dod:cpt-noter-dod-core-engine-foundation-offline:p1
-            cmd.env("NOTER_APP_GROUP_DIR", dir);
+            cmd.env("NOTER_DATA_DIR", dir);
         }
         let mut child = cmd.spawn()?;
         let stdin = child.stdin.take().expect("stdin is piped");

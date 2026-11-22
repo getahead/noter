@@ -12,6 +12,7 @@ use crate::Core;
 pub(super) fn app_snapshot(core: &Core, ctx: &CommandCtx) -> AppSnapshot {
     // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
     let mut snapshot = core.app().clone();
+    snapshot.capture = core.capture_for_reader(snapshot.capture);
     snapshot.accounts = core.accounts.view();
     snapshot.window = match ctx.caller {
         Caller::Window { label } => label,

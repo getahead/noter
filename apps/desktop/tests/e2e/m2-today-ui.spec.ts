@@ -46,6 +46,22 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await expect.poll(() => sent(page, "window_show_call")).toHaveLength(1);
   });
 
+  // #1039: Today mounted after the capture state arrived counts from its arrival, as the sidebar's live row does
+  test("UI — Other — Return to a live call: Today opened later keeps the recording clock of the live row", async ({ page }) => {
+    await page.clock.install();
+    await openWindow(page, "main", { world: () => {} });
+    await page.keyboard.press("Meta+Digit3"); // Today unmounts
+    await page.clock.fastForward(5000);
+    await page.keyboard.press("Meta+Digit1");
+    const seconds = (text: string) => text.match(/\d+/g)!.map(Number).reduce((total, n) => total * 60 + n, 0);
+    const card = cards(page).first().locator(".td-card__elapsed");
+    const row = page.locator('[data-variant="live-row"] .np-tnum');
+    await expect(async () => {
+      const [onCard, onRow] = [seconds(await card.innerText()), seconds(await row.innerText())];
+      expect(Math.abs(onCard - onRow), `card ${onCard} s, live row ${onRow} s`).toBeLessThanOrEqual(1);
+    }).toPass({ timeout: 5000 });
+  });
+
   test("UI — empty path — Calendar not allowed yet: See today's calls here, Allow Calendar Access asks once and refreshes Today", async ({ page }) => {
     await openToday(page, calendar("not_asked"));
     await expect(page.getByText("See today's calls here")).toBeVisible();

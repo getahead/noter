@@ -428,7 +428,7 @@ jobs:
       - name: Engine tests (WAV fixtures through the pipeline)
         if: needs.changes.outputs.engine == 'true'
         run: swift test --package-path engine --enable-code-coverage
-      - name: Built engine signature (sandbox, audio input, no network entitlement)
+      - name: Built engine signature (audio input, hardened runtime, no network entitlement)
         if: needs.changes.outputs.engine == 'true'
         run: scripts/ci/check-engine-signature.sh
       - name: Save the engine build cache
