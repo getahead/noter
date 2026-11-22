@@ -150,7 +150,7 @@ function Models({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: Wiza
   // @cpt-end:cpt-noter-flow-ui-first-run-download-models:p1:inst-return-models
 }
 
-function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
+export function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w: WizardState }) {
   const status = useSelect(bridge.store, (s) => s.whole.setup!);
   const micDb = useSelect(bridge.store, (s) => s.streams.levels_subscribe?.data?.levels?.mic_db);
   const mic = rowStateFor("microphone", permissionState(status, "microphone"), w);
