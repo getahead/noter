@@ -263,8 +263,8 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {check}
           {owner}
           {text}
-          {/* the evidence is the timestamp chip, before the due text (action item row › Anatomy 1–5) */}
-          {prov}
+          {/* the evidence is the timestamp chip with its ↗, before the due text (action item row › Anatomy 1–5) */}
+          {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} arrow />}
           {due}
           {tags}
           <span className="np-tb__spacer" />

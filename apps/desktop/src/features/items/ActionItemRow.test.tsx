@@ -503,6 +503,8 @@ it("compact rows open their source Transcript in one action from the timestamp c
   expect(() => find(tree, (p) => p.label === "Show in transcript")).toThrow();
   const chip = find(tree, (_p, type) => type === ProvenanceChip);
   expect(chip.props.span).toEqual(it.spans[0]);
+  expect(chip.props.arrow).toBe(true); // the compact row's chip carries the ↗ (#1072)
+  expect(renderToString(<ProvenanceChip bridge={bridge} span={it.spans[0]!} />)).not.toContain("↗"); // Ask citations and full rows: none, as in the prototype
   (find(rendered(ProvenanceChip, chip.props as Parameters<typeof ProvenanceChip>[0]), (p) => typeof p.onClick === "function").props.onClick as () => void)();
   await settle();
   expect(seen).toContainEqual(["window_navigate", { target: { type: "call_page", call_id: it.spans[0]!.call_id, tab: "transcript", span: it.spans[0] } }]);
