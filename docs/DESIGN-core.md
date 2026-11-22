@@ -347,7 +347,7 @@ Platform, data residency and licensing constraints come from the PRD; this desig
 | Setup | First-run steps, models, permissions, self-test; never a start gate (owner decision O1) | [model/setup.rs](../crates/noter-protocol/src/model/setup.rs) `SetupStatus` |
 | Error | The one error type and its closed list of codes | [error.rs](../crates/noter-protocol/src/error.rs) `CoreError`, `ErrorCode` |
 
-The `settings` table also holds one row outside the typed sections: key `repos`, the repository mappings (`id`, `key`, `local_path`, `default_tool`) as a JSON list that `noter-handoff` reads and replaces through the change log (`repos_list`, `repo_upsert`, `repo_remove`); `path_exists` is read from the disk on each list, never stored.
+The `settings` table also holds one row outside the typed sections: key `repos`, the repository mappings (`id`, `key`, `local_path`, `default_tool`) as a JSON list that `noter-handoff` reads and replaces through the change log (`repos_list`, `repo_upsert`, `repo_folder_pick`, `repo_remove`); `path_exists` is read from the disk on each list, never stored.
 
 **Relationships**:
 
@@ -1077,7 +1077,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Window scope | Each command lists the windows allowed to call it; the core refuses others with `window_not_allowed`. Tauri capabilities and `AppManifest::commands` are generated from the same list; Tauri's own denial reaches the UI as `window_not_allowed`, and arguments that do not parse as `invalid_input` |
 | Caller | `CommandCtx.caller` is `Caller::Window { label }` for a WebView or `Caller::Native { surface: menu · menu_bar · hotkey · notification }`; native callers skip the scope check and are recorded as the actor surface |
 | Optional arguments | Every `Option` field of an argument type has `#[serde(default)]`, so the UI may omit it; a contract test checks this |
-| Native panels | Commands that need a file choice (`calls_export`, `history_export`, `audit_export`, `perf_brief` when exporting, `source_add_folder`, `repo_upsert` without a path) show the system panel from the core; a cancel returns `cancelled` |
+| Native panels | Commands that need a file choice (`calls_export`, `history_export`, `audit_export`, `perf_brief` when exporting, `source_add_folder`, `repo_upsert` without a path, `repo_folder_pick`) show the system panel from the core; a cancel returns `cancelled` |
 | Clipboard | The core writes rich formats (`share_copy`, `handoff_copy`); the UI may write plain text itself (Copy with Citations, Copy Code, Copy Link, Copy as Prompt) |
 
 **Stability.** **Frozen** surfaces change only additively in a minor version (a new optional field, a new command, a new enum variant the UI can ignore); anything else needs a major version both sides sign off. **Draft** surfaces (Copilot, Agents, Performance, `storage_move`, `copilot:status`) may change in any minor version until their milestone gate (4.1). Every command, event and Channel has its stability in the table and in the manifest.
@@ -1208,6 +1208,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `hotkeys_reset` | Settings and credentials. Restore the default hotkeys and card keys. `NoArgs → HotkeyList`. Windows: S. | frozen |
 | Command | `repos_list` | Settings and credentials. `NoArgs → RepoList`. Windows: SM. | frozen |
 | Command | `repo_upsert` | Settings and credentials. Add Mapping… from the handoff drawer opens the sheet in the main window. `RepoUpsertArgs → RepoList`. Windows: SM. | frozen |
+| Command | `repo_folder_pick` | Settings and credentials. **Choose…** in Add Mapping: the core's folder panel only, nothing saved; **Add Mapping** saves the path with `repo_upsert`; a closed panel is `cancelled`. `RepoFolderPickArgs → RepoFolder`. Windows: SM. | frozen |
 | Command | `repo_remove` | Settings and credentials. `RepoIdArgs → RepoList`. Windows: S. | frozen |
 | Command | `glossary_list` | Settings and credentials. `NoArgs → GlossaryList`. Windows: SM. | frozen |
 | Command | `glossary_upsert` | Settings and credentials. `GlossaryUpsertArgs → GlossaryList`. Windows: SM. | frozen |

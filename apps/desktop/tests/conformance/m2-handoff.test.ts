@@ -114,6 +114,15 @@ describe("handoff and repository commands (2.19)", () => {
     expect(refused(await s.core("main").repoRemove({ id: mapping.id })).code).toBe("window_not_allowed");
   });
 
+  // #1066: Choose… asks the core for a folder only; Add Mapping saves it with repo_upsert
+  it("repo_folder_pick returns the chosen folder and saves no mapping", async () => {
+    open();
+    const before = ok(await s.core("settings").reposList({})).mappings;
+    const picked = ok(await s.core("main").repoFolderPick({ key: "CORE" }));
+    expect(picked.path).not.toBe("");
+    expect(ok(await s.core("settings").reposList({})).mappings).toEqual(before);
+  });
+
   it("handoff_open hands the item off in its mapped repository and handoff_copy works for another owner", async () => {
     open();
     // The fixture world maps VSTOR already; the real core starts with no mappings.

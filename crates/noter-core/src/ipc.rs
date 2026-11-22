@@ -664,6 +664,14 @@ impl CoreApi for Core {
         self.upsert_repo(ctx, args).await
     }
 
+    async fn repo_folder_pick(
+        &self,
+        _ctx: &CommandCtx,
+        args: RepoFolderPickArgs,
+    ) -> Result<RepoFolder, CoreError> {
+        self.pick_repo_folder(args).await
+    }
+
     async fn repo_remove(&self, ctx: &CommandCtx, args: RepoIdArgs) -> Result<RepoList, CoreError> {
         self.remove_repo(ctx, args)
     }

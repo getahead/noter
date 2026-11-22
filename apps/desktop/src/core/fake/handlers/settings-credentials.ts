@@ -98,6 +98,11 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     else world.repos.mappings.push({ id: newId("rep"), key: a.key, local_path: path, default_tool: a.default_tool, path_exists: true });
     return world.repos;
   },
+  // Choose… only: the panel's folder for the key, nothing saved (the real core shows NSOpenPanel)
+  repo_folder_pick: (a) => {
+    if (!a.key.trim()) throw coreError("invalid_input", "key", { type: "validation", field: "key", rule: "required" });
+    return { path: `~/projects/${a.key.trim().toLowerCase()}` };
+  },
   repo_remove: (a, { world }) => {
     const before = world.repos.mappings.length;
     world.repos.mappings = world.repos.mappings.filter((m) => m.id !== a.id);

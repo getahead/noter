@@ -121,11 +121,12 @@ An item becomes a prompt with its evidence, decisions, acceptance criteria and s
 **Steps**:
 1. [x] - `p1` - API: `repos_list {}` returns mappings with `path_exists` derived from the filesystem - `inst-repo-list`
 2. [x] - `p1` - API: `repo_upsert { id, key, local_path, default_tool }`; when path is absent, show the core-owned open panel; cancellation changes nothing - `inst-repo-upsert`
-3. [x] - `p1` - Validate key and local directory, save the mapping through the settings/change-log writer and return `RepoList` - `inst-repo-save`
-4. [x] - `p1` - API: `repo_remove { id }` from Settings removes the mapping through the same write path - `inst-repo-remove`
-5. [x] - `p1` - API: `handoff_set_target { item_id, target }` stores the wanted target and recomputes launch availability without generating or opening a prompt - `inst-repo-target`
-6. [x] - `p1` - Resolve the item's project or component against its configured mapping; expose `unmapped_key` when no mapping fits and keep Copy available - `inst-repo-resolve`
-7. [x] - `p1` - **RETURN** current mappings or the updated handoff view; emit changed settings or entities after commit - `inst-repo-return`
+3. [x] - `p1` - API: `repo_folder_pick { key }` shows the core-owned folder panel for Choose… and returns the chosen folder without saving; closing the panel is `cancelled` - `inst-repo-pick`
+4. [x] - `p1` - Validate key and local directory, save the mapping through the settings/change-log writer and return `RepoList` - `inst-repo-save`
+5. [x] - `p1` - API: `repo_remove { id }` from Settings removes the mapping through the same write path - `inst-repo-remove`
+6. [x] - `p1` - API: `handoff_set_target { item_id, target }` stores the wanted target and recomputes launch availability without generating or opening a prompt - `inst-repo-target`
+7. [x] - `p1` - Resolve the item's project or component against its configured mapping; expose `unmapped_key` when no mapping fits and keep Copy available - `inst-repo-resolve`
+8. [x] - `p1` - **RETURN** current mappings or the updated handoff view; emit changed settings or entities after commit - `inst-repo-return`
 
 ### Open or copy the reviewed prompt
 
@@ -242,7 +243,7 @@ The system **MUST** resolve mappings, expose missing paths and the actual launch
 - `cpt-noter-algo-core-handoff-launch`
 
 **Touches**:
-- API: `handoff_set_target`, `handoff_open`, `handoff_copy`, `repos_list`, `repo_upsert`, `repo_remove`
+- API: `handoff_set_target`, `handoff_open`, `handoff_copy`, `repos_list`, `repo_upsert`, `repo_folder_pick`, `repo_remove`
 - DB: `items`, `prompt_versions`, settings repository mappings, `changes`
 - Entities: `LaunchPlan`, `HandoffOpenResult`, `HandoffCopyResult`, `RepoMapping`
 

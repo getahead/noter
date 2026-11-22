@@ -60,6 +60,11 @@ export async function saveRepo(bridge: Bridge, args: RepoUpsertArgs) {
 // @cpt-end:cpt-noter-flow-ui-handoff-mapping:p1:inst-return
 // @cpt-end:cpt-noter-flow-ui-handoff-mapping:p1:inst-save
 
+// @cpt-begin:cpt-noter-flow-ui-handoff-mapping:p1:inst-choose
+/** Choose…: the core's folder panel only; the chosen path fills Folder and Add Mapping saves it. */
+export const pickFolder = (bridge: Bridge, key: string) => bridge.act("repos:pick", "repo_folder_pick", () => bridge.core.repoFolderPick({ key: key.trim() }));
+// @cpt-end:cpt-noter-flow-ui-handoff-mapping:p1:inst-choose
+
 // @cpt-begin:cpt-noter-flow-ui-handoff-mapping:p1:inst-remove
 export async function removeRepo(bridge: Bridge, id: string) {
   const result = await bridge.act("repos:remove", "repo_remove", () => bridge.core.repoRemove({ id }));

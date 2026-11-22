@@ -131,6 +131,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   hotkeys_pause: { paused: true },
   repos_list: {},
   repo_upsert: {"key": "noter", "default_tool": "claude_code"},
+  repo_folder_pick: {"key": "noter"},
   repo_remove: {"id": "noter"},
   glossary_list: {},
   glossary_upsert: {"term": "Noter harness", "variants_latin": [], "variants_cyrillic": [], "spoken_forms": [], "always_apply": false},

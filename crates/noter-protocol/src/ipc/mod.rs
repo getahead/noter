@@ -533,6 +533,8 @@ commands! {
     repos_list(NoArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];
     /// Add Mapping… from the handoff drawer opens the sheet in the main window.
     repo_upsert(RepoUpsertArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];
+    /// Choose… in Add Mapping: the folder panel only; Add Mapping saves with `repo_upsert`.
+    repo_folder_pick(RepoFolderPickArgs) -> RepoFolder [SettingsAndCredentials, Frozen, Settings | Main];
     repo_remove(RepoIdArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings];
     glossary_list(NoArgs) -> GlossaryList [SettingsAndCredentials, Frozen, Settings | Main];
     glossary_upsert(GlossaryUpsertArgs) -> GlossaryList [SettingsAndCredentials, Frozen, Settings | Main];

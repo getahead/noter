@@ -1335,6 +1335,7 @@ Every state in a screen's or component's States table must match a prototype sta
   - `handoff_cancel`
   - `repos_list`
   - `repo_upsert`
+  - `repo_folder_pick`
   - `repo_remove`
 
 - **Sequences**:

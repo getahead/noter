@@ -388,6 +388,18 @@ pub struct RepoUpsertArgs {
     pub default_tool: HandoffTarget,
 }
 
+/// **Choose…** in Add Mapping: the core shows the folder panel titled for `key` and returns the
+/// chosen folder without saving anything; closing the panel is `cancelled`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct RepoFolderPickArgs {
+    pub key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct RepoFolder {
+    pub path: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RepoIdArgs {
     pub id: RepoMappingId,

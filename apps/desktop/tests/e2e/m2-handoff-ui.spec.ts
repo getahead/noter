@@ -130,6 +130,26 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     expect(await sent(page, "repo_upsert")).toContainEqual({ key: "VSTOR", local_path: folder, default_tool: "claude_code" });
   });
 
+  // #1066: Choose… only fills Folder; the mapping is saved by Add Mapping, with the Default tool the user picked
+  test("UI — error path: No repository mapped — Choose… fills the folder, then Default tool Codex and Add Mapping save the mapping", async ({ page }) => {
+    await open(page, { mapped: false });
+    await region(page, "HD-R3").getByRole("button", { name: "Add Mapping…" }).click();
+    const sheet = page.getByRole("dialog", { name: "Add Mapping", exact: true });
+    const folder = sheet.getByRole("textbox", { name: "Folder", exact: true });
+    await expect(folder).toHaveValue("");
+    await sheet.getByRole("button", { name: "Choose…" }).click();
+    await expect(folder).not.toHaveValue("");
+    await expect(sheet).toBeVisible();
+    expect(await sent(page, "repo_upsert")).toEqual([]);
+    expect(await sent(page, "repo_folder_pick")).toEqual([{ key: "VSTOR" }]);
+    const chosen = await folder.inputValue();
+    await sheet.getByRole("tab", { name: "Codex" }).click();
+    await sheet.getByRole("button", { name: "Add Mapping", exact: true }).click();
+    await expect(sheet).toHaveCount(0);
+    expect(await sent(page, "repo_upsert")).toEqual([{ key: "VSTOR", local_path: chosen, default_tool: "codex" }]);
+    await expect(region(page, "HD-R3")).toContainText(chosen);
+  });
+
   test("UI — other path: Compare uses the current edit and generated text without historical-body requests", async ({ page }) => {
     await open(page);
     await region(page, "HD-R4").getByRole("textbox").fill("A current edited prompt.");

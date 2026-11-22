@@ -1,4 +1,4 @@
-// Choosing a folder is part of repo_upsert: a successful Choose saves and closes; cancellation keeps the draft.
+// Choose… asks the core's folder panel for a path and fills Folder; Add Mapping saves with repo_upsert. A closed panel keeps the draft.
 import { useRef, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { HandoffTarget, RepoMapping } from "../../core/bindings";
@@ -8,7 +8,7 @@ import { SegmentedControl } from "../../ui/primitives/segmented-control";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { TextField } from "../../ui/primitives/text-field";
 import { toolLabel } from "./controls";
-import { initialMapping, mappingArgs, mappingError, saveRepo } from "./mappings";
+import { initialMapping, mappingArgs, mappingError, pickFolder, saveRepo } from "./mappings";
 import "./handoff.css";
 
 export interface AddMappingProps { bridge: Bridge; sourceKey?: string; mapping?: RepoMapping; fromHandoff?: boolean; returnFocus?: () => void; close: () => void; onSaved?: () => Promise<void> | void }
@@ -21,8 +21,8 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, retur
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const title = t(mapping ? "mapping.edit" : "mapping.add");
-  const save = async (picker: boolean) => {
-    const args = mappingArgs(draft, picker);
+  const save = async () => {
+    const args = mappingArgs(draft, false);
     if (!args || saving.current) return;
     saving.current = true;
     setBusy(true);
@@ -37,10 +37,24 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, retur
       setBusy(false);
     }
   };
+  const choose = async () => {
+    if (saving.current || !draft.key.trim()) return;
+    saving.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await pickFolder(bridge, draft.key);
+      if (result.status === "error") return void setError(mappingError(result.error.code));
+      setDraft((d) => ({ ...d, path: result.data.path }));
+    } finally {
+      saving.current = false;
+      setBusy(false);
+    }
+  };
   // the Sheet primitive refocuses what was focused before it opened, so the opener takes focus after that (DESIGN › Focus order)
   const cancel = () => { if (saving.current) return; close(); if (returnFocus) requestAnimationFrame(returnFocus); };
   return (
-    <Sheet title={title} width={520} busy={busy} onCancel={cancel} onDefault={() => void save(false)}>
+    <Sheet title={title} width={520} busy={busy} onCancel={cancel} onDefault={() => void save()}>
       <div className="np-sheet__head">
         <div className="np-sheet__title">{title}</div>
         {fromHandoff && <div className="np-sheet__sub">{t("mapping.from_handoff")}</div>}
@@ -49,7 +63,7 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, retur
         <TextField label={t("mapping.key")} showLabel placeholder={t("mapping.key_placeholder")} value={draft.key} disabled={busy} invalid={error?.field === "key"} message={error?.message} onChange={(key) => { setDraft({ ...draft, key }); setError(null); }} />
         <div className="hd-mapping__folder">
           <TextField label={t("mapping.folder")} showLabel mono value={draft.path} disabled={busy} invalid={error?.field === "path"} message={error?.message} onChange={(path) => { setDraft({ ...draft, path }); setError(null); }} />
-          <PushButton label={t("mapping.choose")} disabled={busy || !mappingArgs(draft, true)} onAction={() => save(true)} />
+          <PushButton label={t("mapping.choose")} disabled={busy || !draft.key.trim()} onAction={choose} />
         </div>
         <div className="hd-mapping__tool">
           <span>{t("mapping.tool")}</span>
@@ -57,7 +71,7 @@ export function AddMappingSheet({ bridge, sourceKey, mapping, fromHandoff, retur
         </div>
         {error?.field === "form" && <p className="hd__err" role="alert">{error.message}</p>}
       </div>
-      <SheetFooter defaultButton={<PushButton label={t(mapping ? "mapping.save" : "mapping.add")} variant="primary" disabled={busy || !mappingArgs(draft, false)} loading={busy} onAction={() => save(false)} />}>
+      <SheetFooter defaultButton={<PushButton label={t(mapping ? "mapping.save" : "mapping.add")} variant="primary" disabled={busy || !mappingArgs(draft, false)} loading={busy} onAction={() => save()} />}>
         <PushButton label={t("dialogs.cancel")} disabled={busy} onAction={cancel} />
       </SheetFooter>
     </Sheet>
