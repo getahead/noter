@@ -686,14 +686,12 @@ mod account_tests {
 
     /// A mock `claude`: `--version` works, `auth status` prints what the `status` file holds.
     fn mock_claude(dir: &Path) -> Cli {
-        use std::os::unix::fs::PermissionsExt;
         let program = dir.join("claude");
         let script = format!(
             "#!/bin/sh\nif [ \"$1\" = auth ]; then cat {}/status; exit $?; fi\necho '2.1.296 (Claude Code)'\n",
             dir.display()
         );
-        std::fs::write(&program, script).unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_exec::write_executable(&program, &script);
         Cli::new(
             CliConfig {
                 program,
@@ -755,14 +753,12 @@ mod account_tests {
 
     #[test]
     fn first_availability_probe_releases_the_cache_lock_before_probing() {
-        use std::os::unix::fs::PermissionsExt;
         use std::sync::mpsc;
         use std::thread;
 
         let dir = tempfile::tempdir().unwrap();
         let program = dir.path().join("claude");
-        std::fs::write(&program, "#!/bin/sh\necho '2.1.296 (Claude Code)'\n").unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_exec::write_executable(&program, "#!/bin/sh\necho '2.1.296 (Claude Code)'\n");
         let cli = Arc::new(Cli::new(
             CliConfig {
                 program,
@@ -786,12 +782,9 @@ mod account_tests {
 
     #[test]
     fn a_hung_version_probe_is_killed_within_its_deadline() {
-        use std::os::unix::fs::PermissionsExt;
-
         let dir = tempfile::tempdir().unwrap();
         let program = dir.path().join("claude");
-        std::fs::write(&program, "#!/bin/sh\nexec sleep 30\n").unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_exec::write_executable(&program, "#!/bin/sh\nexec sleep 30\n");
         let cli = Cli::new(
             CliConfig {
                 program,
@@ -824,22 +817,18 @@ mod account_tests {
 
     #[tokio::test]
     async fn failed_and_malformed_auth_probes_are_unknown_but_logged_out_is_explicit() {
-        use std::os::unix::fs::PermissionsExt;
-
         let dir = tempfile::tempdir().unwrap();
         let auth = dir.path().join("auth.json");
         let exit = dir.path().join("exit");
         let program = dir.path().join("claude");
-        std::fs::write(
+        crate::test_exec::write_executable(
             &program,
-            format!(
+            &format!(
                 "#!/bin/sh\ncase \"$*\" in\n  --version) echo '2.1.296' ;;\n  'auth status') cat {}; exit $(cat {}) ;;\nesac\n",
                 auth.display(),
                 exit.display()
             ),
-        )
-        .unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
+        );
         let cli = CliAccounts {
             claude: program.clone(),
             codex: program.clone(),

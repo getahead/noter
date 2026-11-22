@@ -25,6 +25,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
 
+#[path = "common/exec.rs"]
+mod exec;
+
 const TEXT: &str = "Ann agreed to ship the importer on Friday.";
 const SUBSCRIPTION_TOKEN: &str = "SUBSCRIPTION-TOKEN-NEVER-READ";
 const CLAUDE_OK: &str = "2.1.296 (Claude Code)";
@@ -39,7 +42,10 @@ impl Stub {
     fn new(version: &str) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/stub-cli/cli.sh");
-        std::fs::copy(src, dir.path().join("cli")).unwrap();
+        exec::write_executable(
+            &dir.path().join("cli"),
+            &std::fs::read_to_string(src).unwrap(),
+        );
         let stub = Self { dir };
         stub.set("version", version);
         stub.set("mode", "ok");

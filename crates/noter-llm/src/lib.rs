@@ -53,6 +53,9 @@ mod fetch_tests;
 mod mcp_client_tests;
 #[cfg(test)]
 mod runtime_tests;
+#[cfg(test)]
+#[path = "../tests/common/exec.rs"]
+mod test_exec;
 
 fn model_hosts() -> &'static [&'static str] {
     ALLOW_WITHOUT_AUDIT

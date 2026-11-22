@@ -1396,7 +1396,6 @@ async fn a_local_runs_tool_result_passes_without_an_audit_row() {
 /// The CLI adapters' lockdown with noter-mcp: a fake CLI records its command line, environment
 /// and MCP config; no real Claude Code or Codex runs.
 mod launch_tests {
-    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
     use std::sync::{mpsc, Arc};
     use std::time::Duration;
@@ -1429,8 +1428,7 @@ mod launch_tests {
              echo '{{\"is_error\":false,\"structured_output\":{{}},\"usage\":{{}},\"type\":\"turn.completed\"}}'\n",
             o = out.display()
         );
-        std::fs::write(&script, body).unwrap();
-        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_exec::write_executable(&script, &body);
         let config = CliConfig {
             program: script,
             home: dir.join("home"),
@@ -1548,23 +1546,13 @@ mod launch_tests {
         let started = dir.path().join("probe-started");
         let release = dir.path().join("probe-release");
         let claude = dir.path().join("claude");
-        std::fs::write(
-            &claude,
-            format!(
+        crate::test_exec::write_executable(&claude, &format!(
                 "#!/bin/sh\nif [ \"$1\" = --version ]; then touch '{}'; while [ ! -f '{}' ]; do sleep 0.01; done; echo '2.1.296'; exit 0; fi\ncat >/dev/null\necho '{{\"is_error\":false,\"structured_output\":{{\"answer_md\":\"\",\"citations\":[],\"found\":false}},\"usage\":{{}}}}'\n",
                 started.display(),
                 release.display(),
-            ),
-        )
-        .unwrap();
-        std::fs::set_permissions(&claude, std::fs::Permissions::from_mode(0o755)).unwrap();
+            ));
         let codex = dir.path().join("codex");
-        std::fs::write(
-            &codex,
-            "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'codex-cli 0.163.0'; exit 0; fi\necho '{}'\n",
-        )
-        .unwrap();
-        std::fs::set_permissions(&codex, std::fs::Permissions::from_mode(0o755)).unwrap();
+        crate::test_exec::write_executable(&codex, "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'codex-cli 0.163.0'; exit 0; fi\necho '{}'\n");
         let config = |program: PathBuf, signed_in| CliConfig {
             program,
             home: dir.path().join("home"),
