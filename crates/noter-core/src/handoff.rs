@@ -363,6 +363,26 @@ impl Core {
         })
     }
 
+    /// **Choose…** in Add Mapping: the folder panel only, nothing saved; closing it is
+    /// `cancelled`. **Add Mapping** then saves the chosen path with `repo_upsert`.
+    // @cpt-begin:cpt-noter-flow-core-handoff-repositories:p1:inst-repo-pick
+    pub(crate) async fn pick_repo_folder(
+        &self,
+        args: RepoFolderPickArgs,
+    ) -> Result<RepoFolder, CoreError> {
+        self.ready()?;
+        let path = self
+            .deps
+            .native_ops
+            .save_panel(&args.key, crate::SaveKind::Folder)
+            .await
+            .ok_or_else(|| CoreError::new(ErrorCode::Cancelled, "no folder chosen"))?;
+        Ok(RepoFolder {
+            path: path.to_string_lossy().into_owned(),
+        })
+    }
+    // @cpt-end:cpt-noter-flow-core-handoff-repositories:p1:inst-repo-pick
+
     // @cpt-begin:cpt-noter-flow-core-handoff-repositories:p1:inst-repo-upsert
     /// Saves a mapping; without a folder the core asks for one with the folder panel, and
     /// closing it is `cancelled` with nothing changed.

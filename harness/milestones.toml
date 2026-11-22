@@ -63,7 +63,7 @@ commands = [
   "handoff_get", "handoff_generate", "handoff_edit", "handoff_set_target", "handoff_open", "handoff_copy", "handoff_cancel",
   "history_list", "change_undo", "change_redo", "history_export",
   "call_tags_set", "tags_list",
-  "repos_list", "repo_upsert", "repo_remove", "share_test_run",
+  "repos_list", "repo_upsert", "repo_folder_pick", "repo_remove", "share_test_run",
   # Moved from M3 by the owner on 18 Oct: post-call outputs need a key (DECOMPOSITION-core §1 item 1).
   "accounts_get", "api_key_set",
 ]

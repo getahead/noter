@@ -1548,6 +1548,19 @@
       ]
     },
     {
+      "args": "RepoFolderPickArgs",
+      "channel": null,
+      "doc": "Choose… in Add Mapping: the folder panel only; Add Mapping saves with `repo_upsert`.",
+      "group": "settings_and_credentials",
+      "name": "repo_folder_pick",
+      "result": "RepoFolder",
+      "stability": "frozen",
+      "windows": [
+        "settings",
+        "main"
+      ]
+    },
+    {
       "args": "RepoIdArgs",
       "channel": null,
       "doc": "",
@@ -2235,7 +2248,7 @@
       ]
     }
   ],
-  "contract_version": "2.26",
+  "contract_version": "2.27",
   "default_retryable": [
     "not_ready",
     "internal",

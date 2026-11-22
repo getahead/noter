@@ -642,6 +642,14 @@ async fn repositories_are_listed_added_and_removed_and_resolve_the_item() {
         .await
         .unwrap_err();
     assert_eq!(cancelled.code, ErrorCode::Cancelled);
+    // Choose… with the panel closed: cancelled, and the mappings stay as they were (#1066).
+    let picked = w
+        .core
+        .repo_folder_pick(&ctx(), RepoFolderPickArgs { key: "UI".into() })
+        .await
+        .unwrap_err();
+    assert_eq!(picked.code, ErrorCode::Cancelled);
+    assert_eq!(w.core.repos_list(&ctx(), NoArgs {}).await.unwrap(), list);
     let removed = w
         .core
         .repo_remove(

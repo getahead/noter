@@ -36,17 +36,19 @@ describe("Add Mapping sheet", () => {
     expect(returnFocus).toHaveBeenCalledOnce();
   });
 
-  it("Choose sends null path to the core and closes only after success", async () => {
+  // #1066: Choose… asks the core for a folder only; nothing is saved and the sheet stays for Add Mapping or Cancel
+  it("Choose asks the core for a folder without saving or closing, and a closed panel keeps the draft", async () => {
     const close = vi.fn();
+    const pick = vi.spyOn(bridge.core, "repoFolderPick");
     const upsert = vi.spyOn(bridge.core, "repoUpsert");
-    let tree = rendered(AddMappingSheet, { bridge, sourceKey: "OTHER", close });
-    fake.failNext("repo_upsert", "cancelled");
+    const tree = rendered(AddMappingSheet, { bridge, sourceKey: "OTHER", close });
+    fake.failNext("repo_folder_pick", "cancelled");
     await (find(tree, (p) => p.label === "Choose…").props.onAction as () => Promise<void>)();
-    expect(upsert).toHaveBeenCalledWith({ key: "OTHER", local_path: null, default_tool: "claude_code" });
+    await (find(tree, (p) => p.label === "Choose…").props.onAction as () => Promise<void>)();
+    expect(pick).toHaveBeenCalledTimes(2);
+    expect(pick).toHaveBeenCalledWith({ key: "OTHER" });
+    expect(upsert).not.toHaveBeenCalled();
     expect(close).not.toHaveBeenCalled();
-    tree = rendered(AddMappingSheet, { bridge, sourceKey: "OTHER", close });
-    await (find(tree, (p) => p.label === "Choose…").props.onAction as () => Promise<void>)();
-    expect(close).toHaveBeenCalledOnce();
   });
 
   it("editing sends the mapping id and retains the sheet on failure", async () => {

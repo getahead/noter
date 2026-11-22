@@ -1122,7 +1122,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
   - `cpt-noter-component-core-handoff`
 
 - **API**:
-  - Commands (frozen unless noted in DESIGN-core 3.3): `handoff_get`, `handoff_generate`, `handoff_edit`, `handoff_set_target`, `handoff_open`, `handoff_copy`, `handoff_cancel`, `repos_list`, `repo_upsert`, `repo_remove`
+  - Commands (frozen unless noted in DESIGN-core 3.3): `handoff_get`, `handoff_generate`, `handoff_edit`, `handoff_set_target`, `handoff_open`, `handoff_copy`, `handoff_cancel`, `repos_list`, `repo_upsert`, `repo_folder_pick`, `repo_remove`
   - Events: `entity:changed`
 
 - **Sequences** (DESIGN-core sequences, then the DESIGN.md stories this feature delivers for the E2E gate):

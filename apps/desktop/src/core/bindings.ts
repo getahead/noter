@@ -2792,6 +2792,18 @@ export type RenameSpeakerArgs = {
 	scope: RenameScope,
 };
 
+export type RepoFolder = {
+	path: string,
+};
+
+/**
+ *  **Choose…** in Add Mapping: the core shows the folder panel titled for `key` and returns the
+ *  chosen folder without saving anything; closing the panel is `cancelled`.
+ */
+export type RepoFolderPickArgs = {
+	key: string,
+};
+
 export type RepoIdArgs = {
 	id: RepoMappingId,
 };
@@ -3775,7 +3787,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.26";
+export const CONTRACT_VERSION = "2.27";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3905,6 +3917,7 @@ export const COMMANDS = {
   hotkeys_pause: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   repos_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_upsert: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
+  repo_folder_pick: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_remove: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   glossary_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   glossary_upsert: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
@@ -4087,6 +4100,7 @@ export interface CommandArgs {
   hotkeys_pause: HotkeysPauseArgs;
   repos_list: NoArgs;
   repo_upsert: RepoUpsertArgs;
+  repo_folder_pick: RepoFolderPickArgs;
   repo_remove: RepoIdArgs;
   glossary_list: NoArgs;
   glossary_upsert: GlossaryUpsertArgs;
@@ -4267,6 +4281,7 @@ export interface CommandResults {
   hotkeys_pause: Ack;
   repos_list: RepoList;
   repo_upsert: RepoList;
+  repo_folder_pick: RepoFolder;
   repo_remove: RepoList;
   glossary_list: GlossaryList;
   glossary_upsert: GlossaryList;
@@ -4866,6 +4881,10 @@ export function createCore(transport: Transport) {
      * Add Mapping… from the handoff drawer opens the sheet in the main window.
      */
     repoUpsert: (args: RepoUpsertArgs) => call("repo_upsert", args),
+    /**
+     * Choose… in Add Mapping: the folder panel only; Add Mapping saves with `repo_upsert`.
+     */
+    repoFolderPick: (args: RepoFolderPickArgs) => call("repo_folder_pick", args),
     repoRemove: (args: RepoIdArgs) => call("repo_remove", args),
     glossaryList: (args: NoArgs) => call("glossary_list", args),
     glossaryUpsert: (args: GlossaryUpsertArgs) => call("glossary_upsert", args),
