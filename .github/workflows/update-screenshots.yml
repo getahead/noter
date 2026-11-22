@@ -40,8 +40,10 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           git config --global --add safe.directory "$GITHUB_WORKSPACE"
-          git config user.name "noter-ci"
-          git config user.email "noter-ci@users.noreply.github.com"
+          # Commit as the Actions bot, whose noreply address GitHub maps to its account: the
+          # ruleset holds a PR whose head commit is unattributed for an extra approval (#1144).
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A -- '**/__screenshots__/**'
           if git diff --cached --quiet; then echo "changed=false" >> "$GITHUB_OUTPUT"; exit 0; fi
           git commit -m "test(visual): refresh screenshot baselines" -m "Rendered by the update-screenshots workflow in $HEAD_SHA."
