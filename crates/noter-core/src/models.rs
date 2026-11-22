@@ -431,6 +431,7 @@ impl Core {
     /// cancels it.
     // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-pause
     async fn download_job(self: &Arc<Self>, ctx: &mut RunCtx) -> Result<(), Stop> {
+        self.resume_after_relaunch();
         let mut guard = self.capture_guard.subscribe();
         loop {
             if guard.borrow().live {
@@ -483,6 +484,27 @@ impl Core {
 
     /// Starts the paused bundles again once the call that paused them ended; `false` when the
     /// user took the download over meanwhile.
+    /// The scheduler re-runs an unfinished download after a relaunch, where nothing is running and
+    /// the bundles read their state from disk: the half-done one as paused, the ones queued behind
+    /// it as pending. Every selected bundle not ready goes on, not only the half-done one (issue 1141).
+    fn resume_after_relaunch(&self) {
+        let mut d = lock(&self.downloads);
+        if d.running {
+            return;
+        }
+        for b in d
+            .bundles
+            .iter_mut()
+            .filter(|b| b.selected && matches!(b.state, BundleState::Pending | BundleState::Paused))
+        {
+            b.state = BundleState::Downloading;
+        }
+        d.running = true;
+        d.pause.store(false, Ordering::SeqCst);
+        drop(d);
+        self.refresh_setup();
+    }
+
     fn resume_after_call(&self) -> bool {
         let mut d = lock(&self.downloads);
         if !std::mem::take(&mut d.live_paused) {

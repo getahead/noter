@@ -3024,3 +3024,51 @@ async fn the_scripted_surfaces_record_the_setup_window_handing_over_to_today() {
     );
     r.finish().await;
 }
+
+#[tokio::test]
+// issue 1141: a fresh install restarted mid-download needs its data to outlive the launch.
+async fn a_data_dir_from_the_launch_hooks_keeps_the_core_data_across_launches() {
+    let path = std::env::temp_dir().join(format!("noter-data-dir-{}", std::process::id()));
+    let env = |key: &str| match key {
+        "NOTER_TEST_FIXTURE" => Some("none".to_string()),
+        "NOTER_TEST_DATA_DIR" => Some(path.display().to_string()),
+        _ => None,
+    };
+    let mut r = start_with(Options::from_env(env).unwrap().unwrap()).await;
+    assert_eq!(r.data_dir, path);
+    r.data_dir = PathBuf::new(); // the runner removes its data folder when dropped: keep this one
+    r.ok(
+        "first-run",
+        "setup_set_step",
+        json!({"step":"welcome","state":"done"}),
+    )
+    .await;
+    r.finish().await;
+    // a download left half done: the relaunch must find it, not the fixture's installed models
+    let models = path.join("models");
+    for entry in std::fs::read_dir(&models).unwrap().flatten() {
+        std::fs::remove_dir_all(entry.path()).unwrap();
+    }
+    std::fs::create_dir_all(models.join("whisper-turbo.partial")).unwrap();
+    let mut again = start_with(Options::from_env(env).unwrap().unwrap()).await;
+    let setup = again.ok("first-run", "setup_status", json!({})).await;
+    assert_eq!(setup["steps"][0], json!({"step":"welcome","state":"done"}));
+    let left: Vec<_> = std::fs::read_dir(&models)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(
+        left,
+        vec!["whisper-turbo.partial"],
+        "issue 1141: the relaunch placed models"
+    );
+    again.finish().await;
+    let relative = Options::from_env(|key| match key {
+        "NOTER_TEST_FIXTURE" => Some("none".to_string()),
+        "NOTER_TEST_DATA_DIR" => Some("noter".to_string()),
+        _ => None,
+    });
+    assert!(relative.unwrap_err().contains("absolute"));
+    let _ = std::fs::remove_dir_all(&path);
+}
