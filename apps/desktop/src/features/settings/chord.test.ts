@@ -89,6 +89,11 @@ describe("refusalLine", () => {
     expect(refusalLine(err("hotkey_conflict", "Raycast"))).toBe("Used by Raycast");
   });
 
+  it("cpt-noter-seq-settings-set-hotkeys — names another Noter action by its label, not its id (issue 1143)", () => {
+    expect(refusalLine(err("hotkey_conflict", "start_stop"))).toBe("Used by Start or stop recording");
+    expect(conflictLine({ type: "conflict", owner: "mark_moment" })).toBe("Used by Mark moment");
+  });
+
   it("falls back to macOS for a reservation and another app for a conflict", () => {
     expect(refusalLine(err("hotkey_reserved"))).toBe("Used by macOS");
     expect(refusalLine(err("hotkey_conflict", null))).toBe("Used by another app");
