@@ -16,6 +16,16 @@ afterEach(() => {
 });
 
 describe("fake core stream and record parity", () => {
+  // #1162, #1163: as the core does, Show latency and Text size reach the call window through window:call.
+  it("puts Show latency and Text size into the call window state and republishes it", async () => {
+    const fake = core("settings");
+    const heard: { show_latency?: boolean; text_size_pct?: number }[] = [];
+    await fake.listen("window:call", (payload) => void heard.push(payload as never));
+    const { call_screen, rev } = fake.world.settings;
+    await fake.invoke("settings_update", { rev, section: { section: "call_screen", value: { ...call_screen, show_latency: true, text_size_pct: 120 } } });
+    expect(heard.at(-1)).toMatchObject({ show_latency: true, text_size_pct: 120 });
+  });
+
   it("does not carry handoff edits into a fresh core with a fresh world", async () => {
     const first = core("main");
     await first.invoke("handoff_edit", { item_id: "itm_replay", rev: 1, prompt_md: "private edit" });

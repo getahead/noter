@@ -2,7 +2,7 @@
 // C.recordingIndicator, C.personChip (call-window variants), C.callStatusStrip and C.collapsedCallStrip.
 import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
-import type { SpeakerView } from "../../core/bindings";
+import type { Lag, SpeakerView } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { InlineStatus } from "../../ui/feedback/inline-status";
@@ -56,6 +56,25 @@ export function RecordingIndicator({ variant, status, clock }: { variant: "dot" 
       <span className={cx("np-recind__word", live && "is-rec")}>{word}</span>
       {clock && live && <span className="np-tnum">{clock}</span>}
     </span>
+  );
+}
+
+/** Seconds to one decimal, or a dash before the first line of that kind. */
+const seconds = (lag: Lag | null | undefined) => (lag ? Math.round(lag.ms / 100) / 10 : "–");
+
+// @cpt-algo:cpt-noter-algo-ui-call-window-layout-content:p1
+/**
+ * CS-R1's latency line (DESIGN, Settings › Call Screen & Menu Bar › Show latency): **Hypothesis 1.4 s · confirmed 3.1 s**,
+ * in the warning colour with its icon while either is over its budget; nothing before the first measured line.
+ */
+export function LatencyLine({ hypothesis, confirmed }: { hypothesis?: Lag | null; confirmed?: Lag | null }) {
+  if (!hypothesis && !confirmed) return null;
+  const over = [hypothesis, confirmed].some((l) => l && l.ms > l.budget_ms);
+  return (
+    <div className={cx("cs-r1__line cw-latency t-foot np-tnum", over && "is-over")} data-testid="latency-line">
+      {over && <Icon name="warning" size={13} label={t("cw.latency_over")} />}
+      {t("cw.latency", { hypothesis: seconds(hypothesis), confirmed: seconds(confirmed) })}
+    </div>
   );
 }
 

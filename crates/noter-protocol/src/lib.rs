@@ -34,4 +34,4 @@ pub use error::{internal, invalid, CoreError, ErrorCode, ErrorDetail};
 /// command, event or Channel (see DESIGN-core 4.1, Contract governance).
 /// `major.minor`: minor = additive, major = breaking a frozen surface.
 /// 2.0 applies the 17 Oct 2026 design review (`docs/REVIEW-2026-10-17-design-core.md`).
-pub const CONTRACT_VERSION: &str = "2.24";
+pub const CONTRACT_VERSION: &str = "2.28";

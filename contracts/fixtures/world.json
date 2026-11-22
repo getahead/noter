@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.24",
+    "contract_version": "2.28",
     "copilot": {
       "agents": [
         {
@@ -1981,6 +1981,10 @@
   },
   "live_script": [
     {
+      "lag": {
+        "budget_ms": 2000,
+        "ms": 1300
+      },
       "segment": {
         "call_id": "call_live",
         "channel": "sys",
@@ -2012,6 +2016,10 @@
       "type": "hypothesis"
     },
     {
+      "lag": {
+        "budget_ms": 4000,
+        "ms": 2900
+      },
       "segment": {
         "call_id": "call_live",
         "channel": "sys",
@@ -2043,6 +2051,10 @@
       "type": "confirmed"
     },
     {
+      "lag": {
+        "budget_ms": 2000,
+        "ms": 1200
+      },
       "segment": {
         "call_id": "call_live",
         "channel": "sys",
@@ -2074,6 +2086,10 @@
       "type": "hypothesis"
     },
     {
+      "lag": {
+        "budget_ms": 4000,
+        "ms": 4600
+      },
       "segment": {
         "call_id": "call_live",
         "channel": "sys",
@@ -2946,6 +2962,10 @@
       "archive": "not_started",
       "audio_available": true,
       "call_id": "call_live",
+      "confirmed_lag": {
+        "budget_ms": 4000,
+        "ms": 3100
+      },
       "gaps": [
         {
           "call_id": "call_live",
@@ -2984,6 +3004,10 @@
           "text": "I think we should ask the backend team whether…"
         }
       ],
+      "hypothesis_lag": {
+        "budget_ms": 2000,
+        "ms": 1400
+      },
       "last_seq": 42,
       "live": true,
       "marks": [
@@ -3316,6 +3340,7 @@
       "archive": "done",
       "audio_available": true,
       "call_id": "call_backend",
+      "confirmed_lag": null,
       "gaps": [
         {
           "call_id": "call_backend",
@@ -3325,6 +3350,7 @@
         }
       ],
       "hypotheses": [],
+      "hypothesis_lag": null,
       "last_seq": 17,
       "live": false,
       "marks": [

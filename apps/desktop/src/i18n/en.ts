@@ -1234,6 +1234,8 @@ export const en = {
   "cw.header": "Call header",
   "cw.panel_header": "Panel header",
   "cw.transcript": "Transcript",
+  "cw.latency": "Hypothesis {hypothesis} s · confirmed {confirmed} s",
+  "cw.latency_over": "Over budget",
   "cw.share_glyph": "Hidden from window shares",
   "cw.share_help": "Hidden from Teams, Meet and window-filtered Zoom shares. Share a window, not a display.",
   "cw.hide_presenting": "Hide Noter for Presenting",

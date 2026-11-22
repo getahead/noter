@@ -767,6 +767,12 @@ export type CallWindowState = {
 	chosen_display_missing: boolean,
 	/**  The share warning shows the first time the floating panel opens (PM-49). */
 	show_share_warning: boolean,
+	/**
+	 *  Settings › Call Screen & Menu Bar › **Show latency** and **Text size**, for the call window,
+	 *  which cannot read the settings (`CallScreenSettings`).
+	 */
+	show_latency?: boolean,
+	text_size_pct?: number,
 };
 
 export type CallsDeleteArgs = {
@@ -2108,6 +2114,17 @@ export type KeyStatus = { type: "not_set" } | { type: "verifying" } |
 export type KeyView = {
 	provider: KeyProvider,
 	status: KeyStatus,
+};
+
+/**
+ *  How far a live line trails the speech it shows: call time when the core took the line from
+ *  the engine (confirmed: when it published it) minus the line's end, against the PRD budget
+ *  (PRD › Success metrics: hypothesis ≤ 2 s, confirmed ≤ 4 s, provisional). Over budget when
+ *  `ms > budget_ms`.
+ */
+export type Lag = {
+	ms: number,
+	budget_ms: number,
 };
 
 /**
@@ -3527,9 +3544,11 @@ export type TopicThreadGroup = {
 
 export type TranscriptEvent = 
 /**  Replace the current hypothesis of `segment.channel`. */
-{ type: "hypothesis"; segment: SegmentView } | 
+{ type: "hypothesis"; segment: SegmentView; 
+/**  `null` when the core cannot place the line in call time (no running session). */
+lag?: Lag | null } | 
 /**  Append; removes the hypothesis it confirms. */
-{ type: "confirmed"; segment: SegmentView } | 
+{ type: "confirmed"; segment: SegmentView; lag?: Lag | null } | 
 /**  A correction changed confirmed rows (term fix, rename): replace by id. */
 { type: "segments_updated"; segments: SegmentView[] } | 
 /**  Speaker labels changed (rename, or the archive pass relabelled them: "Transcript upgraded"). */
@@ -3566,6 +3585,12 @@ export type TranscriptSnapshot = {
 	speakers: SpeakerView[],
 	last_seq: Seq,
 	audio_available: boolean,
+	/**
+	 *  The newest lag of a hypothesis and of a confirmed line while the call is live (the call
+	 *  screen's latency line); `null` before the first one and for a call that is not live.
+	 */
+	hypothesis_lag?: Lag | null,
+	confirmed_lag?: Lag | null,
 };
 
 export type TranscriptSubscribeArgs = {
@@ -3740,7 +3765,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.24";
+export const CONTRACT_VERSION = "2.28";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

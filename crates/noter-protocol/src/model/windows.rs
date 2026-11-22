@@ -57,6 +57,14 @@ pub struct CallWindowState {
     pub chosen_display_missing: bool,
     /// The share warning shows the first time the floating panel opens (PM-49).
     pub show_share_warning: bool,
+    /// Settings › Call Screen & Menu Bar › **Show latency** and **Text size**, for the call window,
+    /// which cannot read the settings (`CallScreenSettings`).
+    #[serde(default)]
+    #[specta(optional)]
+    pub show_latency: bool,
+    #[serde(default = "default_text_size_pct")]
+    #[specta(optional)]
+    pub text_size_pct: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

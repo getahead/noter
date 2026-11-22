@@ -31,6 +31,9 @@ use crate::{internal, lock, object, to_json, Core};
 const BATCH: Duration = Duration::from_millis(250);
 /// Levels reach a window at most this often (the hub coalesces).
 const LEVELS_EVERY_MS: i64 = 100;
+/// PRD › Success metrics (provisional): hypothesis text lag ≤ 2 s, confirmed text lag ≤ 4 s.
+const HYPOTHESIS_BUDGET_MS: u32 = 2_000;
+const CONFIRMED_BUDGET_MS: u32 = 4_000;
 
 impl StreamMsg for TranscriptMsg {
     fn set_seq(&mut self, seq: Seq) {
@@ -120,7 +123,13 @@ struct Live {
     /// delivers them, so nothing shows twice.
     unpublished: HashSet<SegmentId>,
     timer: bool,
+    /// The newest lag of each kind, for a snapshot.
+    hypothesis_lag: Option<Lag>,
+    confirmed_lag: Option<Lag>,
 }
+
+/// What the live state adds to a snapshot: the current hypotheses and the newest lags.
+type Heard = (Vec<SegmentView>, Option<Lag>, Option<Lag>);
 
 impl Core {
     fn transcript_hub(&self) -> Arc<StreamHub<TranscriptMsg>> {
@@ -213,6 +222,8 @@ impl Core {
         let view = segment_view(&seg, id, speaker);
         // @cpt-begin:cpt-noter-algo-core-live-transcript-batch:p1:inst-if-hypothesis
         if hypothesis {
+            let lag = self.lag(&call_id, view.t1_ms, HYPOTHESIS_BUDGET_MS);
+            live.hypothesis_lag = lag.or(live.hypothesis_lag);
             // @cpt-begin:cpt-noter-algo-core-live-transcript-batch:p1:inst-publish-hypothesis
             // @cpt-begin:cpt-noter-state-core-live-transcript-segment:p1:inst-st-replace
             live.hypotheses.retain(|h| h.channel != seg.channel);
@@ -222,7 +233,7 @@ impl Core {
                 call_id.as_str(),
                 TranscriptMsg {
                     seq: Seq(0),
-                    event: TranscriptEvent::Hypothesis { segment: view },
+                    event: TranscriptEvent::Hypothesis { segment: view, lag },
                 },
             );
             // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-publish-hypothesis
@@ -236,6 +247,15 @@ impl Core {
         // @cpt-begin:cpt-noter-algo-core-live-transcript-batch:p1:inst-return-batch
         self.arm(&call_id, live);
         // @cpt-end:cpt-noter-algo-core-live-transcript-batch:p1:inst-return-batch
+    }
+
+    /// How far a line ending at `end` trails the running session's call time now.
+    fn lag(&self, call_id: &CallId, end: OffsetMs, budget_ms: u32) -> Option<Lag> {
+        let now = self.engine.call_offset(call_id)?;
+        Some(Lag {
+            ms: now.0.saturating_sub(end.0),
+            budget_ms,
+        })
     }
 
     // @cpt-algo:cpt-noter-algo-core-live-transcript-speakers:p1
@@ -380,11 +400,13 @@ impl Core {
             live.hypotheses
                 .retain(|h| h.channel != segment.channel || h.t0_ms >= segment.t1_ms);
             live.unpublished.remove(&segment.id);
+            let lag = self.lag(call_id, segment.t1_ms, CONFIRMED_BUDGET_MS);
+            live.confirmed_lag = lag.or(live.confirmed_lag);
             hub.publish(
                 call_id.as_str(),
                 TranscriptMsg {
                     seq: Seq(0),
-                    event: TranscriptEvent::Confirmed { segment },
+                    event: TranscriptEvent::Confirmed { segment, lag },
                 },
             );
         }
@@ -497,7 +519,8 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-if-unknown
         if !call.live {
             // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-return-snapshot
-            let snapshot = self.snapshot(&args.call_id, &call, vec![], &HashSet::new())?;
+            let snapshot =
+                self.snapshot(&args.call_id, &call, Default::default(), &HashSet::new())?;
             // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-return-snapshot
             // Nothing will stream: no subscription and no message (`subscription_id` is null).
             return Ok(snapshot);
@@ -505,9 +528,12 @@ impl Core {
         // The state lock comes first: a commit that has not published yet is left out of the
         // snapshot and arrives on the Channel.
         let state = lock(&self.transcript.state);
-        let (hypotheses, unpublished) = state.calls.get(&args.call_id).map_or_else(
-            || (vec![], HashSet::new()),
-            |l| (l.hypotheses.clone(), l.unpublished.clone()),
+        let (heard, unpublished) = state.calls.get(&args.call_id).map_or_else(
+            || (Heard::default(), HashSet::new()),
+            |l| {
+                let heard = (l.hypotheses.clone(), l.hypothesis_lag, l.confirmed_lag);
+                (heard, l.unpublished.clone())
+            },
         );
         // @cpt-begin:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-snapshot
         let subscribed = self.subscribe(
@@ -515,7 +541,7 @@ impl Core {
             args.call_id.as_str(),
             ctx,
             channel,
-            || self.snapshot(&args.call_id, &call, hypotheses, &unpublished),
+            || self.snapshot(&args.call_id, &call, heard.clone(), &unpublished),
         )?;
         // @cpt-end:cpt-noter-flow-core-live-transcript-subscribe:p1:inst-snapshot
         drop(state);
@@ -533,7 +559,7 @@ impl Core {
         &self,
         call_id: &CallId,
         call: &CallState,
-        hypotheses: Vec<SegmentView>,
+        (hypotheses, hypothesis_lag, confirmed_lag): Heard,
         unpublished: &HashSet<SegmentId>,
     ) -> Result<TranscriptSnapshot, CoreError> {
         let id = call_id.clone();
@@ -589,6 +615,8 @@ impl Core {
             speakers,
             last_seq: Seq(0),
             audio_available: call.audio_available,
+            hypothesis_lag,
+            confirmed_lag,
         })
     }
 
