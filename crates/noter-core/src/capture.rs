@@ -600,6 +600,15 @@ impl Core {
         // @cpt-end:cpt-noter-state-core-capture-session-phase:p1:inst-st-start
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-phase-starting
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-engine
+        // #1167: macOS's microphone prompt is shown by the app first, never inside the engine's
+        // start; the system-audio prompt can only come from the engine's tap (the supervisor
+        // and the engine tolerate it).
+        if self.deps.native.permission(PermissionKind::Microphone) == PermissionState::NotAsked {
+            self.deps
+                .native
+                .request_permission(PermissionKind::Microphone)
+                .await;
+        }
         if self.engine.start_session(start).await.is_err() {
             // Never refused (O1): the call stays; Stop ends it, Try Again restarts the engine.
             session.failed_at = Some(now);

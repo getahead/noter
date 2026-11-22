@@ -485,3 +485,81 @@ async fn an_unpaced_self_test_sends_no_levels() {
     let got = until_result(&mut events).await;
     assert!(!got.iter().any(|e| matches!(e, EngineEvent::Levels { .. })));
 }
+
+/// #1167: the first Record shows macOS's Microphone and System Audio prompts while the engine
+/// opens its streams. An engine that waits for the user, but still answers `ping`, must not be
+/// restarted, and its session must start: the recording is never lost.
+#[tokio::test(start_paused = true)]
+async fn a_start_waiting_on_a_permission_prompt_is_not_restarted() {
+    let engine = ScriptedEngine::new().with_default(Behaviour {
+        answer_capture_sessions: true,
+        start_session_delay_ms: 45_000,
+        ..Behaviour::default()
+    });
+    let c = client(&engine);
+    let mut events = c.events();
+    let call_id = CallId::new("call-prompt");
+    let started = c
+        .command(EngineCommand::StartSession(StartSession {
+            call_id: call_id.clone(),
+            session_dir: "audio/call-prompt".into(),
+            store_audio: true,
+            mic_device_uid: None,
+            exclude_bundle_ids: vec![],
+            languages: vec![],
+            backend: AsrBackend::WhisperTurbo,
+            glossary: vec![],
+            speaker_priors: vec![],
+            enrolled_embeddings_path: None,
+            resume_from_ms: None,
+        }))
+        .await;
+    assert_eq!(
+        started,
+        Ok(()),
+        "the start waits for the user, longer than command_timeout"
+    );
+    assert_eq!(engine.launches(), 1, "the engine was not restarted");
+    loop {
+        if let EngineEvent::SessionStarted { call_id: got, .. } = events.recv().await.unwrap().event
+        {
+            assert_eq!(got, call_id);
+            break;
+        }
+    }
+}
+
+/// #1167, the other side: a start may wait for the user, but an engine that stops answering
+/// `ping` meanwhile is still ended by liveness, long before the permission timeout.
+#[tokio::test(start_paused = true)]
+async fn a_hung_engine_does_not_hide_behind_a_permission_wait() {
+    let engine = ScriptedEngine::new()
+        .then(Behaviour {
+            hang: true,
+            ..Behaviour::default()
+        })
+        .with_default(Behaviour::default());
+    let c = client(&engine);
+    let began = Instant::now();
+    let started = c
+        .command(EngineCommand::StartSession(StartSession {
+            call_id: CallId::new("call-hung"),
+            session_dir: "audio/call-hung".into(),
+            store_audio: true,
+            mic_device_uid: None,
+            exclude_bundle_ids: vec![],
+            languages: vec![],
+            backend: AsrBackend::WhisperTurbo,
+            glossary: vec![],
+            speaker_priors: vec![],
+            enrolled_embeddings_path: None,
+            resume_from_ms: None,
+        }))
+        .await;
+    assert_eq!(started, Err(noter_engine_client::CommandError::Unavailable));
+    assert!(
+        began.elapsed() < Duration::from_secs(30),
+        "{:?}",
+        began.elapsed()
+    );
+}

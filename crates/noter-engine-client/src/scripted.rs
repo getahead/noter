@@ -169,6 +169,9 @@ pub struct Behaviour {
     pub self_test_pace_ms: u64,
     /// A `self_test_line` with this text follows each stream that arrives.
     pub self_test_line: Option<String>,
+    /// Milliseconds (tokio time) a `start_session` waits for macOS's permission prompts before
+    /// its `ack` and `session_started`; `ping` is still answered meanwhile (#1167).
+    pub start_session_delay_ms: u64,
 }
 
 impl Default for Behaviour {
@@ -184,6 +187,7 @@ impl Default for Behaviour {
             raw_after_ready: Vec::new(),
             self_test_pace_ms: 0,
             self_test_line: None,
+            start_session_delay_ms: 0,
         }
     }
 }
@@ -775,13 +779,20 @@ async fn run(
             EngineCommand::StartSession(ref start)
                 if b.answer_capture_sessions && !scripted_start =>
             {
-                out.emit(ack).await;
-                out.emit(EngineEvent::SessionStarted {
+                let started = EngineEvent::SessionStarted {
                     call_id: start.call_id.clone(),
                     mic_device: "Scripted Microphone".into(),
                     output_device: "Scripted Speakers".into(),
-                })
-                .await;
+                };
+                if b.start_session_delay_ms > 0 {
+                    let at =
+                        Instant::now() + std::time::Duration::from_millis(b.start_session_delay_ms);
+                    due.push_back((at, ack));
+                    due.push_back((at, started));
+                } else {
+                    out.emit(ack).await;
+                    out.emit(started).await;
+                }
                 schedule(&mut steps, &script, &cmd, container.as_deref());
             }
             // @cpt-end:cpt-noter-algo-core-harness-scripted-engine:p1:inst-answer-session
