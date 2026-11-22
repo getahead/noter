@@ -10,7 +10,7 @@ import { find, rendered } from "../../ui/testing";
 import type { ModeView } from "../shell/mode-indicator";
 import { subscribeWhile } from "./call-window";
 import { CaptureNotice, ClosingState, type CaptureNoticeProps } from "./notice";
-import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type StripProps } from "./strip";
+import { CallStatusStrip, CollapsedCallStrip, LatencyLine, MoreMenu, PersonChip, RecordingIndicator, type StripProps } from "./strip";
 
 const mode: ModeView = { state: "CLOUD_REDACTED", warning: false } as ModeView;
 const speaker = (label: SpeakerView["label"]): SpeakerView => ({ id: "s", call_id: "c", label, channel: "mic", segment_count: 1, talk_ms: null, sample: null, suggestion: null, named_by: null });
@@ -27,6 +27,19 @@ describe("RecordingIndicator (cpt-noter-component-ui-recording-indicator)", () =
     expect(stopped).toContain("Stopped");
     expect(stopped).not.toContain("00:01:00");
     expect(renderToString(<RecordingIndicator variant="dot" status="paused" />)).toContain("is-paused");
+  });
+});
+
+describe("LatencyLine (cpt-noter-algo-ui-call-window-layout-content, #1162)", () => {
+  it("reads both delays in seconds, a dash before the first of a kind, and warns with its icon when either is over budget", () => {
+    expect(renderToString(<LatencyLine />)).toBe("");
+    const calm = renderToString(<LatencyLine hypothesis={{ ms: 1400, budget_ms: 2000 }} confirmed={{ ms: 3140, budget_ms: 4000 }} />);
+    expect(calm).toContain("Hypothesis 1.4 s · confirmed 3.1 s");
+    expect(calm).not.toContain("is-over");
+    expect(renderToString(<LatencyLine hypothesis={{ ms: 900, budget_ms: 2000 }} />)).toContain("Hypothesis 0.9 s · confirmed – s");
+    const late = renderToString(<LatencyLine hypothesis={{ ms: 1200, budget_ms: 2000 }} confirmed={{ ms: 4600, budget_ms: 4000 }} />);
+    expect(late).toContain("is-over");
+    expect(late).toContain('aria-label="Over budget"');
   });
 });
 

@@ -35,6 +35,11 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
       env.version += 1;
       publish("env:changed");
     }
+    if (sec.section === "call_screen") {
+      // as the core does: the call window, which cannot read the settings, gets Show latency and Text size in its state
+      Object.assign(fake.callWindow, { show_latency: sec.value.show_latency, text_size_pct: sec.value.text_size_pct });
+      publish("window:call");
+    }
     if (sec.section === "general") {
       world.app.setup.detection_enabled = sec.value.offer_to_record && world.app.setup.self_test.type === "passed";
       publish("setup:changed");

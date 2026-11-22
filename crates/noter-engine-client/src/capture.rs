@@ -199,6 +199,15 @@ impl<L: EngineLauncher> EngineClient<L> {
             .map_or(EngineSession::Idle, |s| s.state)
     }
 
+    /// Where `call_id`'s running session is now in call time, paused time left out (the timeline
+    /// of the engine's segments); `None` before its `session_started` or for another call.
+    pub fn call_offset(&self, call_id: &CallId) -> Option<OffsetMs> {
+        let s = self.shared();
+        let x = s.session.as_ref().filter(|x| x.running())?;
+        (x.start.call_id == *call_id && x.started_at.is_some())
+            .then(|| OffsetMs(x.offset(Instant::now())))
+    }
+
     /// Gaps and degraded states of the running session, next to [`EngineClient::events`].
     pub fn capture_facts(&self) -> broadcast::Receiver<CaptureFact> {
         self.inner.facts.subscribe()

@@ -35,7 +35,7 @@ function ownedDetail(d: Detail) {
 
 // Subscription and live-script fields are created at run time; fixture transcript data is exact.
 function ownedTranscript(t: Transcript) {
-  const { subscription_id: _s, live: _l, last_seq: _q, hypotheses: _h, ...rest } = t;
+  const { subscription_id: _s, live: _l, last_seq: _q, hypotheses: _h, hypothesis_lag: _hl, confirmed_lag: _cl, ...rest } = t;
   // A transcript subscription exposes speaker labels, while playable sample lookup belongs to
   // call_get's detail projection. Compare the shared snapshot fields without that detail-only
   // metadata; call_get below still checks samples against the persisted fixture rows.

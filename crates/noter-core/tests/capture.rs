@@ -2394,6 +2394,56 @@ async fn pausing_a_call_with_a_silence_notice_hides_it_until_resume() {
         .await;
 }
 
+/// `cpt-noter-algo-ui-call-window-layout-content` (#1162; no DESIGN story covers the latency line). A live line carries how far it trails the speech in the session's call
+/// time, against the PRD budget; a later snapshot carries the newest of each kind.
+#[tokio::test(start_paused = true)]
+async fn a_live_line_carries_its_lag_behind_the_speech() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let heard = r.subscribe_transcript(call_id.clone()).await;
+    r.pass(5_000).await;
+    let EngineEvent::Segment { segment: mut line } = segment(&call_id) else {
+        unreachable!()
+    };
+    line.state = noter_protocol::engine::EngineSegmentState::Hypothesis;
+    r.fact(EngineEvent::Segment {
+        segment: line.clone(),
+    });
+    r.pass(1_000).await;
+    line.state = noter_protocol::engine::EngineSegmentState::Confirmed;
+    r.fact(EngineEvent::Segment { segment: line });
+    r.pass(1_000).await;
+    let lags: Vec<_> = heard
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|e| match e {
+            TranscriptEvent::Hypothesis { lag, .. } | TranscriptEvent::Confirmed { lag, .. } => {
+                Some(lag.map(|l| (l.ms, l.budget_ms)))
+            }
+            _ => None,
+        })
+        .collect();
+    // The line ends 0.9 s into the call; the hypothesis arrives after 5 s or more of it, the
+    // confirmation a second later (plus its batch), each measured against its own budget.
+    let [Some((hypothesis, 2_000)), Some((confirmed, 4_000))] = lags[..] else {
+        panic!("{lags:?}")
+    };
+    assert!(hypothesis >= 4_100, "{lags:?}");
+    assert!(confirmed >= hypothesis + 1_000, "{lags:?}");
+    let snapshot = r
+        .core
+        .transcript_subscribe(
+            &main_window(),
+            TranscriptSubscribeArgs { call_id },
+            Sink::new(|_: TranscriptMsg| true),
+        )
+        .await
+        .unwrap();
+    assert_eq!(snapshot.hypothesis_lag.map(|l| l.ms), Some(hypothesis));
+    assert_eq!(snapshot.confirmed_lag.map(|l| l.ms), Some(confirmed));
+}
+
 #[tokio::test(start_paused = true)]
 async fn a_heard_segment_means_no_nothing_heard_notice() {
     let r = rig();

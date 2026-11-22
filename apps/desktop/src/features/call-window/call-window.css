@@ -68,6 +68,19 @@
 .cs-r1__people {
   gap: 10px;
 }
+.cw-latency {
+  gap: 4px;
+  color: var(--label-2);
+}
+.cw-latency.is-over {
+  color: var(--warning);
+}
+/* Settings › Text size (85–150 %, D57): the header and transcript text scale; the controls keep their size. */
+.cs-r1,
+.cs-r2,
+.fp-r5 {
+  zoom: var(--cw-text, 1);
+}
 .cs-title {
   white-space: nowrap;
   overflow: hidden;

@@ -572,3 +572,37 @@ test.describe("cpt-noter-flow-ui-dialogs-host-inline-confirm", () => {
     expect(await sent(page, "audio_delete_older")).toHaveLength(0);
   });
 });
+
+// #1162, #1163: no DESIGN story covers the latency line (DESIGN CS-R1, **Hypothesis 1.4 s · confirmed 3.1 s**) or the call
+// screen's Text size (D57); the FEATURE algorithm that lays out CS-R1 and CS-R2 is the closest real ID (spec gap noted in both issues).
+test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
+  test("Show latency draws the measured delays in CS-R1, and Text size scales the header and transcript", async ({ page }) => {
+    const latency = page.getByTestId("latency-line");
+    const shown = /^Hypothesis \d+(\.\d)? s · confirmed \d+(\.\d)? s$/;
+    if (FAKE) {
+      // The fake core cannot start a capture from steering: its live call's snapshot carries the world's 1.4 s and 3.1 s.
+      // No scripted lines, so the line stays at the snapshot's values.
+      await startLive(page, (w) => (still(w), void Object.assign(w.settings.call_screen, { show_latency: true, text_size_pct: 150 })));
+      await expect(dedicated(page)).toBeVisible();
+      await expect(latency).toHaveText("Hypothesis 1.4 s · confirmed 3.1 s");
+      await expect(transcript(page)).toHaveCSS("zoom", "1.5");
+      return;
+    }
+    // A capture started here, so the engine runs a session the core measures against (the fixture's live call is seeded without one).
+    const steer = await startLive(page, W.idle);
+    const s = (await steer.invoke("settings_get", {}, "settings")) as { rev: number; call_screen: Record<string, unknown> };
+    await steer.invoke("settings_update", { rev: s.rev, section: { section: "call_screen", value: { ...s.call_screen, show_latency: true, text_size_pct: 150 } } }, "settings");
+    const started = await steer.captureStart();
+    await steer.invoke("window_show_call", {}, "call-screen");
+    await expect(dedicated(page)).toBeVisible();
+    await expect(transcript(page)).toHaveCSS("zoom", "1.5");
+    await expect(strip(page)).toHaveCSS("zoom", "1"); // the controls keep their size
+    await expect(latency).toHaveCount(0); // nothing measured yet
+    const spoken = { call_id: started.call_id, channel: "sys", speaker: { speaker_id: "spk_lat", label: { type: "unnamed", n: 1 } }, crosstalk_with: [], t0_ms: 0, t1_ms: 100, lang: "en", lang_p: 0.9, confidence: 0.9, pass: "live", corrections: [] };
+    await steer.push("transcript_subscribe", { event: { type: "hypothesis", segment: { ...spoken, id: "eng_lat", text: "Latency…", state: "hypothesis" } } } as never);
+    await steer.push("transcript_subscribe", { event: { type: "confirmed", segment: { ...spoken, id: "eng_lat", text: "Latency line.", state: "confirmed" } } } as never);
+    await expect(transcript(page)).toContainText("Latency line.");
+    await expect(latency).toHaveText(shown); // measured by the core against the session's call time
+    await expect(header(page)).toHaveCSS("zoom", "1.5");
+  });
+});

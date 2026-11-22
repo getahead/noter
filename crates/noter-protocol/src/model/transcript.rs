@@ -154,6 +154,24 @@ pub struct TranscriptSnapshot {
     pub speakers: Vec<SpeakerView>,
     pub last_seq: Seq,
     pub audio_available: bool,
+    /// The newest lag of a hypothesis and of a confirmed line while the call is live (the call
+    /// screen's latency line); `null` before the first one and for a call that is not live.
+    #[serde(default)]
+    #[specta(optional)]
+    pub hypothesis_lag: Option<Lag>,
+    #[serde(default)]
+    #[specta(optional)]
+    pub confirmed_lag: Option<Lag>,
+}
+
+/// How far a live line trails the speech it shows: call time when the core took the line from
+/// the engine (confirmed: when it published it) minus the line's end, against the PRD budget
+/// (PRD › Success metrics: hypothesis ≤ 2 s, confirmed ≤ 4 s, provisional). Over budget when
+/// `ms > budget_ms`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct Lag {
+    pub ms: u32,
+    pub budget_ms: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -174,10 +192,17 @@ pub enum TranscriptEvent {
     /// Replace the current hypothesis of `segment.channel`.
     Hypothesis {
         segment: SegmentView,
+        /// `null` when the core cannot place the line in call time (no running session).
+        #[serde(default)]
+        #[specta(optional)]
+        lag: Option<Lag>,
     },
     /// Append; removes the hypothesis it confirms.
     Confirmed {
         segment: SegmentView,
+        #[serde(default)]
+        #[specta(optional)]
+        lag: Option<Lag>,
     },
     /// A correction changed confirmed rows (term fix, rename): replace by id.
     SegmentsUpdated {

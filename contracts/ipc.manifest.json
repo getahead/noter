@@ -2223,7 +2223,7 @@
       ]
     }
   ],
-  "contract_version": "2.24",
+  "contract_version": "2.25",
   "default_retryable": [
     "not_ready",
     "internal",

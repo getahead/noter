@@ -344,6 +344,19 @@ describe("stream flush", () => {
     expect(out.gaps).toHaveLength(1);
   });
 
+  // cpt-noter-algo-ui-call-window-layout-content (#1162): the newest lag of each kind stays for the latency line.
+  it("transcript: keeps the newest hypothesis and confirmed lag; a line without one keeps the last", () => {
+    const lag = (ms: number, budget_ms: number) => ({ ms, budget_ms });
+    const out = reduceStream("transcript_subscribe", transcript(), [
+      { seq: 1, event: { type: "hypothesis", segment: seg("h1", "mic", 1000, "hel"), lag: lag(1400, 2000) } },
+      { seq: 2, event: { type: "confirmed", segment: seg("b", "mic", 1000, "hello"), lag: lag(3100, 4000) } },
+      { seq: 3, event: { type: "hypothesis", segment: seg("h2", "sys", 1000, "hi"), lag: null } },
+      { seq: 4, event: { type: "confirmed", segment: seg("c", "sys", 2000, "hi there") } },
+    ]);
+    expect(out.hypothesis_lag).toEqual(lag(1400, 2000));
+    expect(out.confirmed_lag).toEqual(lag(3100, 4000));
+  });
+
   it("levels: keeps only the newest message", () => {
     const out = reduceStream(
       "levels_subscribe",

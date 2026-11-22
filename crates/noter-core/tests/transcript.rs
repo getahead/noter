@@ -208,7 +208,7 @@ async fn a_hypothesis_is_streamed_and_never_stored() {
     let heard = events(&got);
     assert_eq!(heard.len(), 2);
     assert!(
-        matches!(&heard[1], TranscriptEvent::Hypothesis { segment } if segment.text == "hello" && segment.state == SegmentState::Hypothesis)
+        matches!(&heard[1], TranscriptEvent::Hypothesis { segment, .. } if segment.text == "hello" && segment.state == SegmentState::Hypothesis)
     );
     assert!(stored(&r.core, "SELECT id FROM segments").is_empty());
     // A window that arrives now sees the one current hypothesis and its speaker.
@@ -256,7 +256,7 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
     let first = events(&got)
         .into_iter()
         .find_map(|e| match e {
-            TranscriptEvent::Confirmed { segment } => Some(segment),
+            TranscriptEvent::Confirmed { segment, .. } => Some(segment),
             _ => None,
         })
         .unwrap();
@@ -305,7 +305,8 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
     let later: Vec<_> = heard
         .iter()
         .filter_map(|e| match e {
-            TranscriptEvent::Hypothesis { segment } | TranscriptEvent::Confirmed { segment }
+            TranscriptEvent::Hypothesis { segment, .. }
+            | TranscriptEvent::Confirmed { segment, .. }
                 if segment.t0_ms == OffsetMs(1000) =>
             {
                 Some(segment)
@@ -319,7 +320,7 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
         assert_eq!(segment.speaker.label, named.label);
     }
     assert!(heard.iter().any(|e| matches!(e,
-        TranscriptEvent::Confirmed { segment }
+        TranscriptEvent::Confirmed { segment, .. }
             if segment.t0_ms == OffsetMs(2000)
                 && matches!(segment.speaker.label, SpeakerLabel::Unnamed { n: 2 })
     )));
@@ -341,7 +342,7 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
         .inject(confirmed(AudioChannel::Sys, "spk_0", 3000, "after undo"));
     settle(500).await;
     assert!(events(&got).iter().any(|e| matches!(e,
-        TranscriptEvent::Confirmed { segment }
+        TranscriptEvent::Confirmed { segment, .. }
             if segment.speaker.speaker_id == first.speaker.speaker_id
                 && segment.speaker.label == first.speaker.label
     )));
@@ -371,7 +372,7 @@ async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {
     ));
     settle(500).await;
     assert!(events(&got).iter().any(|e| matches!(e,
-        TranscriptEvent::Confirmed { segment }
+        TranscriptEvent::Confirmed { segment, .. }
             if segment.speaker.speaker_id == first.speaker.speaker_id
                 && segment.speaker.label == first.speaker.label
     )));
@@ -408,7 +409,7 @@ async fn confirmed_segments_commit_in_one_batch_and_publish_after_it() {
     let texts: Vec<_> = events(&got)
         .iter()
         .filter_map(|e| match e {
-            TranscriptEvent::Confirmed { segment } => Some(segment.text.clone()),
+            TranscriptEvent::Confirmed { segment, .. } => Some(segment.text.clone()),
             _ => None,
         })
         .collect();
@@ -633,7 +634,7 @@ async fn call_finalization_waits_for_an_in_flight_batch_commit_and_publish() {
     finalizer.join().unwrap();
 
     assert!(events(&got).iter().any(
-        |event| matches!(event, TranscriptEvent::Confirmed { segment } if segment.text == "the final line")
+        |event| matches!(event, TranscriptEvent::Confirmed { segment, .. } if segment.text == "the final line")
     ));
     let file = dir.path().join("audio/call_live/transcript.jsonl");
     let lines: Vec<_> = std::fs::read_to_string(file)
@@ -664,7 +665,7 @@ async fn stopping_commits_the_last_batch_writes_the_file_and_ends_streams() {
     settle(10).await;
     let heard = events(&got);
     assert!(
-        matches!(&heard[0], TranscriptEvent::Confirmed { segment } if segment.text == "last words")
+        matches!(&heard[0], TranscriptEvent::Confirmed { segment, .. } if segment.text == "last words")
     );
     assert_eq!(
         heard[1],

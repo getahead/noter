@@ -163,6 +163,24 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(page).toContain("Speaker 3");
   });
 
+  // cpt-noter-algo-ui-call-window-layout-content (#1162, #1163): the latency line only while Show latency is on; Text size scales the text.
+  it("draws the latency line while Show latency is on and scales the text by Text size", async () => {
+    await open();
+    await bridge!.subscribe("transcript_subscribe", live);
+    expect(html()).not.toContain("latency-line");
+    expect(html()).toContain("--cw-text:1");
+    await bridge!.close();
+    await open();
+    // Settings › Call Screen & Menu Bar changed: the call window hears it as window:call
+    Object.assign(fake.world.settings.call_screen, { show_latency: true, text_size_pct: 150 });
+    await fake.invoke("window_call_state", {});
+    fake.publish("window:call");
+    await bridge!.subscribe("transcript_subscribe", live);
+    const page = html();
+    expect(page).toContain("Hypothesis 1.4 s · confirmed 3.1 s");
+    expect(page).toContain("--cw-text:1.5");
+  });
+
   it("wires the live speaker chip to its first transcript line", async () => {
     await open({ phase: "recording", call_id: "call_live" });
     await bridge!.subscribe("transcript_subscribe", live);

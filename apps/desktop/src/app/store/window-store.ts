@@ -400,6 +400,7 @@ function flushTranscript(
         t.hypotheses = t.hypotheses.filter(
           (h) => h.channel !== e.segment.channel,
         );
+        t.confirmed_lag = e.lag ?? t.confirmed_lag;
         break;
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-confirmed
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-hypothesis
@@ -408,6 +409,7 @@ function flushTranscript(
           ...t.hypotheses.filter((h) => h.channel !== e.segment.channel),
           e.segment,
         ];
+        t.hypothesis_lag = e.lag ?? t.hypothesis_lag;
         break;
       // @cpt-end:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-hypothesis
       // @cpt-begin:cpt-noter-algo-ui-core-bridge-flush-buffer:p1:inst-case-updated

@@ -624,11 +624,11 @@ impl Harness {
             let event: TranscriptEvent =
                 serde_json::from_value(body).map_err(|e| bad(&e.to_string()))?;
             let segment = match event {
-                TranscriptEvent::Hypothesis { segment } => {
+                TranscriptEvent::Hypothesis { segment, .. } => {
                     self.remember_line(&segment, false);
                     engine_segment(&segment, EngineSegmentState::Hypothesis)
                 }
-                TranscriptEvent::Confirmed { segment } => {
+                TranscriptEvent::Confirmed { segment, .. } => {
                     self.remember_line(&segment, true);
                     engine_segment(&segment, EngineSegmentState::Confirmed)
                 }

@@ -154,7 +154,7 @@ export class FakeCore implements Transport {
     this.handlers = { ...createDefaultHandlers(this), ...opts.handlers };
     const cap = this.world.app.capture;
     this.playback = { version: 1, playing: false, call_id: null, position_ms: 0, to_ms: null, route: cap.output_route, stopped_reason: null };
-    this.callWindow = { version: 1, visible: cap.phase === "recording", key: false, layout: "dedicated", collapsed: false, display_id: this.world.settings.call_screen.display_id ?? null, chosen_display_missing: false, show_share_warning: false };
+    this.callWindow = { version: 1, visible: cap.phase === "recording", key: false, layout: "dedicated", collapsed: false, display_id: this.world.settings.call_screen.display_id ?? null, chosen_display_missing: false, show_share_warning: false, show_latency: this.world.settings.call_screen.show_latency, text_size_pct: this.world.settings.call_screen.text_size_pct };
   }
 
   /** The next self-test Channel stays open for manually injected scenario events. */

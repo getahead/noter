@@ -19,6 +19,7 @@ use noter_core::{
 use noter_protocol::ipc::{event_names, Caller, CommandCtx, CoreApi, NativeSurface};
 use noter_protocol::model::*;
 use noter_protocol::*;
+use serde_json::json;
 
 /// What the core asked of the native layer, in order.
 #[derive(Default)]
@@ -214,6 +215,41 @@ async fn the_call_window_shows_without_focus_then_takes_it_and_hides() {
         core.window_call_state(&main, NoArgs {}).await.unwrap(),
         hidden
     );
+}
+
+// cpt-noter-algo-ui-call-window-layout-content (#1162, #1163): Show latency and Text size reach the
+// call window, which cannot read the settings, through its own state, and nothing moves the window.
+#[tokio::test]
+async fn show_latency_and_text_size_reach_the_call_window_state() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events, rec) = open(dir.path());
+    let call = window(WindowLabel::CallScreen);
+    let before = core.window_call_state(&call, NoArgs {}).await.unwrap();
+    assert_eq!((before.show_latency, before.text_size_pct), (false, 100));
+    rec.take();
+    events.named(event_names::WINDOW_CALL);
+    let ctx = window(WindowLabel::Settings);
+    let stored = core.settings_get(&ctx, NoArgs {}).await.unwrap();
+    let mut call_screen = stored.call_screen;
+    (call_screen.show_latency, call_screen.text_size_pct) = (true, 130);
+    let args = SettingsUpdateArgs {
+        rev: stored.rev,
+        section: SettingsSection::CallScreen(call_screen),
+    };
+    core.settings_update(&ctx, args).await.unwrap();
+    let sent = events.named(event_names::WINDOW_CALL);
+    assert_eq!(sent.len(), 1);
+    assert_eq!(
+        (
+            sent[0]["show_latency"].clone(),
+            sent[0]["text_size_pct"].clone()
+        ),
+        (json!(true), json!(130))
+    );
+    assert_eq!(sent[0]["layout"], json!(before.layout));
+    assert!(rec.take().is_empty(), "nothing is placed again");
+    let after = core.window_call_state(&call, NoArgs {}).await.unwrap();
+    assert_eq!((after.show_latency, after.text_size_pct), (true, 130));
 }
 
 // cpt-noter-seq-call-screen-name-speaker: each rename can reclaim native focus.

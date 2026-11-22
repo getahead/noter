@@ -51,6 +51,8 @@ impl Default for Windows {
                 display_id: None,
                 chosen_display_missing: false,
                 show_share_warning: false,
+                show_latency: false,
+                text_size_pct: default_text_size_pct(),
             },
             was_visible: false,
             warned: false,
@@ -224,8 +226,19 @@ impl Core {
 
     /// At start the state takes the placement without announcing it.
     pub(crate) fn init_call_window(&self) {
-        let placement = self.placement_for(&self.call_screen_now());
-        Self::set_placement(&mut lock(&self.windows), &placement);
+        let call_screen = self.call_screen_now();
+        let placement = self.placement_for(&call_screen);
+        let mut w = lock(&self.windows);
+        Self::set_placement(&mut w, &placement);
+        Self::set_text(&mut w, &call_screen);
+    }
+
+    /// Takes **Show latency** and **Text size** into the call window's state; `true` when they changed.
+    fn set_text(w: &mut Windows, call_screen: &CallScreenSettings) -> bool {
+        let text = (call_screen.show_latency, call_screen.text_size_pct);
+        let changed = (w.call.show_latency, w.call.text_size_pct) != text;
+        (w.call.show_latency, w.call.text_size_pct) = text;
+        changed
     }
 
     /// The state's layout and display follow the displays and settings even while the window is
@@ -284,16 +297,20 @@ impl Core {
         let placement = self.placement_for(call_screen);
         // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-read-displays
         let mut w = lock(&self.windows);
-        if placement_of(&w.call) == placement {
+        let moved = placement_of(&w.call) != placement;
+        let text = Self::set_text(&mut w, call_screen);
+        if !moved && !text {
             return;
         }
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-replace
-        Self::set_placement(&mut w, &placement);
-        if w.call.visible {
-            Self::warn_if_first_floating(&mut w);
-            self.deps
-                .surfaces
-                .place_call_window(&placement, w.call.collapsed);
+        if moved {
+            Self::set_placement(&mut w, &placement);
+            if w.call.visible {
+                Self::warn_if_first_floating(&mut w);
+                self.deps
+                    .surfaces
+                    .place_call_window(&placement, w.call.collapsed);
+            }
         }
         // @cpt-end:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-replace
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-display-change:p1:inst-emit-displays

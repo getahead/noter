@@ -217,6 +217,10 @@ fn backend_ref() -> CallRef {
     )
 }
 
+fn lag(ms: u32, budget_ms: u32) -> Lag {
+    Lag { ms, budget_ms }
+}
+
 fn span(call: &str, t0_s: u32, t1_s: u32) -> TimeSpan {
     TimeSpan {
         call_id: CallId(s(call)),
@@ -911,6 +915,9 @@ pub fn world() -> FakeWorld {
         speakers: speakers.clone(),
         last_seq: Seq(42),
         audio_available: true,
+        // DESIGN CS-R1: **Hypothesis 1.4 s · confirmed 3.1 s**.
+        hypothesis_lag: Some(lag(1_400, 2_000)),
+        confirmed_lag: Some(lag(3_100, 4_000)),
     };
 
     // The past call as the Library and the call page read it back: an archive-pass transcript,
@@ -996,6 +1003,8 @@ pub fn world() -> FakeWorld {
         // The last sequence number the call's stream reached before it stopped.
         last_seq: Seq(17),
         audio_available: true,
+        hypothesis_lag: None,
+        confirmed_lag: None,
     };
 
     let mut confirmed = hypothesis.clone();
@@ -1005,10 +1014,15 @@ pub fn world() -> FakeWorld {
     confirmed.confidence = 0.93;
     let live_script = vec![
         TranscriptEvent::Hypothesis {
+            lag: Some(lag(1_300, 2_000)),
             segment: hypothesis.clone(),
         },
-        TranscriptEvent::Confirmed { segment: confirmed },
+        TranscriptEvent::Confirmed {
+            lag: Some(lag(2_900, 4_000)),
+            segment: confirmed,
+        },
         TranscriptEvent::Hypothesis {
+            lag: Some(lag(1_200, 2_000)),
             segment: seg(
                 10,
                 named("spk_anna", "per_anna"),
@@ -1021,6 +1035,7 @@ pub fn world() -> FakeWorld {
             ),
         },
         TranscriptEvent::Confirmed {
+            lag: Some(lag(4_600, 4_000)),
             segment: seg(
                 10,
                 named("spk_anna", "per_anna"),

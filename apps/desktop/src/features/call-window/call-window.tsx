@@ -4,7 +4,7 @@
 // keys the panel and sends `window:call`; the window renders the layout it names and sends wanted state.
 import "./call-window.css";
 
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 
 import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
@@ -24,7 +24,7 @@ import { MODE_MSG } from "../shell/mode-indicator-view";
 import { leaveTimer, tickWhile } from "../shell/shell-effects";
 import { captureAnnouncements, captureView, closingTitle, degradedBanners, failureAnnouncements, indicatorStatus, layoutRegions, layoutState, pausedMinutes, stopped, windowState, type BannerHandlers, type Seen } from "./model";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
-import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
+import { CallStatusStrip, CollapsedCallStrip, LatencyLine, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
 import { TranscriptBar, TranscriptLog, useTranscript } from "../transcript/hosts";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 
@@ -499,6 +499,9 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                     ))}
                     {/* @cpt-end:cpt-noter-flow-ui-speakers-live-name:p1:inst-open */}
                   </div>
+                  {/* @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-dedicated-regions */}
+                  {cw.show_latency && <LatencyLine hypothesis={tr.data?.hypothesis_lag} confirmed={tr.data?.confirmed_lag} />}
+                  {/* @cpt-end:cpt-noter-algo-ui-call-window-layout-content:p1:inst-dedicated-regions */}
                 </header>
                 {regions.has("CS-R3") && (
                   <div className="cs-r3" data-region="CS-R3">
@@ -605,6 +608,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
       data-component="cpt-noter-component-shell-call-window"
       data-variant={layout.toLowerCase()}
       data-state={view.toLowerCase().replace(/_/g, "-")}
+      style={{ "--cw-text": (cw.text_size_pct ?? 100) / 100 } as CSSProperties}
     >
       {body}
     </div>
