@@ -210,6 +210,9 @@ export const en = {
     "Replay and the archive pass are not available",
   "first_run.storage.hint":
     "You can change this later in Settings › Privacy › Audio retention.",
+  "first_run.storage.login": "Launch Noter at login",
+  "first_run.storage.login_hint":
+    "Noter waits in the menu bar so it can offer to record when a call starts. You can change this later in Settings › General.",
   "first_run.assistants.title": "Assistants",
   "first_run.assistants.body":
     "Summaries, cards and answers come from an assistant. Add an API key, sign in with your own Claude or ChatGPT account, use a local model, or combine them. Keys go to the Keychain.",

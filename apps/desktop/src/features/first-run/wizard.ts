@@ -75,6 +75,8 @@ export interface WizardState {
   display: DisplayId | null;
   autoOpen: boolean;
   retention: AudioRetention;
+  /** Settings › General › Launch at login; the core registers it only once setup finishes (issue 1161). */
+  launchAtLogin: boolean;
   privacy: PrivacyMode;
   modelsAnnounced: boolean;
 }
@@ -103,6 +105,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     display: status0.call_display,
     autoOpen: true,
     retention: "days30",
+    launchAtLogin: true,
     privacy: "cloud_redacted",
     modelsAnnounced: allReady(status0.models.bundles),
   }));
@@ -189,7 +192,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     const s = await settingsNow();
     if (!s || mine !== generation) return; // refused, or the window's wizard was stopped meanwhile
     confirmedPrivacy = s.privacy.mode;
-    const stored = { autoOpen: s.call_screen.open_automatically, retention: s.audio.retention, privacy: s.privacy.mode };
+    const stored = { autoOpen: s.call_screen.open_automatically, retention: s.audio.retention, launchAtLogin: s.general.launch_at_login, privacy: s.privacy.mode };
     set((w) => ({
       loaded: true,
       ...Object.fromEntries(Object.entries(stored).filter(([k]) => !edited.has(k))),
@@ -241,7 +244,9 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-audio-storage
       const args = { never_store_audio: s.retention === "never_store", retention: s.retention };
       const res = await send("setup_set_audio_storage", "setup_set_audio_storage", () => bridge.core.setupSetAudioStorage(args), { slice: "setup" });
-      return res.status === "ok";
+      const now = await settingsNow();
+      if (res.status !== "ok" || !now) return false;
+      return now.general.launch_at_login === s.launchAtLogin || saveSettings({ section: "general", value: { ...now.general, launch_at_login: s.launchAtLogin } });
       // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-audio-storage
     }
     return true;
@@ -363,7 +368,7 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
       refreshSelfTest();
     },
     runTest,
-    choose: (patch: Partial<Pick<WizardState, "display" | "autoOpen" | "retention">>) => {
+    choose: (patch: Partial<Pick<WizardState, "display" | "autoOpen" | "retention" | "launchAtLogin">>) => {
       Object.keys(patch).forEach((k) => edited.add(k));
       set(patch);
     },

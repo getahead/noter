@@ -937,6 +937,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .fr-st__clip { display: flex; align-items: center; gap: 10px; }
 .fr-st__hint { font-size: 11px; color: var(--label-3); line-height: 14px; }
 .fr-row { display: flex; align-items: center; gap: 10px; }
+.fr-row--login { margin-top: 16px; }
 .fr-dp { display: grid; gap: 14px; }
 .fr-dp__draw { position: relative; height: 132px; width: 384px; max-width: 100%; }
 .fr-dp__screen { position: absolute; border: 1px solid var(--ctrl-border-soft); border-radius: var(--r-control); background: var(--sel-unemph); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--label-2); cursor: pointer; padding: 4px; }
@@ -4298,7 +4299,9 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
           { value: '7', label: '7 days' }, { value: '90', label: '90 days' }, { value: 'forever', label: 'Forever' },
           { value: 'never', label: 'Never store audio', note: 'Replay and the archive pass are not available' },
         ], L.retention, { label: 'Audio retention', bind: 'local.firstrun.retention' })}
-        <p class="fr-hint">You can change this later in Settings › Privacy › Audio retention.</p>`;
+        <p class="fr-hint">You can change this later in Settings › Privacy › Audio retention.</p>
+        <div class="fr-row fr-row--login">${P.checkbox('Launch Noter at login', L.launchAtLogin !== false, { id: 'fr-login', bind: 'local.firstrun.launchAtLogin' })}</div>
+        <p class="fr-hint">Noter waits in the menu bar so it can offer to record when a call starts. You can change this later in Settings › General.</p>`;
       default: {
         const noAssist = L.ollama === 'missing' && L.keyState.anthropic !== 'stored' && L.keyState.codex !== 'stored' && !(NP.auth && (NP.auth.signedIn('claude') || NP.auth.signedIn('chatgpt')));
         return html`${title('Assistants')}
