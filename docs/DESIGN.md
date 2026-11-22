@@ -3787,6 +3787,8 @@ The menu bar extra and notifications are native and use no WebView primitives (i
 
 ##### Anatomy and variants
 
+**App icon.** The approved *Voice to note* mark is a dark transcript page on a mint tile. Its waveform becomes the first line of text, and the last line is shorter. Finder, the Dock, the app switcher, About, native alerts (AL) and notification banners (NT) use the bundled macOS icon. The record prompt (RP-R1) shows the same artwork decoratively beside the source name. The editable master is [icon.svg](../apps/desktop/src-tauri/icons/icon.svg).
+
 **Typography.** The system font (SF Pro Text and Display, which cover Cyrillic) for all text, and SF Mono for prompts, paths and key caps. Clocks, timestamps, durations and metrics use tabular figures. The minimum size is 11 pt, except key caps at 10 pt. Body line height is at least 1.35, so Cyrillic and German diacritics never clip. The two call-screen styles scale with the call screen's text size, 85 to 150 % (D57).
 
 | Style | Size on line height | Weight | Used for |

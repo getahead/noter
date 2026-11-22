@@ -8,6 +8,7 @@ vi.mock("react", async (importOriginal) => {
   return { ...react, useEffect: (effect: () => void) => void effects.push(effect) };
 });
 
+import appIcon from "../../../src-tauri/icons/icon.png";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CaptureNotice } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -57,6 +58,8 @@ describe("Default", () => {
     const out = html();
     expect(out).toContain('data-variant="default"');
     expect(out).toContain('data-state="default"');
+    const icon = find(rendered(RecordPrompt, { bridge }), (props) => props.src === appIcon);
+    expect(icon.props.alt).toBe("");
     for (const s of ["Record this call?", "Microsoft Teams is using the microphone", "Record as Sensitive", "⌃⌥⌘R", 'data-region="RP-R1"', 'data-region="RP-R3"']) expect(out).toContain(s);
   });
 

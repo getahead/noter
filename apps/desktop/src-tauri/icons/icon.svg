@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 256 256">
+  <title>Voice to note</title>
+  <desc>A waveform settles into the first line on a transcript page.</desc>
+  <defs>
+    <path id="tile" d="M75 16 H181 C204 16 215 18 225 28 C235 38 240 50 240 75 V181 C240 205 237 217 226 227 C216 237 204 240 181 240 H75 C51 240 40 237 29 227 C19 217 16 205 16 181 V75 C16 51 19 39 29 29 C39 19 51 16 75 16 Z"/>
+    <clipPath id="clip">
+      <use xlink:href="#tile"/>
+    </clipPath>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="210%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.6"/>
+    </filter>
+    <filter id="lift" x="-50%" y="-50%" width="200%" height="210%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="3.3"/>
+    </filter>
+    <linearGradient id="rim" x1="0%" y1="0%" x2="65%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="30%" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="62%" stop-color="#ffffff" stop-opacity="0.03"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="base" x1="4%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#cefeea" stop-opacity="1"/>
+      <stop offset="37%" stop-color="#9bebdc" stop-opacity="1"/>
+      <stop offset="72%" stop-color="#58c6c4" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#32aab4" stop-opacity="1"/>
+    </linearGradient>
+    <radialGradient id="topLight" cx="5%" cy="4%" r="95%">
+      <stop stop-color="#f3ffe7" stop-opacity="0.68"/>
+      <stop offset="1" stop-color="#f3ffe7" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="paper" x1="0%" y1="0%" x2="87%" y2="100%">
+      <stop offset="0%" stop-color="#175765" stop-opacity="1"/>
+      <stop offset="44%" stop-color="#104651" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#082e43" stop-opacity="1"/>
+    </linearGradient>
+    <linearGradient id="voice" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#9bfbd8" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#defff0" stop-opacity="1"/>
+    </linearGradient>
+    <rect id="sheet" x="63" y="58" width="130" height="144" rx="23"/>
+    <linearGradient id="edge" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.6"/>
+      <stop offset="45%" stop-color="#9cfff2" stop-opacity="0.17"/>
+      <stop offset="100%" stop-color="#345c5f" stop-opacity="0.04"/>
+    </linearGradient>
+  </defs>
+  <use xlink:href="#tile" fill="#15212b" opacity=".24" transform="translate(0 2)" filter="url(#shadow)"/>
+  <g clip-path="url(#clip)">
+    <use xlink:href="#tile" fill="url(#base)"/>
+    <use xlink:href="#tile" fill="url(#topLight)"/>
+    <use xlink:href="#tile" fill="none" stroke="url(#rim)" stroke-width="2"/>
+  </g>
+  <g transform="rotate(-5 128 128)">
+    <use xlink:href="#sheet" fill="#065562" opacity=".28" transform="translate(0 3)" filter="url(#lift)"/>
+    <use xlink:href="#sheet" fill="url(#paper)"/>
+    <use xlink:href="#sheet" fill="none" stroke="url(#edge)" stroke-width="1.4"/>
+    <path d="M85 101v6 M97 91v26 M109 85v38 M121 96v16 M133 101v3h36" fill="none" stroke="url(#voice)" stroke-width="7.7" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M86 135h83 M86 157h48" fill="none" stroke="#e2fff8" stroke-width="9" stroke-linecap="round"/>
+  </g>
+</svg>

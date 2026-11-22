@@ -4,7 +4,7 @@
 @media (prefers-reduced-motion: reduce) { .rp-panel { transition: none; } }
 .rp-r1 { display: flex; align-items: flex-start; gap: 10px; }
 .rp-r1__text { flex: 1 1 auto; min-width: 0; display: grid; gap: 3px; }
-.rp-appicon { width: 32px; height: 32px; border-radius: var(--r-row); background: var(--sel-accent); color: var(--accent-text); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.rp-appicon { flex: none; }
 .rp-title { font: 600 13px/18px var(--font); }
 .rp-sub { color: var(--label-2); font-size: 12px; line-height: 16px; }
 .rp-r3 { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
