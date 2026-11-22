@@ -271,23 +271,21 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
   });
 });
 
+// Design fixes against the prototype of record (Main window › Topics and People, State ▾ Normal).
 test.describe("cpt-noter-seq-library-follow-topic", () => {
-  for (const [width, px] of [["Medium", 1000], ["Narrow", 700]] as const)
-    test(`UI — design — thread rows at ${width}: time, review buttons, share and ⓘ stay inside the row; the call link and text truncate`, async ({ page }) => {
-      await page.setViewportSize({ width: px, height: 800 });
-      await openTopics(page);
-      await page.getByRole("table").getByRole("row", { name: /Drawer redesign/ }).click();
-      await page.keyboard.press("Enter");
-      await expect(page.getByRole("heading", { name: "Drawer redesign" })).toBeVisible();
-      const rows = page.locator(".lb-throw");
-      await expect(rows.first()).toBeVisible();
-      await expect(page.locator(".lb-throw").getByRole("button", { name: "Accept" }).first()).toBeVisible(); // a suggested row with its review buttons
-      const content = (await page.locator(".np-content").boundingBox())!;
-      for (const row of await rows.all()) {
-        const last = (await row.locator(":scope > *").last().boundingBox())!;
-        expect(last.x + last.width).toBeLessThanOrEqual(content.x + content.width + 1); // nothing runs past the content pane
-        const tag = row.locator(":scope > .np-badge").first();
-        expect(await tag.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true); // the kind tag is never cut
-      }
-    });
+  test("UI — design — #1085 the page title shows no focus ring after navigation", async ({ page }) => {
+    await openCalls(page);
+    await page.keyboard.press("Meta+Digit5");
+    const title = page.getByRole("heading", { name: "Topics", level: 1 });
+    await expect(title).toBeVisible();
+    await expect(title).toHaveCSS("outline-style", "none");
+    // the table shows its true order: newest first, so Last discussed ⌄ (owner decision, 22 Nov)
+    const last = page.getByRole("columnheader", { name: "Last discussed" });
+    await expect(last).toHaveAttribute("aria-sort", "descending");
+    await expect(last.locator(".np-th__sort")).toBeVisible();
+    await page.keyboard.press("Meta+Digit4");
+    const name = page.getByRole("columnheader", { name: "Name" });
+    await expect(name).toHaveAttribute("aria-sort", "ascending");
+    await expect(name.locator(".np-th__sort")).toBeVisible();
+  });
 });

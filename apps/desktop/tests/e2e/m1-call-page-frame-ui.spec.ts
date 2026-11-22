@@ -425,3 +425,24 @@ test.describe("cpt-noter-seq-notifications-allow-notifications", () => {
     await expect(banner(page)).toHaveCount(0);
   });
 });
+
+// Design fixes against the prototype of record (Call page, Planning: VHI 8.0 drawer redesign, State ▾ Normal).
+test.describe("cpt-noter-seq-today-review-before-call", () => {
+  test("UI — design — #1081 the subtitle and Call info's When use the short date with no year and no 'at'", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet(), fixedClock: true });
+    await openCall(page);
+    const sub = toolbar(page).locator(".np-toolbar__sub");
+    await expect(sub).toHaveText(/^(Today \d{2}:\d{2}|[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2} \d{2}:\d{2}) · 52 min · /);
+    await expect(sub).not.toHaveText(/\b20\d\d\b| at /);
+    const when = info(page).locator("dt", { hasText: /^When$/ }).locator("xpath=following-sibling::dd[1]");
+    await expect(when).toHaveText(/^(Today|[A-Z][a-z]{2}, [A-Z][a-z]{2} \d{1,2}) · \d{2}:\d{2}$/);
+  });
+  test("UI — design — #1082 Call info has a visible × that closes it, and its languages are language tags", async ({ page }) => {
+    await openWindow(page, "main", { world: quiet() });
+    await openCall(page);
+    const languages = info(page).locator("dt", { hasText: /^Languages$/ }).locator("xpath=following-sibling::dd[1]");
+    await expect(languages.locator('[data-component="cpt-noter-component-ui-language-tag"]').first()).toBeVisible();
+    await page.locator('[data-region="MW-R4"]').getByRole("button", { name: "Close Inspector" }).click({ timeout: 3000 });
+    await expect(info(page)).toHaveCount(0);
+  });
+});

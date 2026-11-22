@@ -2,7 +2,7 @@
 // subtitle and the Call info rows. Nothing here reads the store or draws.
 import type { CommandState } from "../../app/store/window-store";
 import type { CallPageTab, CallRow, TimeSpan, UiPrefs } from "../../core/bindings";
-import { clock, dayOf, duration, formatDateTime, shortDay, t } from "../../i18n/format";
+import { clock, dayOf, duration, shortDay, t, zoned } from "../../i18n/format";
 import type { MsgKey } from "../../i18n/en";
 
 /** `call:<id>:<tab>`, plus `:<t0>:<t1>` when evidence opened it on a span (the Transcript highlights it). */
@@ -55,9 +55,15 @@ export function pageState(read: CommandState | undefined, haveCall: boolean): Pa
   // @cpt-end:cpt-noter-state-ui-call-page-frame-page:p1:inst-error-loading
 }
 
-/** **Today 10:00**, or the date and time of another day. */
-export const whenLabel = (ms: number, now: number, prefs: UiPrefs): string =>
-  dayOf(ms, prefs) === dayOf(now, prefs) ? t("callpage.when_today", { time: clock(ms, prefs) }) : formatDateTime(ms, prefs);
+/** **Today 10:00** or **Thu 2 Oct 16:00** (subtitle); **Today · 10:00** or **Thu 2 Oct · 16:00** (Call info's When, `info`). Short
+ * weekday and month forms, the year only for another year, no "at" (Content rules › Dates and times). */
+export const whenLabel = (ms: number, now: number, prefs: UiPrefs, info = false): string => {
+  const time = clock(ms, prefs);
+  if (dayOf(ms, prefs) === dayOf(now, prefs)) return t(info ? "callpage.info.when_today" : "callpage.when_today", { time });
+  const year = (x: number) => zoned(x, { year: "numeric" }, prefs);
+  const date = zoned(ms, { weekday: "short", month: "short", day: "numeric", ...(year(ms) === year(now) ? {} : { year: "numeric" }) }, prefs);
+  return t(info ? "callpage.info.when_day" : "callpage.when_day", { date, time });
+};
 
 const people = (c: CallRow): string => c.participants.map((p) => p.short_name).join(", ");
 
@@ -99,7 +105,7 @@ export function callInfo(c: CallRow, extra: { audio_not_stored: boolean }, now: 
     call: [
       { label: t("callpage.info.type"), value: typeLabel },
       { label: t("callpage.info.app"), value: c.platform ?? t("callpage.info.no_app") },
-      { label: t("callpage.info.when"), value: whenLabel(c.started_at, now, prefs) },
+      { label: t("callpage.info.when"), value: whenLabel(c.started_at, now, prefs, true) },
       { label: t("callpage.info.length"), value: duration(c.duration_ms / 1000) },
       { label: t("callpage.info.languages"), value: c.languages.map((l) => (typeof l === "string" ? l : l.code).toUpperCase()).join(", ") },
     ],

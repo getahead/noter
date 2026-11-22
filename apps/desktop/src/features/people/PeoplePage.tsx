@@ -9,7 +9,7 @@ import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Menu, type MenuItem } from "../../ui/primitives/menu";
 import { PushButton } from "../../ui/primitives/push-button";
-import { Table } from "../../ui/primitives/table";
+import { Table, Th } from "../../ui/primitives/table";
 import { NONE, press, retain, type Selection } from "../library/selection";
 import { holdPeople } from "./count";
 import { settleNaming } from "./focus-return";
@@ -175,9 +175,7 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
             <thead>
               <tr>
                 {COLS.map(([c, label]) => (
-                  <th key={c} scope="col" aria-sort={c === "name" ? "ascending" : undefined} style={{ width: WIDTH[c] }}>
-                    {t(label)}
-                  </th>
+                  <Th key={c} label={t(label)} sort={c === "name" ? "asc" : undefined} width={WIDTH[c]} />
                 ))}
               </tr>
             </thead>

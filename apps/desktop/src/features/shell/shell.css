@@ -12,7 +12,8 @@
 .np-inspector { position: relative; animation: np-slide-trail 250ms ease-out; }
 .np-inspector.is-leaving { animation: np-slide-out 250ms ease-in forwards; pointer-events: none; }
 .np-inspector.is-overlay { position: absolute; right: 0; top: 0; bottom: 0; z-index: 5; box-shadow: var(--shadow-pop); }
-.np-inspector__close { position: absolute; top: 8px; right: 8px; z-index: 1; }
+/* above a page's sticky inspector header (Call info), so the × stays visible and clickable (#1082) */
+.np-inspector__close { position: absolute; top: 8px; right: 8px; z-index: 3; }
 @media (max-width: 1180px) { .np-inspector { position: relative; box-shadow: none; } .np-inspector.is-overlay { position: absolute; box-shadow: var(--shadow-pop); } }
 @keyframes np-slide-trail { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes np-slide-out { from { transform: none; opacity: 1; } to { transform: translateX(24px); opacity: 0; } }
@@ -27,3 +28,5 @@
 
 /* the sidebar footer line wraps in a long (German, Cyrillic) translation instead of truncating */
 .np-sidebar__footer .np-mode__word { white-space: normal; overflow: visible; text-overflow: clip; }
+/* focus moves to the page heading after navigation for VoiceOver; a heading is not a control, so it shows no ring (#1085) */
+:is(h1, h2, h3)[tabindex="-1"]:focus-visible { outline: none; }

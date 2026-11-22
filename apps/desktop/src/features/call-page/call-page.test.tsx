@@ -63,6 +63,7 @@ describe("CallInfo", () => {
     const seen = sent();
     const html = renderToString(<CallInfo bridge={bridge} callId={id} />);
     for (const h of ["Call info", "Participants", "Call", "Privacy", "Audio", "Processing"]) expect(html).toContain(h);
+    expect(html).toContain('data-component="cpt-noter-component-ui-language-tag" data-variant="call"'); // Languages as tags (#1082)
     const tree = rendered(CallInfo, { bridge, callId: id });
     (find(tree, (p) => p.label === "Sensitive" && typeof p.onAction === "function").props.onAction as () => void)();
     await settle();
