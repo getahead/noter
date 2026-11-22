@@ -347,3 +347,16 @@ test("cpt-noter-seq-ask-cited-answer — Medium toolbar keeps the search field u
   await search.fill("websocket");
   await expect(search).toHaveValue("websocket");
 });
+
+// Design fixes against the prototype of record (Ask › First question).
+test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
+  test("UI — design — #1089 New Question carries a plus icon, and the scope pop-up comes before the mode indicator", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 820 });
+    await openAsk(page);
+    const bar = page.locator('[data-region="AK-R1"]');
+    await expect(bar.getByRole("button", { name: "New Question" }).locator("svg")).toBeVisible();
+    const scope = (await bar.locator(".ak-scope-pop").boundingBox())!;
+    const mode = (await bar.locator('[data-component="cpt-noter-component-ui-mode-indicator"]').boundingBox())!;
+    expect(scope.x).toBeLessThan(mode.x);
+  });
+});

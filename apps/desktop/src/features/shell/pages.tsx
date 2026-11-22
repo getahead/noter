@@ -4,6 +4,7 @@ import type { Bridge } from "../../app/bridge/bridge";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
+import type { IconName } from "../../ui/icons";
 import type { BannerSlotProps } from "../../ui/feedback/inline-banner";
 import type { CollapseInput } from "./collapse";
 import type { Route, SectionKey } from "./history";
@@ -25,7 +26,7 @@ export interface PageDef {
   /** Page banners normally follow the app slot; an opted-in component combines both in one slot. */
   banners?: ComponentType<PageBannerProps> & { includesAppBanners?: boolean };
   /** The page's own toolbar actions; at Narrow all but the primary one overflow into » from the trailing side. */
-  actions?: Array<{ label: string; onAction: () => void; primary?: boolean; /** The » menu marks the action that is the current choice (a scope or a sort). */ checked?: boolean }>;
+  actions?: Array<{ label: string; onAction: () => void; primary?: boolean; /** A leading icon, such as Ask's **+ New Question**. */ icon?: IconName; /** The » menu marks the action that is the current choice (a scope or a sort). */ checked?: boolean }>;
   /** The page has no search field (the prototype's `search: false`). */
   search?: false;
 }
