@@ -63,7 +63,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
         />
         {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
         <Row label={t("settings.privacy.metrics")} error={rowError("privacy", "behaviour_metrics")} note={t("settings.privacy.metrics_note")}>
-          <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
+          <Toggle on={privacy.behaviour_metrics} ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
         </Row>
         <Row label={t("settings.privacy.voice_profiles")}>
           <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" disabled help={t("settings.privacy.voice_profiles_later")} />

@@ -41,7 +41,7 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
           <PopupButton options={LAYOUT} value={call.layout} label={t("settings.call.layout")} onAction={(v) => void saveSection(bridge, "call_screen", { layout: v as typeof call.layout })} />
         </Row>
         <Row label={t("settings.call.auto_open")} error={rowError("call_screen", "open_automatically")} note={t("settings.call.auto_open_note")}>
-          <Toggle on={call.open_automatically} size="small" ariaLabel={t("settings.call.auto_open")} onAction={(open_automatically) => void saveSection(bridge, "call_screen", { open_automatically })} />
+          <Toggle on={call.open_automatically} ariaLabel={t("settings.call.auto_open")} onAction={(open_automatically) => void saveSection(bridge, "call_screen", { open_automatically })} />
         </Row>
       </Group>
       <Group title={t("settings.call.menu_bar")}>

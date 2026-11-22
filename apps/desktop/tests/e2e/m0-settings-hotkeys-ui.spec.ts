@@ -156,3 +156,19 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     expect(await sent(page, "hotkey_set")).toHaveLength(0);
   });
 });
+
+// Design fixes against the prototype of record (Settings window, General pane).
+test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
+  test("UI — design — #1113 a 40-pt title bar names the pane, and the switches are 34×20", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    const bar = page.locator(".st-titlebar");
+    await expect(bar).toHaveText("General");
+    expect(Math.round((await bar.boundingBox())!.height)).toBe(40);
+    await expect(bar).toHaveCSS("border-bottom-width", "1px");
+    const track = page.locator('[data-region="ST-R2"] .np-toggle__track').first();
+    const box = (await track.boundingBox())!;
+    expect([Math.round(box.width), Math.round(box.height)]).toEqual([34, 20]);
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Hotkeys", { exact: true }).click();
+    await expect(bar).toHaveText("Hotkeys");
+  });
+});

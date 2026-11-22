@@ -66,10 +66,10 @@ export function GeneralPane({ bridge, settings }: PaneProps) {
     <>
       <Group>
         <Row label={t("settings.general.launch")} error={rowError("general", "launch_at_login")}>
-          <Toggle on={general.launch_at_login} size="small" ariaLabel={t("settings.general.launch")} onAction={(launch_at_login) => general_({ launch_at_login })} />
+          <Toggle on={general.launch_at_login} ariaLabel={t("settings.general.launch")} onAction={(launch_at_login) => general_({ launch_at_login })} />
         </Row>
         <Row label={t("settings.general.offer")} error={rowError("general", "offer_to_record")} note={selfTestPassed ? t("settings.general.offer_note") : <><Warn>{t("settings.general.needs_self_test")}</Warn> <PushButton label={t("settings.general.run_self_test")} size="small" onAction={() => setSelfTest(true)} /></>}>
-          <Toggle on={selfTestPassed && general.offer_to_record} size="small" disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
+          <Toggle on={selfTestPassed && general.offer_to_record} disabled={!selfTestPassed} ariaLabel={t("settings.general.offer")} onAction={(offer_to_record) => general_({ offer_to_record })} />
         </Row>
         {notificationsOff && (
           <Row label={t("settings.general.notifications")} note={t("settings.general.notifications_note")}>
