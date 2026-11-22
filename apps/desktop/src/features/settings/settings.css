@@ -137,3 +137,4 @@
 .f-bind { display: grid; gap: 6px; }
 .f-bind__h { font-weight: 600; }
 .f-bind__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
+.st-cred__head { display: flex; align-items: center; gap: 8px; min-width: 0; }

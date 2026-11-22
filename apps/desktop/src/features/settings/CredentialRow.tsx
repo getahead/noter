@@ -66,9 +66,12 @@ export function KeyRow({ view, saved, onSavedExpire, onAdd, onReplace, onRemove,
   return (
     <div className="e-status st-cred" role="group" aria-label={t(KEY_NAME[view.provider])} data-component={COMPONENT} data-variant="row" data-state={state}>
       <div className="e-status__main">
-        <span className="e-status__title">{t(KEY_NAME[view.provider])}</span>
+        {/* the state tag sits beside the name, the use line under them (prototype e-cred__head) */}
+        <span className="st-cred__head">
+          <span className="e-status__title">{t(KEY_NAME[view.provider])}</span>
+          <Tag state={state} />
+        </span>
         <span className="e-status__sub">{t(KEY_USE[view.provider])}</span>
-        <Tag state={state} />
         {state === "configured" && <span className="st-cred__dots">{t("settings.keys.keychain")}</span>}
         {view.status.type === "rejected" && <span className="st-row__err">{reasonText(view.provider, view.status.reason)}</span>}
       </div>

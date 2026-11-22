@@ -189,6 +189,15 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await nav.getByText("Audio & Transcription", { exact: true }).click();
     await expect(groups.filter({ hasText: /^Models$/ })).toHaveCount(1);
   });
+  test("UI — design — #1120 an API-key row has its state tag beside the name, the use line under it, actions trailing", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Models & Runtimes", { exact: true }).click();
+    const row = page.locator('[data-component="cpt-noter-component-ui-credential-row"][data-variant="row"]').first();
+    const name = (await row.locator(".e-status__title").boundingBox())!;
+    const tag = (await row.locator(".st-cred__tag").boundingBox())!;
+    expect(Math.abs(tag.y + tag.height / 2 - (name.y + name.height / 2))).toBeLessThan(4); // on the name's line
+    expect(tag.x).toBeGreaterThan(name.x + name.width);
+  });
   test("UI — design — #1121 Privacy's In force is a plain secondary line with the mode indicator, not a tag", async ({ page }) => {
     await openWindow(page, "settings", {});
     await page.getByRole("navigation", { name: "Settings panes" }).getByText("Privacy", { exact: true }).click();
