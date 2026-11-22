@@ -97,9 +97,15 @@ export const CallRowView = memo(function CallRowView({
       // @cpt-begin:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
       onDoubleClick={() => onOpen(c.id)}
       onContextMenu={(e) => onContext(c.id, e)}
-      onKeyDown={(e) =>
-        e.key === "Enter" && !e.metaKey && (e.preventDefault(), onOpen(c.id))
-      }
+      onKeyDown={(e) => {
+        if (e.key === "Enter" && !e.metaKey) return (e.preventDefault(), onOpen(c.id));
+        // the keyboard's way to the row's context menu (Add Tag…, issue 1112): the Menu key or ⇧F10, at the row
+        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
+          const r = e.currentTarget.getBoundingClientRect();
+          e.preventDefault();
+          onContext(c.id, { clientX: r.left + 24, clientY: r.bottom, preventDefault: () => {} } as unknown as MouseEvent);
+        }
+      }}
       // @cpt-end:cpt-noter-flow-ui-library-calls-browse:p1:inst-user-row
     >
       <td className="lb-crow__when np-tnum">{whenOf(c.started_at, undefined, prefs)}</td>
