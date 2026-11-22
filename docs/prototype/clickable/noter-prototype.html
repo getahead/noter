@@ -1280,6 +1280,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .it-row__line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .it-row--compact .it-row__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
 .it-row--compact .it-row__due, .it-row--compact .np-badge, .it-row--compact .np-prov { flex: none; }
+/* a compact row stays on one line: the meta truncates and the text keeps a minimum width (#1093) */
+.it-row--compact .it-row__text { min-width: 4em; }
+.it-row--compact .it-row__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 0; }
 .it-row__call { flex: none; font-size: 12px; }
 .it-row__outcome { padding: 2px 0 0 24px; }
 .it-row.is-outcome { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--sep); }
@@ -1572,6 +1575,8 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .pe-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; max-width: 1180px; }
 @media (max-width: 1250px) { .pe-cols { grid-template-columns: minmax(0, 1fr); } }
 .pe-col { display: grid; gap: 22px; align-content: start; min-width: 0; }
+/* grid items take min-width 0 so a row never pushes past its column into the Identity card (#1093) */
+.pe-col > *, .pe-col .lb-items, .pe-col .lb-items > * { min-width: 0; }
 .pe-block { display: grid; gap: 6px; min-width: 0; }
 .pe-topics { display: flex; flex-wrap: wrap; gap: 6px; }
 .pe-identity .np-kv { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
@@ -3647,7 +3652,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     if (variant === 'unmatched') {
       return comp('upcoming-call-card', { variant, state: 'live', cls: 'td-card np-card is-live' },
         html`<div class="td-card__head"><div class="td-card__time">${C.recordingIndicator({ variant: 'dot', clock: false })}</div>
-        <div class="td-card__title">Recording · Microsoft Teams · ${NP.clock(false)}</div>
+        <div class="td-card__title">${NP.state.rec.status === 'paused' ? 'Paused' : 'Recording'} · Microsoft Teams · ${NP.clock(false)}</div>
         ${P.button('Open Call Screen', { variant: 'primary', size: 'small', action: ['call.show'] })}</div>`);
     }
     const items = (ev.items || []).map(D.item).filter((i) => i && (i.status !== 'done' || NP.flashed('row-' + i.id)));
@@ -7495,7 +7500,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
     if (ctx.demo === 'no-topics') return region('LT-R2', { label: 'Topics' }, C.emptyState({ icon: 'thread', title: 'No topics yet', body: 'Topics appear after a few calls, when decisions and questions come back to the same subject.' }));
     const topics = D.topics.filter((t) => !l.hidden[t.id] && (!q || t.name.toLowerCase().includes(q)));
     if (!topics.length) return region('LT-R2', { label: 'Topics' }, C.emptyState({ variant: 'filtered', title: `No topics match “${l.topicQ}”`, actionLabel: 'Clear Search', action: ['lib.clearTopicQ'] }));
-    return html`${C.undoStrip({ where: KEY })}${region('LT-R2', { label: 'Topics' }, P.table({ variant: 'sortable', label: 'Topics', cls: 'lb-table lb-ttable' }, html`<thead><tr>${P.th('Topic', { sort: 'asc' })}${P.th('Calls', { width: '80px' })}${P.th('Decisions', { width: '100px' })}${P.th('Open questions', { width: '130px' })}${P.th('Last discussed', { width: '130px' })}<th style="width:36px"><span class="np-sr">Open</span></th></tr></thead>
+    return html`${C.undoStrip({ where: KEY })}${region('LT-R2', { label: 'Topics' }, P.table({ variant: 'sortable', label: 'Topics', cls: 'lb-table lb-ttable' }, html`<thead><tr>${P.th('Topic')}${P.th('Calls', { width: '80px' })}${P.th('Decisions', { width: '100px' })}${P.th('Open questions', { width: '130px' })}${P.th('Last discussed', { width: '130px', sort: 'desc' })}<th style="width:36px"><span class="np-sr">Open</span></th></tr></thead>
       <tbody>${topics.map((t) => {
         const merge = t.mergeWith && !l.keptSeparate;
         const anchor = 'trow-' + t.id;

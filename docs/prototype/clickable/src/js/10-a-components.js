@@ -97,7 +97,7 @@
     if (variant === 'unmatched') {
       return comp('upcoming-call-card', { variant, state: 'live', cls: 'td-card np-card is-live' },
         html`<div class="td-card__head"><div class="td-card__time">${C.recordingIndicator({ variant: 'dot', clock: false })}</div>
-        <div class="td-card__title">Recording · Microsoft Teams · ${NP.clock(false)}</div>
+        <div class="td-card__title">${NP.state.rec.status === 'paused' ? 'Paused' : 'Recording'} · Microsoft Teams · ${NP.clock(false)}</div>
         ${P.button('Open Call Screen', { variant: 'primary', size: 'small', action: ['call.show'] })}</div>`);
     }
     const items = (ev.items || []).map(D.item).filter((i) => i && (i.status !== 'done' || NP.flashed('row-' + i.id)));

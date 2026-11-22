@@ -135,7 +135,7 @@
     if (ctx.demo === 'no-topics') return region('LT-R2', { label: 'Topics' }, C.emptyState({ icon: 'thread', title: 'No topics yet', body: 'Topics appear after a few calls, when decisions and questions come back to the same subject.' }));
     const topics = D.topics.filter((t) => !l.hidden[t.id] && (!q || t.name.toLowerCase().includes(q)));
     if (!topics.length) return region('LT-R2', { label: 'Topics' }, C.emptyState({ variant: 'filtered', title: `No topics match “${l.topicQ}”`, actionLabel: 'Clear Search', action: ['lib.clearTopicQ'] }));
-    return html`${C.undoStrip({ where: KEY })}${region('LT-R2', { label: 'Topics' }, P.table({ variant: 'sortable', label: 'Topics', cls: 'lb-table lb-ttable' }, html`<thead><tr>${P.th('Topic', { sort: 'asc' })}${P.th('Calls', { width: '80px' })}${P.th('Decisions', { width: '100px' })}${P.th('Open questions', { width: '130px' })}${P.th('Last discussed', { width: '130px' })}<th style="width:36px"><span class="np-sr">Open</span></th></tr></thead>
+    return html`${C.undoStrip({ where: KEY })}${region('LT-R2', { label: 'Topics' }, P.table({ variant: 'sortable', label: 'Topics', cls: 'lb-table lb-ttable' }, html`<thead><tr>${P.th('Topic')}${P.th('Calls', { width: '80px' })}${P.th('Decisions', { width: '100px' })}${P.th('Open questions', { width: '130px' })}${P.th('Last discussed', { width: '130px', sort: 'desc' })}<th style="width:36px"><span class="np-sr">Open</span></th></tr></thead>
       <tbody>${topics.map((t) => {
         const merge = t.mergeWith && !l.keptSeparate;
         const anchor = 'trow-' + t.id;

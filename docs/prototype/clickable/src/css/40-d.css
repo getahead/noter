@@ -143,6 +143,8 @@
 .pe-cols { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 28px; max-width: 1180px; }
 @media (max-width: 1250px) { .pe-cols { grid-template-columns: minmax(0, 1fr); } }
 .pe-col { display: grid; gap: 22px; align-content: start; min-width: 0; }
+/* grid items take min-width 0 so a row never pushes past its column into the Identity card (#1093) */
+.pe-col > *, .pe-col .lb-items, .pe-col .lb-items > * { min-width: 0; }
 .pe-block { display: grid; gap: 6px; min-width: 0; }
 .pe-topics { display: flex; flex-wrap: wrap; gap: 6px; }
 .pe-identity .np-kv { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
