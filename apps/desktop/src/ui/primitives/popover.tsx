@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { createPortal } from "react-dom";
 import { base, zoomFactor } from "./attrs";
 import { focusInside } from "./sheet";
+import { MENU_FIRST } from "../../app/a11y/focus";
 import { closeOnEscape, dismissPopover } from "./popover-escape";
 
 export { closeOnEscape } from "./popover-escape";
@@ -63,6 +64,10 @@ export function returnFocus(anchor: { tabIndex: number; focus(): void } | null |
   anchor.focus();
 }
 
+/** Focus into an opened popover: a menu's first item before anything else. Roving menu items have tabIndex -1, so the
+ *  plain focusable rule skipped them and focus fell on the popover box, where ↑/↓ reach no item (issue 1098). */
+export const popoverFocus = (root: HTMLElement | null) => focusInside(root, MENU_FIRST);
+
 // @cpt-dod:cpt-noter-dod-ui-primitives-controls:p1
 export function Popover({ variant, anchor, align, width, label, onClose, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
@@ -72,7 +77,7 @@ export function Popover({ variant, anchor, align, width, label, onClose, childre
   const placed = place !== null;
   useEffect(() => {
     if (!placed) return;
-    const restore = focusInside(ref.current);
+    const restore = popoverFocus(ref.current);
     // focus goes back to the anchor: after a click WebKit leaves no focused element to go back to
     return () => returnFocus(anchor, restore);
   }, [placed]); // once per opening

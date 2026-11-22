@@ -125,6 +125,19 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
     expect(onOpen).toHaveBeenCalledOnce();
   });
 
+  // #1112: Add Tag… and the other row actions live in the context menu, so the keyboard opens it at the row
+  it("cpt-noter-seq-library-filter-calls — #1112: opens the context menu from the keyboard: the Menu key or ⇧F10, at the row", () => {
+    const onContext = vi.fn();
+    const tr = find(rowTree({ call: call(), onPress: vi.fn(), onOpen: vi.fn(), onContext }), (p) => p["data-lib-row"] === "c1");
+    const key = (k: string, shiftKey = false) => ({ key: k, shiftKey, metaKey: false, preventDefault: vi.fn(), currentTarget: { getBoundingClientRect: () => ({ left: 10, bottom: 50 }) } });
+    (tr.props.onKeyDown as (e: unknown) => void)(key("ContextMenu"));
+    expect(onContext).toHaveBeenLastCalledWith("c1", expect.objectContaining({ clientX: 34, clientY: 50 }));
+    (tr.props.onKeyDown as (e: unknown) => void)(key("F10", true));
+    expect(onContext).toHaveBeenCalledTimes(2);
+    (tr.props.onKeyDown as (e: unknown) => void)(key("F10"));
+    expect(onContext).toHaveBeenCalledTimes(2);
+  });
+
   it("opens on Return and on a double-click, and reports a press and a context click", () => {
     const [onPress, onOpen, onContext] = [vi.fn(), vi.fn(), vi.fn()];
     const tr = find(

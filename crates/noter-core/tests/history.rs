@@ -1015,3 +1015,63 @@ async fn history_names_a_changed_item_by_its_text() {
     assert_eq!(change.entity.kind, EntityKind::Item);
     assert_eq!(change.entity.label, "Ship drawer events behind a flag");
 }
+
+// cpt-noter-seq-people-prepare-one-on-one — #1092: naming a speaker as a person is logged on the speaker; the person's History lists it too
+#[tokio::test]
+async fn a_person_history_lists_the_namings_of_its_speakers() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    core.store()
+        .insert_batch(vec![
+            call("call_a"),
+            row(
+                "people",
+                &[
+                    ("id", json!("per_d")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Dmitri Sokolov")),
+                    ("short_name", json!("Dmitri S.")),
+                ],
+            ),
+            row(
+                "speakers",
+                &[
+                    ("id", json!("spk_3")),
+                    ("call_id", json!("call_a")),
+                    ("label", json!("spk_3")),
+                    ("n", json!(3)),
+                    ("channel", json!("sys")),
+                    ("pass", json!("live")),
+                ],
+            ),
+        ])
+        .unwrap();
+    let named = core
+        .store()
+        .write(
+            Mutation {
+                entity_type: "speaker",
+                table: "speakers",
+                id: "spk_3".into(),
+                base_rev: None,
+                bump_rev: false,
+                values: vec![("person_id", json!("per_d")), ("n", json!(null))],
+            },
+            meta("Named a speaker"),
+        )
+        .unwrap();
+    let page = history(
+        &core,
+        list_args(HistoryTarget::Person {
+            person_id: PersonId::new("per_d"),
+        }),
+    )
+    .await;
+    assert!(
+        page.rows
+            .iter()
+            .any(|r| r.id.as_str() == named.change_id.as_str()),
+        "{:?}",
+        page.rows
+    );
+}

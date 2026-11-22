@@ -1,7 +1,7 @@
 // The identity rules of People (docs/features/ui/people.md): matching, ordering and which rows a query leaves.
 import type { PeopleList, PersonRow, UnnamedSpeaker } from "../../core/bindings";
 import { locale, t } from "../../i18n/format";
-import { fold } from "../speakers/picker";
+import { fold, nameMatches } from "../speakers/picker";
 
 // @cpt-algo:cpt-noter-algo-ui-people-identity:p1
 // @cpt-begin:cpt-noter-algo-ui-people-identity:p1:inst-match
@@ -9,7 +9,7 @@ export { fold };
 
 export const matches = (p: Pick<PersonRow, "display_name" | "short_name" | "aliases">, query: string): boolean => {
   const q = fold(query.trim());
-  return !q || [p.display_name, p.short_name, ...p.aliases].some((n) => fold(n).includes(q));
+  return !q || [p.display_name, p.short_name, ...p.aliases].some((n) => nameMatches(n, q));
 };
 // @cpt-end:cpt-noter-algo-ui-people-identity:p1:inst-match
 

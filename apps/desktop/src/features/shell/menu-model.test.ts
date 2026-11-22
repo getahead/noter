@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { APP_MENU, dispatchNativeMenuShortcut, nativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type MenuItem } from "./menu-model";
+import { APP_MENU, dispatchNativeMenuShortcut, nativeMenuShortcut, shellActionForMenuItem, shellShortcuts, textEditFromMenu, type MenuItem } from "./menu-model";
 
 const items = APP_MENU.flatMap((m) => m.items).filter((e): e is MenuItem => e !== "separator");
 
@@ -79,5 +79,21 @@ describe("app menu model", () => {
     expect(event).toMatchObject({ type: "keydown", code: "KeyE", key: "e", metaKey: true, bubbles: true });
     expect(dispatchNativeMenuShortcut("menu.about_noter")).toBe(false);
     vi.unstubAllGlobals();
+  });
+});
+
+// #1064: Edit › Undo and Redo are the app's; in a text field they still edit the text
+describe("textEditFromMenu", () => {
+  it("cpt-noter-seq-activity-undo-batch — #1064: runs the native text undo or redo only when a text field has focus", () => {
+    const exec = vi.fn(() => true);
+    const doc = (tag: string | null) => ({ activeElement: tag ? { tagName: tag, type: "text" } : null, execCommand: exec }) as never;
+    expect(textEditFromMenu("menu.undo", doc("INPUT"))).toBe(true);
+    expect(exec).toHaveBeenLastCalledWith("undo");
+    expect(textEditFromMenu("menu.redo", doc("TEXTAREA"))).toBe(true);
+    expect(exec).toHaveBeenLastCalledWith("redo");
+    expect(textEditFromMenu("menu.undo", doc("DIV"))).toBe(false);
+    expect(textEditFromMenu("menu.undo", doc(null))).toBe(false);
+    expect(textEditFromMenu("menu.find", doc("INPUT"))).toBe(false);
+    expect(exec).toHaveBeenCalledTimes(2);
   });
 });

@@ -248,9 +248,10 @@ export function releaseFailedRoute(key: string, phase: TurnPhase | null): void {
   if (phase === "error") routed.delete(key);
 }
 
-/** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again. */
+/** Once the routed question is stored its history entry becomes the thread: Back then reopens that thread, and a later Ask Instead with the same words asks again.
+ *  A question asked on Ask's own page (`root`) becomes its thread too, so Back from a cited call returns to it (issue 1068). */
 export function settleRoute(key: string, threadId: string | null, stored: boolean, replace: (route: { section: "ask"; key: string }) => void): void {
-  if (!(key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
+  if (!(key === "root" || key.startsWith("new:") || key.startsWith("new-topic:")) || !threadId || !stored) return;
   routed.delete(key);
   replace({ section: "ask", key: `thread:${threadId}` });
 }

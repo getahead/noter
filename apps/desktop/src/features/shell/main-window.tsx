@@ -23,7 +23,7 @@ import { currentRoute, INITIAL_SHELL, SIDEBAR, shellReduce, zoomStyle } from "./
 import { elapsedSeconds, isLive, receivedAtOf, shortTitle } from "./live-row";
 import { idleFooter, modeChangeAnnouncement, modeIndicator, type ModeState } from "./mode-indicator";
 import { MODE_MSG } from "./mode-indicator-view";
-import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, type ShellAction } from "./menu-model";
+import { dispatchNativeMenuShortcut, shellActionForMenuItem, shellShortcuts, textEditFromMenu, type ShellAction } from "./menu-model";
 import { pageFor } from "./pages";
 import { runShellAction, createScrollMemory, dockQuietly, escapeEvent, focusEffect, layoutFor, navEffect, scrollEffect, scrollSaver, watchWidth, type NavFlags } from "./shell-effects";
 import { navigateEffect } from "./navigate";
@@ -165,7 +165,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
       if (action) act(action);
       else if (["menu.accept_item", "menu.accept_all_suggestions", "menu.reject_item"].includes(key)) {
         window.dispatchEvent(new CustomEvent("shell:native-item-review", { detail: key }));
-      } else dispatchNativeMenuShortcut(key);
+      } else if (!textEditFromMenu(key)) dispatchNativeMenuShortcut(key);
     }).then((stop) => active ? unlisten = stop : stop());
     return () => {
       active = false;
@@ -183,7 +183,7 @@ export function MainWindow({ bridge }: { bridge: Bridge }) {
   // moving focus: the heading is not focused for it, and the core decides whether the window activates.
   const flags = useRef<NavFlags>({ first: true, quiet: null });
   useEffect(() => navEffect(nav, flags.current, dispatch), [nav]);
-  useEffect(() => navigateEffect(dispatch), []);
+  useEffect(() => navigateEffect(dispatch, (id) => void (flags.current.quiet = id)), []);
   // A search opened from a page (Search by Keyword) or reached by Back shows its words in the field.
   useEffect(() => void setSearch((typed) => searchWords(route) ?? typed), [routeId]); // eslint-disable-line react-hooks/exhaustive-deps
   // @cpt-end:cpt-noter-flow-ui-main-window-shell-app-state:p1:inst-nav-request

@@ -97,6 +97,9 @@ export const FOCUSABLE = [
   .map((s) => s + NOT_OFF)
   .join(",");
 
+/** Focus into a popover: a menu's roving items (tabIndex -1) first, then anything focusable (issue 1098). */
+export const MENU_FIRST = `[role^="menuitem"]:not(:disabled),${FOCUSABLE}`;
+
 /** The next element in Tab order, wrapping around; with no current one, the first (or last going back). */
 export function nextFocusable<T>(
   candidates: T[],

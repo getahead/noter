@@ -230,6 +230,14 @@ describe("Ask actions (cpt-noter-flow-ui-ask-question)", () => {
     expect(startFromRoute("root", ask)).toBe(false);
     expect(ask).toHaveBeenCalledTimes(2);
   });
+  // #1068: a question asked on Ask's own page becomes its thread too, so Back from a cited call returns to it
+  it("cpt-noter-seq-ask-cited-answer — #1068: replaces the root entry with the thread once its first answer is stored", () => {
+    const replace = vi.fn();
+    settleRoute("root", "ask_7", false, replace);
+    expect(replace).not.toHaveBeenCalled();
+    settleRoute("root", "ask_7", true, replace);
+    expect(replace).toHaveBeenCalledWith({ section: "ask", key: "thread:ask_7" });
+  });
   it("replaces the new: entry with the thread once stored, so a later Ask Instead with the same words asks again", () => {
     const ask = vi.fn();
     const replace = vi.fn();
