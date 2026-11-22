@@ -580,8 +580,9 @@ test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
     const latency = page.getByTestId("latency-line");
     const shown = /^Hypothesis \d+(\.\d)? s · confirmed \d+(\.\d)? s$/;
     if (FAKE) {
-      // The fake core cannot start a capture from steering: its live call carries the world's measured 1.4 s and 3.1 s.
-      await startLive(page, (w) => void Object.assign(w.settings.call_screen, { show_latency: true, text_size_pct: 150 }));
+      // The fake core cannot start a capture from steering: its live call's snapshot carries the world's 1.4 s and 3.1 s.
+      // No scripted lines, so the line stays at the snapshot's values.
+      await startLive(page, (w) => (still(w), void Object.assign(w.settings.call_screen, { show_latency: true, text_size_pct: 150 })));
       await expect(dedicated(page)).toBeVisible();
       await expect(latency).toHaveText("Hypothesis 1.4 s · confirmed 3.1 s");
       await expect(transcript(page)).toHaveCSS("zoom", "1.5");
