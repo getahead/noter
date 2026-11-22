@@ -638,3 +638,52 @@ test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
     }
   });
 });
+
+// #1190: at Text size 150 % the ⋯ More menu was laid out inside the zoomed header, so it opened 1.5× wide and 1.5× off
+// its button: cut off at the floating panel's edge, and outside the call screen altogether. Menus keep system size.
+test.describe("cpt-noter-flow-ui-call-window-controls", () => {
+  const atText150 = async (page: Page) => {
+    if (FAKE) return void (await startLive(page, (w) => (still(w), void Object.assign(w.settings.call_screen, { text_size_pct: 150 }))));
+    const steer = await startLive(page, still);
+    const s = (await steer.invoke("settings_get", {}, "settings")) as { rev: number; call_screen: Record<string, unknown> };
+    await steer.invoke("settings_update", { rev: s.rev, section: { section: "call_screen", value: { ...s.call_screen, text_size_pct: 150 } } }, "settings");
+  };
+  const menuInside = async (page: Page) => {
+    await header(page).getByRole("button", { name: "More", exact: true }).click();
+    const menu = page.getByRole("menu", { name: "More" });
+    await expect(menu).toBeVisible();
+    const box = (await menu.boundingBox())!;
+    const view = page.viewportSize()!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(view.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(view.height);
+    // right-aligned to its button
+    const more = (await header(page).getByRole("button", { name: "More", exact: true }).boundingBox())!;
+    const right = box.x + box.width;
+    expect(Math.abs(right - (more.x + more.width)) <= 1 || right >= view.width - 9).toBe(true); // or held 8 pt in
+    expect(box.y).toBeGreaterThanOrEqual(more.y + more.height - 1);
+    // system size: no zoomed ancestor
+    expect(await menu.evaluate((el) => { let z = 1; for (let e: Element | null = el; e; e = e.parentElement) z *= parseFloat(getComputedStyle(e).zoom) || 1; return z; })).toBe(1);
+  };
+
+  test("the More menu opens inside the call screen at Text size 150 %", async ({ page }) => {
+    await page.setViewportSize({ width: 1312, height: 800 });
+    await atText150(page);
+    await expect(dedicated(page)).toBeVisible();
+    await menuInside(page);
+  });
+
+  test("the More menu opens inside the floating panel at Text size 150 %", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 800 });
+    await atText150(page);
+    await coreWindow(page, { layout: "floating" });
+    await expect(floating(page)).toBeVisible();
+    await menuInside(page);
+    // the controls #1186 folds into More at 150 % in 420 pt are in the menu, inside the window
+    const view = page.viewportSize()!;
+    for (const name of ["Open Call Screen on Display 2", "Collapse Panel"]) {
+      const box = (await page.getByRole("menuitem", { name }).boundingBox())!;
+      expect(box.x >= 0 && box.x + box.width <= view.width).toBe(true);
+    }
+  });
+});
