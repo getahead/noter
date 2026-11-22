@@ -18,6 +18,9 @@
 .it-row--compact { padding: 4px 0; }
 .it-row__line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .it-row--compact .it-row__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+/* the text keeps 4 em and the line clips, so the call link and the meta give way first (prototype; #1155 at Narrow) */
+.it-row--compact .it-row__text { min-width: 4em; }
+.it-row--compact .it-row__line { overflow: hidden; }
 .it-row--compact .it-row__due, .it-row--compact .np-badge { flex: none; }
 /* narrow widths: the title gives way first; the evidence link, time code, person, checkbox and controls keep their size on one line */
 .it-row--compact .np-link, .it-row--compact .np-prov, .it-row--compact .np-person, .it-row--compact .np-check, .it-row--compact .np-ibtn { flex: none; white-space: nowrap; }
