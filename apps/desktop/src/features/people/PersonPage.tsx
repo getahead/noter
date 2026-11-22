@@ -12,6 +12,7 @@ import { Table } from "../../ui/primitives/table";
 import { HistoryTimeline } from "../history/HistoryTimeline";
 import { ActionItemRow } from "../items/ActionItemRow";
 import { CallRowView } from "../library/call-row";
+import { TopicChip } from "../../ui/primitives/topic-chip";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
 import { afterVoiceAlert, afterVoiceChange } from "./focus-return";
@@ -216,8 +217,9 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
         <Block region="PE-R4" title={t("person.topics")}>
           {page.topics.length ? (
             <div className="pe-topics">
+              {/* topic chips with their call count (prototype ⑂ Drawer redesign · 6 calls) */}
               {page.topics.map((tp) => (
-                <button key={tp.id} type="button" className="pe-topic" onClick={() => navigate(bridge, { type: "topic", topic_id: tp.id })}>{tp.name}</button>
+                <TopicChip key={tp.id} name={tp.name} counts={t("person.topic_calls", { count: tp.calls })} onOpen={() => navigate(bridge, { type: "topic", topic_id: tp.id })} />
               ))}
             </div>
           ) : (
@@ -252,7 +254,7 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
         </Block>
         <Block region="PE-R6" title={t("person.last_calls")}>
           <CallsTable bridge={bridge} calls={page.calls.slice(0, 5)} prefs={prefs} name={p.short_name} compact />
-          <button type="button" className="pe-showall" onClick={onShowAll}>{t("person.show_all")}</button>
+          <PushButton label={t("person.show_all")} size="small" cls="pe-showall" onAction={onShowAll} />
         </Block>
       </div>
     </div>

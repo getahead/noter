@@ -56,7 +56,7 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
   it("a topic chip opens the topic route", () => {
     const p = page({ calls: [call], topics: [{ id: "top_1", name: "Pricing" }] as never });
     const tree = rendered(Overview, { bridge, page: p, prefs: undefined });
-    (find(tree, (x) => x.className === "pe-topic").props.onClick as () => void)();
+    (find(tree, (x) => typeof x.name === "string" && typeof x.onOpen === "function").props.onOpen as () => void)(); // a TopicChip (#1090)
     expect((bridge as never as { act: ReturnType<typeof vi.fn> }).act).toHaveBeenCalledWith("window_navigate", "window_navigate", expect.any(Function), expect.anything());
   });
   it("CALLS lists the person's calls; HISTORY mounts the person's timeline", () => {
@@ -93,7 +93,7 @@ describe("Show All (QA #908)", () => {
     const withCalls = page({ calls: [call] });
     const onShowAll = vi.fn();
     const tree = rendered(Overview, { bridge, page: withCalls, prefs: undefined, onShowAll });
-    (find(tree, (x) => x.className === "pe-showall").props.onClick as () => void)();
+    (find(tree, (x) => x.cls === "pe-showall").props.onAction as () => void)(); // the Show All push button (#1090)
     expect(onShowAll).toHaveBeenCalledOnce();
   });
   it("the page wires it to the Calls view of that person", async () => {

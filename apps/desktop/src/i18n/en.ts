@@ -1127,6 +1127,7 @@ export const en = {
   "topics.title": "Topics",
   "topics.count": { one: "{count} topic", other: "{count} topics" },
   "topics.calls": { one: "{count} call", other: "{count} calls" },
+  "person.topic_calls": { one: "· {count} call", other: "· {count} calls" },
   "topics.decisions": { one: "{count} decision", other: "{count} decisions" },
   "topics.open": { one: "{count} open question", other: "{count} open questions" },
   "topics.since": "since {date}",
