@@ -412,7 +412,7 @@ const MONTHS: [&str; 12] = [
 
 /// A call's export folder, as the save panel suggests it: "<title> <day> <month>" ("Planning 16
 /// Oct", DESIGN 2467), from the local date of `local_ms`. Finder cannot name a folder with `/`
-/// or `:`, and a leading dot would hide it.
+/// or `:`, a leading dot would hide it, and the title is cut to 80 characters or 200 bytes.
 fn folder_name(title: &str, id: &str, local_ms: i64) -> String {
     let date = crate::history::date_of(local_ms);
     let (month, day) = (&date[5..7], &date[8..10]);
@@ -428,6 +428,11 @@ fn folder_name(title: &str, id: &str, local_ms: i64) -> String {
             }
         })
         .take(80)
+        .scan(0, |bytes, c| {
+            // APFS names are at most 255 UTF-8 bytes; the date and a " 99" suffix need the rest
+            *bytes += c.len_utf8();
+            (*bytes <= 200).then_some(c)
+        })
         .collect();
     let title = title.trim().trim_start_matches('.').trim();
     let title = if title.is_empty() { id } else { title };
@@ -950,6 +955,13 @@ mod tests {
         assert_eq!(
             folder_name(&"x".repeat(200), "c", jan).len(),
             80 + " 5 Jan".len()
+        );
+        // APFS names are at most 255 UTF-8 bytes: a long emoji or Cyrillic title still fits
+        let wide = folder_name(&"🎉".repeat(100), "c", jan);
+        assert!(
+            wide.len() <= 255 && wide.ends_with(" 5 Jan"),
+            "{}",
+            wide.len()
         );
     }
 
