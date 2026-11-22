@@ -2,12 +2,14 @@
 //! Claude Code 2.1.325 and codex-cli 0.171.0): a fake binary replays each recorded output on the
 //! stream and with the exit code the real one used.
 
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use noter_llm::{AccountCli, CliAccounts, LoginOutcome};
 use noter_protocol::model::{AccountProvider, CliTool};
+
+#[path = "common/exec.rs"]
+mod exec;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/cli-auth");
 
@@ -60,8 +62,7 @@ esac
         );
         for (name, script) in [("claude", claude), ("codex", codex)] {
             let path = dir.path().join(name);
-            std::fs::write(&path, script).unwrap();
-            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            exec::write_executable(&path, &script);
         }
         std::fs::create_dir(dir.path().join("codex-home")).unwrap();
         let fake = Self { dir };

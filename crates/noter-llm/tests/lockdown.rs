@@ -25,6 +25,9 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tokio::sync::watch;
 
+#[path = "common/exec.rs"]
+mod exec;
+
 const TEXT: &str = "Ann agreed to ship the importer on Friday.";
 const SUBSCRIPTION_TOKEN: &str = "SUBSCRIPTION-TOKEN-NEVER-READ";
 const CLAUDE_OK: &str = "2.1.296 (Claude Code)";
@@ -39,7 +42,10 @@ impl Stub {
     fn new(version: &str) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/stub-cli/cli.sh");
-        std::fs::copy(src, dir.path().join("cli")).unwrap();
+        exec::write_executable(
+            &dir.path().join("cli"),
+            &std::fs::read_to_string(src).unwrap(),
+        );
         let stub = Self { dir };
         stub.set("version", version);
         stub.set("mode", "ok");
@@ -79,36 +85,27 @@ impl Stub {
         records.remove(0)
     }
 
-    /// Waits until a hanging run has started, and returns its pid.
+    /// Waits until a hanging run has started, and returns its pid. Starting a process takes as
+    /// long as the machine lets it (#1124), so the wait runs on Tokio's blocking pool: while it
+    /// runs, a paused clock does not advance on its own, and the run's timeout cannot fire first.
     async fn hanging_pid(&self) -> String {
-        for _ in 0..1000 {
-            if let Ok(pid) = std::fs::read_to_string(self.dir.path().join("pid")) {
-                let pid = pid.trim();
-                if !pid.is_empty() && pid.parse::<u32>().is_ok() {
-                    return pid.to_owned();
+        let file = self.dir.path().join("pid");
+        tokio::task::spawn_blocking(move || {
+            // Only a stub that never starts reaches this: it fails the test rather than hang it.
+            let broken = std::time::Instant::now() + Duration::from_secs(120);
+            loop {
+                if let Ok(pid) = std::fs::read_to_string(&file) {
+                    let pid = pid.trim();
+                    if !pid.is_empty() && pid.parse::<u32>().is_ok() {
+                        return pid.to_owned();
+                    }
                 }
+                assert!(std::time::Instant::now() < broken, "the stub never started");
+                std::thread::sleep(Duration::from_millis(1));
             }
-            tokio::time::sleep(Duration::from_millis(1)).await;
-        }
-        panic!("the stub never started");
-    }
-
-    /// Waits for a spawned child without advancing Tokio's paused clock.
-    async fn hanging_pid_before_deadline(&self) -> String {
-        let deadline = std::time::Instant::now() + Duration::from_secs(2);
-        loop {
-            if let Ok(pid) = std::fs::read_to_string(self.dir.path().join("pid")) {
-                let pid = pid.trim();
-                if !pid.is_empty() && pid.parse::<u32>().is_ok() {
-                    return pid.to_owned();
-                }
-            }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "the stub never started"
-            );
-            tokio::task::yield_now().await;
-        }
+        })
+        .await
+        .unwrap()
     }
 }
 
@@ -840,7 +837,7 @@ async fn a_timed_out_run_leaves_nothing_behind() {
     let llm = world.claude_only(&stub, Some("sk-ant-test"), false);
     let request = world.request(RuntimeChoice::ClaudeApiKey);
     let run = tokio::spawn(async move { llm.run_once(request).await });
-    let pid = stub.hanging_pid_before_deadline().await;
+    let pid = stub.hanging_pid().await;
     tokio::time::advance(Duration::from_secs(600)).await;
     let failed = run.await.unwrap();
     assert!(matches!(failed, Err(Failure::Timeout)), "{failed:?}");
