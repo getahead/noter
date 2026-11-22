@@ -482,6 +482,8 @@ async fn a_start_creates_the_call_and_records_once_the_engine_session_started() 
     assert_eq!(session.session_dir, format!("audio/{call_id}/"));
     assert!(session.store_audio);
     assert_eq!(session.resume_from_ms, None);
+    // Settings › Languages reaches the engine at session start (#1127).
+    assert_eq!(session.languages, vec![Lang::En, Lang::Ru, Lang::De]);
 
     r.session_started(&call_id);
     let recording = r.phase_becomes(CapturePhase::Recording).await;

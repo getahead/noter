@@ -147,6 +147,8 @@ impl ScriptedNative {
             displays: env.displays.clone(),
             output_device: env.output_device.clone(),
             output_route: env.output_route,
+            input_devices: env.input_devices.clone(),
+            output_devices: env.output_devices.clone(),
             notifications: env.notifications,
             online: env.online,
             disk_free_mb: env.disk_free_mb,

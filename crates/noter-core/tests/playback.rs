@@ -249,6 +249,29 @@ async fn treating_the_output_as_headphones_in_settings_unlocks_replay_at_once() 
         name: "Scarlett".into(),
         marked_headphones: false,
     });
+    // Settings › Output devices lists every device; Microphone lists the inputs (#1125, #1126).
+    {
+        let mut reading = r.mac.reading.lock().unwrap();
+        reading.output_devices = vec![
+            OutputDeviceRow {
+                uid: "usb-1".into(),
+                name: "Scarlett".into(),
+                route: OutputRoute::Unknown,
+                marked_headphones: false,
+            },
+            OutputDeviceRow {
+                uid: "spk".into(),
+                name: "MacBook Pro Speakers".into(),
+                route: OutputRoute::Speakers,
+                marked_headphones: false,
+            },
+        ];
+        reading.input_devices = vec![InputDeviceInfo {
+            uid: "mic".into(),
+            name: "MacBook Pro Microphone".into(),
+            is_default: true,
+        }];
+    }
     r.mac.route(OutputRoute::Unknown);
     call(&r.core, "call_old", "ready", 0);
     call(&r.core, "call_live", "recording", 0);
@@ -276,6 +299,30 @@ async fn treating_the_output_as_headphones_in_settings_unlocks_replay_at_once() 
             .unwrap()
             .playing
     );
+    let env = r
+        .core
+        .app_snapshot(&window(), NoArgs {})
+        .await
+        .unwrap()
+        .environment;
+    assert_eq!(
+        env.output_devices,
+        vec![
+            OutputDeviceRow {
+                uid: "usb-1".into(),
+                name: "Scarlett".into(),
+                route: OutputRoute::Headphones,
+                marked_headphones: true
+            },
+            OutputDeviceRow {
+                uid: "spk".into(),
+                name: "MacBook Pro Speakers".into(),
+                route: OutputRoute::Speakers,
+                marked_headphones: false
+            },
+        ]
+    );
+    assert_eq!(env.input_devices[0].name, "MacBook Pro Microphone");
 }
 
 #[tokio::test(start_paused = true)]

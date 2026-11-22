@@ -443,6 +443,18 @@ impl Core {
             d.marked_headphones = headphones.contains(&d.uid);
             d
         });
+        // A device the user marked reads as headphones, as the current one does below.
+        let output_devices = reading
+            .output_devices
+            .into_iter()
+            .map(|mut d| {
+                d.marked_headphones = headphones.contains(&d.uid);
+                if d.marked_headphones {
+                    d.route = OutputRoute::Headphones;
+                }
+                d
+            })
+            .collect();
         let output_route = match &output_device {
             Some(d) if d.marked_headphones => OutputRoute::Headphones,
             _ => reading.output_route,
@@ -454,6 +466,8 @@ impl Core {
             displays: reading.displays,
             output_route,
             output_device,
+            input_devices: reading.input_devices,
+            output_devices,
             permissions: self.permission_rows(&stored),
             notifications: reading.notifications,
             online: reading.online,

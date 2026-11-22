@@ -316,7 +316,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.20",
+    "contract_version": "2.24",
     "copilot": {
       "agents": [
         {
@@ -386,6 +386,18 @@
           "width_pt": 2560
         }
       ],
+      "input_devices": [
+        {
+          "is_default": true,
+          "name": "MacBook Pro Microphone",
+          "uid": "BuiltInMicrophoneDevice"
+        },
+        {
+          "is_default": false,
+          "name": "Studio Display Microphone",
+          "uid": "StudioDisplayMicrophone"
+        }
+      ],
       "native": null,
       "notifications": "not_determined",
       "online": true,
@@ -394,6 +406,32 @@
         "name": "External Headphones",
         "uid": "BuiltInHeadphoneOutputDevice"
       },
+      "output_devices": [
+        {
+          "marked_headphones": false,
+          "name": "External Headphones",
+          "route": "headphones",
+          "uid": "BuiltInHeadphoneOutputDevice"
+        },
+        {
+          "marked_headphones": false,
+          "name": "MacBook Pro Speakers",
+          "route": "speakers",
+          "uid": "BuiltInSpeakerDevice"
+        },
+        {
+          "marked_headphones": true,
+          "name": "USB-C DAC",
+          "route": "headphones",
+          "uid": "BuiltInHeadphoneOutputDevice-USB-DAC-4F2A"
+        },
+        {
+          "marked_headphones": false,
+          "name": "Living Room",
+          "route": "unknown",
+          "uid": "AirPlay-LivingRoom"
+        }
+      ],
       "output_route": "headphones",
       "permissions": [
         {
@@ -2443,6 +2481,11 @@
   "settings": {
     "audio": {
       "exclude_own_sounds": true,
+      "languages": [
+        "en",
+        "ru",
+        "de"
+      ],
       "live_backend": "whisper_turbo_noter_loop",
       "mic_device": null,
       "offline_backend": "whisper_large_v3",
@@ -2457,7 +2500,9 @@
     "call_screen": {
       "display_id": "dsp_studio",
       "layout": "auto",
-      "open_automatically": true
+      "open_automatically": true,
+      "show_latency": false,
+      "text_size_pct": 100
     },
     "copilot": {
       "card_keys": {

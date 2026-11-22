@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use block2::{DynBlock, RcBlock};
 use noter_protocol::model::{
-    CalendarEventRef, DisplayInfo, NativeEnvironment, NavTarget, NotificationAuth,
-    OutputDeviceInfo, OutputRoute,
+    CalendarEventRef, DisplayInfo, InputDeviceInfo, NativeEnvironment, NavTarget, NotificationAuth,
+    OutputDeviceInfo, OutputDeviceRow, OutputRoute,
 };
 use noter_protocol::{CalendarEventId, DisplayId, PermissionKind, PermissionState, TimestampMs};
 use objc2::rc::Retained;
@@ -22,11 +22,13 @@ use objc2_app_kit::{
 };
 use objc2_av_foundation::{AVCaptureDevice, AVMediaTypeAudio};
 use objc2_core_audio::{
-    kAudioDevicePropertyDataSource, kAudioDevicePropertyDeviceUID,
-    kAudioDevicePropertyTransportType, kAudioHardwarePropertyDefaultOutputDevice,
+    kAudioDevicePropertyDataSource, kAudioDevicePropertyDeviceUID, kAudioDevicePropertyStreams,
+    kAudioDevicePropertyTransportType, kAudioHardwarePropertyDefaultInputDevice,
+    kAudioHardwarePropertyDefaultOutputDevice, kAudioHardwarePropertyDevices,
     kAudioObjectPropertyElementMain, kAudioObjectPropertyName, kAudioObjectPropertyScopeGlobal,
-    kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject, AudioObjectGetPropertyData,
-    AudioObjectID, AudioObjectPropertyAddress,
+    kAudioObjectPropertyScopeInput, kAudioObjectPropertyScopeOutput, kAudioObjectSystemObject,
+    AudioObjectGetPropertyData, AudioObjectGetPropertyDataSize, AudioObjectID,
+    AudioObjectPropertyAddress,
 };
 use objc2_core_foundation::{CFRetained, CFString, CFUUID};
 use objc2_core_graphics::{
@@ -219,11 +221,14 @@ fn default_browser() -> Option<String> {
 
 pub fn environment(storage: &Path) -> Reading {
     let (output_device, output_route) = output();
+    let (input_devices, output_devices) = devices();
     Reading {
         native: native_environment(),
         displays: displays(),
         output_device,
         output_route,
+        input_devices,
+        output_devices,
         // @cpt-begin:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
         notifications: notifications(),
         // @cpt-end:cpt-noter-flow-core-native-surfaces-notifications:p1:inst-read-auth
@@ -366,6 +371,115 @@ fn output() -> (Option<OutputDeviceInfo>, OutputRoute) {
         marked_headphones: false,
     });
     (info, classify_route(transport, source))
+}
+
+/// The size in bytes of a variable-length property, 0 when it cannot be read.
+fn property_size(object: AudioObjectID, selector: u32, scope: u32) -> u32 {
+    let address = AudioObjectPropertyAddress {
+        mSelector: selector,
+        mScope: scope,
+        mElement: kAudioObjectPropertyElementMain,
+    };
+    let mut size = 0u32;
+    // SAFETY: both pointers are to live locals.
+    let status = unsafe {
+        AudioObjectGetPropertyDataSize(
+            object,
+            NonNull::from(&address),
+            0,
+            std::ptr::null(),
+            NonNull::from(&mut size),
+        )
+    };
+    if status == 0 {
+        size
+    } else {
+        0
+    }
+}
+
+/// Every audio device: those with input streams for Settings › Microphone, those with output
+/// streams with their detected route for Settings › Output devices (the core marks headphones).
+fn devices() -> (Vec<InputDeviceInfo>, Vec<OutputDeviceRow>) {
+    let system = kAudioObjectSystemObject as AudioObjectID;
+    let count = property_size(
+        system,
+        kAudioHardwarePropertyDevices,
+        kAudioObjectPropertyScopeGlobal,
+    ) as usize
+        / std::mem::size_of::<AudioObjectID>();
+    let mut ids = vec![0 as AudioObjectID; count];
+    let address = AudioObjectPropertyAddress {
+        mSelector: kAudioHardwarePropertyDevices,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain,
+    };
+    let mut size = (count * std::mem::size_of::<AudioObjectID>()) as u32;
+    // SAFETY: `ids` has room for `size` bytes; an empty list skips the call.
+    let ok = count > 0
+        && unsafe {
+            AudioObjectGetPropertyData(
+                system,
+                NonNull::from(&address),
+                0,
+                std::ptr::null(),
+                NonNull::from(&mut size),
+                NonNull::new_unchecked(ids.as_mut_ptr().cast()),
+            )
+        } == 0;
+    if !ok {
+        return (Vec::new(), Vec::new());
+    }
+    ids.truncate(size as usize / std::mem::size_of::<AudioObjectID>());
+    let default_input = property::<AudioObjectID>(
+        system,
+        kAudioHardwarePropertyDefaultInputDevice,
+        kAudioObjectPropertyScopeGlobal,
+    );
+    let (mut inputs, mut outputs) = (Vec::new(), Vec::new());
+    for id in ids {
+        let Some(uid) = string_property(id, kAudioDevicePropertyDeviceUID) else {
+            continue;
+        };
+        let name = string_property(id, kAudioObjectPropertyName).unwrap_or_default();
+        if property_size(
+            id,
+            kAudioDevicePropertyStreams,
+            kAudioObjectPropertyScopeInput,
+        ) > 0
+        {
+            inputs.push(InputDeviceInfo {
+                uid: uid.clone(),
+                name: name.clone(),
+                is_default: default_input == Some(id),
+            });
+        }
+        if property_size(
+            id,
+            kAudioDevicePropertyStreams,
+            kAudioObjectPropertyScopeOutput,
+        ) > 0
+        {
+            let transport = property::<u32>(
+                id,
+                kAudioDevicePropertyTransportType,
+                kAudioObjectPropertyScopeGlobal,
+            )
+            .unwrap_or(0);
+            let source = property::<u32>(
+                id,
+                kAudioDevicePropertyDataSource,
+                kAudioObjectPropertyScopeOutput,
+            );
+            outputs.push(OutputDeviceRow {
+                uid,
+                name,
+                route: classify_route(transport, source),
+                marked_headphones: false,
+            });
+        }
+    }
+    (inputs, outputs)
 }
 
 fn online() -> bool {

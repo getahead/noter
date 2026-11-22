@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use super::{
-    DisplayInfo, HandoffTarget, NativeEnvironment, NotificationAuth, OutputDeviceInfo, OutputRoute,
+    DisplayInfo, HandoffTarget, InputDeviceInfo, NativeEnvironment, NotificationAuth,
+    OutputDeviceInfo, OutputDeviceRow, OutputRoute,
 };
 
 /// The native environment fields shared by the host and core.
@@ -11,6 +12,9 @@ pub struct EnvironmentReading {
     pub displays: Vec<DisplayInfo>,
     pub output_device: Option<OutputDeviceInfo>,
     pub output_route: OutputRoute,
+    pub input_devices: Vec<InputDeviceInfo>,
+    /// Detected routes; `marked_headphones` is filled by the core.
+    pub output_devices: Vec<OutputDeviceRow>,
     pub notifications: NotificationAuth,
     pub online: bool,
     pub disk_free_mb: u32,
@@ -23,6 +27,8 @@ impl Default for EnvironmentReading {
             displays: Vec::new(),
             output_device: None,
             output_route: OutputRoute::Unknown,
+            input_devices: Vec::new(),
+            output_devices: Vec::new(),
             notifications: NotificationAuth::NotDetermined,
             online: true,
             disk_free_mb: 0,

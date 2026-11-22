@@ -50,6 +50,8 @@ fn reading() -> EnvironmentReading {
         displays: vec![display("dsp_main", true), display("dsp_side", false)],
         output_device: None,
         output_route: OutputRoute::Speakers,
+        input_devices: vec![],
+        output_devices: vec![],
         notifications: NotificationAuth::NotDetermined,
         online: true,
         disk_free_mb: 90_000,

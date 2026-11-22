@@ -99,6 +99,15 @@ pub struct AudioSettings {
     /// `null` = system default input.
     #[serde(default)]
     pub mic_device: Option<String>,
+    /// The languages the engine's language identification picks among, from the next call
+    /// (Settings › Audio & Transcription › Languages).
+    #[serde(default = "default_languages")]
+    pub languages: Vec<Lang>,
+}
+
+/// English, Russian and German, all on (the prototype's Languages checkboxes).
+pub fn default_languages() -> Vec<Lang> {
+    vec![Lang::En, Lang::Ru, Lang::De]
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
@@ -162,6 +171,16 @@ pub struct CallScreenSettings {
     pub display_id: Option<DisplayId>,
     pub layout: CallLayoutPreference,
     pub open_automatically: bool,
+    /// The call screen's latency line (**Hypothesis 1.4 s · confirmed 3.1 s**); off by default.
+    #[serde(default)]
+    pub show_latency: bool,
+    /// Call screen text size, 85 to 150 % (D57).
+    #[serde(default = "default_text_size_pct")]
+    pub text_size_pct: u16,
+}
+
+pub const fn default_text_size_pct() -> u16 {
+    100
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]

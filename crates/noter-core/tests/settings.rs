@@ -279,6 +279,20 @@ async fn values_out_of_range_are_invalid_input_naming_the_field() {
             Some(("over_pct".into(), ValidationRule::OutOfRange))
         )
     );
+    // Text size runs 85 to 150 % (D57, #1128).
+    let mut call_screen = noter_core::default_settings().call_screen;
+    call_screen.text_size_pct = 160;
+    let err = core
+        .settings_update(&w, update(1, SettingsSection::CallScreen(call_screen)))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        rule(err),
+        (
+            ErrorCode::InvalidInput,
+            Some(("text_size_pct".into(), ValidationRule::OutOfRange))
+        )
+    );
     let mut maintenance = noter_core::default_settings().maintenance;
     maintenance.window_end = "25:99".into();
     let err = core

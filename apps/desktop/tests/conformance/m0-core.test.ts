@@ -101,6 +101,32 @@ describe("settings with revisions and whole-state events (R25)", () => {
     expect(changes.latest()!.rev).toBe(updated.rev);
   });
 
+  // #1125-#1128: device lists in the environment, languages, latency line and text size in settings
+  it("the environment lists input and output devices; marking an unidentified output as headphones makes it read headphones", async () => {
+    const env = ok(await s.core("settings").appSnapshot({})).environment;
+    expect(env.input_devices?.find((d) => d.is_default)?.name).toBe("MacBook Pro Microphone");
+    expect(env.output_devices?.find((d) => d.uid === "AirPlay-LivingRoom")).toMatchObject({ route: "unknown", marked_headphones: false });
+    const settings = s.core("settings");
+    const current = ok(await settings.settingsGet({}));
+    const audio = { ...current.audio, output: { headphones_devices: [...current.audio.output.headphones_devices, "AirPlay-LivingRoom"] } };
+    ok(await settings.settingsUpdate({ rev: current.rev, section: { section: "audio", value: audio } }));
+    const after = ok(await s.core("settings").appSnapshot({})).environment;
+    expect(after.output_devices?.find((d) => d.uid === "AirPlay-LivingRoom")).toMatchObject({ route: "headphones", marked_headphones: true });
+  });
+
+  it("languages, show_latency and text_size_pct round-trip; a text size outside 85-150 is refused naming the field", async () => {
+    const settings = s.core("settings");
+    const current = ok(await settings.settingsGet({}));
+    expect(current.audio.languages).toEqual(["en", "ru", "de"]);
+    expect(current.call_screen).toMatchObject({ show_latency: false, text_size_pct: 100 });
+    const audio = ok(await settings.settingsUpdate({ rev: current.rev, section: { section: "audio", value: { ...current.audio, languages: ["en", "de"] } } }));
+    expect(audio.audio.languages).toEqual(["en", "de"]);
+    const screen = ok(await settings.settingsUpdate({ rev: audio.rev, section: { section: "call_screen", value: { ...audio.call_screen, show_latency: true, text_size_pct: 125 } } }));
+    expect(screen.call_screen).toMatchObject({ show_latency: true, text_size_pct: 125 });
+    const big = refused(await settings.settingsUpdate({ rev: screen.rev, section: { section: "call_screen", value: { ...screen.call_screen, text_size_pct: 160 } } }));
+    expect(big).toMatchObject({ code: "invalid_input", detail: { type: "validation", field: "text_size_pct", rule: "out_of_range" } });
+  });
+
   it("settings_unignore_app removes Spotify from the ignored apps once; a second time is not_found", async () => {
     const settings = s.core("settings");
     const before = ok(await settings.settingsGet({}));
