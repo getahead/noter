@@ -207,8 +207,29 @@ describe("AccountSignInSheet", () => {
     expect(html("claude")).toContain("didn’t finish");
     expect(html("claude")).toContain("Install Claude Code");
     m().dispatch("claude", { type: "prepareFailed", code: "cli_version_unsupported" });
-    expect(html("claude")).toContain("This version of Claude Code isn’t supported");
+    // ET 22 Nov: the refusal names the installed version and points at a tested one or the key, never "Update"
+    expect(html("claude")).toContain("Claude Code 1 isn’t supported yet");
+    expect(html("claude")).toContain("use the Anthropic API key instead");
     expect(html("claude")).not.toContain("Something went wrong");
+  });
+
+  it("an unsupported CLI of unknown version keeps the generic unsupported title", async () => {
+    await ready((w) => Object.assign(w.app.accounts.accounts.find((a) => a.provider === "chatgpt")!.cli, { version: null }));
+    await m().open("chatgpt");
+    m().dispatch("chatgpt", { type: "prepareFailed", code: "cli_version_unsupported" });
+    expect(html("chatgpt")).toContain("This version of Codex isn’t supported");
+  });
+
+  it("ET 22 Nov: a refused plan names the account and the plan the CLI reported", async () => {
+    const { fake } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, existing: { email: "ann@example.com", plan: "team" } } });
+    m().dispatch("claude", { type: "confirm", on: true });
+    m().dispatch("claude", { type: "choose", choice: "existing" });
+    fake.failNext("account_use_existing", "plan_not_eligible");
+    await m().proceed("claude");
+    expect(html("claude")).toContain("ann@example.com has no Claude Pro or Max plan");
+    expect(html("claude")).toContain("Claude Code reports the “team” plan");
   });
 
   it("recovers a signing_in row after a reload with Show and no code", async () => {

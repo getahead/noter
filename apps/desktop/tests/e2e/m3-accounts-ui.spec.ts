@@ -127,6 +127,34 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await expect(button(dlg, "Continue in Browser")).toBeDisabled();
   });
 
+  // ET 22 Nov: the owner's Codex 0.171.0 was refused with copy that named no version and said "Update"
+  test("error path — an unsupported Codex names its version and offers the API key, not an update", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await codexCli(steer, { version: "0.171.0", supported: false });
+    await openModels(page);
+    await button(row(page, "Your ChatGPT account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your ChatGPT account/);
+    await expect(dlg).toContainText(/Codex 0\.171\.0 isn[’']t supported yet/);
+    await expect(dlg).toContainText("versions it was tested with");
+    await expect(dlg).not.toContainText("Update Codex");
+    await expect(button(dlg, "Continue in Browser")).toBeDisabled();
+  });
+
+  // ET 22 Nov: the owner's Claude Code is signed in to a Team plan; the refusal must say whose plan and which
+  test("error path — Use This Account on a Team plan names the account and its plan, with the API key instead", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await openModels(page);
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your Claude account/);
+    await dlg.getByRole("checkbox").click({ force: true });
+    await button(dlg, "Use This Account").click();
+    await expect(dlg.getByRole("alert")).toContainText("ann@example.com has no Claude Pro or Max plan");
+    await expect(dlg.getByRole("alert")).toContainText("team");
+    await expect(button(dlg, "Use an API Key Instead")).toBeVisible();
+    await expect(row(page, "Your Claude account")).toContainText("Not signed in");
+  });
+
   test("other path: Esc hides the waiting sheet, the row keeps Finishing in your browser…, Cancel ends the session", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
     await codexCli(steer, { login: { url: "https://chatgpt.com/device", hold: true } });
@@ -190,6 +218,21 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
     await expect(row(page, "Your Claude account")).toContainText("Signed in");
     await button(page, "Finish").click();
     expect(await sent(page, "setup_set_step")).toContainEqual({ step: "assistants", state: "done" });
+  });
+
+  // ET 22 Nov: the same refusals in the wizard's Assistants step, both providers
+  test("error path: Assistants — a Team plan and an unsupported Codex each say why on the sheet", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: assistantsOpen });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await codexCli(steer, { version: "0.171.0", supported: false });
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const claude = sheet(page, /Sign in with your Claude account/);
+    await claude.getByRole("checkbox").click({ force: true });
+    await button(claude, "Use This Account").click();
+    await expect(claude.getByRole("alert")).toContainText("ann@example.com has no Claude Pro or Max plan");
+    await button(claude, "Cancel").click();
+    await button(row(page, "Your ChatGPT account"), /Sign In/).click();
+    await expect(sheet(page, /Sign in with your ChatGPT account/)).toContainText(/Codex 0\.171\.0 isn[’']t supported yet/);
   });
 
   test("other path: Install Ollama… installs the local runtime through cli_install and the offer goes away", async ({ page }) => {
