@@ -549,6 +549,15 @@ export type BudgetState = {
 
 export type BundleState = "pending" | "downloading" | "paused" | "verifying" | "ready" | "checksum_failed" | "failed";
 
+export type Cadence = {
+	/**  Most of their calls had just the two of you. */
+	one_on_one: boolean,
+	/**  The usual gap between calls, when there is one. */
+	every: CadenceEvery | null,
+};
+
+export type CadenceEvery = "weekly" | "every_two_weeks" | "monthly";
+
 export type CalendarAccess = 
 /**  Show **Allow Calendar Access**; never asked automatically. */
 "not_asked" | "granted" | "denied" | "read_failed";
@@ -2152,6 +2161,12 @@ export type Lang = "en" | "ru" | "de" |
 	code: string,
 };
 
+export type LanguageShare = {
+	lang: Lang,
+	/**  0..=1 of their transcribed speech. */
+	share: number | null,
+};
+
 export type LastTimeLine = {
 	call: CallRef,
 	/**  The previous call's one-line summary. */
@@ -2587,6 +2602,13 @@ export type PersonPage = {
 	topics: TopicRow[],
 	/**  Only when behaviour metrics are on (D47). */
 	talk_share: number | null,
+	/**  The languages of their transcribed lines, largest share first (PE-R5 Languages, #1152). */
+	languages?: LanguageShare[],
+	/**
+	 *  How often you meet, from their calls (PE-R1 subtitle "1:1 weekly"); absent when no
+	 *  pattern shows (#1152, contract 2.25).
+	 */
+	cadence?: Cadence | null,
 };
 
 export type PersonPatch = {
@@ -2916,6 +2938,11 @@ export type SearchHit = {
 	provenance: Provenance,
 	/**  The query matched across languages ("Cross-language match"). */
 	cross_language: boolean,
+	/**
+	 *  For an item target: the item as its row draws it (owner, due, spans, state); absent for
+	 *  other targets and for an item gone since indexing (issue 1155, contract 2.25).
+	 */
+	item?: ItemView | null,
 };
 
 export type SearchMode = { type: "hybrid" } | 
@@ -3109,6 +3136,15 @@ export type ShareTestRow = {
 };
 
 export type ShareVisibility = "hidden" | "visible" | "depends_on_app";
+
+/**
+ *  `account_signin_code`: the code the provider's page shows, for a CLI login that asks for it
+ *  (Claude's "Paste code here if prompted"; issue 1136, contract 2.25). Never logged.
+ */
+export type SignInCodeArgs = {
+	session_id: SignInSessionId,
+	code: string,
+};
 
 /**  Step 1 of the sign-in sheet: Prepare. */
 export type SignInPrepare = {
@@ -3666,6 +3702,9 @@ export type UnnamedSpeaker = {
 	n: number,
 	segment_count: number,
 	sample: TimeSpan | null,
+	/**  What the speaker said in `sample`, in its own language (issue 1151, contract 2.25). */
+	sample_text?: string | null,
+	sample_lang?: Lang | null,
 	suggestion: PersonChip | null,
 };
 
@@ -3787,7 +3826,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.27";
+export const CONTRACT_VERSION = "2.28";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3933,6 +3972,7 @@ export const COMMANDS = {
   cli_install: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_signin_start: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_signin_cancel: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
+  account_signin_code: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_use_existing: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_bind_agents: { group: "settings_and_credentials", stability: "frozen", windows: ["main", "settings", "first-run"], channel: false },
   account_test: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "first-run", "main"], channel: false },
@@ -4116,6 +4156,7 @@ export interface CommandArgs {
   cli_install: CliInstallArgs;
   account_signin_start: SignInStartArgs;
   account_signin_cancel: SignInSessionArgs;
+  account_signin_code: SignInCodeArgs;
   account_use_existing: AccountProviderArgs;
   account_bind_agents: AccountBindArgs;
   account_test: AccountProviderArgs;
@@ -4297,6 +4338,7 @@ export interface CommandResults {
   cli_install: JobAccepted;
   account_signin_start: SignInSession;
   account_signin_cancel: AccountsView;
+  account_signin_code: Ack;
   account_use_existing: AccountsView;
   account_bind_agents: AccountBindResult;
   account_test: AccountTestResult;
@@ -4921,6 +4963,7 @@ export function createCore(transport: Transport) {
      */
     accountSigninStart: (args: SignInStartArgs) => call("account_signin_start", args),
     accountSigninCancel: (args: SignInSessionArgs) => call("account_signin_cancel", args),
+    accountSigninCode: (args: SignInCodeArgs) => call("account_signin_code", args),
     /**
      * Use This Account: bind the sign-in the CLI already has on this Mac.
      */

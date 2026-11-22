@@ -876,3 +876,55 @@ async fn the_launch_read_of_the_accounts_can_be_awaited() {
         .await
         .expect("the launch read ends once the probe answers");
 }
+
+#[tokio::test(start_paused = true)]
+// issue 1136: Claude's fallback page ends on a code to paste into the login; the sheet's field
+// sends it, the login finishes, and the code reaches neither the log nor the change history.
+async fn a_pasted_code_finishes_a_claude_sign_in_waiting_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    w.cli.set(tool(
+        r#"{"tool":"claude_code","installed":true,"path":"/bin/claude","version":"2.1.325",
+            "login_identity":{"email":"ann@example.com","plan":"Max"},
+            "login":{"hold":true}}"#,
+    ));
+    codex(&w, "Plus", 60_000);
+    let session = w
+        .core
+        .account_signin_start(&settings(), start(CLAUDE, true))
+        .await
+        .unwrap();
+    let code = |code: &str| SignInCodeArgs {
+        session_id: session.id.clone(),
+        code: code.into(),
+    };
+    let empty = w.core.account_signin_code(&settings(), code("  ")).await;
+    assert_eq!(empty.unwrap_err().code, ErrorCode::InvalidInput);
+    let unknown = SignInCodeArgs {
+        session_id: SignInSessionId::new("sis_nope"),
+        code: "abc".into(),
+    };
+    let err = w.core.account_signin_code(&settings(), unknown).await;
+    assert_eq!(err.unwrap_err().code, ErrorCode::NotFound);
+    w.core
+        .account_signin_code(&settings(), code(" sk-paste-me#state "))
+        .await
+        .unwrap();
+    wait(1_000).await;
+    assert!(is_signed_in(&view(&w).await, CLAUDE));
+    assert!(w.cli.log().contains(&"code:Claude".to_string()));
+    assert!(!w.cli.log().iter().any(|l| l.contains("paste-me")));
+    assert!(!account_row(&w).contains("paste-me"));
+    // ChatGPT's device sign-in shows its own code; nothing is pasted into it
+    let chatgpt = w
+        .core
+        .account_signin_start(&settings(), start(CHATGPT, false))
+        .await
+        .unwrap();
+    let none = SignInCodeArgs {
+        session_id: chatgpt.id,
+        code: "abc".into(),
+    };
+    let err = w.core.account_signin_code(&settings(), none).await;
+    assert_eq!(err.unwrap_err().code, ErrorCode::InvalidInput);
+}

@@ -338,6 +338,8 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
             n: r.get(1)?,
             segment_count: r.get(6)?,
+            sample_text: None,
+            sample_lang: None,
             suggestion: None,
         })
     })?
@@ -657,6 +659,8 @@ impl Core {
             open_questions,
             topics,
             talk_share,
+            languages: vec![],
+            cadence: None,
         })
         // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-return
         // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-empty

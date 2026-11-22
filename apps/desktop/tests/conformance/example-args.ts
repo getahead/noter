@@ -147,6 +147,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   cli_install: {"tool": "claude_code"},
   account_signin_start: {"provider": "claude", "personal_use_confirmed": false},
   account_signin_cancel: {"session_id": "noter"},
+  account_signin_code: {"session_id": "noter", "code": "noter"},
   account_use_existing: {"provider": "claude"},
   account_bind_agents: {"provider": "claude", "agent_ids": [], "default_for_new_agents": false},
   account_test: {"provider": "claude"},

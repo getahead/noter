@@ -573,12 +573,30 @@ impl AccountCli for CliAccounts {
                 return Err(CliError::Failed("the login printed no page".into()));
             };
             let codex_home = self.codex_home.clone();
+            // Claude's fallback page shows a code to paste into the login (issue 1136): the
+            // sheet's field sends it here and it goes to the CLI's stdin, never to the log.
+            let (paste, mut pasted) = tokio::sync::mpsc::unbounded_channel::<String>();
             // Dropping `done` (cancel, timeout, a new sign-in) kills the CLI.
             let done: BoxFuture<'static, LoginOutcome> = Box::pin(async move {
-                let _stdin = stdin;
+                use tokio::io::AsyncWriteExt;
+                let mut stdin = stdin;
+                let feed = async {
+                    while let Some(code) = pasted.recv().await {
+                        if let Some(input) = stdin.as_mut() {
+                            let line = format!("{code}\n");
+                            let _ = input.write_all(line.as_bytes()).await;
+                            let _ = input.flush().await;
+                        }
+                    }
+                    // the sheet is gone: stdin stays open until the login ends
+                    std::future::pending::<()>().await;
+                };
                 let mut sink = tokio::io::sink();
                 let drain = tokio::io::copy(&mut stdout, &mut sink);
-                let (exit, _) = tokio::join!(child.wait(), drain);
+                let (exit, _) = tokio::select! {
+                    ended = async { tokio::join!(child.wait(), drain) } => ended,
+                    () = feed => unreachable!("feeding codes never ends on its own"),
+                };
                 match exit {
                     Ok(exit) if exit.success() => {
                         match auth_state(tool, &program, &codex_home).await {
@@ -590,7 +608,13 @@ impl AccountCli for CliAccounts {
                     Err(_) => LoginOutcome::Failed("login wait".into()),
                 }
             });
-            Ok(LoginStart { url, code, done })
+            let paste = (provider == AccountProvider::Claude).then_some(paste);
+            Ok(LoginStart {
+                url,
+                code,
+                done,
+                paste,
+            })
         })
     }
     // @cpt-end:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account

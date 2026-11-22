@@ -30,8 +30,8 @@ mod tools;
 mod validate;
 
 pub use account_cli::{
-    tool_of, AccountCli, CliError, CliStatus, InstallScript, LoginOutcome, LoginScript, LoginStart,
-    NoAccountCli, ScriptedAccountCli, ToolScript,
+    tool_of, AccountCli, CliError, CliStatus, CodeSink, InstallScript, LoginOutcome, LoginScript,
+    LoginStart, NoAccountCli, ScriptedAccountCli, ToolScript,
 };
 pub use adapters::cli::{CliAccounts, CliConfig};
 pub use adapters::ollama::OllamaConfig;

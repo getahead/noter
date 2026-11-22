@@ -59,6 +59,11 @@ pub struct UnnamedSpeaker {
     pub n: u16,
     pub segment_count: u32,
     pub sample: Option<TimeSpan>,
+    /// What the speaker said in `sample`, in its own language (issue 1151, contract 2.25).
+    #[serde(default)]
+    pub sample_text: Option<String>,
+    #[serde(default)]
+    pub sample_lang: Option<Lang>,
     pub suggestion: Option<PersonChip>,
 }
 
@@ -75,6 +80,36 @@ pub struct PersonPage {
     pub topics: Vec<TopicRow>,
     /// Only when behaviour metrics are on (D47).
     pub talk_share: Option<f32>,
+    /// The languages of their transcribed lines, largest share first (PE-R5 Languages, #1152).
+    #[serde(default)]
+    pub languages: Vec<LanguageShare>,
+    /// How often you meet, from their calls (PE-R1 subtitle "1:1 weekly"); absent when no
+    /// pattern shows (#1152, contract 2.25).
+    #[serde(default)]
+    pub cadence: Option<Cadence>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct LanguageShare {
+    pub lang: Lang,
+    /// 0..=1 of their transcribed speech.
+    pub share: f32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Type)]
+pub struct Cadence {
+    /// Most of their calls had just the two of you.
+    pub one_on_one: bool,
+    /// The usual gap between calls, when there is one.
+    pub every: Option<CadenceEvery>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum CadenceEvery {
+    Weekly,
+    EveryTwoWeeks,
+    Monthly,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

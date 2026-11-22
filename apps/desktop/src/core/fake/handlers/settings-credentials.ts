@@ -225,6 +225,13 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     publish("accounts:changed");
     return world.app.accounts;
   },
+  // The code reaches the login's stdin in the real core; the fake only checks the session (issue 1136).
+  account_signin_code: (a, { world }) => {
+    const acc = world.app.accounts.accounts.find((x) => x.status.type === "signing_in" && x.status.session_id === a.session_id);
+    if (!acc) throw coreError("not_found", `session ${a.session_id}`);
+    if (!a.code.trim()) throw coreError("invalid_input", "the code is empty", { type: "validation", field: "code", rule: "required" });
+    return {};
+  },
   account_use_existing: (a, { world, publish }) => {
     const acc = world.app.accounts.accounts.find((x) => x.provider === a.provider);
     if (!acc) throw coreError("not_found");

@@ -226,6 +226,10 @@ pub struct SearchHit {
     pub provenance: Provenance,
     /// The query matched across languages ("Cross-language match").
     pub cross_language: bool,
+    /// For an item target: the item as its row draws it (owner, due, spans, state); absent for
+    /// other targets and for an item gone since indexing (issue 1155, contract 2.25).
+    #[serde(default)]
+    pub item: Option<ItemView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

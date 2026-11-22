@@ -8,7 +8,7 @@ import { FakeCore } from "../../core/fake/fake-core";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { loadAccounts } from "./accounts";
-import { AccountSignInSheet } from "./AccountSignInSheet";
+import { AccountSignInSheet, sendSignInCode } from "./AccountSignInSheet";
 import { canContinue } from "./signin-session";
 import { signInMachines } from "./signin-store";
 
@@ -63,6 +63,21 @@ describe("AccountSignInSheet", () => {
     expect(m().state.claude.phase).toBe("BROWSER");
     expect(html("claude")).toContain("ABCD-EFGH");
     expect(html("claude")).toContain("Waiting for your browser…");
+  });
+
+  it("#1136: Claude's waiting step takes the code the fallback page shows and sends it to the login; ChatGPT has no such field", async () => {
+    const { seen } = await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "confirm", on: true });
+    m().dispatch("claude", { type: "choose", choice: "other" });
+    await m().proceed("claude");
+    expect(html("claude")).toContain("If the page shows a code, paste it here");
+    expect(html("claude")).toContain("Send Code");
+    expect(await sendSignInCode(bridge, m().state.claude.session!.id, " abc#123 ")).toBe(true);
+    expect(seen).toContainEqual(["account_signin_code", { session_id: m().state.claude.session!.id, code: "abc#123" }]);
+    await m().open("chatgpt");
+    await m().proceed("chatgpt");
+    expect(html("chatgpt")).not.toContain("paste it here");
   });
 
   it("hides on Esc without cancelling, Show restores it and Cancel sends account_signin_cancel", async () => {

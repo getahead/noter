@@ -88,7 +88,7 @@ commands = [
   "people_list", "person_get", "person_create", "person_update", "people_merge", "person_delete",
   "voice_profile_create", "voice_profile_delete",
   "api_key_remove", "account_signin_prepare", "cli_install",
-  "account_signin_start", "account_signin_cancel", "account_use_existing", "account_bind_agents",
+  "account_signin_start", "account_signin_cancel", "account_signin_code", "account_use_existing", "account_bind_agents",
   "account_test", "account_sign_out",
   "sources_list", "source_add_folder", "source_add_mcp", "source_update", "source_reindex",
   "source_remove", "source_revoke_token",

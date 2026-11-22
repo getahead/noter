@@ -557,6 +557,7 @@ commands! {
     /// Step 2 (Sign in): the CLI opens the browser; progress on `signin:progress`.
     account_signin_start(SignInStartArgs) -> SignInSession [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     account_signin_cancel(SignInSessionArgs) -> AccountsView [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
+    account_signin_code(SignInCodeArgs) -> Ack [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     /// Use This Account: bind the sign-in the CLI already has on this Mac.
     account_use_existing(AccountProviderArgs) -> AccountsView [SettingsAndCredentials, Frozen, Main | Settings | FirstRun];
     /// Step 4 (Use): switch agents to the account, with Undo.

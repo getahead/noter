@@ -1106,6 +1106,15 @@ impl CoreApi for Core {
         self.signin_cancel(&args.session_id).await
     }
 
+    async fn account_signin_code(
+        &self,
+        _ctx: &CommandCtx,
+        args: SignInCodeArgs,
+    ) -> Result<Ack, CoreError> {
+        self.signin_code(&args.session_id, &args.code)?;
+        Ok(Ack {})
+    }
+
     async fn account_use_existing(
         &self,
         ctx: &CommandCtx,
