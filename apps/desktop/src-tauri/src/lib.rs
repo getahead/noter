@@ -368,6 +368,7 @@ fn account_cli() -> CliAccounts {
         claude: find_cli(&home, "claude"),
         codex: find_cli(&home, "codex"),
         ollama: find_cli(&home, "ollama"),
+        codex_home: home.join(".codex"),
     }
 }
 

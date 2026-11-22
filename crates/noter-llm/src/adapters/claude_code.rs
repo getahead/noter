@@ -6,6 +6,7 @@
 //! Noter-owned home; own-account runs keep every other flag without `--bare` and run in the
 //! user's home, where Claude Code keeps its sign-in. Structured output against the app schema.
 
+use noter_protocol::model::CliTool;
 use noter_protocol::RuntimeChoice;
 use serde_json::{json, Value};
 use tokio::process::Command;
@@ -128,7 +129,7 @@ impl RuntimeAdapter for ClaudeCode {
     }
 
     fn probe(&self) -> BoxFuture<'_, ()> {
-        Box::pin(self.0.observe_claude_sign_in())
+        Box::pin(self.0.observe_sign_in(CliTool::ClaudeCode))
     }
 
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>> {
