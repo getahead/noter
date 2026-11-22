@@ -152,6 +152,20 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
   });
 });
 
+test.describe("cpt-noter-seq-menu-bar-control-recording", () => {
+  // #1040: Call info › Processing follows Pause and Resume from another surface while the page stays open
+  test("UI — other path: the live call's page follows Pause and Resume in Call info › Processing", async ({ page }) => {
+    const steer = await openWindow(page, "main", { world: () => {} });
+    await openCall(page, W.LIVE_TITLE);
+    const processing = info(page).locator(".pc-info__sec").filter({ has: page.getByRole("heading", { name: "Processing", exact: true }) });
+    await expect(processing).toContainText("Recording");
+    for (const [paused, status] of [[true, "Paused"], [false, "Recording"]] as const) {
+      await steer.invoke("capture_set_paused", { call_id: W.LIVE_CALL, paused }, "call-screen");
+      await expect(processing).toContainText(status);
+    }
+  });
+});
+
 test.describe("cpt-noter-flow-ui-call-page-frame-more-menu", () => {
   test("UI — happy path: ⋯ offers Rename…, Call Type ▸, Mark as Sensitive, Show in Finder and Delete Call… (⌘⌫), no later-milestone items", async ({
     page,

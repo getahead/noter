@@ -72,7 +72,11 @@ describe("window scope with valid arguments (PM-08): refused, and nothing change
     const err = await (s as unknown as { core(w: WindowLabel): { [k: string]: unknown } }).core(window) && (await invokeRaw(window, cmd, args));
     expect(err?.code).toBe("window_not_allowed");
     const after = ok(await s.core("main").appSnapshot({}));
-    expect(after.capture).toEqual(before.capture);
+    // a snapshot reads the time recorded up to now (#1048): a refused command changes nothing, while a recording keeps counting
+    const { recorded_ms: was, ...captureBefore } = before.capture;
+    const { recorded_ms: now, ...captureAfter } = after.capture;
+    expect(captureAfter).toEqual(captureBefore);
+    expect(now).toBeGreaterThanOrEqual(was);
     expect(after.setup.version).toBe(before.setup.version);
     if (calls !== null) expect(ok(await s.core("main").callsList({ filter: {}, sort: "newest", page: {} })).total).toBe(calls);
     expect(ok(await s.core("settings").hotkeysList({}))).toEqual(keys);

@@ -442,39 +442,53 @@ fn select_all_context<R: Runtime>(
 
 /// Mirror the core's recording and presenting state in the app-owned Call menu.
 pub fn update_app_menu_from_tray<R: Runtime>(app: &AppHandle<R>, model: &TrayModel) {
-    let start = model
-        .item(TrayAction::StopRecording)
-        .filter(|item| item.enabled)
-        .or_else(|| model.item(TrayAction::StartRecording));
-    if let Some(item) = start {
-        set_text_enabled_by_id(app, "menu.start_recording", &item.label, item.enabled);
-    }
-    let pause = model
-        .item(TrayAction::Pause)
-        .filter(|item| item.enabled)
-        .or_else(|| model.item(TrayAction::Resume));
-    if let Some(item) = pause {
-        set_text_enabled_by_id(app, "menu.pause", &item.label, item.enabled);
-    }
-    let presenting = model
-        .item(TrayAction::HideForPresenting)
-        .filter(|item| item.enabled)
-        .or_else(|| model.item(TrayAction::ShowAfterPresenting));
-    if let Some(item) = presenting {
-        set_text_enabled_by_id(app, "menu.hide_for_presenting", &item.label, item.enabled);
-    }
-    for (id, action) in [
-        ("menu.mark_moment", TrayAction::MarkMoment),
-        ("menu.open_call_screen", TrayAction::OpenCallScreen),
-        ("menu.use_floating_panel", TrayAction::UseFloatingPanel),
-    ] {
-        if let Some(item) = model.item(action) {
-            set_text_enabled_by_id(app, id, &item.label, item.enabled);
-            if action == TrayAction::UseFloatingPanel {
-                set_checked_by_id(app, id, item.checked == Some(true));
-            }
+    for (id, label, enabled, checked) in app_menu_state(model) {
+        set_text_enabled_by_id(app, id, &label, enabled);
+        if let Some(checked) = checked {
+            set_checked_by_id(app, id, checked);
         }
     }
+}
+
+/// Each Call menu item's label, enabled state and checkmark from the tray model. An item the
+/// model leaves out (Pause and Mark Moment with no recording) is dimmed under its catalogue
+/// label, never left as it last was (issue 1041).
+fn app_menu_state(model: &TrayModel) -> Vec<(&'static str, String, bool, Option<bool>)> {
+    let either = |on: TrayAction, off: TrayAction| {
+        model
+            .item(on)
+            .filter(|item| item.enabled)
+            .or_else(|| model.item(off))
+    };
+    [
+        (
+            "menu.start_recording",
+            either(TrayAction::StopRecording, TrayAction::StartRecording),
+        ),
+        ("menu.pause", either(TrayAction::Pause, TrayAction::Resume)),
+        (
+            "menu.hide_for_presenting",
+            either(
+                TrayAction::HideForPresenting,
+                TrayAction::ShowAfterPresenting,
+            ),
+        ),
+        ("menu.mark_moment", model.item(TrayAction::MarkMoment)),
+        (
+            "menu.open_call_screen",
+            model.item(TrayAction::OpenCallScreen),
+        ),
+        (
+            "menu.use_floating_panel",
+            model.item(TrayAction::UseFloatingPanel),
+        ),
+    ]
+    .into_iter()
+    .map(|(id, item)| match item {
+        Some(item) => (id, item.label.clone(), item.enabled, item.checked),
+        None => (id, catalogue(id), false, None),
+    })
+    .collect()
 }
 
 fn set_enabled_by_id<R: Runtime>(menu: &Menu<R>, id: &str, enabled: bool) {
@@ -554,6 +568,57 @@ pub fn navigate_from_menu<R: Runtime>(app: &AppHandle<R>, target: NavTarget) {
 #[cfg(test)]
 mod menu_tests {
     use super::*;
+
+    fn item(action: TrayAction, label: &str, enabled: bool) -> noter_core::TrayEntry {
+        noter_core::TrayEntry::Item(noter_core::TrayItem {
+            action,
+            label: label.into(),
+            enabled,
+            checked: None,
+            key: None,
+        })
+    }
+
+    fn state_of(entries: Vec<noter_core::TrayEntry>, id: &str) -> (String, bool) {
+        let model = TrayModel {
+            glyph: noter_core::TrayGlyph::Idle,
+            hidden: false,
+            title: None,
+            label: String::new(),
+            entries,
+        };
+        let found = app_menu_state(&model).into_iter().find(|e| e.0 == id);
+        found
+            .map(|(_, label, enabled, _)| (label, enabled))
+            .unwrap()
+    }
+
+    // cpt-noter-seq-menu-bar-control-recording (issue 1041): no recording, nothing to pause or mark
+    #[test]
+    fn pause_and_mark_moment_are_dimmed_once_the_recording_ends() {
+        let recording = || {
+            vec![
+                item(TrayAction::StopRecording, "Stop Recording", true),
+                item(TrayAction::Pause, "Pause", true),
+                item(TrayAction::MarkMoment, "Mark Moment", true),
+            ]
+        };
+        assert_eq!(state_of(recording(), "menu.pause"), ("Pause".into(), true));
+        assert_eq!(
+            state_of(recording(), "menu.mark_moment"),
+            ("Mark Moment".into(), true)
+        );
+        let idle = || vec![item(TrayAction::StartRecording, "Start Recording", true)];
+        assert_eq!(state_of(idle(), "menu.pause"), ("Pause".into(), false));
+        assert_eq!(
+            state_of(idle(), "menu.mark_moment"),
+            ("Mark Moment".into(), false)
+        );
+        assert_eq!(
+            state_of(idle(), "menu.start_recording"),
+            ("Start Recording".into(), true)
+        );
+    }
 
     #[test]
     fn failed_capture_snapshot_never_exits() {

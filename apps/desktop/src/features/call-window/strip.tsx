@@ -171,6 +171,7 @@ export function CallStatusStrip(p: StripProps) {
               size="small"
               help={p.keys.mark ? t("cw.mark_help", { key: p.keys.mark }) : undefined}
               loading={p.busy.mark}
+              disabled={paused}
               flash={p.marked ?? undefined}
               onAction={p.onMark}
             />
@@ -194,7 +195,7 @@ export function CallStatusStrip(p: StripProps) {
         <PushButton label={t("action.try_again")} variant="primary" loading={p.busy.retry} onAction={p.onRetry} />
       ) : (
         <>
-          <PushButton label={t("cw.mark")} kbd={p.keys.mark || undefined} loading={p.busy.mark} flash={p.marked ?? undefined} onAction={p.onMark} />
+          <PushButton label={t("cw.mark")} kbd={p.keys.mark || undefined} loading={p.busy.mark} disabled={paused} flash={p.marked ?? undefined} onAction={p.onMark} />
           <PushButton
             label={t(paused ? "cw.resume" : "cw.pause")}
             kbd={p.keys.pause || undefined}
