@@ -10,7 +10,7 @@ import { evidenceNotes, openEvidence, spanTime } from "./evidence";
 type Phase = "idle" | "loading" | "gone" | "error";
 
 // @cpt-component:cpt-noter-component-ui-provenance-chip:p1
-export function ProvenanceChip({ bridge, span, variant = "timestamp", unverified = false, arrow = false }: { bridge: Bridge; span: TimeSpan; variant?: "chip" | "inline" | "timestamp"; unverified?: boolean; /** The trailing ↗ of a compact item row's evidence (#1072); Ask citations and full rows have none. */ arrow?: boolean }) {
+export function ProvenanceChip({ bridge, span, variant = "timestamp", unverified = false, arrow = variant === "timestamp" }: { bridge: Bridge; span: TimeSpan; variant?: "chip" | "inline" | "timestamp"; unverified?: boolean; /** The timestamp's trailing ↗, as the prototype draws it on item, decision, question and search rows; Ask's citations have none. */ arrow?: boolean }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [notes, setNotes] = useState<ReturnType<typeof evidenceNotes> | null>(null);
   const open = async () => {
