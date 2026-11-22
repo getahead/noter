@@ -23,6 +23,7 @@ const props = (o: Partial<PeopleBodyProps>): PeopleBodyProps => ({
 describe("cpt-noter-flow-ui-people-prepare", () => {
   it("LISTED: a row with name, role · org, open items, last call and the voice profile", () => {
     const h = renderToString(<PeopleBody {...props({})} />);
+    expect(h).toMatch(/aria-sort="ascending"[^>]*>Name<svg class="np-ic np-th__sort"/); // Name ⌃: the table's true order (#1085)
     expect(h).toContain("Anna Kuznetsova");
     expect(h).toContain("PM · Acme");
     expect(h).toContain("Voice profile on");

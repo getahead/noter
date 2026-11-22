@@ -8,7 +8,7 @@ import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Menu } from "../../ui/primitives/menu";
-import { Table } from "../../ui/primitives/table";
+import { Table, Th } from "../../ui/primitives/table";
 import { useSheetIfAny } from "../../ui/dialogs/host";
 import { threadActions, useRegisterTopicSheets } from "./ThreadPage";
 import { filterTopics, lastSeen, mergeTopics } from "./topics-model";
@@ -98,7 +98,8 @@ export function TopicsBody({ bridge, status, retry, topics, shown, names, words,
             <th scope="col" style={{ width: "80px" }}>{t("topics.col.calls")}</th>
             <th scope="col" style={{ width: "100px" }}>{t("topics.col.decisions")}</th>
             <th scope="col" style={{ width: "130px" }}>{t("topics.col.open")}</th>
-            <th scope="col" style={{ width: "130px" }}>{t("topics.col.last")}</th>
+            {/* the core lists topics newest first: the header shows that true order (owner, 22 Nov) */}
+            <Th label={t("topics.col.last")} sort="desc" width="130px" />
             <th scope="col" style={{ width: "36px" }}><span className="np-sr">{t("topics.col.go")}</span></th>
           </tr>
         </thead>
