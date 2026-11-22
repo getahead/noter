@@ -265,12 +265,31 @@ async fn the_unnamed_queue_lists_speaker_rows_without_a_person() {
     assert_eq!(u.call.id.as_str(), "call_b");
     assert!(u.sample.is_some(), "audio remains");
     assert!(u.suggestion.is_none());
+    // issue 1151: the row quotes what the speaker said, in its own language
+    assert_eq!(u.sample_text.as_deref(), Some("hello there"));
+    assert_eq!(u.sample_lang, None, "the line has no language");
+    exec(
+        dir.path(),
+        "UPDATE segments SET lang = 'de', text = 'Fast, ja.' WHERE id = 'seg_2'",
+    )
+    .unwrap();
+    let u = &list(&core, None).await.unnamed[0];
+    assert_eq!(
+        (u.sample_text.as_deref(), u.sample_lang.clone()),
+        (Some("Fast, ja."), Some(Lang::De))
+    );
     exec(
         dir.path(),
         "UPDATE calls SET audio_deleted = 1 WHERE id = 'call_b'",
     )
     .unwrap();
-    assert!(list(&core, None).await.unnamed[0].sample.is_none());
+    let u = &list(&core, None).await.unnamed[0];
+    assert!(u.sample.is_none());
+    assert_eq!(
+        u.sample_text.as_deref(),
+        Some("Fast, ja."),
+        "the text outlives the audio"
+    );
 }
 
 #[tokio::test]

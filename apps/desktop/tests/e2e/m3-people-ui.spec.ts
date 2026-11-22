@@ -93,7 +93,7 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
 });
 
 test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
-  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. in 1 call, the row is gone", async ({ page }) => {
+  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. in its call, the row is gone", async ({ page }) => {
     await openPeople(page);
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await expect(unnamed).toContainText("Speaker 3");
@@ -105,7 +105,7 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toEqual([
       expect.objectContaining({ speaker_id: expect.stringMatching(/./), person: { type: "existing", person_id: "per_dmitri" } }),
     ]);
-    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. in 1 call/)).toBeVisible();
+    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. in /)).toBeVisible(); // in {call} (#1151)
     await expect(unnamed.getByText("Speaker 3")).toHaveCount(0);
   });
 

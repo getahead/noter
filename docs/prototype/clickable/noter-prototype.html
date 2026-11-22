@@ -1568,7 +1568,9 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .pe-unnamed__list { border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--card-bg); }
 .pe-urow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--sep); }
 .pe-urow:last-child { border-bottom: 0; }
-.pe-urow__sample { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.pe-urow__sample { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; flex: 0 100 auto; }
+.pe-urow__day { flex: none; }
+.pe-urow__meta { min-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
 .pe-picker { display: grid; gap: 6px; }
 .pe-picker__list { display: grid; gap: 1px; max-height: 220px; overflow: auto; }
 .pe-picker__opt { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 5px 6px; border-radius: var(--r-control); cursor: pointer; text-align: left; }
@@ -7143,8 +7145,9 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
     'p-markus': { theirOpen: 0, youOwe: 1, lastCall: '7 Oct', sub: 'Vendor account manager · MonitorCo · 2 calls', langs: 'German 70 % · English 30 %' },
   };
   D.unnamedVoices = [
-    { id: 'u-2', label: 'Speaker 2', calls: 3, last: '9 Oct', sample: '“Fast, ja. Der Kanal ist da, aber…”', lang: 'de' },
-    { id: 'u-4', label: 'Speaker 4', calls: 1, last: '13 Oct', sample: '“Хорошо, тогда я посмотрю логи.”', lang: 'ru' },
+    // one row per call until voice profiles group a speaker across calls (owner, #1151)
+    { id: 'u-4', label: 'Speaker 4', call: 'Planning: VHI 8.0 drawer redesign', calls: 1, last: '16 Oct', sample: '“Хорошо, тогда я посмотрю логи.”', lang: 'ru' },
+    { id: 'u-2', label: 'Speaker 2', call: 'Vendor call: MonitorCo', calls: 1, last: '7 Oct', sample: '“Fast, ja. Der Kanal ist da, aber…”', lang: 'de' },
   ];
 
   /* Items the user owes people ("Asked you") */
@@ -8049,7 +8052,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
           <div class="pe-picker__list" role="listbox">${list.map((x) => html`<button type="button" role="option" class="pe-picker__opt" ${act('ppl.name', { speaker: p.id, person: x.id })}><span class="np-person__ini">${x.initials}</span><span>${x.short}</span><span class="np-dim">${x.role}</span></button>`)}
           ${q && !list.length ? html`<div class="np-dim pe-picker__none">No one called “${q}”</div>` : ''}
           ${q ? html`<button type="button" class="pe-picker__opt pe-picker__new" ${act('ppl.newFor', { speaker: p.id, name: q, anchor: p.anchor })}>${icon('plus', { size: 12 })}<span>New Person “${q}”…</span></button>` : ''}</div>`)}
-        <div class="np-dim t-callout">Names ${p.label} in all ${p.calls} calls as one change you can undo.</div>`);
+        <div class="np-dim t-callout">Names ${p.label} in this call as one change you can undo.</div>`);
     },
   });
 
@@ -8094,7 +8097,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
           : C.emptyState({ variant: 'filtered', title: `No people match “${q}”`, actionLabel: 'Clear Search', action: ['ppl.clearQ'] }))}
         ${nSel >= 2 ? html`<p class="lb-hint" data-proto-chrome>${nSel} selected · right-click for Merge 2 People…</p>` : list.length ? html`<p class="lb-hint" data-proto-chrome>Click selects (⌘-click adds) · double-click or a name opens the Person page</p>` : ''}
         ${unnamed.length ? region('PL-R3', { label: 'Unnamed speakers', cls: 'pe-unnamed' }, html`<h2 class="np-section-h">Unnamed speakers <span class="np-dim">· ${unnamed.length}</span></h2>
-          <div class="pe-unnamed__list">${unnamed.map((u) => html`<div class="pe-urow">${C.speakerLabel(u.label, { static: true })}<span class="np-muted">· ${u.calls} call${u.calls === 1 ? '' : 's'} · last on ${u.last}</span><span class="np-dim pe-urow__sample" lang="${u.lang}">${u.sample}</span><span class="np-tb__spacer"></span>${P.button('Name…', { size: 'small', anchor: 'pl-name-' + u.id, action: ['ppl.namePop', { anchor: 'pl-name-' + u.id, id: u.id }] })}</div>`)}</div>`) : ''}`;
+          <div class="pe-unnamed__list">${unnamed.map((u) => html`<div class="pe-urow">${C.speakerLabel(u.label, { static: true })}<span class="np-muted pe-urow__meta">in ${u.call}</span><span class="np-muted pe-urow__day">· ${u.last}</span><span class="np-dim pe-urow__sample" lang="${u.lang}">${u.sample}</span><span class="np-tb__spacer"></span>${P.button('Name…', { size: 'small', anchor: 'pl-name-' + u.id, action: ['ppl.namePop', { anchor: 'pl-name-' + u.id, id: u.id }] })}</div>`)}</div>`) : ''}`;
     },
   });
 
@@ -8260,7 +8263,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
     'ppl.name': (a) => {
       const u = D.unnamedVoices.find((x) => x.id === a.speaker);
       PL().named[a.speaker] = a.person; NP.state.popover = null;
-      NP.undo(`Named ${u.label} as ${D.person(a.person).short} in ${u.calls} call${u.calls === 1 ? '' : 's'}`, { where: 'people', action: 'ppl.unname', args: { speaker: a.speaker }, redoAction: 'ppl.rename', context: `${u.calls} calls · last on ${u.last}` });
+      NP.undo(`Named ${u.label} as ${D.person(a.person).short} in ${u.call}`, { where: 'people', action: 'ppl.unname', args: { speaker: a.speaker }, redoAction: 'ppl.rename', context: `in ${u.call} · ${u.last}` });
       NP.state.undo.args.person = a.person;
     },
     'ppl.unname': (a) => { PL().named[a.speaker] = null; },

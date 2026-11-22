@@ -14,6 +14,6 @@ describe("cpt-noter-flow-ui-people-name Undo", () => {
     const bridge = { act: async (_k: string, _c: string, run: () => unknown) => (run(), res), core: { transcriptRenameSpeaker: vi.fn() } } as never;
     expect(await nameSpeaker(bridge, u, { type: "existing", person_id: "per_d" }, "Dmitri")).toBe(true);
     expect(held.mock.calls[0]![0].refresh).toBe(bumpPerson);
-    expect(held.mock.calls[0]![0].message).toBe("Named Speaker 3 as Dmitri S. in 1 call");
+    expect(held.mock.calls[0]![0].message).toBe("Named Speaker 3 as Dmitri S. in Sync");
   });
 });

@@ -43,7 +43,7 @@
           <div class="pe-picker__list" role="listbox">${list.map((x) => html`<button type="button" role="option" class="pe-picker__opt" ${act('ppl.name', { speaker: p.id, person: x.id })}><span class="np-person__ini">${x.initials}</span><span>${x.short}</span><span class="np-dim">${x.role}</span></button>`)}
           ${q && !list.length ? html`<div class="np-dim pe-picker__none">No one called “${q}”</div>` : ''}
           ${q ? html`<button type="button" class="pe-picker__opt pe-picker__new" ${act('ppl.newFor', { speaker: p.id, name: q, anchor: p.anchor })}>${icon('plus', { size: 12 })}<span>New Person “${q}”…</span></button>` : ''}</div>`)}
-        <div class="np-dim t-callout">Names ${p.label} in all ${p.calls} calls as one change you can undo.</div>`);
+        <div class="np-dim t-callout">Names ${p.label} in this call as one change you can undo.</div>`);
     },
   });
 
@@ -88,7 +88,7 @@
           : C.emptyState({ variant: 'filtered', title: `No people match “${q}”`, actionLabel: 'Clear Search', action: ['ppl.clearQ'] }))}
         ${nSel >= 2 ? html`<p class="lb-hint" data-proto-chrome>${nSel} selected · right-click for Merge 2 People…</p>` : list.length ? html`<p class="lb-hint" data-proto-chrome>Click selects (⌘-click adds) · double-click or a name opens the Person page</p>` : ''}
         ${unnamed.length ? region('PL-R3', { label: 'Unnamed speakers', cls: 'pe-unnamed' }, html`<h2 class="np-section-h">Unnamed speakers <span class="np-dim">· ${unnamed.length}</span></h2>
-          <div class="pe-unnamed__list">${unnamed.map((u) => html`<div class="pe-urow">${C.speakerLabel(u.label, { static: true })}<span class="np-muted">· ${u.calls} call${u.calls === 1 ? '' : 's'} · last on ${u.last}</span><span class="np-dim pe-urow__sample" lang="${u.lang}">${u.sample}</span><span class="np-tb__spacer"></span>${P.button('Name…', { size: 'small', anchor: 'pl-name-' + u.id, action: ['ppl.namePop', { anchor: 'pl-name-' + u.id, id: u.id }] })}</div>`)}</div>`) : ''}`;
+          <div class="pe-unnamed__list">${unnamed.map((u) => html`<div class="pe-urow">${C.speakerLabel(u.label, { static: true })}<span class="np-muted pe-urow__meta">in ${u.call}</span><span class="np-muted pe-urow__day">· ${u.last}</span><span class="np-dim pe-urow__sample" lang="${u.lang}">${u.sample}</span><span class="np-tb__spacer"></span>${P.button('Name…', { size: 'small', anchor: 'pl-name-' + u.id, action: ['ppl.namePop', { anchor: 'pl-name-' + u.id, id: u.id }] })}</div>`)}</div>`) : ''}`;
     },
   });
 
@@ -254,7 +254,7 @@
     'ppl.name': (a) => {
       const u = D.unnamedVoices.find((x) => x.id === a.speaker);
       PL().named[a.speaker] = a.person; NP.state.popover = null;
-      NP.undo(`Named ${u.label} as ${D.person(a.person).short} in ${u.calls} call${u.calls === 1 ? '' : 's'}`, { where: 'people', action: 'ppl.unname', args: { speaker: a.speaker }, redoAction: 'ppl.rename', context: `${u.calls} calls · last on ${u.last}` });
+      NP.undo(`Named ${u.label} as ${D.person(a.person).short} in ${u.call}`, { where: 'people', action: 'ppl.unname', args: { speaker: a.speaker }, redoAction: 'ppl.rename', context: `in ${u.call} · ${u.last}` });
       NP.state.undo.args.person = a.person;
     },
     'ppl.unname': (a) => { PL().named[a.speaker] = null; },

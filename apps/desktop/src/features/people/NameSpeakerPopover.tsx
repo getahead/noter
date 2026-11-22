@@ -32,7 +32,7 @@ export async function nameSpeaker(bridge: Bridge, u: UnnamedSpeaker, ref: Person
   const named = res.data.speakers.find((s) => s.id === u.speaker_id);
   const name = named?.label.type === "person" ? named.label.person.short_name : to;
   // @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-undo
-  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "people.named_new" : "people.named", { from: label, to: name }), refresh: bumpPerson });
+  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "people.named_new" : "people.named", { from: label, to: name, call: u.call.title }), refresh: bumpPerson });
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-undo
   return true;
 }

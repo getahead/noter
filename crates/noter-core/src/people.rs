@@ -307,7 +307,9 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
                 (SELECT count(*) FROM segments g WHERE g.speaker_id = s.id),
                 (SELECT t0_ms FROM segments g WHERE g.speaker_id = s.id ORDER BY t0_ms LIMIT 1),
                 (SELECT t1_ms FROM segments g WHERE g.speaker_id = s.id ORDER BY t0_ms LIMIT 1),
-                c.audio_deleted = 0 AND c.audio_not_stored = 0
+                c.audio_deleted = 0 AND c.audio_not_stored = 0,
+                (SELECT text FROM segments g WHERE g.speaker_id = s.id ORDER BY t0_ms LIMIT 1),
+                (SELECT lang FROM segments g WHERE g.speaker_id = s.id ORDER BY t0_ms LIMIT 1)
          FROM speakers s JOIN calls c ON c.id = s.call_id
          WHERE s.person_id IS NULL AND s.n IS NOT NULL AND s.channel = 'sys'
            AND s.pass = (CASE WHEN EXISTS
@@ -338,8 +340,9 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
             speaker_id: SpeakerId::new(r.get::<_, String>(0)?),
             n: r.get(1)?,
             segment_count: r.get(6)?,
-            sample_text: None,
-            sample_lang: None,
+            // what they said, kept with the transcript when the audio is gone (issue 1151)
+            sample_text: r.get(10)?,
+            sample_lang: r.get::<_, Option<String>>(11)?.map(crate::library::lang_of),
             suggestion: None,
         })
     })?

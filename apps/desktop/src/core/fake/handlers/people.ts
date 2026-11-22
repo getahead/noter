@@ -15,7 +15,12 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     return {
       people: world.people.filter((p) => !query || [p.display_name, p.short_name, ...p.aliases].some((name) => fold(name).includes(query))).map((p) => ({ ...p, you_owe: owed(world, p).length })),
       unnamed: world.transcripts.flatMap((t) =>
-        t.speakers.flatMap((s) => (s.label.type === "unnamed" ? [{ call: shared.callRef(shared.call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, suggestion: s.suggestion }] : [])),
+        t.speakers.flatMap((s) => {
+          if (s.label.type !== "unnamed") return [];
+          // what the speaker said first, as the core quotes it (issue 1151)
+          const first = t.segments.find((g) => g.speaker.speaker_id === s.id);
+          return [{ call: shared.callRef(shared.call(world, t.call_id)), speaker_id: s.id, n: s.label.n, segment_count: s.segment_count, sample: s.sample, sample_text: first?.text ?? null, sample_lang: first?.lang ?? null, suggestion: s.suggestion }];
+        }),
       ),
     };
   },
