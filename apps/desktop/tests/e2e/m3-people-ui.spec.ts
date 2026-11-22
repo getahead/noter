@@ -224,10 +224,10 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
     const person = await steer.invoke("person_get", { person_id: "per_anna" }) as import("../../src/core/bindings").PersonPage;
     const stats = person.person.voice_profile_stats!;
     expect(stats.opted_in_at).toEqual(expect.any(Number));
-    // one PE-R5 line: On since … · N profiles · matched in M calls (#1152)
-    const profiles = `${stats.profiles} ${stats.profiles === 1 ? "profile" : "profiles"}`;
-    const matched = `matched in ${stats.matched_calls} ${stats.matched_calls === 1 ? "call" : "calls"}`;
-    await expect(page.getByText(new RegExp(`^On since .+ · ${profiles} · ${matched}$`))).toBeVisible();
+    // one PE-R5 line: On since … · N profiles · matched in M calls, a part that is 0 left out (#1152)
+    const profiles = stats.profiles ? ` · ${stats.profiles} ${stats.profiles === 1 ? "profile" : "profiles"}` : "";
+    const matched = stats.matched_calls ? ` · matched in ${stats.matched_calls} ${stats.matched_calls === 1 ? "call" : "calls"}` : "";
+    await expect(page.getByText(new RegExp(`^On since [^·]+${profiles}${matched}$`))).toBeVisible();
   });
 
   test("UI — other path: Delete Profile… asks Delete Anna K.'s voice profile?; Cancel keeps it, Delete Profile calls voice_profile_delete and Set Up Voice Profile… comes back", async ({ page }) => {

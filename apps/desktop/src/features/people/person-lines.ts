@@ -30,5 +30,7 @@ export function languagesLine(languages: readonly LanguageShare[]): string | nul
  *  profiles kept, not the ones that matched, so the two counts stay apart. */
 export function voiceLine(stats: VoiceProfileStats, prefs: UiPrefs | undefined): string {
   const on = stats.opted_in_at != null ? t("person.voice_since", { date: shortDay(stats.opted_in_at, prefs) }) : t("person.voice_on");
-  return [on, t("person.voice_profiles_n", { count: stats.profiles }), t("person.voice_matched_in", { count: stats.matched_calls })].join(" · ");
+  // a count of 0 (right after Create Profile) reads as broken, so it is left out
+  const counts = [stats.profiles > 0 && t("person.voice_profiles_n", { count: stats.profiles }), stats.matched_calls > 0 && t("person.voice_matched_in", { count: stats.matched_calls })];
+  return [on, ...counts].filter(Boolean).join(" · ");
 }

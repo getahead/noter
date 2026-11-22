@@ -20,5 +20,8 @@ describe("Person page lines (DESIGN PE-R1, PE-R5; issue 1152)", () => {
   it("cpt-noter-seq-people-prepare-one-on-one — #1152: voice profile: since when, how many profiles matched in how many calls", () => {
     expect(voiceLine({ opted_in_at: day(9, 3), profiles: 2, matched_calls: 28 }, prefs)).toBe("On since Oct 3 · 2 profiles · matched in 28 calls");
     expect(voiceLine({ opted_in_at: null, profiles: 1, matched_calls: 1 }, prefs)).toBe("On · 1 profile · matched in 1 call");
+    // right after Create Profile nothing is counted yet: a part that is 0 is left out (#1198 review)
+    expect(voiceLine({ opted_in_at: day(10, 22), profiles: 0, matched_calls: 0 }, prefs)).toBe("On since Nov 22");
+    expect(voiceLine({ opted_in_at: day(10, 22), profiles: 1, matched_calls: 0 }, prefs)).toBe("On since Nov 22 · 1 profile");
   });
 });
