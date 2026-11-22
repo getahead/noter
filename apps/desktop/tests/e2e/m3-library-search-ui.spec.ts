@@ -248,6 +248,8 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
       for (const row of await rows.all()) {
         const last = (await row.locator(":scope > *").last().boundingBox())!;
         expect(last.x + last.width).toBeLessThanOrEqual(content.x + content.width + 1); // nothing runs past the content pane
+        const tag = row.locator(":scope > .np-badge").first();
+        expect(await tag.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true); // the kind tag is never cut
       }
     });
 });

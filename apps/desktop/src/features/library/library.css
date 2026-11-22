@@ -235,7 +235,8 @@
 .lb-throw > :not(.pc-item__text) { flex: none; max-width: 100%; white-space: nowrap; }
 /* the call link gives way first, so the time, share and ⓘ stay on the row at Medium width */
 .lb-throw > .np-link { flex: 0 1 auto; min-width: 3em; overflow: hidden; text-overflow: ellipsis; display: block; }
-.lb-throw > .np-dim, .lb-throw > .np-badge { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* the owner gives way; the kind tag (Action item, Open question) stays whole */
+.lb-throw > .np-dim { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* at Narrow the review buttons alone fill the row: let it wrap rather than clip */
 [data-width="narrow"] .lb-throw { flex-wrap: wrap; }
 
