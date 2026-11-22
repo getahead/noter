@@ -170,6 +170,14 @@ pub struct SignInSessionArgs {
     pub session_id: SignInSessionId,
 }
 
+/// `account_signin_code`: the code the provider's page shows, for a CLI login that asks for it
+/// (Claude's "Paste code here if prompted"; issue 1136, contract 2.25). Never logged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct SignInCodeArgs {
+    pub session_id: SignInSessionId,
+    pub code: String,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum SignInStep {

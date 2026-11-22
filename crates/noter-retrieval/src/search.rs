@@ -105,6 +105,8 @@ fn search_hit(h: &Hit, terms: &[String], query_lang: Option<&Lang>) -> SearchHit
             && h.lang.is_some()
             && query_lang.is_some()
             && h.lang.as_ref() != query_lang,
+        // the core fills it from the item store (issue 1155)
+        item: None,
     }
 }
 

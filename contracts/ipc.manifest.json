@@ -1756,6 +1756,20 @@
       ]
     },
     {
+      "args": "SignInCodeArgs",
+      "channel": null,
+      "doc": "",
+      "group": "settings_and_credentials",
+      "name": "account_signin_code",
+      "result": "Ack",
+      "stability": "frozen",
+      "windows": [
+        "main",
+        "settings",
+        "first-run"
+      ]
+    },
+    {
       "args": "AccountProviderArgs",
       "channel": null,
       "doc": "Use This Account: bind the sign-in the CLI already has on this Mac.",
@@ -2248,7 +2262,7 @@
       ]
     }
   ],
-  "contract_version": "2.27",
+  "contract_version": "2.28",
   "default_retryable": [
     "not_ready",
     "internal",
