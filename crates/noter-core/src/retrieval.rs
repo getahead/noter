@@ -176,8 +176,16 @@ impl Core {
         let request = noter_retrieval::search_request(&args)?;
         let (vector, mode) = self.query_vector(request.text()).await;
         let request = request.with_vector(vector);
-        self.store()
-            .read(|c| noter_retrieval::search(c, &args.query, &request, mode, &Documents))
+        let mut results = self
+            .store()
+            .read(|c| noter_retrieval::search(c, &args.query, &request, mode, &Documents))?;
+        // An item hit is drawn as the item's row: it carries the item (issue 1155).
+        for hit in &mut results.items {
+            if let HitTarget::Item { item_id } = &hit.target {
+                hit.item = self.item_view(item_id.as_str())?;
+            }
+        }
+        Ok(results)
     }
 
     /// A query's local embedding when the vector indexes are ready, and the mode the request

@@ -95,14 +95,17 @@ for (const [width, px] of Object.entries(WIDTHS)) {
       await expect(page.getByRole("button", { name: "Pause" }).first()).toBeVisible();
       await shot(page, "search-hit-playing", width);
     });
-    test("the play glyph and Open link on one line", async ({ page }) => {
+    test("the play glyph and the moment's time chip on one line", async ({ page }) => {
       await search(page, px, {});
-      await page.locator(".lb-hit").first().hover();
-      await expect(page.getByRole("button", { name: "Play this line" }).first()).toBeVisible();
-      await expect(page.getByRole("link", { name: "Open at this moment" }).first()).toBeVisible();
+      // a transcript hit, which opens at its moment from the time chip; an item hit is drawn as the
+      // item's own row, without play or Open at this moment (#1155)
+      const hit = page.locator(".lb-hit:not(.lb-hit--item)").first();
+      await hit.hover();
+      await expect(hit.getByRole("button", { name: "Play this line" })).toBeVisible();
+      await expect(hit.locator('[data-component="cpt-noter-component-ui-provenance-chip"]')).toBeVisible();
       await page.mouse.move(0, 0);
       await settled(page);
-      await expect(page.locator(".lb-hit").first()).toHaveScreenshot(`search-hit-go-${width}.png`);
+      await expect(hit).toHaveScreenshot(`search-hit-go-${width}.png`);
     });
     test("two filters named in the weak warning", async ({ page }) => {
       await search(page, px, { only_weak: true });
