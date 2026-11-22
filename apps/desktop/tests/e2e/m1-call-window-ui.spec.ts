@@ -606,3 +606,22 @@ test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
     await expect(header(page)).toHaveCSS("zoom", "1.5");
   });
 });
+
+// #1186: Text size (D57) covers the whole call window, so the floating panel's header (FP-R1: title, clock and its icon
+// buttons) scales like CS-R1; the status strip keeps its size in both layouts.
+test.describe("cpt-noter-algo-ui-call-window-layout-content", () => {
+  test("Text size scales the floating panel's header like the call screen's", async ({ page }) => {
+    await startLive(page, (w) => (still(w), void Object.assign(w.settings.call_screen, { text_size_pct: 150 })));
+    await coreWindow(page, { layout: "floating" });
+    await expect(floating(page)).toBeVisible();
+    const fpHeader = floating(page).locator('[data-region="FP-R1"]');
+    await expect(fpHeader).toHaveCSS("zoom", "1.5");
+    await expect(floating(page).locator('[data-region="FP-R5"]')).toHaveCSS("zoom", "1.5");
+    // nothing overlaps at 150 %: the title truncates first and every header button stays inside the panel
+    const panel = (await floating(page).boundingBox())!;
+    for (const b of await fpHeader.getByRole("button").all()) {
+      const box = (await b.boundingBox())!;
+      expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
+    }
+  });
+});
