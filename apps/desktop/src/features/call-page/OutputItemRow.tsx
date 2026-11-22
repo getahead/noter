@@ -21,7 +21,7 @@ export function OutputItemRow({ bridge, item: listed }: { bridge: Bridge; item: 
   const span = item.spans[0];
   return (
     <li className="pc-item" data-component="cpt-noter-component-ui-output-item-row" data-call-id={item.call?.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} tabIndex={-1} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
-      <span className="pc-item__text" lang={typeof item.lang === "string" ? item.lang : item.lang.code}>{item.text}</span>
+      <span className="pc-item__text" title={item.text} lang={typeof item.lang === "string" ? item.lang : item.lang.code}>{item.text}</span>
       {item.owner && <span className="np-dim">{item.owner.short_name}</span>}
       {item.topic && <Badge kind="kind" text={item.topic.name} />}
       {item.review === "suggested" && <Badge kind="status" tone="accent" text={t("outputs.suggested")} />}

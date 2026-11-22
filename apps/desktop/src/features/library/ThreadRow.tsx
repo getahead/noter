@@ -23,7 +23,7 @@ export function ThreadRow({ bridge, item: listed, call, prefs }: { bridge: Bridg
   return (
     <li className="pc-item lb-throw" data-component="cpt-noter-component-ui-output-item-row" data-variant="thread" data-call-id={call.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} tabIndex={0} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
       <Badge kind="kind" text={t(KIND_KEY[item.kind])} />
-      <span className="pc-item__text" lang={typeof item.lang === "string" ? item.lang : item.lang.code}>
+      <span className="pc-item__text" title={item.text} lang={typeof item.lang === "string" ? item.lang : item.lang.code}>
         {item.text}
       </span>
       {item.owner && <span className="np-dim">{item.owner.short_name}</span>}
