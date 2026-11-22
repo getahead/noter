@@ -18,6 +18,8 @@ export interface KeyDraft {
   edit: (value: string) => void;
   /** **Verify** or Return: one `api_key_set` with the draft; true when the key was stored. */
   verify: () => Promise<boolean>;
+  /** Back to an empty draft, after the stored key was removed. */
+  reset: () => void;
 }
 
 /** The key sheet's machine over the bridge: KEY_DRAFT → KEY_VERIFYING → KEY_CONFIGURED | KEY_INVALID | KEYCHAIN_LOCKED. */
@@ -67,7 +69,11 @@ export function useKeyDraft(bridge: Bridge, provider: KeyProvider, onLocked?: ()
     // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-invalid
     // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-if-rejected
   };
-  return { draft, state, message, edit, verify };
+  const reset = () => {
+    go({ draft: "", state: "DRAFT" });
+    setMessage(null);
+  };
+  return { draft, state, message, edit, verify, reset };
 }
 
 /** A refused key puts focus back in the field so the user can paste the right one (spec step 5.1). */

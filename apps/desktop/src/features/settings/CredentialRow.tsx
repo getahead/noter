@@ -103,6 +103,8 @@ export function KeyFieldRow({ bridge, view, onRemove }: { bridge: Bridge; view: 
   useEffect(() => {
     const wasStored = previousStored.current;
     previousStored.current = stored;
+    // a removed key leaves an empty field, not the old "Stored in the Keychain" line (issue 1057)
+    if (wasStored && !stored) draft.reset();
     if (returnFocus.current && wasStored && !stored) {
       returnFocus.current = false;
       focusFirstAvailable(document, [fieldId]);

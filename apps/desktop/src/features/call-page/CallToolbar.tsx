@@ -29,7 +29,7 @@ import { shareState } from "./share-logic";
 import { useTypes } from "./cache";
 import { useRegenerate } from "./RegenerateSheet";
 import { registeredViews } from "./views";
-import { callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
+import { audioKept as keepsAudio, callViews, parseCallKey, subtitleOf, VIEW_LABEL } from "./logic";
 
 export function nativeItemReviewMenuState(focused: boolean, hasActionableSelection: boolean, pendingSuggestions: number) {
   return {
@@ -125,7 +125,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const extras = useExtras(at.callId);
   const [renaming, setRenaming] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
-  const audioKept = !!call && !call.audio_deleted && !extras?.audio_not_stored;
+  const audioKept = !!call && keepsAudio(call, extras?.audio_not_stored ?? false);
   const openExport = useExport(bridge, at.callId, audioKept, setExported);
   // the status stays 8 s
   useEffect(() => {
