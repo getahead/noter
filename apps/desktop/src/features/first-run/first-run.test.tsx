@@ -40,6 +40,13 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     expect(html).not.toContain(">Resume<");
     expect(html).toContain("Models downloaded");
   });
+  it("cpt-noter-seq-first-run-complete-setup — names the running macOS version in the footer, as the permission row does", async () => {
+    const html = await screen((w) => {
+      at("welcome")(w);
+      w.app.environment.native = { accent_rgb: [0, 122, 255], app_name: "Noter", bundle_id: "ai.noter", app_path: "/Applications/Noter.app", os_version: "26.6" };
+    });
+    expect(html).toContain("macOS 26.6 · Core Audio process tap");
+  });
   it("is the three regions of FR-R1 to FR-R3 with the stepper, the step and the footer", async () => {
     const html = await screen(at("welcome"));
     expect(html).toContain('data-component="cpt-noter-component-screen-first-run" data-variant="step-1" data-state="welcome"');

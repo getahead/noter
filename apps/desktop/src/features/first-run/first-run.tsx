@@ -339,6 +339,7 @@ function FirstRunWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-open
   const w = useSelect(wizard.store, (s) => s);
   const status = useSelect(bridge.store, (s) => s.whole.setup!);
+  const native = useSelect(bridge.store, (s) => s.whole.environment?.native);
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => wizard.start(), [wizard]);
   const shown = useRef(w.current);
@@ -381,9 +382,7 @@ function FirstRunWindow({ bridge }: { bridge: Bridge }) {
           {step === "assistants" && <Assistants bridge={bridge} wizard={wizard} w={w} />}
         </div>
         <footer className="fr-r3" data-region="FR-R3">
-          <span className="fr-r3__env">
-            <Msg id="first_run.env" />
-          </span>
+          <span className="fr-r3__env">{native ? t("permission.os", { version: native.os_version }) : t("first_run.env")}</span>
           <span className="np-tb__spacer" />
           {/* @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-if-skip */}
           {SKIPPABLE.includes(step) && <PushButton label={t("first_run.skip")} variant="quiet" onAction={() => void wizard.skip()} />}

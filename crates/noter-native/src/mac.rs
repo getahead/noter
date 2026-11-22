@@ -263,9 +263,14 @@ fn native_environment() -> Option<NativeEnvironment> {
         app_name: name,
         bundle_id: bundle.bundleIdentifier().map(|id| id.to_string()),
         app_path,
-        os_version: NSProcessInfo::processInfo()
-            .operatingSystemVersionString()
-            .to_string(),
+        // "26.6" or "26.6.1": the UI writes "macOS {version}"
+        os_version: {
+            let v = NSProcessInfo::processInfo().operatingSystemVersion();
+            match v.patchVersion {
+                0 => format!("{}.{}", v.majorVersion, v.minorVersion),
+                p => format!("{}.{}.{p}", v.majorVersion, v.minorVersion),
+            }
+        },
     })
 }
 
