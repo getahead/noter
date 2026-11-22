@@ -6,7 +6,7 @@ import type { Settings } from "../../core/bindings";
 import { FakeCore } from "../../core/fake/fake-core";
 import { t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
-import { checkForUpdate, loadHotkeys, loadSettings, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
+import { checkForUpdate, loadHotkeys, loadSettings, pauseHotkeys, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
 import { AudioPane } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
@@ -94,6 +94,17 @@ describe("saveSection", () => {
 });
 
 describe("hotkey actions", () => {
+  // #1143: pausing answers an Ack; it must never replace the window's hotkey list (the pane then crashed)
+  it("pausing and resuming the hotkeys leaves the hotkey list as it was", async () => {
+    await ready();
+    await loadHotkeys(bridge);
+    const before = bridge.store.getState().whole.hotkeys?.bindings.length;
+    expect(before).toBeGreaterThan(0);
+    await pauseHotkeys(bridge, true);
+    await pauseHotkeys(bridge, false);
+    expect(bridge.store.getState().whole.hotkeys?.bindings.length).toBe(before);
+  });
+
   it("lists, sets, refuses with the core's owner line, and restores defaults", async () => {
     await ready();
     await loadHotkeys(bridge);

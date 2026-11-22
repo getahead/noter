@@ -345,6 +345,13 @@ pub struct HotkeyList {
     pub bindings: Vec<HotkeyBinding>,
 }
 
+/// A shortcut field in Settings records (`paused`) or stopped: while it records the app's global
+/// hotkeys are released, so a pressed app chord reaches the field instead of running its action.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct HotkeysPauseArgs {
+    pub paused: bool,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct HotkeySetArgs {
     pub action: HotkeyAction,
@@ -440,6 +447,8 @@ pub enum AuditWhat {
     EvidenceLookup,
     LiveMcpQuery,
     HandoffPrompt,
+    /// The short test request of an API key or own-account check: none of the user's text.
+    CredentialCheck,
 }
 
 /// One row of `audit_log`: one per LLM run (the packet) plus, for a run on a cloud runtime,

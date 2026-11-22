@@ -69,6 +69,12 @@ export function loadHotkeys(bridge: Bridge) {
 export type HotkeyAnswer = { ok: true } | { ok: false; message: string };
 
 /** `hotkey_set`: the row shows the new chord, or the old one stays with the line the core's refusal gives. */
+/** `hotkeys_pause`: a shortcut field records, so the app's hotkeys are released until it stops (issue 1104).
+ *  It answers an Ack, so nothing is written to the hotkey list (issue 1143). */
+export function pauseHotkeys(bridge: Bridge, paused: boolean) {
+  return bridge.act("hotkeys:pause", "hotkeys_pause", () => bridge.core.hotkeysPause({ paused }));
+}
+
 export async function setHotkey(bridge: Bridge, action: HotkeyAction, shortcut: string | null): Promise<HotkeyAnswer> {
   // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-api-set
   const res = await bridge.act(`hotkey:${action}`, "hotkey_set", () => bridge.core.hotkeySet({ action, shortcut }), { slice: "hotkeys" });

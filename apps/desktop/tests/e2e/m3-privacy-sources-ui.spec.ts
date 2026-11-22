@@ -70,6 +70,22 @@ describeReal("cpt-noter-seq-settings-check-privacy", () => {
     await expect(pane(page)).toContainText(/Exported|Saved/); // success from the returned path only
   });
 
+  test("other path — #1100: verifying an API key is listed as a Key or account check, not as summary text", async ({ page }) => {
+    await openWindow(page, "settings", { fixedClock: true });
+    await openPane(page, "Models & Runtimes");
+    await pane(page).locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: "Anthropic API key" }).getByRole("button", { name: /^(Add|Replace)…$/ }).click();
+    const keySheet = sheet(page, /Anthropic API Key/i);
+    await keySheet.getByLabel("API key").fill("test-stand-in-value-0001"); // a stand-in, never a key shape
+    await button(keySheet, "Verify").click();
+    await expect(keySheet).toContainText("Verified · Claude Code can use this key");
+    await button(keySheet, "Save").click();
+    await expect(keySheet).toHaveCount(0);
+    await openPane(page, "Privacy");
+    const check = pane(page).getByRole("row").filter({ hasText: "api.anthropic.com" });
+    await expect(check.first()).toContainText("Key or account check");
+    await expect(check.filter({ hasText: "Summary text" })).toHaveCount(0);
+  });
+
   test("other path: a cancelled save panel shows no success", async ({ page }) => {
     const steer = await openWindow(page, "settings", { fixedClock: true });
     await auditRows(steer, 1);

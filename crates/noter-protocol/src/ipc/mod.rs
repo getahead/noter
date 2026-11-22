@@ -527,6 +527,9 @@ commands! {
     hotkey_set(HotkeySetArgs) -> HotkeyList [SettingsAndCredentials, Frozen, Settings];
     /// Restore Defaults: every app hotkey back to its default shortcut.
     hotkeys_reset(NoArgs) -> HotkeyList [SettingsAndCredentials, Frozen, Settings];
+    /// A shortcut field records: the app's global hotkeys are released until it stops; the host
+    /// also resumes them when the Settings window loses focus or closes.
+    hotkeys_pause(HotkeysPauseArgs) -> Ack [SettingsAndCredentials, Frozen, Settings];
     repos_list(NoArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];
     /// Add Mapping… from the handoff drawer opens the sheet in the main window.
     repo_upsert(RepoUpsertArgs) -> RepoList [SettingsAndCredentials, Frozen, Settings | Main];

@@ -100,6 +100,9 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 }
             }
             WindowEvent::Destroyed => {
+                if window.label() == WindowLabel::Settings.as_str() {
+                    resume_hotkeys(window.try_state::<Booted>().as_deref());
+                }
                 window_destroyed(window.label(), window.try_state::<Booted>().as_deref());
                 surfaces::update_activation_for_visible_windows(window.app_handle());
                 if let Some(pending) = window.try_state::<PendingNavigation>() {
@@ -123,6 +126,10 @@ pub fn builder<R: Runtime>(builder: tauri::Builder<R>) -> tauri::Builder<R> {
                 if let Some(surfaces) = window.try_state::<Arc<surfaces::TauriSurfaces<R>>>() {
                     surfaces.call_window_changed(window);
                 }
+            }
+            // a shortcut field never leaves the hotkeys released once Settings is left (issue 1104)
+            WindowEvent::Focused(false) if window.label() == WindowLabel::Settings.as_str() => {
+                resume_hotkeys(window.try_state::<Booted>().as_deref());
             }
             // @cpt-state:cpt-noter-state-core-native-surfaces-call-window:p1
             WindowEvent::Focused(focused) => {
@@ -495,6 +502,13 @@ fn window_label(label: &str) -> Option<WindowLabel> {
 fn reset(label: &str, booted: Option<&Booted>) {
     if let (Some(label), Some(Booted(Ok(core)))) = (window_label(label), booted) {
         core.webview_reset(label);
+    }
+}
+
+/// The app's hotkeys back, if a shortcut field had them released (`hotkeys_pause`).
+fn resume_hotkeys(booted: Option<&Booted>) {
+    if let Some(Booted(Ok(core))) = booted {
+        core.pause_hotkeys(false);
     }
 }
 

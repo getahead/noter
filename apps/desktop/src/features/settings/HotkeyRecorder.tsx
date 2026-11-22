@@ -20,6 +20,8 @@ export interface HotkeyRecorderProps {
   disabled?: boolean;
   /** The line the pane's test registration reports for this row; the state is then CONFLICT. */
   conflict?: string | null;
+  /** The field starts (true) or stops (false) recording: the pane releases the app's hotkeys meanwhile. */
+  onRecording?: (recording: boolean) => void;
   /** An accepted chord: resolve once the core answered. */
   onRecord?: (chord: { code: string; modifiers: ChordModifiers }) => Promise<HotkeyAnswer>;
   /** ⌫ or **Clear shortcut**. */
@@ -35,14 +37,25 @@ export const hotkeyRecorderLabel = (label: string, caps: string, recording: bool
 export const hotkeyConflictDescription = (id: string, message: string | null, recording: boolean) =>
   message && !recording ? `${id}c` : undefined;
 
+/** While a field records, the app's global hotkeys are released (`hotkeys_pause`) so a pressed app chord reaches
+ *  the field instead of running its action (it stopped a live recording, issue 1104); they come back when it ends. */
+export function releaseHotkeysWhile(recording: boolean, pause: ((paused: boolean) => void) | undefined): (() => void) | undefined {
+  if (!recording || !pause) return undefined;
+  pause(true);
+  return () => pause(false);
+}
+
 // @cpt-component:cpt-noter-component-ui-hotkey-recorder:p1
-export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear }: HotkeyRecorderProps) {
+export function HotkeyRecorder({ id, label, variant = "single", caps, disabled, conflict, onRecord, onClear, onRecording }: HotkeyRecorderProps) {
   const [state, dispatch] = useReducer(recorderReduce, IDLE_RECORDER);
   useEffect(() => dispatch({ type: disabled ? "disable" : "enable" }), [disabled]);
   useEffect(() => void (conflict ? dispatch({ type: "refused", message: conflict }) : dispatch({ type: "dismiss" })), [conflict]);
 
   const held = useRef<ChordModifiers | null>(null); // a modifier set collects its keys until they are released
   const recording = state.type === "RECORDING";
+  const pauseRef = useRef(onRecording);
+  pauseRef.current = onRecording;
+  useEffect(() => releaseHotkeysWhile(recording, (paused) => pauseRef.current?.(paused)), [recording]);
   const message = (state.type === "CONFLICT" || state.type === "INVALID" ? state.message : null) ?? conflict ?? null;
   const settle = async (answer: Promise<HotkeyAnswer> | undefined) => {
     const r = await answer;

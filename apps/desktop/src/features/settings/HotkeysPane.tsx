@@ -9,7 +9,7 @@ import { Icon } from "../../ui/icons";
 import { PushButton } from "../../ui/primitives/push-button";
 import { Toggle } from "../../ui/primitives/toggle";
 import { modifierCaps, toAccelerator } from "./accelerator";
-import { loadHotkeys, resetHotkeys, saveSection, setHotkey, useRowErrors, type HotkeyAnswer } from "./actions";
+import { loadHotkeys, pauseHotkeys, resetHotkeys, saveSection, setHotkey, useRowErrors, type HotkeyAnswer } from "./actions";
 import { Group, Row } from "./form";
 import { cardKeyRows } from "./card-keys";
 import { cardKeyConflictCaps, hotkeyRows, undoRow } from "./hotkey-rows";
@@ -20,6 +20,7 @@ const RESTORE_KEY = "hotkeys:reset";
 // @cpt-dod:cpt-noter-dod-ui-settings-hotkeys:p1
 // @cpt-begin:cpt-noter-flow-ui-settings-set-hotkeys:p1:inst-open-hotkeys
 export function HotkeysPane({ bridge }: { bridge: Bridge }) {
+  const pause = (paused: boolean) => void pauseHotkeys(bridge, paused);
   // the pane opening asks the core to test-register the set again, so each row's result is fresh
   // (the ref keeps StrictMode's second effect run from asking twice)
   const asked = useRef(false);
@@ -59,7 +60,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
       )}
       <Group title={t("settings.hotkeys.global")}>
         {hotkeyRows(list).map((r) => (
-          <HotkeyRecorder key={r.action} id={`hk-${r.action}`} label={t(r.label)} caps={r.caps} conflict={r.conflict} onRecord={record(r.action)} onClear={clear(r.action)} />
+          <HotkeyRecorder onRecording={pause} key={r.action} id={`hk-${r.action}`} label={t(r.label)} caps={r.caps} conflict={r.conflict} onRecord={record(r.action)} onClear={clear(r.action)} />
         ))}
       </Group>
       <Group
@@ -75,7 +76,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
         <Row label={t("settings.hotkeys.use_card_keys")} error={rowError("copilot", "card_keys.enabled")}>
           <Toggle on={copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.use_card_keys")} onAction={(enabled) => void cardKeys({ card_keys: { enabled } })} />
         </Row>
-        <HotkeyRecorder id="hk-pin" variant="modifier-set" label={t("settings.hotkeys.pin")} caps={modifierCaps(pin!.modifiers!)} disabled={pin!.disabled} onRecord={recordModifiers} />
+        <HotkeyRecorder onRecording={pause} id="hk-pin" variant="modifier-set" label={t("settings.hotkeys.pin")} caps={modifierCaps(pin!.modifiers!)} disabled={pin!.disabled} onRecord={recordModifiers} />
         {cardKeyConflictCaps(cardConflicts).map((caps) => (
           <div key={caps} className="st-conflict">
             <Icon name="warning" size={12} />
@@ -85,8 +86,8 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
         <Row label={t("settings.hotkeys.dismiss_keys")} error={rowError("copilot", "dismiss_with_keys")}>
           <Toggle on={copilot.dismiss_with_keys} disabled={!copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.dismiss_keys")} onAction={(v) => void saveSection(bridge, "copilot", { dismiss_with_keys: v })} />
         </Row>
-        <HotkeyRecorder id="hk-dismiss" variant="derived" label={t("settings.hotkeys.dismiss")} caps={modifierCaps(dismiss!.modifiers!)} disabled={dismiss!.disabled} />
-        {undo && <HotkeyRecorder id="hk-undo" label={t("settings.hotkeys.undo")} caps={undo.caps} conflict={undo.conflict} disabled={!copilot.card_keys.enabled} onRecord={record("undo_card_action")} onClear={clear("undo_card_action")} />}
+        <HotkeyRecorder onRecording={pause} id="hk-dismiss" variant="derived" label={t("settings.hotkeys.dismiss")} caps={modifierCaps(dismiss!.modifiers!)} disabled={dismiss!.disabled} />
+        {undo && <HotkeyRecorder onRecording={pause} id="hk-undo" label={t("settings.hotkeys.undo")} caps={undo.caps} conflict={undo.conflict} disabled={!copilot.card_keys.enabled} onRecord={record("undo_card_action")} onClear={clear("undo_card_action")} />}
       </Group>
       <p className="st-hint">{t("settings.hotkeys.vo_note")}</p>
     </>

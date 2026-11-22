@@ -532,3 +532,46 @@ async fn a_hotkey_press_runs_its_command_through_the_core() {
     let shown = core.hotkey_pressed("Ctrl+Alt+Super+N").await.unwrap();
     assert_eq!(shown["visible"], true);
 }
+
+// #1104: while a Settings shortcut field records, the app's chords are released so a pressed
+// app chord reaches the field instead of running its action; only the Settings window may ask.
+#[tokio::test]
+async fn hotkeys_pause_releases_and_restores_the_registered_chords() {
+    let dir = tempfile::tempdir().unwrap();
+    let shortcuts = Arc::new(Shortcuts::default());
+    let (core, _) = open_with(dir.path(), shortcuts.clone());
+    let before = shortcuts.registered();
+    assert!(before.contains("Ctrl+Alt+Super+R"), "{before:?}");
+    let pause = |paused| json!({ "paused": paused });
+
+    let main = CommandCtx {
+        caller: Caller::Window {
+            label: WindowLabel::Main,
+        },
+    };
+    let refused = dispatch_json(&core, &main, "hotkeys_pause", pause(true), None)
+        .await
+        .unwrap_err();
+    assert_eq!(refused.code, ErrorCode::WindowNotAllowed);
+    assert_eq!(shortcuts.registered(), before);
+
+    dispatch_json(&core, &settings(), "hotkeys_pause", pause(true), None)
+        .await
+        .unwrap();
+    assert!(
+        shortcuts.registered().is_empty(),
+        "released while recording"
+    );
+    let list = core.hotkeys_list(&settings(), NoArgs {}).await.unwrap();
+    assert!(
+        list.bindings
+            .iter()
+            .any(|b| b.status == HotkeyStatus::Registered),
+        "the Settings list still shows them as registered"
+    );
+
+    dispatch_json(&core, &settings(), "hotkeys_pause", pause(false), None)
+        .await
+        .unwrap();
+    assert_eq!(shortcuts.registered(), before, "all back once it stops");
+}

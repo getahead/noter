@@ -128,6 +128,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   hotkeys_list: {},
   hotkey_set: {"action": "start_stop"},
   hotkeys_reset: {},
+  hotkeys_pause: { paused: true },
   repos_list: {},
   repo_upsert: {"key": "noter", "default_tool": "claude_code"},
   repo_remove: {"id": "noter"},

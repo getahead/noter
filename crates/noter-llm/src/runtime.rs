@@ -216,9 +216,8 @@ impl Llm {
         candidate: Candidate,
     ) -> Result<(), Failure> {
         let packet = Packet {
-            // shortcut: the closest category for a call that carries no user text; a `key_check`
-            // value needs a contract change (M3 audit pane).
-            what: AuditWhat::Outputs,
+            // a key or account check carries none of the user's text (issue 1100)
+            what: AuditWhat::CredentialCheck,
             items: Vec::new(),
             people: Vec::new(),
             context: PacketContext::default(),

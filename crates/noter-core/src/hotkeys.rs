@@ -211,6 +211,31 @@ impl Core {
         Ok(())
     }
 
+    /// Releases every registered chord while a shortcut field records, and registers them again
+    /// when it stops (issue 1104): a pressed app chord then reaches the field instead of running
+    /// its action. Statuses stay as they were; a chord already back (a set landed meanwhile) is
+    /// not reported as a conflict.
+    pub fn pause_hotkeys(&self, paused: bool) {
+        use std::sync::atomic::Ordering;
+        // the list's lock first: a pause and a resume (Settings losing focus) never interleave
+        let list = lock(&self.hotkeys);
+        if self.hotkeys_paused.swap(paused, Ordering::SeqCst) == paused {
+            return;
+        }
+        let chords = list
+            .bindings
+            .iter()
+            .filter(|b| b.status == HotkeyStatus::Registered)
+            .filter_map(|b| b.shortcut.as_deref());
+        for chord in chords {
+            if paused {
+                self.deps.shortcuts.unregister(chord);
+            } else {
+                let _ = self.deps.shortcuts.register(chord);
+            }
+        }
+    }
+
     /// Registers every bound app hotkey and records the ones macOS refused in the degraded set.
     // @cpt-algo:cpt-noter-algo-core-settings-register-hotkeys:p1
     // @cpt-state:cpt-noter-state-core-settings-hotkey:p1

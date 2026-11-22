@@ -233,6 +233,8 @@ pub struct Core {
     privacy_watches: Mutex<Vec<privacy::Watch>>,
     /// App hotkeys and their registration status; writes hold this lock, then `settings`.
     hotkeys: Mutex<HotkeyList>,
+    /// A shortcut field records: the registered chords are released (`hotkeys_pause`).
+    hotkeys_paused: std::sync::atomic::AtomicBool,
     /// First run's stored setup state and the settings values it follows.
     first_run: Mutex<first_run::State>,
     /// Model downloads, shown in the setup status.
@@ -471,6 +473,7 @@ impl Core {
             settings: Mutex::new(settings),
             privacy_watches: Mutex::new(vec![]),
             hotkeys: Mutex::new(hotkeys::fresh_list()),
+            hotkeys_paused: std::sync::atomic::AtomicBool::new(false),
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
             this,

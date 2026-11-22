@@ -72,6 +72,8 @@ export function settingsHandlers(fake: Core.FakeCore): Core.Handlers {
     publish("hotkeys:changed");
     return world.hotkeys;
   },
+  // the fake core registers nothing with the OS: releasing and taking back the hotkeys is a no-op here
+  hotkeys_pause: () => ({}),
   hotkeys_reset: (_a, { world, publish }) => {
     world.hotkeys.bindings.forEach((b) => {
       b.shortcut = b.default_shortcut;

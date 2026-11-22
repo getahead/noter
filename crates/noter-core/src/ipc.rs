@@ -854,6 +854,15 @@ impl CoreApi for Core {
         self.reset_hotkeys(ctx)
     }
 
+    async fn hotkeys_pause(
+        &self,
+        _ctx: &CommandCtx,
+        args: HotkeysPauseArgs,
+    ) -> Result<Ack, CoreError> {
+        self.pause_hotkeys(args.paused);
+        Ok(Ack {})
+    }
+
     async fn glossary_list(
         &self,
         _ctx: &CommandCtx,

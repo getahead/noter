@@ -490,7 +490,9 @@ export type AuditListArgs = {
 	page: PageRequest,
 };
 
-export type AuditWhat = "transcript_delta" | "full_transcript" | "outputs" | "document_excerpts" | "search_question" | "evidence_lookup" | "live_mcp_query" | "handoff_prompt";
+export type AuditWhat = "transcript_delta" | "full_transcript" | "outputs" | "document_excerpts" | "search_question" | "evidence_lookup" | "live_mcp_query" | "handoff_prompt" | 
+/**  The short test request of an API key or own-account check: none of the user's text. */
+"credential_check";
 
 export type BannerDismissArgs = {
 	banner: BannerKind,
@@ -1862,6 +1864,14 @@ export type HotkeyStatus =
  *  hidden for presenting.
  */
 { type: "registered_during_capture" } | { type: "conflict"; owner: string | null } | { type: "reserved_by_system" } | { type: "not_set" };
+
+/**
+ *  A shortcut field in Settings records (`paused`) or stopped: while it records the app's global
+ *  hotkeys are released, so a pressed app chord reaches the field instead of running its action.
+ */
+export type HotkeysPauseArgs = {
+	paused: boolean,
+};
 
 export type IgnoreAppArgs = {
 	bundle_id: string,
@@ -3765,7 +3775,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.25";
+export const CONTRACT_VERSION = "2.26";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3892,6 +3902,7 @@ export const COMMANDS = {
   hotkeys_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   hotkey_set: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   hotkeys_reset: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
+  hotkeys_pause: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
   repos_list: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_upsert: { group: "settings_and_credentials", stability: "frozen", windows: ["settings", "main"], channel: false },
   repo_remove: { group: "settings_and_credentials", stability: "frozen", windows: ["settings"], channel: false },
@@ -4073,6 +4084,7 @@ export interface CommandArgs {
   hotkeys_list: NoArgs;
   hotkey_set: HotkeySetArgs;
   hotkeys_reset: NoArgs;
+  hotkeys_pause: HotkeysPauseArgs;
   repos_list: NoArgs;
   repo_upsert: RepoUpsertArgs;
   repo_remove: RepoIdArgs;
@@ -4252,6 +4264,7 @@ export interface CommandResults {
   hotkeys_list: HotkeyList;
   hotkey_set: HotkeyList;
   hotkeys_reset: HotkeyList;
+  hotkeys_pause: Ack;
   repos_list: RepoList;
   repo_upsert: RepoList;
   repo_remove: RepoList;
@@ -4843,6 +4856,11 @@ export function createCore(transport: Transport) {
      * Restore Defaults: every app hotkey back to its default shortcut.
      */
     hotkeysReset: (args: NoArgs) => call("hotkeys_reset", args),
+    /**
+     * A shortcut field records: the app's global hotkeys are released until it stops; the host
+     * also resumes them when the Settings window loses focus or closes.
+     */
+    hotkeysPause: (args: HotkeysPauseArgs) => call("hotkeys_pause", args),
     reposList: (args: NoArgs) => call("repos_list", args),
     /**
      * Add Mapping… from the handoff drawer opens the sheet in the main window.

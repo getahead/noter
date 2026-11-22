@@ -13,7 +13,7 @@ commands = [
   "app_snapshot", "stream_unsubscribe", "stream_ack", "banner_dismiss", "log_ui",
   "setup_status", "models_download", "permission_request", "self_test_run",
   "setup_set_call_display", "setup_set_audio_storage", "setup_set_step",
-  "settings_get", "settings_update", "settings_unignore_app", "hotkeys_list", "hotkey_set", "hotkeys_reset",
+  "settings_get", "settings_update", "settings_unignore_app", "hotkeys_list", "hotkey_set", "hotkeys_reset", "hotkeys_pause",
   "glossary_list", "glossary_upsert", "glossary_remove", "update_install",
 ]
 stories = [
