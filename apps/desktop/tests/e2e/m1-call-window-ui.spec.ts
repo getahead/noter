@@ -679,5 +679,11 @@ test.describe("cpt-noter-flow-ui-call-window-controls", () => {
     await coreWindow(page, { layout: "floating" });
     await expect(floating(page)).toBeVisible();
     await menuInside(page);
+    // the controls #1186 folds into More at 150 % in 420 pt are in the menu, inside the window
+    const view = page.viewportSize()!;
+    for (const name of ["Open Call Screen on Display 2", "Collapse Panel"]) {
+      const box = (await page.getByRole("menuitem", { name }).boundingBox())!;
+      expect(box.x >= 0 && box.x + box.width <= view.width).toBe(true);
+    }
   });
 });
