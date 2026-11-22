@@ -27,8 +27,10 @@ afterEach(() => {
   vi.unstubAllGlobals();
   return bridge.close();
 });
-async function ready() {
+/** `ended`: the fixture's live call has stopped recording, so its page may offer the review. */
+async function ready(ended = false) {
   fake = new FakeCore({ window: "main" });
+  if (ended) fake.world.app.capture = { ...fake.world.app.capture, phase: "idle", call_id: null };
   bridge = createBridge("main", fake);
   await bridge.open();
 }
@@ -54,7 +56,7 @@ describe("review banner (PC-R2)", () => {
   });
 
   it("keeps the writing banner before item review when both are present", async () => {
-    await ready();
+    await ready(true);
     await loadItems(bridge, "call_live");
     const outputs = await loadOutputs(bridge, "call_live");
     if (outputs.status !== "ok") throw new Error("Fixture outputs were not loaded");
@@ -134,8 +136,17 @@ describe("review banner (PC-R2)", () => {
     expect(seen).toContain("items_review_all");
   });
 
-  it("Start Review from the Transcript banner navigates to Summary when no item row is mounted", async () => {
+  // cpt-noter-seq-call-page-review-suggested-items: a call still recording has no rows to review yet (#1038)
+  it("a call still recording offers no review, whatever its suggestions", async () => {
     await ready();
+    await loadItems(bridge, "call_live");
+    holdOutputs({ call_id: "call_live", status: "ready", sections: [], archive: "not_started", review_waiting: 3, sensitive: false, written_locally: false } as never);
+    expect(bannerOf("call_live")?.text).toBe("3 suggested items to review before sharing");
+    expect(renderToString(<CallBanners route={{ section: "library", key: "call:call_live:summary" } as never} bridge={bridge} appBanners={0} />)).not.toContain("to review before sharing");
+  });
+
+  it("Start Review from the Transcript banner navigates to Summary when no item row is mounted", async () => {
+    await ready(true);
     await loadItems(bridge, "call_live");
     const tree = rendered(CallBanners, { route: { section: "library", key: "call:call_live:transcript" }, bridge, appBanners: 0 });
     const banners = find(tree, (p) => Array.isArray(p.banners)).props.banners as Banner[];

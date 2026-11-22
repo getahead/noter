@@ -14,7 +14,7 @@ import { watchAlerts } from "./support/native-alert";
 const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const open = async (page: Page, name: string) => {
   await openWindow(page, "settings");
-  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: name }).click();
+  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: name }).click();
 };
 const focused = (page: Page) => page.evaluate(() => `${document.activeElement?.tagName}:${document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent ?? ""}`.trim());
 
@@ -81,7 +81,7 @@ test.describe("cpt-noter-seq-settings-sign-in-account — focus with the mouse",
       if (process.env.NOTER_CORE === "stdio") { // the real core needs its account CLIs scripted
         await steer.invoke("harness.account_cli", { tool: provider === "Claude" ? "claude_code" : "codex", installed: true, path: "/bin/cli", version: "2.1.296", login_identity: { email: "ann@example.com", plan: provider === "Claude" ? "Max" : "Plus" }, login: { url: "https://example.com/device", code: "ONE-TIME-CODE-9137" } });
       }
-      await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Models & Runtimes" }).click();
+      await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
       const row = pane(page).locator('[data-component="cpt-noter-component-ui-credential-row"]').filter({ hasText: `Your ${provider} account` });
       await row.getByRole("button", { name: /Sign In/ }).click();
       const dlg = page.getByRole("dialog", { name: new RegExp(`Sign in with your ${provider} account`) });

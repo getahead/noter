@@ -1,4 +1,5 @@
-import type { DegradedState, PrivacyMode } from "../../core/bindings";
+import type { AccountsView, DegradedState, PrivacyMode } from "../../core/bindings";
+import { t } from "../../i18n/format";
 import type { AnnounceEvent } from "../../app/a11y/announce";
 
 export type ModeState = "CLOUD" | "CLOUD_REDACTED" | "LOCAL_ONLY" | "SENSITIVE_LOCAL" | "SWITCHED_TO_LOCAL" | "NO_ASSISTANT";
@@ -51,4 +52,12 @@ export function modeIndicator({ mode, degraded, sensitiveCall }: ModeInput): Mod
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-switched-redacted
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-local
   // @cpt-end:cpt-noter-state-ui-main-window-shell-mode-indicator:p1:inst-redacted-cloud
+}
+
+/** The idle footer: what answers when nothing records (owner, 21 Nov, issue 1058); nothing at all is the no-assistant state. */
+export function idleFooter(accounts: Pick<AccountsView, "keys" | "accounts" | "local"> | undefined): string {
+  if (!accounts || accounts.keys.some((k) => k.status.type === "configured")) return t("footer.idle");
+  const signedIn = accounts.accounts.find((a) => a.status.type === "signed_in");
+  if (signedIn) return t(signedIn.provider === "claude" ? "footer.idle_claude" : "footer.idle_chatgpt");
+  return accounts.local.running && accounts.local.models.length ? t("footer.idle_local") : t("footer.idle");
 }

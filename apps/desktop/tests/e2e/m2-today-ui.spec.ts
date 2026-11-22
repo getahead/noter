@@ -125,6 +125,13 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
     expect(await sent(page, "change_undo")).toHaveLength(1);
     await expect(button(done(page), "Done today · 0")).toBeVisible();
   });
+  // #1059: a focusable item row is a group named with its item's text, so VoiceOver says which item it is (WCAG 4.1.2)
+  test("UI — accessibility: the focused due row is a group named with its item's text", async ({ page }) => {
+    await openToday(page, dueWorld);
+    const row = due(page).locator('[data-item-id="itm_spec"]');
+    await row.focus();
+    await expect(page.getByRole("group", { name: "Drawer redesign spec by Friday", exact: true })).toBeFocused(); // itm_spec
+  });
   test("UI — Other — keyboard Space completes, focus reaches Done disclosure, Cmd-Z restores", async ({ page }) => {
     await openToday(page, dueWorld);
     const row = due(page).locator('[data-item-id="itm_spec"]');

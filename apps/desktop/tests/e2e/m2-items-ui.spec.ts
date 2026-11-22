@@ -7,7 +7,7 @@ import type { Locator, Page } from "@playwright/test";
 
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { coreReady, openWindow } from "./support/app";
+import { coreReady, openWindow, steerFor } from "./support/app";
 import { sent } from "./support/call-page";
 import * as O from "./support/outputs-world";
 import { expect, test } from "./support/fixtures";
@@ -112,6 +112,13 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     expect(Number(mutations[1]!.rev)).toBeGreaterThan(Number(mutations[0]!.rev));
   });
 
+  // #1059: the row Start Review focuses is named with its item's text, so VoiceOver says which item it is (WCAG 4.1.2)
+  test("UI — accessibility: the row Start Review focuses carries its item's text as its name", async ({ page }) => {
+    await openCall(page, three);
+    await button(banner(page), "Start Review").click();
+    await expect(rowOf(page, DECISION)).toBeFocused();
+    await expect(rowOf(page, DECISION)).toHaveAccessibleName(DECISION); // the row just shown focused
+  });
   test("UI — happy path: the banner counts the suggested items, Start Review focuses the first one, A accepts it and moves on", async ({ page }) => {
     await openCall(page, three);
     await expect(banner(page)).toContainText("3 suggested items to review before sharing");
@@ -232,6 +239,29 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
     await expect(rowOf(page, A0).getByText("Suggested")).toBeVisible();
     await expect(rowOf(page, A0).getByText("Accepted", { exact: true })).toHaveCount(0);
     await expect.poll(async () => (await sent(page, "item_get")).length).toBeGreaterThan(0); // conflict refreshes the item
+  });
+});
+
+// #1038: the fixture's recording call has suggested items but no written outputs, so there is no row to review yet:
+// its page offers no review, and (real core; the fake serves Today as given) Today's review line does not count it
+test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
+  test("UI — empty path: a call still recording offers no review on its page or on Today", async ({ page }) => {
+    await openWindow(page, "main", { world: () => {} });
+    if (process.env.NOTER_CORE === "stdio") {
+      await expect(page.getByRole("heading", { name: "Today", level: 1 })).toBeVisible();
+      await expect(page.locator('[data-component="cpt-noter-component-ui-upcoming-call-card"]').first()).toBeVisible(); // Today has read
+      await expect(page.getByText(/To review: .*suggested item/)).toHaveCount(0);
+    }
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit3");
+      await expect(page.getByRole("heading", { name: "Calls", level: 1 })).toBeVisible({ timeout: 1000 });
+    }).toPass();
+    await coreReady(page);
+    await steerFor(page).invoke("window_navigate", { target: { type: "call_page", call_id: W.LIVE_CALL, tab: "summary" } });
+    await expect(toolbar(page)).toContainText(W.LIVE_TITLE);
+    await expect(page.getByRole("heading", { name: "Processing", level: 3 })).toBeVisible(); // the page has read its call
+    await expect(banner(page).getByText(/suggested items? to review before sharing/)).toHaveCount(0);
+    await expect(button(page, "Start Review")).toHaveCount(0);
   });
 });
 

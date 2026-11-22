@@ -930,3 +930,33 @@ async fn review_links_include_suggestions_and_only_visible_unnamed_speakers() {
     assert_eq!(view["review_calls"], json!([]));
     assert_eq!(view["unnamed_speakers"], 0);
 }
+
+// cpt-noter-seq-call-page-review-suggested-items (#1038): the call page offers no review while recording
+#[tokio::test]
+async fn a_call_still_recording_is_not_offered_for_review() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    people_world(&core);
+    for status in ["recording", "paused"] {
+        exec(
+            dir.path(),
+            &format!("UPDATE calls SET status = '{status}' WHERE id = 'new';"),
+        );
+        let view = today(&core).await.unwrap();
+        assert_eq!(
+            view.review_waiting, 0,
+            "{status}: its suggestions wait for its outputs"
+        );
+        assert!(
+            view.review_calls.is_empty(),
+            "{status}: no link to a page with nothing to review"
+        );
+    }
+    exec(
+        dir.path(),
+        "UPDATE calls SET status = 'ready' WHERE id = 'new';",
+    );
+    let view = today(&core).await.unwrap();
+    assert_eq!(view.review_waiting, 1);
+    assert_eq!(view.review_calls[0].id.as_str(), "new");
+}

@@ -11,7 +11,7 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 
 async function show(page: Page, sources: SourceRow[], plan: CorePlan = {}) {
   await openWindow(page, "settings", { fixedClock: true, ...plan, world: (w) => { plan.world?.(w); w.sources.sources = sources; } });
-  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Knowledge Sources" }).click();
+  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Knowledge Sources" }).click();
   await expect(pane(page).getByRole("heading", { name: "Knowledge Sources", exact: true })).toBeVisible();
 }
 const shot = (page: Page, name: string) => expect(page.locator('[data-region="window"]')).toHaveScreenshot(`knowledge-sources-${name}.png`);

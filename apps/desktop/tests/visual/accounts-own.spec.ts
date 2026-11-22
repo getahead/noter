@@ -134,7 +134,7 @@ const states: { id: string; world: (w: World) => void; ready: (page: Page) => Pr
 for (const s of states) {
   test(`renders ${s.id}`, async ({ page }) => {
     await openWindow(page, "settings", { world: s.world });
-    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Models & Runtimes" }).click();
+    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
     await s.ready(page);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     await settled(page);

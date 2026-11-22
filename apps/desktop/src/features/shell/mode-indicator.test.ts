@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { DegradedState, PrivacyMode } from "../../core/bindings";
-import { modeIndicator, type ModeInput } from "./mode-indicator";
+import { idleFooter, modeIndicator, type ModeInput } from "./mode-indicator";
 
 const switched = { type: "switched_to_local", call_id: null, reason: "unavailable", retry_at: null } as unknown as DegradedState;
 const noAssistant: DegradedState = { type: "no_assistant" };
@@ -37,5 +37,22 @@ describe("modeIndicator", () => {
 
   it("ignores degraded states that are not about the assistant", () => {
     expect(modeIndicator(input({ degraded: [{ type: "disk_full", free_mb: 1 }] })).state).toBe("CLOUD_REDACTED");
+  });
+});
+
+// #1058 (owner, 21 Nov): the idle footer names what is set up
+describe("idleFooter", () => {
+  const view = (o: { key?: boolean; account?: "claude" | "chatgpt"; local?: boolean }) =>
+    ({
+      keys: [{ provider: "anthropic", status: o.key ? { type: "configured", verified_at: 0 } : { type: "not_set" } }],
+      accounts: (["claude", "chatgpt"] as const).map((provider) => ({ provider, status: o.account === provider ? { type: "signed_in" } : { type: "not_signed_in" } })),
+      local: { running: !!o.local, models: o.local ? ["m"] : [] },
+    }) as never;
+  it("says API key, an account, or the local model, by what is there", () => {
+    expect(idleFooter(view({ key: true, local: true }))).toBe("Idle · API key · local fallback ready");
+    expect(idleFooter(view({ account: "claude", local: true }))).toBe("Idle · Claude account · local fallback ready");
+    expect(idleFooter(view({ account: "chatgpt" }))).toBe("Idle · ChatGPT account · local fallback ready");
+    expect(idleFooter(view({ local: true }))).toBe("Idle · local model only");
+    expect(idleFooter(undefined)).toBe("Idle · API key · local fallback ready");
   });
 });

@@ -34,7 +34,8 @@ export function historyMove(h: History, m: HistoryMove): { history: History; rou
   switch (m.type) {
     // @cpt-begin:cpt-noter-algo-ui-main-window-shell-history:p1:inst-case-section
     case "section": {
-      route = h.last[m.section] ?? ROOT(m.section);
+      // the section in view goes back to its root list; another opens where it was left (D17; owner, 21 Nov, issue 1044)
+      route = current.section === m.section ? ROOT(m.section) : (h.last[m.section] ?? ROOT(m.section));
       // shortcut: a section that is already showing is not pushed twice, so ⌘3 pressed twice adds no entry
       if (!same(route, current)) {
         entries = [...entries.slice(0, index + 1), route];

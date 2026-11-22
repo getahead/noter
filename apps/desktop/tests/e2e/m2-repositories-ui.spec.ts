@@ -11,7 +11,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item — repository settings", (
   test("UI — happy path: add, change default tool, edit and confirmed removal persist; cancelled removal keeps the row", async ({ page }) => {
     await watchAlerts(page);
     await openWindow(page, "settings");
-    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Repositories" }).click();
+    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Repositories" }).click();
     const pane = page.locator('[data-region="ST-R2"]');
     await pane.getByRole("button", { name: "Add Mapping…" }).click();
     const sheet = page.getByRole("dialog", { name: "Add Mapping", exact: true });
@@ -43,7 +43,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item — repository settings", (
 
   test("UI — error path: a refused folder save keeps the draft for correction", async ({ page }) => {
     const steer = await openWindow(page, "settings");
-    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Repositories" }).click();
+    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Repositories" }).click();
     await page.getByRole("button", { name: "Add Mapping…" }).click();
     const sheet = page.getByRole("dialog", { name: "Add Mapping", exact: true });
     await sheet.getByRole("textbox", { name: "Jira project or component" }).fill("REPOFAIL");

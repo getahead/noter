@@ -798,3 +798,42 @@ async fn an_install_of_a_tool_the_contract_does_not_name_is_refused() {
     assert_eq!(err.code, ErrorCode::InvalidInput);
     assert!(w.cli.log().is_empty());
 }
+
+// cpt-noter-seq-first-run-connect-assistant, #1058 (owner, 21 Nov): with no key, no signed-in account and no local model, the core says
+// so with the no_assistant degraded state, recomputed on every accounts change.
+#[tokio::test]
+async fn no_assistant_follows_what_is_set_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    async fn no_assistant(w: &World) -> bool {
+        let app = w.core.app_snapshot(&settings(), NoArgs {}).await.unwrap();
+        app.degraded
+            .states
+            .iter()
+            .any(|s| matches!(s, DegradedState::NoAssistant))
+    }
+    let nothing = |v: &AccountsView| {
+        !v.keys
+            .iter()
+            .any(|k| matches!(k.status, KeyStatus::Configured { .. }))
+            && !v
+                .accounts
+                .iter()
+                .any(|a| matches!(a.status, AccountStatus::SignedIn { .. }))
+            && !(v.local.running && !v.local.models.is_empty())
+    };
+    // no local model on this Mac: only the key is left
+    w.cli.set(tool(r#"{"tool":"ollama","installed":false}"#));
+    set_key(&w, KeyProvider::Anthropic).await;
+    assert!(!no_assistant(&w).await, "a stored key is an assistant");
+    let view = w
+        .core
+        .api_key_remove(&settings(), remove(KeyProvider::Anthropic))
+        .await
+        .unwrap();
+    assert_eq!(no_assistant(&w).await, nothing(&view));
+    assert!(
+        nothing(&view),
+        "no key, no account and no local model are left"
+    );
+}

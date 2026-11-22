@@ -39,7 +39,10 @@ describe("SettingsWindow", () => {
     const html = renderToString(<SettingsWindow bridge={bridge} />);
     expect(html).toContain('aria-label="Settings panes"');
     expect(html).toContain('data-state="pane"');
-    const names = [...html.matchAll(/role="listitem"[^>]*>.*?<span>(.*?)<\/span>/g)].map((m) => m[1]);
+    // #1061: one single-select list of named options, the open pane selected (WCAG 4.1.2)
+    expect(html).toMatch(/role="listbox"[^>]*aria-label="Settings panes"|aria-label="Settings panes"[^>]*role="listbox"/);
+    expect(html).toMatch(/role="option"[^>]*aria-selected="true"[^>]*>.*?<span>General<\/span>/);
+    const names = [...html.matchAll(/role="option"[^>]*>.*?<span>(.*?)<\/span>/g)].map((m) => m[1]);
     expect(names).toEqual(["General", "Audio &amp; Transcription", "Models &amp; Runtimes", "Privacy", "Call Screen &amp; Menu Bar", "Hotkeys", "Repositories", "Knowledge Sources", "Maintenance", "Performance", "Updates"]);
     expect(html).toContain('data-region="ST-R2"');
     expect(html).toContain("Launch at login");

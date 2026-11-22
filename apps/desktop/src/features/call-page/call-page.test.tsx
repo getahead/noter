@@ -17,6 +17,7 @@ import { CallPage } from "./CallPage";
 import { CallToolbar, moreItems, nativeItemReviewMenuState, runNativeReviewMenuAction, watchNativeMenuContext } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
+import { loadItems } from "../items/actions";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { deleteAudio } from "./share-actions";
 import { slots } from "./slots";
@@ -292,6 +293,24 @@ describe("CallBanners", () => {
     (find(tree, (p) => typeof p.onDismiss === "function").props.onDismiss as (id: string) => void)("notify");
     expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toBe("");
     expect(seen).toEqual([]);
+  });
+
+  // cpt-noter-seq-call-page-review-suggested-items: no review banner until the outputs are written (#1038)
+  it("offers the review only once the outputs are written, never before they start", async () => {
+    await ready((w) => {
+      const callId = w.calls.find((c) => c.status === "ready")!.id;
+      const item = w.items.find((i) => i.call.id === callId) ?? w.items[0];
+      w.items.push({ ...item, id: "itm_1038", call: { ...item.call, id: callId }, review: "suggested" });
+    });
+    await loadItems(bridge, id);
+    await settle();
+    const summaryRoute = { section: "library", key: `call:${id}:summary` } as const;
+    const ids = () => (find(rendered(CallBanners, { route: summaryRoute, bridge, appBanners: 0 }), (p) => Array.isArray(p.banners)).props.banners as Array<{ id: string }>).map((b) => b.id);
+    const outputs = (status: CallOutputs["status"]) => holdOutputs({ call_id: id, status, sections: [], archive: "not_started", review_waiting: 1, sensitive: false, written_locally: false } as CallOutputs);
+    outputs("ready");
+    expect(ids()).toContain("review");
+    outputs("not_started");
+    expect(renderToString(<CallBanners route={summaryRoute} bridge={bridge} appBanners={0} />)).not.toContain("to review before sharing");
   });
 
   it("does not hide the notification offer when another banner closes", async () => {

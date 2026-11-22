@@ -21,7 +21,7 @@ export function ThreadRow({ bridge, item: listed, call, prefs }: { bridge: Bridg
   const span = item.spans[0];
   const open = () => void bridge.act("window_navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "call_page", call_id: call.id, tab: "summary" } }), { screen: "library-topics" });
   return (
-    <li className="pc-item lb-throw" data-component="cpt-noter-component-ui-output-item-row" data-variant="thread" data-call-id={call.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} tabIndex={0} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
+    <li className="pc-item lb-throw" data-component="cpt-noter-component-ui-output-item-row" data-variant="thread" data-call-id={call.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} aria-label={item.text} tabIndex={0} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
       <Badge kind="kind" text={t(KIND_KEY[item.kind])} />
       <span className="pc-item__text" lang={typeof item.lang === "string" ? item.lang : item.lang.code}>
         {item.text}

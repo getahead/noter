@@ -61,6 +61,14 @@ describe("ActionItemRow (cpt-noter-component-ui-action-item-row)", () => {
     expect(outputSlots.rejectedList).toBe(RejectedList);
   });
 
+  // #1059: the focusable row is a named group, so VoiceOver says which item it is (WCAG 4.1.2)
+  it("names the focusable row with the item's text", async () => {
+    await ready();
+    const it = item("itm_replay");
+    const html = renderToString(<ActionItemRow bridge={bridge} item={it} />);
+    expect(html).toMatch(new RegExp(`<div[^>]*role="group"[^>]*aria-label="${it.text}"`));
+  });
+
   it("a suggested full row names its component, variant and state, with Accept, Edit and Reject", async () => {
     await ready();
     const html = renderToString(<ActionItemRow bridge={bridge} item={item("itm_replay")} />);

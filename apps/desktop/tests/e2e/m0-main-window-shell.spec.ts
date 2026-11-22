@@ -8,7 +8,7 @@
 import type { Page } from "@playwright/test";
 
 import * as W from "../support/world-presets";
-import { openWindow } from "./support/app";
+import { coreReady, openWindow, steerFor } from "./support/app";
 import { expect, test } from "./support/fixtures";
 
 const BANNER = "Call detection is off until the audio self-test passes";
@@ -35,6 +35,30 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
 });
 
 test.describe("cpt-noter-flow-ui-main-window-shell-navigate", () => {
+  // #1044, owner decision 21 Nov (no DESIGN story yet): choosing the section in view, by its key or its sidebar item,
+  // goes to the section's root list as a new entry, so Back returns to the page that was pushed
+  test("UI — other path: ⌘3 and the Calls item on a call page return to the Calls list, and Back to the page", async ({ page }) => {
+    await openWindow(page, "main", { world: () => {} });
+    const calls = page.getByRole("heading", { name: "Calls", level: 1 });
+    const callPage = page.locator('[data-region="PC-R1"]');
+    const openPast = async () => {
+      await coreReady(page);
+      await steerFor(page).invoke("window_navigate", { target: { type: "call_page", call_id: W.PAST_CALL, tab: "transcript" } });
+      await expect(callPage).toContainText("Backend sync");
+    };
+    await expect(async () => {
+      await page.keyboard.press("Meta+Digit3");
+      await expect(calls).toBeVisible({ timeout: 1000 });
+    }).toPass();
+    await openPast();
+    await page.keyboard.press("Meta+Digit3");
+    await expect(calls).toBeVisible();
+    await page.keyboard.press("Meta+BracketLeft");
+    await expect(callPage).toContainText("Backend sync");
+    await section(page, "Calls").click();
+    await expect(calls).toBeVisible();
+  });
+
   test("UI — keyboard only: ⌘3 opens Calls with focus on its heading, ⌘[ goes back, Back is disabled at the start", async ({ page }) => {
     await openWindow(page, "main");
     await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");
