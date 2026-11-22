@@ -19,7 +19,7 @@ import { RadioGroup } from "../../ui/primitives/radio-group";
 import { Toggle } from "../../ui/primitives/toggle";
 import { DisplayPicker } from "../../ui/setup/display-picker";
 import { PermissionCheckRow } from "../../ui/setup/permission-check-row";
-import { SelfTestPanel } from "../../ui/setup/self-test-panel";
+import { SelfTestPanel, sysRefused } from "../../ui/setup/self-test-panel";
 import { STEP_AT, stepLabel, WizardStepper, type StepperEntry } from "../../ui/setup/wizard-stepper";
 import { useAlert } from "../../ui/dialogs/host";
 import { installCli, installKey, loadAccounts, removeKey } from "../settings/accounts";
@@ -180,6 +180,7 @@ function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w:
           id="sys"
           label={t("permission.sys")}
           state={rowStateFor("system_audio", permissionState(status, "system_audio"), w)}
+          detected={sysRefused(w.panel, permissionState(status, "system_audio") === "granted")}
           why={t("permission.sys_why")}
           howto={t("permission.sys_howto")}
           onOpenSettings={() => void wizard.openSettings("system_audio")}
@@ -187,7 +188,7 @@ function Permissions({ bridge, wizard, w }: { bridge: Bridge; wizard: Wizard; w:
       </div>
       {/* @cpt-end:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-permissions-step */}
       <NativePermissionDetails native={native} />
-      <SelfTestPanel panel={w.panel} waitingPercent={speechPercent(status.models.bundles)} playClip={w.clip} onPlayClip={() => void wizard.runTest(true)} onRun={() => void wizard.runTest(false)} onOpenSettings={() => void wizard.openSettings("system_audio")} />
+      <SelfTestPanel panel={w.panel} waitingPercent={speechPercent(status.models.bundles)} playClip={w.clip} onPlayClip={() => void wizard.runTest(true)} onRun={() => void wizard.runTest(false)} onOpenSettings={() => void wizard.openSettings("system_audio")} sysAllowed={permissionState(status, "system_audio") === "granted"} />
     </>
   );
 }
