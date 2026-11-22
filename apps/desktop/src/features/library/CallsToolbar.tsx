@@ -17,6 +17,8 @@ export function CallsToolbar({ route, base }: PageToolbarProps) {
   return (
     <MainToolbar
       {...base}
+      region="LC-R1"
+      subtitle={head.subtitle ?? undefined}
       trailing={
         <>
           {base.trailing}

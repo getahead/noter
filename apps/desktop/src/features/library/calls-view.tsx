@@ -15,6 +15,7 @@ import { Table, Th } from "../../ui/primitives/table";
 import { CallRowView } from "./call-row";
 import type { CallsState } from "./calls-list";
 import { groupByMonth, sortOf, subtitle, type Column } from "./calls-model";
+import { usePublishHead } from "./topics-head";
 import type { Selection } from "./selection";
 import "./library.css";
 
@@ -67,25 +68,21 @@ const selectedRows = (rows: CallRow[], selected: ReadonlySet<string>) =>
   rows.filter((r) => selected.has(r.id));
 
 /** Library › Calls as the prototype draws it: LC-R1 (title and counts) and LC-R3 (table, empty state, skeleton or error). */
+/** LC-R1: the counts are the toolbar's subtitle (**212 calls · 148 hours · since 2 Sep**, or **8 calls match**), not a header in the content. */
+export function callsSubtitle({ state, filtered, selected, prefs }: Pick<CallsViewProps, "state" | "filtered" | "selected" | "prefs">): string | null {
+  if (state.status !== "LISTED") return null;
+  const total = state.total ?? state.rows.length;
+  return filtered ? t("filters.matches", { count: total }) : subtitle(state.rows, total, selectedRows(state.rows, selected).length, prefs);
+}
+
 export function CallsView(p: CallsViewProps) {
   const { state } = p;
   const chosen = selectedRows(state.rows, p.selected);
+  usePublishHead(null, callsSubtitle(p));
   return (
     <>
-      <div data-region="LC-R1" className="lb-head">
-        <h2 className="lb-title" tabIndex={-1}>
-          {t("library.calls.title")}
-        </h2>{" "}
-        {state.status === "LISTED" && p.filtered
-          ? t("filters.matches", { count: state.total ?? state.rows.length })
-          : state.status === "LISTED" &&
-          subtitle(
-            state.rows,
-            state.total ?? state.rows.length,
-            chosen.length,
-            p.prefs,
-          )}
-      </div>
+      {/* the title is the toolbar's; this hidden heading is where focus and VoiceOver land in the content after ⌘3 */}
+      <h2 className="np-sr" tabIndex={-1}>{t("library.calls.title")}</h2>
       {p.bar}
       {p.actions}
       {p.failed && (

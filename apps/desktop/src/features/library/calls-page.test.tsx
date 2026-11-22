@@ -20,7 +20,7 @@ const bridge = {
 } as never;
 
 describe("CallsPage (cpt-noter-state-ui-library-calls-list)", () => {
-  it("starts in LOADING under the bridge and dialogs providers: the header, no rows yet", () => {
+  it("starts in LOADING under the bridge and dialogs providers: the filter bar, no rows yet", () => {
     vi.stubGlobal("document", { hasFocus: () => true });
     const h = renderToString(
       <BridgeProvider value={bridge}>
@@ -29,7 +29,7 @@ describe("CallsPage (cpt-noter-state-ui-library-calls-list)", () => {
         </DialogsProvider>
       </BridgeProvider>,
     );
-    expect(h).toContain('data-region="LC-R1"');
+    expect(h).toContain('data-region="LC-R2"');
     expect(h).toContain('data-region="LC-R3"');
     expect(h).not.toContain("lb-crow");
   });

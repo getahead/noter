@@ -131,6 +131,8 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     const installing = s.phase === "INSTALLING";
     const unsupported = s.cliUnsupported || (!!cli && cli.installed && !cli.supported);
     const missing = s.cliMissing || (!!cli && !cli.installed);
+    // a refused prepare carries no CliInfo: the row's last look at the tool names the version
+    const version = (cli ?? view.cli).version;
     // @cpt-begin:cpt-noter-flow-ui-accounts-sign-in:p1:inst-if-existing
     const existing = s.prepare?.existing && !missing && !unsupported ? s.prepare.existing : null;
     // @cpt-end:cpt-noter-flow-ui-accounts-sign-in:p1:inst-if-existing
@@ -155,7 +157,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
             <Icon name="warning" size={14} />
             <div>
               <div>
-                <strong>{t(missing ? "signin.cli_missing" : "signin.cli_unsupported", names)}</strong>
+                <strong>{missing ? t("signin.cli_missing", names) : version ? t("signin.cli_unsupported_version", { ...names, version }) : t("signin.cli_unsupported", names)}</strong>
               </div>
               <div className="np-dim">{t(missing && s.installFailed ? "signin.cli_install_failed" : missing ? "signin.cli_missing_note" : "signin.cli_unsupported_note", names)}</div>
             </div>
@@ -323,11 +325,13 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     const code = s.code ?? "";
     const known = code in ERROR_TEXT ? code : "other";
     const plan = known === "plan_not_eligible";
+    // the account the plan check refused: the browser sign-in's identity, or the CLI's existing one
+    const who = plan ? (s.identity ?? s.prepare?.existing ?? null) : null;
     body = (
       <div className="np-sheet__body">
         <div className="st-banner" role="alert">
-          <strong>{t(ERROR_TEXT[known]!.title, names)}</strong>
-          <div>{t(ERROR_TEXT[known]!.text, names)}</div>
+          <strong>{who ? t("signin.err.plan_not_eligible_who", { ...names, email: who.email }) : t(ERROR_TEXT[known]!.title, names)}</strong>
+          <div>{who ? t("signin.err.plan_not_eligible_who_text", { ...names, plan: who.plan }) : t(ERROR_TEXT[known]!.text, names)}</div>
         </div>
       </div>
     );
