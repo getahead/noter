@@ -2957,7 +2957,7 @@ The Person page puts on one page what a person owes the user, what they asked of
 | PL-R1 Toolbar | MW-R1 | Title **People**, subtitle **48 people**; search field **Search people** that matches names and aliases as the user types; **Add Person** (+ icon button), which opens the New person form in a popover | D92; PM-59 |
 | PL-R2 Table | Fills the content | Sortable table: **Name** (`cpt-noter-component-ui-person-chip` with initials), **Role · org**, **Their open items**, **You owe**, **Last call**, **Voice profile** (icon with the help tag **Voice profile on**); row context menu **Open**, **Edit Details…**, **Merge 2 People…** (enabled only when exactly two rows are selected) and **Delete Person…** | D62, D95; PM-59 |
 | PL-R3 Unnamed speakers | Own group after PL-R2, headed **Unnamed speakers · 2**; not drawn when empty | Rows **Speaker 2 · 3 calls · last on 9 Oct** with a short quoted sample of what the speaker said, in its own language, and **Name…** (`cpt-noter-component-ui-speaker-label` popover with `cpt-noter-component-ui-person-picker`); `cpt-noter-component-ui-undo-strip` after naming | D16, D89; PM-59 |
-| PE-R1 Toolbar | MW-R1 | **Back**; name; subtitle **Frontend · 31 calls since Sep · 1:1 weekly**; view switch **Overview** · **Calls** · **History**; ⋯ with **Edit Details…**, **Merge With…**, **Delete Person…** | — |
+| PE-R1 Toolbar | MW-R1 | **Back**; name; subtitle **Frontend · 31 calls since Sep · 1:1 weekly**; view switch **Overview** · **Calls** · **History**; ⋯ with **Edit Details…**, **Merge With…**, **Delete Person…**; then the main window's search field **Search calls, people, documents** at the trailing edge, as on every main-window page (owner, 21 Nov) | — |
 | PE-R2 Open commitments · n | Overview, first block | `cpt-noter-component-ui-action-item-row`, compact, owned by the person | PRD › Feature specification › 5 |
 | PE-R3 Asked you · n open | Overview | `cpt-noter-component-ui-action-item-row`, compact, that the user owes them | D62 |
 | PE-R4 Topics you keep returning to | Overview | `cpt-noter-component-ui-topic-chip` list with call counts | — |
@@ -2988,7 +2988,7 @@ People list:
 Person page, Overview:
 
 ```text
-┌ PE-R1 [‹] [›]  Anna K.  Frontend · 31 calls since Sep · 1:1 weekly   [Overview|Calls|History]  [⋯]   ┐
+┌ PE-R1 [‹] [›]  Anna K.  Frontend · 31 calls since Sep · 1:1 weekly   [Overview|Calls|History]  [⋯] [⌕]┐
 ├─────────────────────────────────────────────────┬────────────────────────────────────────────────────┤
 │ PE-R2 Open commitments · 3                      │ PE-R5 Identity                                     │
 │  ☐ Drawer redesign spec · today 00:19:58 ↗ Fri  │  Voice profile  On since 3 Oct · 2 profiles        │
