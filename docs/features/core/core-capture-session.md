@@ -354,7 +354,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Output**: The capture rows of `degraded:changed`, `CaptureState.audio_writing`, gap rows.
 
 **Steps**:
-1. [x] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) at the call-relative `since` supplied by the supervisor - `inst-publish-engine-states`
+1. [x] - `p1` - Publish engine-derived states for the live call (`MicrophoneOff`, `SystemAudioSilent`, `TranscriptionStalled`, `DeviceChanged`, `SecondAudioSource`, `CaptureFailed`) at the call-relative `since` supplied by the supervisor; `MicrophoneOff` only while macOS reports microphone access not granted, since a silent device with access granted is not fixed in System Settings (#1172) - `inst-publish-engine-states`
 2. [x] - `p1` - Free disk under 2 GB → `DiskLow` (never a refusal); disk full → `DiskFull`, stop audio writing (`audio_writing: false`), keep the transcript - `inst-disk`
 3. [x] - `p1` - DB: write a `gaps` row for every gap reason the engine or the session produces using call-relative offsets; do not add the call offset a second time - `inst-write-gaps`
 4. [x] - `p1` - **RETURN** the new `DegradedSet` with a new version - `inst-degraded-return`

@@ -149,6 +149,7 @@ struct Setup {
     then: Vec<Behaviour>,
     /// The self-test passed before this launch (setup done: detection is on from the start).
     self_test_passed: bool,
+    /// What macOS answers for microphone access.
     microphone: PermissionState,
 }
 
@@ -3020,6 +3021,38 @@ async fn engine_gaps_and_degraded_states_reach_the_rows_the_set_and_nt3() {
     // The call ends: no engine state of it stays.
     r.stop(&main_window(), &call_id).await;
     assert!(!r.degraded().await.iter().any(is_engine_state));
+}
+
+#[tokio::test(start_paused = true)]
+// cpt-noter-seq-call-screen-recover-capture — issue 1172: a silent mic (a VM's virtual one, a muted headset) with access granted is not
+// "Microphone off · Open System Settings…": System Settings can't fix it.
+async fn a_silent_microphone_with_access_granted_is_not_microphone_off() {
+    let r = rig_with(Setup {
+        microphone: PermissionState::Granted,
+        ..Setup::default()
+    });
+    let call_id = r.recording().await;
+    r.inject(EngineEvent::Levels {
+        call_id: Some(call_id.clone()),
+        mic_db: -120.0,
+        sys_db: -30.0,
+    });
+    // a later fact as a barrier: the levels were handled before it
+    r.inject(EngineEvent::SystemAudioSilent {
+        call_id: call_id.clone(),
+        since_ms: OffsetMs(2_000),
+        confidence: 0.6,
+    });
+    r.degraded_until(|s| {
+        s.iter()
+            .any(|d| matches!(d, DegradedState::SystemAudioSilent { .. }))
+    })
+    .await;
+    assert!(!r
+        .degraded()
+        .await
+        .iter()
+        .any(|d| matches!(d, DegradedState::MicrophoneOff { .. })));
 }
 
 #[tokio::test(start_paused = true)]
