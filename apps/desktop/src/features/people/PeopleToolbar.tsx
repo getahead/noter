@@ -64,7 +64,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-edit
-  return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} hasSearch={false} center={control} trailing={more} />;
+  return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} center={control} trailing={more} />;
 }
 
 function ListToolbar({ base, bridge }: PageToolbarProps) {
@@ -74,13 +74,14 @@ function ListToolbar({ base, bridge }: PageToolbarProps) {
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-search
   const field = <SearchField id="pl-search" cls="pe-search" placeholder={t("people.search")} ariaLabel={t("people.search")} value={query} onChange={setPeopleQuery} />;
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-search
+  // the search field, then + at the trailing edge (prototype PL-R1)
   const trailing = (
     <>
+      {field}
       <span ref={setAnchor}>
         <IconButton id="pl-add" icon="plus" label={t("people.add")} onAction={() => setAddPerson(true)} />
       </span>
       <AddPersonPopover bridge={bridge} anchor={anchor} />
-      {field}
     </>
   );
   const subtitle = count === null ? undefined : count ? t("people.subtitle", { count }) : t("people.subtitle_empty");

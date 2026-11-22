@@ -32,11 +32,12 @@ export function AskToolbar({ bridge, base }: PageToolbarProps) {
       <PopupButton variant="toolbar" cls="ak-scope-pop" label={t("ask.scope")} options={presets.map((p) => ({ value: p.id, label: p.id === "all" ? t("ask.scope_all") : p.label }))} value={scopeId} onAction={(id) => setAskState({ scopeId: id })} />
     ) : undefined;
   useEffect(() => bindNewKey(document), []);
-  return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), onAction: newQuestion }, ...scopeActions]} trailing={
+  return <MainToolbar {...base} region="AK-R1" title={t("ask.title")} subtitle={answering ? t("ask.answering") : undefined} actions={[{ label: t("ask.new_question"), icon: "plus", onAction: newQuestion }, ...scopeActions]} trailing={
       <>
+        {/* AK-R1 order: New Question, scope, mode indicator (then Recent at Medium and Narrow) */}
+        {scope}
         <ModeIndicator view={mode} variant={base.narrow ? "glyph" : "ask"} runtime={t(privacy?.mode === "local_only" ? "ask.runtime_local" : "ask.runtime_claude_code")} onOpenPrivacy={openPrivacy} />
         {recentPop}
-        {scope}
       </>
     } />;
 }
