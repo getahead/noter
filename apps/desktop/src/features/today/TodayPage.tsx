@@ -14,12 +14,12 @@ import { t, untilNextDay } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Link } from "../../ui/primitives/link";
-import { PushButton } from "../../ui/primitives/push-button";
 import { allowCalendar, loadToday, READ_KEY } from "./actions";
 import { useToday } from "./cache";
 import { expandLive, calendarState, cards, isExpanded, proposalPreview, reviewLine, weekCards } from "./model";
 import { openSpan } from "../items/evidence";
 import { ProposalRow } from "./ProposalRow";
+import { navigate } from "../shell/navigate";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 import "./today.css";
 
@@ -194,7 +194,7 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
         {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-failed */}
         {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-allowed */}
         {state === "NO_CALLS" && <p className="td-empty">{t("today.no_calls")}</p>}
-        {state === "READY" && view && <h2 className="td-h">{t("today.calls", { count: day.length })}</h2>}
+        {state === "READY" && view && <h2 className="td-h">{t("today.title")} <span className="np-dim">{t("today.calls", { count: day.length })}</span></h2>}
         {/* @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-allowed */}
         {/* @cpt-begin:cpt-noter-flow-ui-today-review:p1:inst-cards */}
         {/* the live call card comes from live_call, so it shows whatever the calendar says */}
@@ -216,12 +216,12 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
       {view && (
         <section data-region="TD-R5" data-today-group="due" className="td-due">
           <h2 className="td-h">{t("today.due")}</h2>
-          {view.due_without_call.length === 0 ? <EmptyState variant="section" title={t("today.nothing_due")} /> : view.due_without_call.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />)}
+          {view.due_without_call.length === 0 ? <EmptyState variant="section" title={t("today.nothing_due")} /> : <div className="td-list np-card">{view.due_without_call.map((it) => <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />)}</div>}
         </section>
       )}
       {proposals && (
         <section data-region="TD-R6" className="td-proposals">
-          <h2 className="td-h">{t("today.proposals", { count: proposals.total })}</h2>
+          <h2 className="td-h">{t("today.proposals")} <span className="np-dim">{t("today.count", { count: proposals.total })}</span></h2>
           {proposals.rows.length === 0 ? (
             <p className="td-empty">{t("today.nothing_waiting")}</p>
           ) : (
@@ -229,12 +229,12 @@ export function TodayPage({ bridge }: { bridge: Bridge }) {
               {proposals.rows.map((p) => <ProposalRow key={p.id} proposal={p} />)}
             </div>
           )}
-          <PushButton label={t("today.show_all_activity")} variant="quiet" disabled />
+          <Link label={t("today.show_all_activity")} onAction={() => navigate({ section: "activity", key: "root" })} />
         </section>
       )}
       {view && (
         <section data-region="TD-R7" data-today-group="done" className="td-done">
-          <Disclosure label={t("today.done_today", { count: view.done_today.length })} open={doneOpen ?? view.done_today.length === 0} onAction={() => {
+          <Disclosure label={<>{t("today.done_today")} <span className="np-dim">{t("today.count", { count: view.done_today.length })}</span></>} open={doneOpen ?? view.done_today.length === 0} onAction={() => {
             position.doneOpen = !(doneOpen ?? view.done_today.length === 0);
             setDoneOpen(position.doneOpen);
           }} />

@@ -266,10 +266,10 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
           {check}
           {owner}
           {text}
+          {/* the evidence is the timestamp chip with its ↗, before the due text (action item row › Anatomy 1–5) */}
+          {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
           {due}
-          {it.spans[0] && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, it.spans[0]!, "main-window-shell")} />}
           {tags}
-          {prov}
           <span className="np-tb__spacer" />
           {variant === "done" && <PushButton label={t(local.doneTarget ? "items.undo" : "items.reopen")} size="small" variant="quiet" disabled={completing} onAction={() => void (local.doneTarget ? undoRow(bridge, it.id, local.doneTarget) : setDone(bridge, it, false))} />}
           {handoff}

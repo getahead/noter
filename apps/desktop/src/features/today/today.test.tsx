@@ -1,21 +1,22 @@
+import type { ReactNode } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
-import { setPseudo, t } from "../../i18n/format";
+import { setPseudo, shortCallTime, t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { sentCommands } from "../../../tests/support/fake-core";
 import { resetCache, useTypes } from "../call-page/cache";
 import type { World } from "../../../tests/support/scenario";
 import { openReview } from "../items/review-banner";
+import { navigateEffect } from "../shell/navigate";
 import { allowCalendar, loadToday, openCalendarSettings, record, showCall, showPreviousCall } from "./actions";
 import { holdToday } from "./cache";
 import { TodayBanners } from "./TodayBanners";
 import { positionOf } from "./position";
 import { shouldClearFocusedRow, TodayPage, watchTodayDate } from "./TodayPage";
 import { TodayToolbar } from "./TodayToolbar";
-import { clockOf } from "./clock";
 import { UpcomingCallCard } from "./UpcomingCallCard";
 
 let bridge: Bridge;
@@ -150,9 +151,12 @@ describe("TodayPage (cpt-noter-component-screen-today)", () => {
     const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
     const html = renderToString(<TodayToolbar route={{ section: "today", key: "root" }} bridge={bridge} base={base} inspectorOpen={false} onToggleInspector={() => {}} />);
     expect(html).toContain('data-region="TD-R1"');
-    expect(html).toMatch(/Record|Recording/);
-    expect(clockOf(754)).toBe("12:34");
-    expect(clockOf(754.9)).toBe("12:34");
+    // the fixture records: the indicator's button variant is the dot and the clock, without the word (#1069)
+    expect(html).toContain('data-variant="button"');
+    expect(html).not.toContain(">Recording<");
+    expect(shortCallTime(754)).toBe("12:34"); // MM:SS on the button (#1069)
+    expect(shortCallTime(754.9)).toBe("12:34");
+    expect(shortCallTime(3754)).toBe("01:02:34");
   });
   it("explains that Record has no keyboard shortcut when its binding is cleared", async () => {
     await open();
@@ -209,7 +213,7 @@ describe("call cards (cpt-noter-component-ui-upcoming-call-card)", () => {
     put([event("a", { last_time: { call: { id: "call_1" }, line: "Agreed the plan" } }), event("b", { sensitive: true })])();
     await loadToday(bridge);
     const html = renderToString(<TodayPage bridge={bridge} />);
-    expect(html).toContain("Today · 2 calls");
+    expect(html).toMatch(/Today(<!-- -->)? <span class="np-dim">· 2 calls<\/span>/); // the count is dimmed (#1073)
     expect(html).toMatch(/data-variant="today"[^>]*data-state="expanded"/);
     expect(html).toMatch(/data-state="collapsed"/);
     expect(html).toContain("Anna");
@@ -259,7 +263,7 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     let html = renderToString(<TodayPage bridge={bridge} />);
     expect(html).toContain('data-region="TD-R5"');
     expect(html).toContain("Due this week, no call");
-    expect(html).toContain("Done today · 1");
+    expect(html).toMatch(/Done today(<!-- -->)? <span class="np-dim">· 1<\/span>/);
     expect(html).toContain('data-variant="compact"');
     items().splice(items().length - extra.length, extra.length);
     await loadToday(bridge);
@@ -322,6 +326,21 @@ describe("item regions (TD-R5, TD-R7) and card rows", () => {
     expect(html).not.toContain("Row 5");
     expect(html).toContain("Show 2 More");
   });
+});
+
+it("Show All in Activity opens Activity, and the recording button shows the call window (#1069, #1075)", async () => {
+  await open();
+  await loadToday(bridge);
+  const out = sentCommands(fake);
+  const moves: unknown[] = [];
+  const stop = navigateEffect((e) => moves.push(e));
+  (find(rendered(TodayPage, { bridge }), (p) => p.label === "Show All in Activity").props.onAction as () => void)();
+  stop();
+  expect(moves).toEqual([{ type: "move", move: { type: "push", route: { section: "activity", key: "root" } } }]);
+  const base = { actions: [], hasSearch: false, narrow: false, canBack: false, canForward: false, showToggle: false, search: "", searchOpen: false, title: "", onBack() {}, onForward() {}, onToggleSidebar() {}, onSearch() {}, onRunSearch() {}, onOpenSearch() {} };
+  const toolbar = rendered(TodayToolbar, { route: { section: "today", key: "root" }, bridge, base, inspectorOpen: false, onToggleInspector() {} });
+  (find(toolbar.props.trailing as ReactNode, (p) => p["data-variant"] === "button").props.onClick as () => void)();
+  await vi.waitFor(() => expect(out.map((c) => c[0])).toContain("window_show_call"));
 });
 
 it("Today row keys tick, open typed evidence, and preserve the last focused item", async () => {

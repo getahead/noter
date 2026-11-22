@@ -531,6 +531,12 @@ impl<R: Runtime> Surfaces for TauriSurfaces<R> {
         }
     }
 
+    fn hide_window(&self, window: WindowLabel) {
+        if let Some(w) = self.app.get_webview_window(window.as_str()) {
+            let _ = w.hide();
+        }
+    }
+
     fn call_surface_visible(&self) -> bool {
         self.app
             .get_webview_window(WindowLabel::CallScreen.as_str())
