@@ -2958,7 +2958,7 @@ The Person page puts on one page what a person owes the user, what they asked of
 | --- | --- | --- | --- |
 | PL-R1 Toolbar | MW-R1 | Title **People**, subtitle **48 people**; search field **Search people** that matches names and aliases as the user types; **Add Person** (+ icon button), which opens the New person form in a popover | D92; PM-59 |
 | PL-R2 Table | Fills the content | Sortable table: **Name** (`cpt-noter-component-ui-person-chip` with initials), **Role · org**, **Their open items**, **You owe**, **Last call**, **Voice profile** (icon with the help tag **Voice profile on**); row context menu **Open**, **Edit Details…**, **Merge 2 People…** (enabled only when exactly two rows are selected) and **Delete Person…** | D62, D95; PM-59 |
-| PL-R3 Unnamed speakers | Own group after PL-R2, headed **Unnamed speakers · 2**; not drawn when empty | Rows **Speaker 2 · 3 calls · last on 9 Oct** with a short quoted sample of what the speaker said, in its own language, and **Name…** (`cpt-noter-component-ui-speaker-label` popover with `cpt-noter-component-ui-person-picker`); `cpt-noter-component-ui-undo-strip` after naming | D16, D89; PM-59 |
+| PL-R3 Unnamed speakers | Own group after PL-R2, headed **Unnamed speakers · 2**; not drawn when empty | One row per call, newest first, until voice profiles group a speaker across calls (owner, #1151): **Speaker 2 · in Planning: VHI 8.0 drawer redesign · 16 Oct** with a short quoted sample of what the speaker said, in its own language (it truncates first, then the call title), and **Name…** (`cpt-noter-component-ui-speaker-label` popover with `cpt-noter-component-ui-person-picker`); `cpt-noter-component-ui-undo-strip` after naming | D16, D89; PM-59 |
 | PE-R1 Toolbar | MW-R1 | **Back**; name; subtitle **Frontend · 31 calls since Sep · 1:1 weekly**; view switch **Overview** · **Calls** · **History**; ⋯ with **Edit Details…**, **Merge With…**, **Delete Person…**; then the main window's search field **Search calls, people, documents** at the trailing edge, as on every main-window page (owner, 21 Nov) | — |
 | PE-R2 Open commitments · n | Overview, first block | `cpt-noter-component-ui-action-item-row`, compact, owned by the person | PRD › Feature specification › 5 |
 | PE-R3 Asked you · n open | Overview | `cpt-noter-component-ui-action-item-row`, compact, that the user owes them | D62 |
@@ -2982,8 +2982,8 @@ People list:
 │ (P)  Pavel       │ QA · VHP         │ 1                │ 2       │ Today     │             │
 ├──────────────────┴──────────────────┴──────────────────┴─────────┴───────────┴─────────────┤
 │ PL-R3 Unnamed speakers · 2                                                                 │
-│   Speaker 2 · 3 calls · last on 9 Oct                                             [Name…]  │
-│   Speaker 4 · 1 call · last on 13 Oct                                             [Name…]  │
+│   Speaker 4 · in Planning: VHI 8.0 drawer redesign · 16 Oct  “Хорошо, тогда я…”   [Name…]  │
+│   Speaker 2 · in Vendor call: MonitorCo · 7 Oct  “Fast, ja. Der Kanal ist…”       [Name…]  │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -3014,7 +3014,7 @@ Person page, Overview:
 | Search field | `cpt-noter-component-ui-primitives` | Filters PL-R2 and PL-R3; matching folds ё/е and uses aliases, so **Дима** finds Dmitri S. |
 | **Add Person** | Icon button with a `cpt-noter-component-ui-person-picker` popover | Opens the New person form **New person**: **Name**, **Email**, disabled **Role** and **Create**, disabled until there is a name; a name that exists shows **A person called “Lena” already exists: Lena K. (QA)** with **Use Lena K.** and **Create Anyway** (D92). Role stays disabled until the command contract can persist it. |
 | Person row | Table row with `cpt-noter-component-ui-person-chip` | Click selects and ⌘-click adds to the selection; Return, double-click or the name pushes the Person page › **Overview** (PM-59) |
-| **Name…** on an unnamed speaker | `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-person-picker` | Opens the popover **Name Speaker 2** with the quoted sample, a name field (**Name…**) over up to five matching people, **No one called “Lena”** when none match and **New Person “Lena”…**, and the footnote **Names Speaker 2 in all 3 calls as one change you can undo.** Choosing a person names that speaker in every listed call as one batch; the undo strip reads **Named Speaker 2 as Dmitri S. in 3 calls** · **Undo**, with the context **3 calls · last on 9 Oct** (PM-59) |
+| **Name…** on an unnamed speaker | `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-person-picker` | Opens the popover **Name Speaker 2** with the quoted sample, a name field (**Name…**) over up to five matching people, **No one called “Lena”** when none match and **New Person “Lena”…**, and the footnote **Names Speaker 2 in this call as one change you can undo.** Choosing a person names that call's speaker as one change you can undo; the undo strip reads **Named Speaker 2 as Dmitri S. in Planning: VHI 8.0 drawer redesign** · **Undo** (one row per call until voice profiles group a speaker across calls, owner #1151; PM-59) |
 | View switch **Overview** · **Calls** · **History** | Segmented control | Replaces the page content |
 | **Edit Details…**, **Merge With…**, **Delete Person…** | ⋯ menu, also in the People row context menu | **Edit Details…** opens the sheet **Edit details** with **Name**, **Also known as**, **Email**, **Role**, **Organisation** and **Notes**, and **Cancel** and **Save**; once the name changes, the ticked checkbox **Keep “Pavel” as an alias** appears under it (D94). **Merge With…** opens the merge sheet **Merge Anna K. with another entry** with **Use this when one person has two entries. Their calls, items and names move to the person you keep.**, the field **Keep** (`cpt-noter-component-ui-person-picker`, merge variant, **Choose a person…**), then the list **What moves to Anna Kuznetsova**: the calls and their speaker labels, the items the person owns, their names as aliases and the voice profile; **Merge** stays disabled until a person is chosen (D95). **Delete Person…** opens the alert **Delete Anna K.?** with **Their name is removed from every call; the speakers become unnamed again. Their voice profile is deleted. This can't be undone.** and **Delete** and **Cancel**; after the delete the People list shows (`cpt-noter-component-screen-dialogs`; PM-59) |
 | **Merge 2 People…** | Row context menu, exactly two rows selected | Opens the merge sheet with the second person chosen under **Keep**; afterwards the kept person's page opens with **Merged Anna K. into Anna Kuznetsova · Undo** (D95; PM-59) |
@@ -3045,14 +3045,14 @@ Person page, Overview:
 | No people yet | PL-R2 | `cpt-noter-component-ui-empty-state` **No people yet** · **People appear when you record calls or add them.** · **Add Person**, which opens the New person form with **Create** | UX B.10; D92 | `cpt-noter-seq-people-prepare-one-on-one` (Empty — No people yet) |
 | No match | PL-R2 | **No people match “Lena”** · **Clear Search** | UX B.10 | `cpt-noter-seq-people-name-unnamed-speaker` (Empty — New person) |
 | Unnamed speakers waiting | PL-R3 | **Unnamed speakers · 2** with one row per speaker | D16 | `cpt-noter-seq-people-name-unnamed-speaker` (Happy path) |
-| Speaker named | PL-R3 | **Named Speaker 2 as Dmitri S. in 3 calls** · **Undo** for 10 s | D89 | `cpt-noter-seq-people-name-unnamed-speaker` (Happy path) |
+| Speaker named | PL-R3 | **Named Speaker 2 as Dmitri S. in Planning: VHI 8.0 drawer redesign** · **Undo** for 10 s | D89 | `cpt-noter-seq-people-name-unnamed-speaker` (Happy path) |
 | New person | Person picker | **No one called “Lena”** · **New Person “Lena”…**, then the New person form **New person for Speaker 2** with **Name** filled in, **Email**, disabled **Role** and **Create and Name** | D89, D92; PM-59 | `cpt-noter-seq-people-name-unnamed-speaker` (Empty — New person) |
 | Wrong person chosen | PL-R3, History view | **Undo** on the strip, or on the History entry after it has gone | PRD › Feature specification › 11 | `cpt-noter-seq-people-name-unnamed-speaker` (Error — Wrong person chosen) |
 | Loading | PE-R2 to PE-R6 | Skeleton rows after 300 ms | UX B.0 | Transient; no path |
 | No calls with this person yet | PE-R2 to PE-R6 | **No calls with Anna K. yet** · **Their commitments, questions and topics appear after your first call together.** | UX B.10; PM-59 |
 |  Empty blocks | PE-R2, PE-R3, PE-R4 | **Nothing open**, **Nothing they are waiting for**, **No recurring topics yet** in place of the empty block's rows | PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Happy path); `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
 | Voice profile off | PE-R5 | **Off** · **Set Up Voice Profile…** | D48 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Happy path) |
-| Voice profile on | PE-R5 | **On since 3 Oct · 2 profiles matched in 28 calls** · **Delete Profile…** | UX B.10 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Other — Delete the profile) |
+| Voice profile on | PE-R5 | **On since 3 Oct · 2 profiles · matched in 28 calls** (the profiles kept, and the calls a profile named a speaker in; a part whose count is 0 is left out, so right after **Create Profile** it reads **On since 22 Nov**; #1152) · **Delete Profile…** | UX B.10 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Other — Delete the profile) |
 | No history | History view | **No changes yet** · **Changes to Anna K.'s items, names and voice profile appear here, each with Undo.** | UX C.2; PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
 | Details edited | PE-R1 sheet | **Edit Details…** with **Keep “Pavel” as an alias** ticked after the name changed; the new name on every label, chip and owner | D94 | `cpt-noter-seq-people-name-unnamed-speaker` (Other — Rename a person) |
 | Two entries merged | PL-R2; Person page | **Merge 2 People…**, then the merge sheet; the kept person's page with **Merged Anna K. into Anna Kuznetsova · Undo** | D95; PM-59 | `cpt-noter-seq-people-name-unnamed-speaker` (Other — Merge two entries for one person) |
@@ -11448,11 +11448,11 @@ User:
 User:
 
 1. Opens **People** in the sidebar and sees **Unnamed speakers** under the people table
-2. Sees **Speaker 2 · 3 calls · last on 9 Oct** and clicks **Name…** on that row
-3. Sees **Name Speaker 2** with a quoted sample of what the speaker said, a name field over up to five people, and **Names Speaker 2 in all 3 calls as one change you can undo.**
+2. Sees **Speaker 2 · in Planning: VHI 8.0 drawer redesign · 16 Oct** and clicks **Name…** on that row
+3. Sees **Name Speaker 2** with a quoted sample of what the speaker said, a name field over up to five people, and **Names Speaker 2 in this call as one change you can undo.**
 4. Types “Дима” and sees Dmitri S. at the top of the list
 5. Clicks Dmitri S.
-6. Gets **Named Speaker 2 as Dmitri S. in 3 calls** with **Undo**, the row gone from **Unnamed speakers**, and the name on those lines in all three calls
+6. Gets **Named Speaker 2 as Dmitri S. in Planning: VHI 8.0 drawer redesign** with **Undo**, the row gone from **Unnamed speakers**, and the name on that speaker's lines in that call
 
 **Empty path — New person**
 

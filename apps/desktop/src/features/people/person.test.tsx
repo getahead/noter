@@ -25,9 +25,13 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
     const p = person({ voice_profile: true, voice_profile_stats: { opted_in_at: Date.UTC(2026, 9, 3, 12), profiles: 2, matched_calls: 28 } } as Partial<PersonRow>);
     const h = renderToString(<Overview bridge={bridge} page={page({ person: p, calls: [call] })} prefs={undefined} />);
     expect(h).toContain("On since Oct 3");
-    expect(h).toContain("2 profiles available");
-    expect(h).toContain("Matched in 28 calls");
+    expect(h).toContain("On since Oct 3 · 2 profiles · matched in 28 calls"); // #1152, one line
     expect(h).not.toContain("2 profiles matched");
+  });
+  it("PE-R5 Languages lists their languages with shares; none without transcribed lines (#1152)", () => {
+    const h = renderToString(<Overview bridge={bridge} page={page({ calls: [call], languages: [{ lang: "ru", share: 0.71 }, { lang: "en", share: 0.29 }] } as never)} prefs={undefined} />);
+    expect(h).toContain("<dt>Languages</dt><dd>Russian 71 % · English 29 %</dd>");
+    expect(renderToString(<Overview bridge={bridge} page={page({ calls: [call] })} prefs={undefined} />)).not.toContain("Languages");
   });
   it("NO_CALLS: the person's first-call message, no blocks", () => {
     const h = renderToString(<PersonBody {...props()} />);

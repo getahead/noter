@@ -6,6 +6,8 @@ import { shortDay, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
 import { Badge } from "../../ui/primitives/badge";
 import { KIND_KEY } from "../items/kind";
+import { ActionItemRow } from "../items/ActionItemRow";
+import { OutputItemRow } from "../call-page/OutputItemRow";
 import { Link } from "../../ui/primitives/link";
 import { ProvenanceChip } from "../items/ProvenanceChip";
 import { openSpan } from "../items/evidence";
@@ -68,6 +70,13 @@ export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit
       e.preventDefault();
     }
   };
+  // An item hit is the item's own row (owner, text, evidence chip, due, state), as on its call page (issue 1155).
+  if (hit.target.type === "item" && hit.item)
+    return (
+      <li className="lb-hit lb-hit--item" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
+        {hit.item.kind === "action_item" ? <ActionItemRow bridge={bridge} item={hit.item} variant="compact" showCall /> : <ul className="lb-items"><OutputItemRow bridge={bridge} item={hit.item} compact /></ul>}
+      </li>
+    );
   return (
     <li className="lb-hit" data-component="cpt-noter-component-ui-search-result-row" data-target={hit.target.type} data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
       {hit.title !== hit.snippet && <span className="lb-hit__title">{hit.title}</span>}

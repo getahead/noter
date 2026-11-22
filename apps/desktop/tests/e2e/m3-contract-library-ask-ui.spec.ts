@@ -165,15 +165,13 @@ test("cpt-noter-seq-ask-cited-answer — quote language and measured answer work
   }
 });
 
-test("cpt-noter-seq-library-search-calls — stored item kind is a compact tag", async ({ page }) => {
+test("cpt-noter-seq-library-search-calls — a stored item hit is drawn as the item's own row, without a kind tag (#1155)", async ({ page }) => {
   await openWindow(page, "main", { world: W.idle });
   const search = page.getByRole("searchbox", { name: /Search/ });
   await search.fill("drawer");
   await search.press("Enter");
-  const kind = page.getByRole("region", { name: "Items", exact: true }).getByText("Action item", { exact: true }).first();
-  await expect(kind).toBeVisible();
-  // A kind tag fits its text rather than stretching across the result's grid column.
-  const tag = await kind.boundingBox();
-  const row = await kind.locator("..").boundingBox();
-  expect(tag!.width).toBeLessThan(row!.width / 2);
+  const items = page.getByRole("region", { name: "Items", exact: true });
+  await expect(items.locator('[data-component="cpt-noter-component-ui-action-item-row"]').first()).toBeVisible();
+  await expect(items.getByText("Action item", { exact: true })).toHaveCount(0);
+  await expect(items.getByRole("link", { name: "Open at this moment" })).toHaveCount(0);
 });

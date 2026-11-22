@@ -265,12 +265,31 @@ async fn the_unnamed_queue_lists_speaker_rows_without_a_person() {
     assert_eq!(u.call.id.as_str(), "call_b");
     assert!(u.sample.is_some(), "audio remains");
     assert!(u.suggestion.is_none());
+    // issue 1151: the row quotes what the speaker said, in its own language
+    assert_eq!(u.sample_text.as_deref(), Some("hello there"));
+    assert_eq!(u.sample_lang, None, "the line has no language");
+    exec(
+        dir.path(),
+        "UPDATE segments SET lang = 'de', text = 'Fast, ja.' WHERE id = 'seg_2'",
+    )
+    .unwrap();
+    let u = &list(&core, None).await.unnamed[0];
+    assert_eq!(
+        (u.sample_text.as_deref(), u.sample_lang.clone()),
+        (Some("Fast, ja."), Some(Lang::De))
+    );
     exec(
         dir.path(),
         "UPDATE calls SET audio_deleted = 1 WHERE id = 'call_b'",
     )
     .unwrap();
-    assert!(list(&core, None).await.unnamed[0].sample.is_none());
+    let u = &list(&core, None).await.unnamed[0];
+    assert!(u.sample.is_none());
+    assert_eq!(
+        u.sample_text.as_deref(),
+        Some("Fast, ja."),
+        "the text outlives the audio"
+    );
 }
 
 #[tokio::test]
@@ -910,4 +929,63 @@ async fn a_rename_reaches_the_speakers_of_a_call_without_rewriting_text() {
         text(dir.path(), "SELECT text FROM segments WHERE id = 'seg_1'").as_deref(),
         Some("hello there")
     );
+}
+
+#[tokio::test]
+// cpt-noter-seq-people-prepare-one-on-one — issue 1152: PE-R5 Languages and the PE-R1 cadence ("1:1 weekly") come from their calls.
+async fn a_person_page_has_their_languages_and_how_often_you_meet() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    world(&core);
+    let mut rows = vec![person("per_lena", "Lena Weber")];
+    for (i, lang, ms) in [(0, "ru", 7_000), (1, "en", 2_000), (2, "ru", 1_000)] {
+        let (call_id, spk, seg) = (
+            format!("call_l{i}"),
+            format!("spk_l{i}"),
+            format!("seg_l{i}"),
+        );
+        rows.push(call(&call_id, NOW - (i as i64) * 7 * DAY));
+        rows.push(part(&call_id, "per_lena"));
+        rows.push(speaker(
+            &spk,
+            &call_id,
+            "Lena Weber",
+            Some("per_lena"),
+            None,
+        ));
+        rows.push(row(
+            "segments",
+            &[
+                ("id", json!(seg)),
+                ("call_id", json!(call_id)),
+                ("speaker_id", json!(spk)),
+                ("channel", json!("sys")),
+                ("t0_ms", json!(0)),
+                ("t1_ms", json!(ms)),
+                ("text", json!("x")),
+                ("text_norm", json!("x")),
+                ("lang", json!(lang)),
+                ("pass", json!("live")),
+            ],
+        ));
+    }
+    core.store().insert_batch(rows).unwrap();
+    let page = get(&core, "per_lena").await.unwrap();
+    let shares: Vec<(Lang, u32)> = page
+        .languages
+        .iter()
+        .map(|l| (l.lang.clone(), (l.share * 100.0).round() as u32))
+        .collect();
+    assert_eq!(shares, vec![(Lang::Ru, 80), (Lang::En, 20)]);
+    assert_eq!(
+        page.cadence,
+        Some(Cadence {
+            one_on_one: true,
+            every: Some(CadenceEvery::Weekly)
+        })
+    );
+    // Dmitri: two calls, one with Anna too: no pattern, no languages on record
+    let dima = get(&core, "per_dima").await.unwrap();
+    assert_eq!(dima.cadence, None);
+    assert!(dima.languages.is_empty());
 }

@@ -159,7 +159,7 @@
 
   /* People list facts */
   D.peopleFacts = {
-    'p-anna': { theirOpen: 3, youOwe: 1, lastCall: 'Today', sub: 'Frontend · 31 calls since Sep · 1:1 weekly', langs: 'Russian 71 % · English 26 % · German 3 %', voiceSince: '3 Oct', voiceDetail: '2 profiles matched in 28 calls' },
+    'p-anna': { theirOpen: 3, youOwe: 1, lastCall: 'Today', sub: 'Frontend · 31 calls since Sep · 1:1 weekly', langs: 'Russian 71 % · English 26 % · German 3 %', voiceSince: '3 Oct', voiceDetail: '2 profiles · matched in 28 calls' },
     'p-dmitri': { theirOpen: 2, youOwe: 1, lastCall: 'Today', sub: 'Backend lead · 18 calls since Sep', langs: 'Russian 64 % · English 36 %', voiceSince: '28 Sep', voiceDetail: '1 profile matched in 15 calls' },
     'p-pavel': { theirOpen: 1, youOwe: 2, lastCall: 'Today', sub: 'Product manager · 22 calls since Sep', langs: 'English 90 % · Russian 10 %' },
     'p-oleg': { theirOpen: 2, youOwe: 0, lastCall: '6 Oct', sub: 'QA engineer · 9 calls since Sep', langs: 'Russian 88 % · English 12 %' },
@@ -167,8 +167,9 @@
     'p-markus': { theirOpen: 0, youOwe: 1, lastCall: '7 Oct', sub: 'Vendor account manager · MonitorCo · 2 calls', langs: 'German 70 % · English 30 %' },
   };
   D.unnamedVoices = [
-    { id: 'u-2', label: 'Speaker 2', calls: 3, last: '9 Oct', sample: '“Fast, ja. Der Kanal ist da, aber…”', lang: 'de' },
-    { id: 'u-4', label: 'Speaker 4', calls: 1, last: '13 Oct', sample: '“Хорошо, тогда я посмотрю логи.”', lang: 'ru' },
+    // one row per call until voice profiles group a speaker across calls (owner, #1151)
+    { id: 'u-4', label: 'Speaker 4', call: 'Planning: VHI 8.0 drawer redesign', calls: 1, last: '16 Oct', sample: '“Хорошо, тогда я посмотрю логи.”', lang: 'ru' },
+    { id: 'u-2', label: 'Speaker 2', call: 'Vendor call: MonitorCo', calls: 1, last: '7 Oct', sample: '“Fast, ja. Der Kanal ist da, aber…”', lang: 'de' },
   ];
 
   /* Items the user owes people ("Asked you") */

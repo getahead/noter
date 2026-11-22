@@ -8,6 +8,10 @@
 .pe-unnamed__list { border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--card-bg); }
 .pe-urow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--sep); }
 .pe-urow:last-child { border-bottom: 0; }
+/* the sample truncates first, then the call title; the chip, date and Name… never do (#1151) */
+.pe-urow__day { flex: none; }
+.pe-urow__meta { min-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
+.pe-urow__sample { font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 100 auto; min-width: 0; }
 .pe-table td { vertical-align: middle; }
 /* selected cells repeat the fill and bleed 1px sideways: Chromium anti-aliases hairlines at fractional column edges */
 .np-table.pe-table tbody tr.is-sel td { background: var(--accent-fill); box-shadow: 1px 0 0 var(--accent-fill), -1px 0 0 var(--accent-fill); }

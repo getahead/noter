@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
-import type { PersonRef, PersonRow, UiPrefs, UnnamedSpeaker } from "../../core/bindings";
-import { shortDay, t } from "../../i18n/format";
+import type { PersonRef, PersonRow, UnnamedSpeaker } from "../../core/bindings";
+import { t } from "../../i18n/format";
 import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
 import { bumpPerson } from "./person-store";
@@ -32,25 +32,15 @@ export async function nameSpeaker(bridge: Bridge, u: UnnamedSpeaker, ref: Person
   const named = res.data.speakers.find((s) => s.id === u.speaker_id);
   const name = named?.label.type === "person" ? named.label.person.short_name : to;
   // @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-undo
-  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "people.named_new" : "people.named", { from: label, to: name }), refresh: bumpPerson });
+  holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: t(ref.type === "new" ? "people.named_new" : "people.named", { from: label, to: name, call: u.call.title }), refresh: bumpPerson });
   // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-undo
   return true;
 }
 // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-name-single
 // @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-if-single
 
-/** The calls where the same "Speaker N" is unnamed, this one included, when there are several. The contract has no
- *  cross-call identity, so this is only what the list shows: it never merges the speakers or names more than one call. */
-export function recurrence(all: readonly UnnamedSpeaker[], speaker: UnnamedSpeaker): { calls: number; last: number } | null {
-  const same = all.filter((u) => u.n === speaker.n);
-  const calls = new Set(same.map((u) => u.call.id));
-  if (!calls.has(speaker.call.id) || calls.size < 2) return null;
-  return { calls: calls.size, last: Math.max(...same.map((u) => u.call.started_at)) };
-}
-
-export function NameSpeakerPopover({ bridge, speaker, all = [], prefs, people, anchor, onClose, onNamed }: { bridge: Bridge; speaker: UnnamedSpeaker; all?: readonly UnnamedSpeaker[]; prefs?: UiPrefs; people: readonly PersonRow[]; anchor: HTMLElement | null; onClose: () => void; onNamed?: () => void }) {
+export function NameSpeakerPopover({ bridge, speaker, people, anchor, onClose, onNamed }: { bridge: Bridge; speaker: UnnamedSpeaker; people: readonly PersonRow[]; anchor: HTMLElement | null; onClose: () => void; onNamed?: () => void }) {
   const label = t("people.unnamed_label", { n: speaker.n });
-  const many = recurrence(all, speaker);
   const [sample, setSample] = useState<{ text: string; lang: string } | null>(null);
   const [form, setForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,18 +89,10 @@ export function NameSpeakerPopover({ bridge, speaker, all = [], prefs, people, a
           onForm={setForm}
         />
         {/* @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-name-popover */}
-        {/* @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-if-batch */}
-        {many ? (
-          <>
-            {/* @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-batch-gap */}
-            <div className="np-dim t-callout">{t("people.name_batch", { label, count: many.calls, last: shortDay(many.last, prefs) })}</div>
-            <div className="np-dim t-callout">{t("people.name_batch_gap", { label })}</div>
-            {/* @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-batch-gap */}
-          </>
-        ) : (
-          <div className="np-dim t-callout">{t("people.name_note", { label })}</div>
-        )}
-        {/* @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-if-batch */}
+        {/* one row per call: a speaker number shared with other calls is still named here only (owner #1151) */}
+        {/* @cpt-begin:cpt-noter-flow-ui-people-name:p1:inst-batch-gap */}
+        <div className="np-dim t-callout">{t("people.name_note", { label })}</div>
+        {/* @cpt-end:cpt-noter-flow-ui-people-name:p1:inst-batch-gap */}
       </div>
     </Popover>
   );

@@ -93,7 +93,7 @@ test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
 });
 
 test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
-  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. in 1 call, the row is gone", async ({ page }) => {
+  test("UI — happy path: Unnamed speakers lists Speaker 3, Name… shows the sample, Дима is not a person, Dmitri S. is clicked, the strip says Named Speaker 3 as Dmitri S. in its call, the row is gone", async ({ page }) => {
     await openPeople(page);
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await expect(unnamed).toContainText("Speaker 3");
@@ -105,17 +105,17 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toEqual([
       expect.objectContaining({ speaker_id: expect.stringMatching(/./), person: { type: "existing", person_id: "per_dmitri" } }),
     ]);
-    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. in 1 call/)).toBeVisible();
+    await expect(page.getByText(/Named Speaker 3 as Dmitri S\. in /)).toBeVisible(); // in {call} (#1151)
     await expect(unnamed.getByText("Speaker 3")).toHaveCount(0);
   });
 
-  test("UI — other path: Speaker 3 unnamed in two calls shows the calls and names this call only", async ({ page }) => {
+  test("UI — other path: Speaker 3 unnamed in two calls is named in this call only, one row per call", async ({ page }) => {
     await openPeople(page, (w) => (W.idle(w), recurring(w, 2)));
     const unnamed = page.getByRole("region", { name: "Unnamed speakers" });
     await unnamed.getByRole("button", { name: "Name…" }).first().click();
     const pop = page.getByRole("dialog", { name: "Name Speaker 3" });
-    await expect(pop).toContainText(/Speaker 3 · 2 calls · last on/);
-    await expect(pop).toContainText("Names Speaker 3 in this call only. Naming it in every call at once isn’t supported yet.");
+    await expect(pop).toContainText("Names Speaker 3 in this call as one change you can undo.");
+    await expect(pop).not.toContainText(/calls · last on/); // one row per call: no cross-call line (#1151)
     await pop.getByRole("combobox", { name: "Name…" }).fill("Dmitri");
     await pop.getByRole("option", { name: /Dmitri Sokolov/ }).click();
     await expect.poll(() => sent(page, "transcript_rename_speaker")).toHaveLength(1); // one call, never one change for the group
@@ -224,9 +224,10 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
     const person = await steer.invoke("person_get", { person_id: "per_anna" }) as import("../../src/core/bindings").PersonPage;
     const stats = person.person.voice_profile_stats!;
     expect(stats.opted_in_at).toEqual(expect.any(Number));
-    await expect(page.getByText(`${stats.profiles} ${stats.profiles === 1 ? "profile" : "profiles"} available`, { exact: true })).toBeVisible();
-    await expect(page.getByText(`Matched in ${stats.matched_calls} ${stats.matched_calls === 1 ? "call" : "calls"}`, { exact: true })).toBeVisible();
-    await expect(page.getByText(/^On since /)).toBeVisible();
+    // one PE-R5 line: On since … · N profiles · matched in M calls, a part that is 0 left out (#1152)
+    const profiles = stats.profiles ? ` · ${stats.profiles} ${stats.profiles === 1 ? "profile" : "profiles"}` : "";
+    const matched = stats.matched_calls ? ` · matched in ${stats.matched_calls} ${stats.matched_calls === 1 ? "call" : "calls"}` : "";
+    await expect(page.getByText(new RegExp(`^On since [^·]+${profiles}${matched}$`))).toBeVisible();
   });
 
   test("UI — other path: Delete Profile… asks Delete Anna K.'s voice profile?; Cancel keeps it, Delete Profile calls voice_profile_delete and Set Up Voice Profile… comes back", async ({ page }) => {

@@ -16,6 +16,7 @@ import { settleNaming } from "./focus-return";
 import { setAddPerson } from "./add-person";
 import { view, type PeopleView } from "./identity";
 import { NameSpeakerPopover } from "./NameSpeakerPopover";
+import { SpeakerLabel } from "../transcript/labels";
 import { usePersonReread } from "./person-store";
 import { confirmDelete, usePeopleSheets } from "./sheets";
 import { createPeopleList, setPeopleQuery, usePeopleQuery, type PeopleState } from "./model";
@@ -87,7 +88,7 @@ export function PeoplePage() {
     <>
       {failed && <InlineBanner banner={{ id: "people-delete-failed", severity: "error", text: failed }} onDismiss={() => setFailed(null)} />}
       <PeopleBody status={state.status} shown={shown} query={query} prefs={prefs} selection={selection} slow={slow} onOpen={open} onSelect={(id, mods) => setSelection((s) => press(s, order, id, mods))} onRetry={() => void list.load()} onContext={onContext} onName={(u, anchor) => setNaming({ u, anchor })} />
-      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} all={state.read?.unnamed ?? []} prefs={prefs} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => ((named.current = true), void list.load())} />}
+      {naming && <NameSpeakerPopover bridge={bridge} speaker={naming.u} people={rows.filter((p) => !p.is_you)} anchor={naming.anchor} onClose={() => setNaming(null)} onNamed={() => ((named.current = true), void list.load())} />}
       {menu && (
         <div className="pe-ctx" style={{ left: menu.x, top: menu.y }}>
           <Menu variant="context-menu" onClose={() => setMenu(null)} items={rowMenu(menu.ids.flatMap((id) => rows.find((p) => p.id === id) ?? []), { open, close: () => setMenu(null), edit: (p) => sheets.open("person-edit", { bridge, person: p }), merge: (a, b) => sheets.open("person-merge", { bridge, source: a, people: rows, target: b?.id }), del: (p) => void confirmDelete(bridge, p, setFailed) })} />
@@ -209,8 +210,15 @@ export function PeopleBody({ status, shown, query, prefs, selection, slow, onOpe
           <div className="pe-unnamed__list">
             {shown.unnamed.map((u, i) => (
               <div key={`${u.call.id}:${u.speaker_id}`} className="pe-urow" onClickCapture={(e) => (clicked.current = e.currentTarget)}>
-                <strong>{t("people.unnamed_label", { n: u.n })}</strong>
-                <span className="np-muted">{t("people.unnamed_meta", { call: u.call.title, lines: t("people.unnamed_lines", { count: u.segment_count }) })}</span>
+                {/* one row per call until voice profiles group a speaker across calls (owner, #1151) */}
+                <SpeakerLabel text={t("people.unnamed_label", { n: u.n })} variant="unresolved" />
+                <span className="np-muted pe-urow__meta">{t("people.unnamed_meta", { call: u.call.title })}</span>
+                <span className="np-muted pe-urow__day">{t("people.unnamed_day", { date: shortDay(u.call.started_at, prefs) })}</span>
+                {u.sample_text && (
+                  <span className="np-dim pe-urow__sample" lang={typeof u.sample_lang === "string" ? u.sample_lang : u.sample_lang?.code}>
+                    {t("people.unnamed_sample", { text: u.sample_text })}
+                  </span>
+                )}
                 <span className="np-tb__spacer" />
                 <PushButton id={i === 0 ? "pe-name-first" : undefined} label={t("people.name")} size="small" onAction={() => onName?.(u, clicked.current)} />
               </div>

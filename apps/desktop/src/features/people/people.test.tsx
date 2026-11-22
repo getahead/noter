@@ -103,3 +103,16 @@ describe("PeoplePage", () => {
     expect(h).not.toContain("pe-row");
   });
 });
+
+describe("Unnamed speakers row (PL-R3, issue 1151)", () => {
+  it("cpt-noter-seq-people-name-unnamed-speaker — #1151: is one line: Speaker n, the call and its day, the quoted sample in its language, Name…", () => {
+    const u = { call: { id: "call_b", title: "Planning: VHI 8.0 drawer redesign", started_at: Date.UTC(2026, 9, 16, 12), call_type: "planning" }, speaker_id: "spk_2", n: 2, segment_count: 3, sample: null, sample_text: "Fast, ja. Der Kanal ist da", sample_lang: "de", suggestion: null } as never;
+    const h = renderToString(<PeopleBody {...props({ shown: listed([person({})], [u]) })} />);
+    expect(h).toContain("Speaker 2");
+    expect(h).toContain(">in Planning: VHI 8.0 drawer redesign</span>");
+    expect(h).toContain('class="np-muted pe-urow__day">· Oct 16</span>'); // its own span: a long title never hides the day
+    expect(h).toContain('lang="de"');
+    expect(h).toContain("“Fast, ja. Der Kanal ist da”");
+    expect(h).not.toContain("3 lines");
+  });
+});

@@ -11,6 +11,8 @@ import { Menu } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { PullDownButton } from "../../ui/primitives/pull-down-button";
 import { usePeopleHeld } from "./count";
+import { personSubtitle } from "./person-lines";
+import { useWindow } from "../../app/use-window";
 import { AddPersonPopover, setAddPerson } from "./add-person";
 import { setPeopleQuery, usePeopleQuery } from "./model";
 import { setPersonNotice, setPersonTab, usePersonHeld, usePersonTab, type PersonTab } from "./person-store";
@@ -36,6 +38,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   const sheets = usePeopleSheets();
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const held = usePersonHeld();
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const person = held?.person.id === id ? held.person : null;
   const control = <SegmentedControl items={TABS.map((x) => ({ value: x.value, label: t(x.label) }))} value={tab} label={t("person.view")} onAction={(v) => setPersonTab(id, v as PersonTab)} />;
   // @cpt-begin:cpt-noter-state-ui-people-view:p1:inst-edit
@@ -64,7 +67,7 @@ function PersonToolbar({ base, bridge, id }: PageToolbarProps & { id: string }) 
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-merge-open
   // @cpt-end:cpt-noter-flow-ui-people-edit-merge:p1:inst-edit-sheet
   // @cpt-end:cpt-noter-state-ui-people-view:p1:inst-edit
-  return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={person?.role ?? undefined} center={control} trailing={more} />;
+  return <MainToolbar {...base} region="PE-R1" title={person?.short_name ?? t("people.title")} subtitle={held && person ? personSubtitle(held, prefs) : undefined} center={control} trailing={more} />;
 }
 
 function ListToolbar({ base, bridge }: PageToolbarProps) {

@@ -364,7 +364,8 @@ test.describe("cpt-noter-seq-today-tick-item", () => {
     const row = due(page).locator('[data-item-id="itm_spec"]');
     await expect(row.getByText("Show in transcript")).toHaveCount(0);
     await expect(row.locator('[data-component="cpt-noter-component-ui-provenance-chip"]')).toHaveText(/^\d{2}:\d{2}:\d{2}\s?↗$/);
-    const order = await row.locator(".it-row__line > *").evaluateAll((els) => els.map((el) => el.getAttribute("data-component") ?? el.className));
+    // the text, chip and due sit in the row's middle span, the part that gives way at narrow widths (#1155)
+    const order = await row.locator(".it-row__line > *, .it-row__mid > *").evaluateAll((els) => els.map((el) => el.getAttribute("data-component") ?? el.className));
     expect(order.findIndex((c) => c.includes("provenance-chip"))).toBeLessThan(order.findIndex((c) => c.includes("it-row__due")));
     await expect(due(page).locator(".np-card")).toHaveCount(1);
   });

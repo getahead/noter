@@ -138,7 +138,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
         )}
         {/* @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-present */}
         {sections(r).map((s) => (
-          <section key={s.key} aria-label={t(SECTION[s.key])}>
+          <section key={s.key} className="lb-sec" aria-label={t(SECTION[s.key])}>
             <h3 className="lb-thmonth__h">{t(SECTION[s.key])}</h3>
             {groupByCall(s.strong, 3).map((g) => (
               <ul key={g.callId} className="lb-items">

@@ -67,9 +67,9 @@ test.describe("cpt-noter-dod-ui-people-identity naming an unnamed speaker", () =
     await expect(form.getByText(/A person called “Anna Kuznetsova” already exists: Anna Kuznetsova/)).toBeVisible();
     await shot(page, "people-name-speaker-taken");
   });
-  test("a speaker unnamed in several calls shows the calls and that only this call is named", async ({ page }) => {
+  test("a speaker unnamed in several calls is named in this call only, one row per call", async ({ page }) => {
     const popover = await openPopover(page, (w) => (W.idle(w), recurring(w, 2)));
-    await expect(popover).toContainText(/2 calls · last on/);
+    await expect(popover).toContainText("in this call as one change you can undo.");
     await shot(page, "people-name-speaker-recurring");
   });
 });

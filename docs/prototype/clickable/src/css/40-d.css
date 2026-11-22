@@ -131,7 +131,9 @@
 .pe-unnamed__list { border: 1px solid var(--sep); border-radius: var(--r-row); background: var(--card-bg); }
 .pe-urow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 8px 12px; border-bottom: 1px solid var(--sep); }
 .pe-urow:last-child { border-bottom: 0; }
-.pe-urow__sample { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.pe-urow__sample { font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; flex: 0 100 auto; }
+.pe-urow__day { flex: none; }
+.pe-urow__meta { min-width: 8em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; }
 .pe-picker { display: grid; gap: 6px; }
 .pe-picker__list { display: grid; gap: 1px; max-height: 220px; overflow: auto; }
 .pe-picker__opt { display: flex; align-items: center; gap: 8px; border: 0; background: transparent; padding: 5px 6px; border-radius: var(--r-control); cursor: pointer; text-align: left; }

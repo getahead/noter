@@ -27,6 +27,7 @@ import { patchLocal, useLocal, type Local } from "./local";
 import { completion, draftOf, isDone, isOverdue, keyOf, langOf, nextSuggested, rowState, SECTION_OF, type Draft } from "./review";
 import { ShareMenu } from "../call-page/ShareMenu";
 import { ProvenanceChip } from "./ProvenanceChip";
+import { CallLink } from "./CallLink";
 import { handoffButtonId, slots } from "./slots";
 import { openSpan } from "./evidence";
 import "./items.css";
@@ -166,7 +167,7 @@ const startEdit = (it: ItemView) => patchLocal(it.id, { phase: "editing", draft:
 
 // @cpt-component:cpt-noter-component-ui-action-item-row:p1
 // @cpt-dod:cpt-noter-dod-ui-items-actions:p1
-export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowProps) {
+export function ActionItemRow({ bridge, item, variant = "full", showCall = false }: ActionItemRowProps) {
   const rowId = useId();
   const it = useItem(bridge, item);
   useEffect(() => rememberItem(bridge, it), [bridge, it]);
@@ -265,12 +266,15 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
         <div className="it-row__line">
           {check}
           {owner}
-          {text}
-          {/* the evidence is the timestamp chip with its ↗, before the due text (action item row › Anatomy 1–5) */}
-          {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
-          {due}
-          {tags}
-          <span className="np-tb__spacer" />
+          {/* only the middle gives way at narrow widths (call link, then tags and due, the text down to 4 em); the checkbox, owner and controls never clip */}
+          <span className="it-row__mid">
+            {text}
+            {/* the evidence is the timestamp chip with its ↗, before the due text (action item row › Anatomy 1–5) */}
+            {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
+            {due}
+            {tags}
+            {showCall && <CallLink bridge={bridge} call={it.call} />}
+          </span>
           {variant === "done" && <PushButton label={t(local.doneTarget ? "items.undo" : "items.reopen")} size="small" variant="quiet" disabled={completing} onAction={() => void (local.doneTarget ? undoRow(bridge, it.id, local.doneTarget) : setDone(bridge, it, false))} />}
           {handoff}
           {suggested && variant === "compact" && <CompactReview it={it} bridge={bridge} />}

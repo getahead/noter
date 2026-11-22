@@ -93,3 +93,42 @@ describe("SearchResultRow (cpt-noter-component-ui-search-result-row)", () => {
     expect(label({ ...(on as object), playing: false })).toContain('aria-label="Play this line"');
   });
 });
+
+describe("an item hit is the item's own row (issue 1155)", () => {
+  it("cpt-noter-seq-library-search-calls — #1155: draws an action item as its row: owner, text and evidence, without the kind tag or Open at this moment", async () => {
+    const { createBridge } = await import("../../app/bridge/bridge");
+    const { FakeCore } = await import("../../core/fake/fake-core");
+    const fake = new FakeCore({ window: "main" });
+    const bridge = createBridge("main", fake);
+    await bridge.open();
+    const item = fake.world.items.find((i) => i.kind === "action_item")!;
+    const hit = { target: { type: "item", item_id: item.id }, item_kind: item.kind, title: item.text, snippet: item.text, highlights: [], lang: null, strength: "strong", call: item.call, provenance: { type: "past_call", call: item.call, span: item.spans[0] }, cross_language: false, item } as never;
+    const html = renderToString(<SearchResultRow bridge={bridge} hit={hit} />);
+    expect(html).toContain("cpt-noter-component-ui-action-item-row");
+    expect(html).not.toContain("np-badge--kind");
+    expect(html).not.toContain("Open at this moment");
+    // the row ends with its call, so a hit from another call can be told apart (#1198 review)
+    expect(html).toMatch(new RegExp(`class="it-row__call"><a[^>]*>${item.call.title}`));
+    bridge.close();
+  });
+  it("draws a decision as a compact row: ◇ glyph, text, call, time chip, no owner", async () => {
+    await import("../items/register"); // the time chip and actions, as main.tsx registers them
+    const { createBridge } = await import("../../app/bridge/bridge");
+    const { FakeCore } = await import("../../core/fake/fake-core");
+    const fake = new FakeCore({ window: "main" });
+    const bridge = createBridge("main", fake);
+    await bridge.open();
+    const found = fake.world.items.find((i) => i.kind === "decision" && i.spans.length > 0)!;
+    const item = { ...found, owner: { id: "per_dmitri", short_name: "Dmitri S.", display_name: "Dmitri Sokolov", is_you: false } };
+    const hit = { target: { type: "item", item_id: item.id }, item_kind: item.kind, title: item.text, snippet: item.text, highlights: [], lang: null, strength: "strong", call: item.call, cross_language: false, item } as never;
+    const html = renderToString(<SearchResultRow bridge={bridge} hit={hit} />);
+    const at = (needle: string) => html.indexOf(needle);
+    expect(at('class="it-row__glyph"')).toBeGreaterThan(-1);
+    expect(html).toContain('aria-label="Decision"');
+    expect(at('class="it-row__glyph"')).toBeLessThan(at(`>${item.text}<`));
+    expect(at(`>${item.text}<`)).toBeLessThan(at('class="it-row__call"'));
+    expect(at('class="it-row__call"')).toBeLessThan(at("np-prov"));
+    expect(html).not.toContain("Dmitri S.");
+    bridge.close();
+  });
+});

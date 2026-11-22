@@ -100,7 +100,7 @@ export function libraryHandlers(fake: Core.FakeCore): Core.Handlers {
         provenance: { type: "past_call", call: callOf(s.call_id), span: { call_id: s.call_id, channel: s.channel, t0_ms: s.t0_ms, t1_ms: s.t1_ms } },
         cross_language: false,
       })),
-      items: items.map((i) => ({ item_kind: i.kind, target: { type: "item", item_id: i.id }, title: i.text, snippet: i.text, highlights: [], lang: i.lang, strength: "strong", call: i.call, provenance: { type: "past_call", call: i.call, span: i.spans[0] }, cross_language: false })),
+      items: items.map((i) => ({ item_kind: i.kind, target: { type: "item", item_id: i.id }, title: i.text, snippet: i.text, highlights: [], lang: i.lang, strength: "strong", call: i.call, provenance: { type: "past_call", call: i.call, span: i.spans[0] }, cross_language: false, item: i })),
       documents: [],
       topics: world.topics.filter((t) => shared.matchesTerms(t.name, terms)),
       only_weak: false,

@@ -193,6 +193,16 @@ async fn search_returns_sections_with_strong_keyword_hits_on_the_real_store() {
     assert!(r.calls.iter().all(|h| h.strength == MatchStrength::Strong));
     assert_eq!(r.items.len(), 1);
     assert_eq!(r.items[0].title, "Use WebSockets");
+    // issue 1155: the hit carries the item its row draws (owner, due, spans, state)
+    let HitTarget::Item { item_id } = &r.items[0].target else {
+        panic!("{:?}", r.items[0].target)
+    };
+    let item = r.items[0]
+        .item
+        .as_ref()
+        .expect("the item hit carries its item");
+    assert_eq!((&item.id, item.text.as_str()), (item_id, "Use WebSockets"));
+    assert!(r.calls.iter().all(|h| h.item.is_none()));
     assert!(!r.only_weak);
     assert_eq!(r.explain.normalized_query, "websockets");
     assert_eq!(r.explain.keyword_hits, 3);

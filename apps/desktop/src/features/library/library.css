@@ -242,6 +242,10 @@
 
 .lb-hit { display: grid; gap: 2px; padding: 6px 8px; list-style: none; max-width: 960px; }
 .lb-hit > .np-badge--kind { justify-self: start; }
+/* an item hit is the item's compact row: its own 4 pt padding, 32 pt apart as on the Person page */
+.lb-hit--item { padding: 0 8px; }
+/* each results section (Items, Transcripts, Documents) has the 16 pt that Items has above its heading */
+.lb-sec + .lb-sec { margin-top: 16px; }
 .lb-hit__title { font-weight: 600; }
 .lb-hit mark { background: var(--accent-fill); color: inherit; border-radius: 2px; }
 .lb-thmerge { margin-bottom: 14px; }
