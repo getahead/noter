@@ -54,6 +54,8 @@ export interface CallRowProps {
   onOpen: (id: string) => void;
   onContext: (id: string, e: MouseEvent) => void;
   prefs?: UiPrefs;
+  /** The type's name from `call_types_list` (1:1, Cross-team); the id, spaced, without it. */
+  typeName?: (id: string) => string;
 }
 
 // @cpt-component:cpt-noter-component-ui-call-row:p1
@@ -66,6 +68,7 @@ export const CallRowView = memo(function CallRowView({
   onOpen,
   onContext,
   prefs,
+  typeName = typeLabel,
 }: CallRowProps) {
   const sensitive = c.privacy === "sensitive";
   const st = statusOf(c);
@@ -140,7 +143,7 @@ export const CallRowView = memo(function CallRowView({
           )}
         </div>
       </td>
-      <td className="lb-crow__type">{typeLabel(c.call_type)}</td>
+      <td className="lb-crow__type">{typeName(c.call_type)}</td>
       <td className="lb-crow__len np-tnum">{duration(c.duration_ms / 1000)}</td>
       <td className="lb-crow__open np-tnum">
         {c.open_items ? (

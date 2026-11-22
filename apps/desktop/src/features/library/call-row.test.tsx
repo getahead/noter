@@ -41,6 +41,12 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
     expect(CallRowView).toHaveProperty("$$typeof", Symbol.for("react.memo"));
   });
 
+  // #1055: the Type column shows the core's label for the type (1:1, Cross-team), as the filter does
+  it("shows the call type's name from the type list", () => {
+    const html = renderToString(<CallRowView call={call({ call_type: "cross_team" })} onPress={() => {}} onOpen={() => {}} onContext={() => {}} typeName={(id) => (id === "cross_team" ? "Cross-team" : id)} />);
+    expect(html).toContain('<td class="lb-crow__type">Cross-team</td>');
+  });
+
   it("names the people, the user last, with +N past three", () => {
     expect(
       peopleOf(

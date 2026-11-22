@@ -206,6 +206,28 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await expect(page.getByText(new RegExp(`· ${questions} open questions? ·`))).toBeVisible();
   });
 
+  test("UI — #1045: the row's › button opens the topic once, so one Back returns to Topics", async ({ page }) => {
+    await openTopics(page);
+    await page.getByRole("button", { name: "Open Websocket notifications" }).click();
+    await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
+    await page.keyboard.press("Meta+BracketLeft");
+    await expect(page.getByRole("heading", { name: "Topics", level: 1 })).toBeVisible();
+  });
+
+  test("UI — #1047: Rename… from the thread's More menu shows the new name in the thread's heading at once", async ({ page }) => {
+    await openTopics(page);
+    await page.getByRole("table").getByRole("row", { name: /Websocket notifications/ }).click();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { name: "Websocket notifications" })).toBeVisible();
+    await button(page, "More").click();
+    await page.getByRole("menuitem", { name: "Rename…" }).click();
+    const pop = page.getByRole("dialog", { name: "Rename topic" });
+    await pop.getByRole("textbox").fill("Websocket reconnects");
+    await pop.getByRole("button", { name: "Rename" }).click();
+    await expect(page.getByText("Renamed “Websocket notifications” to “Websocket reconnects”")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Websocket reconnects" })).toBeVisible();
+  });
+
   test("UI — other path: search reconnect finds none, Clear Search restores, Rename… sends topic_rename with the current rev and shows Renamed … · Undo", async ({ page }) => {
     await openTopics(page);
     const field = page.getByRole("searchbox", { name: /Search/ });

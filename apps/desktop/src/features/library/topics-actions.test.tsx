@@ -29,8 +29,11 @@ describe("topic actions (cpt-noter-flow-ui-library-search-topics-topic)", () => 
     expect(await renameTopic(bridge, a!, "  ", [a!, b!], () => {})).toEqual({ type: "blank" });
     expect(await renameTopic(bridge, a!, b!.name.toUpperCase(), [a!, b!], () => {})).toMatchObject({ type: "clash", other: { id: b!.id } });
     expect(act).not.toHaveBeenCalled();
-    const out = await renameTopic(bridge, a!, "Brand new name", [a!, b!], () => {});
+    // #1047: the page that asked (the thread's heading, the table) rereads once the name is saved
+    const refresh = vi.fn();
+    const out = await renameTopic(bridge, a!, "Brand new name", [a!, b!], refresh);
     expect(out).toMatchObject({ type: "renamed", topic: { name: "Brand new name" } });
+    expect(refresh).toHaveBeenCalledOnce();
   });
   it("a stale revision re-reads the topic and retries once with the fresh revision, keeping only the typed name", async () => {
     const [a, b] = await ready();

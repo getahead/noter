@@ -1858,20 +1858,21 @@ pub fn world() -> FakeWorld {
             }],
         },
         call_types: CallTypeList {
+            // DESIGN's names, as the core labels them (issue 1055)
             call_types: [
-                "one_on_one",
-                "standup",
-                "planning",
-                "retro",
-                "cross_team",
-                "vendor",
-                "interview",
-                "incident",
+                ("one_on_one", "1:1"),
+                ("standup", "Standup"),
+                ("planning", "Planning"),
+                ("retro", "Retro"),
+                ("cross_team", "Cross-team"),
+                ("vendor", "Vendor"),
+                ("interview", "Interview"),
+                ("incident", "Incident"),
             ]
             .iter()
-            .map(|t| CallTypeInfo {
+            .map(|(t, label)| CallTypeInfo {
                 id: ct(t),
-                label: t.replace('_', " "),
+                label: (*label).into(),
                 builtin: true,
                 skill_path: format!("skills/{t}/SKILL.md"),
             })

@@ -828,7 +828,25 @@ async fn call_types_are_the_eight_built_ins_plus_readable_user_folders() {
             "incident"
         ]
     );
-    assert_eq!(types[0].label, "one on one");
+    // #1055: DESIGN's names, one per type, on every surface that lists them
+    let labels: Vec<_> = types
+        .iter()
+        .filter(|t| t.builtin)
+        .map(|t| t.label.as_str())
+        .collect();
+    assert_eq!(
+        labels,
+        [
+            "1:1",
+            "Standup",
+            "Planning",
+            "Retro",
+            "Cross-team",
+            "Vendor",
+            "Interview",
+            "Incident"
+        ]
+    );
     assert_eq!(types[0].skill_path, "skills/one_on_one/SKILL.md");
     let user: Vec<_> = types.iter().filter(|t| !t.builtin).collect();
     assert_eq!(user.len(), 1);

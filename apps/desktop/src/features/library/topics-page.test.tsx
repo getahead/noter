@@ -196,6 +196,14 @@ describe("small page helpers", () => {
     const ref = { current: null as string | null };
     expect([claim(ref, "a"), claim(ref, "a"), claim(ref, "b")]).toEqual([true, false, true]);
   });
+  // #1045: the › button sits inside the clickable row; its click must not also reach the row (two pushes, two Backs)
+  it("the › button opens the topic once: its cell keeps the click from the row", () => {
+    const tr = rendered(TopicLine, { bridge: {} as never, topic: { id: "t", name: "T" } as never, stop: true, merge: null, last: "—" });
+    const cell = find(tr, (p, type) => type === "td" && JSON.stringify(Object.keys(p)).includes("onClick"));
+    const stop = vi.fn();
+    (cell.props.onClick as (e: unknown) => void)({ stopPropagation: stop });
+    expect(stop).toHaveBeenCalled();
+  });
   it("a Topics row opens its menu from the keyboard (Menu key, ⇧F10) at the row, and from the mouse where it was clicked", () => {
     const onContext = vi.fn();
     const row = find(rendered(TopicLine, { bridge: {} as never, topic: { id: "t", name: "T" } as never, stop: true, merge: null, last: "—", onContext }), (p) => typeof p.onKeyDown === "function");
