@@ -37,10 +37,15 @@ test.describe("cpt-noter-flow-ui-main-window-shell-resize", () => {
     await page.setViewportSize({ width: 1280, height: 820 });
     await openWindow(page, "main");
     const toggle = page.getByRole("button", { name: "Show Sidebar" });
-    const clear = async () => expect((await toggle.boundingBox())!.x).toBeGreaterThanOrEqual(78);
+    const clear = async () => {
+      await expect(toggle).toBeVisible();
+      expect((await toggle.boundingBox())!.x).toBeGreaterThanOrEqual(78);
+    };
+    await expect(page.locator('[data-region="MW-R2"]')).toBeVisible(); // the window takes ⌃⌘S once it is ready
     await page.keyboard.press("Control+Meta+KeyS"); // hidden at 100 %
     await clear();
     await page.keyboard.press("Control+Meta+KeyS");
+    await expect(page.locator('[data-region="MW-R2"]')).toBeVisible();
     for (let i = 0; i < 3; i++) await page.keyboard.press("Meta+Equal");
     await expect(win(page)).toHaveAttribute("data-collapse", "sidebar"); // 175 %
     await clear();
