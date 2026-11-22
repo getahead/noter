@@ -735,3 +735,90 @@ async fn a_line_moved_after_a_whole_call_naming_drops_the_must_links_that_touch_
         .all(|l| l["a"]["t0_ms"] != 2_000 && l["b"]["t0_ms"] != 2_000));
     assert_eq!(file["cannot_link"].as_array().unwrap().len(), 1);
 }
+
+// cpt-noter-seq-call-page-name-speakers — #1097: the participant a naming adds is undone with it: one batch, as History's Undo reverts it
+#[tokio::test]
+async fn undoing_a_naming_removes_the_participant_it_added() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    seed(&core);
+    let participants = |core: &Core| -> Vec<String> {
+        core.store()
+            .read(|c| {
+                let mut q = c.prepare(
+                    "SELECT p.display_name FROM call_participants cp JOIN people p ON p.id = cp.person_id
+                     WHERE cp.call_id = 'call_a' ORDER BY 1",
+                )?;
+                let names = q.query_map([], |r| r.get(0))?.collect();
+                names
+            })
+            .unwrap()
+    };
+    // Dana exists before the naming (QA named an existing person), so undo can't delete her
+    let dana = core
+        .person_create(
+            &ctx(),
+            PersonCreateArgs {
+                display_name: "Dana".into(),
+                email: None,
+                role: None,
+                org: None,
+            },
+        )
+        .await
+        .unwrap();
+    let mut args = rename_args("spk_1", "Dana", RenameScope::WholeCall);
+    args.person = PersonRef::Existing {
+        person_id: dana.person.id.clone(),
+    };
+    let done = core.transcript_rename_speaker(&ctx(), args).await.unwrap();
+    assert!(participants(&core).contains(&"Dana".to_string()));
+    let batch: String = core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT batch_id FROM changes WHERE id = ?1",
+                [done.change_id.as_str()],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
+    // the call page reads the call row: the undo sends it again without Dana (issue 1097)
+    events.named("entity:changed");
+    let call_names = |events: &Events| -> Vec<Vec<String>> {
+        events
+            .named("entity:changed")
+            .iter()
+            .filter(|c| c["type"] == "call" && c["call"]["id"] == "call_a")
+            .map(|c| {
+                c["call"]["participants"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|p| p["display_name"].as_str().unwrap().to_string())
+                    .collect()
+            })
+            .collect()
+    };
+    core.change_undo(
+        &ctx(),
+        UndoArgs {
+            target: UndoTarget::Batch {
+                batch_id: BatchId::new(batch),
+            },
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        !participants(&core).contains(&"Dana".to_string()),
+        "{:?}",
+        participants(&core)
+    );
+    let sent = call_names(&events);
+    assert!(
+        sent.last()
+            .is_some_and(|n| !n.contains(&"Dana".to_string())),
+        "{sent:?}"
+    );
+}

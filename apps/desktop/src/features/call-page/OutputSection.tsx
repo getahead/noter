@@ -44,6 +44,8 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     if (section.regenerated_with_edits && section.summary_id && !versions) void loadVersions(bridge, section.summary_id);
   }, [bridge, section.regenerated_with_edits, section.summary_id, versions]);
   const itemRecords = useWindow(bridge, (s) => s.entities.item);
+  // no key, account or local model: naming a tool that timed out would mislead, Try Again can't help (issue 1170)
+  const noAssistant = useWindow(bridge, (s) => !!s.whole.degraded?.states.some((d) => d.type === "no_assistant"));
   const regenerateError = useWindow(bridge, (s) => s.commands[outputsRegenerateKey(call.id)]?.state === "ERROR" ? s.commands[outputsRegenerateKey(call.id)]?.error : null);
   const counts = sectionCounts({ ...section, items: currentItems(section.items, itemRecords) });
   const Row = section.kind === "action_items" ? slots.actionItemRow : null;
@@ -120,13 +122,24 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
     if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading })}</p>;
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
+    if (state === "failed" && noAssistant && !regenerateError)
+      return (
+        <InlineBanner
+          banner={{
+            id: sectionId("failed", section.kind),
+            severity: "error",
+            text: t("outputs.failed_no_assistant", { section: heading.toLowerCase() }),
+            actions: [{ label: t("outputs.add_assistant"), onAction: () => void bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } }) }],
+          }}
+        />
+      );
     if (state === "failed")
       return (
         <InlineBanner
           banner={{
             id: sectionId("failed", section.kind),
             severity: "error",
-            text: regenerateError ? t("outputs.regen.failed") : t(section.state.type === "failed" && section.state.code === "internal" ? "outputs.failed" : "outputs.failed_timeout", { section: heading.toLowerCase() }),
+            text: regenerateError ? t("outputs.regen.failed") : t(section.state.type === "failed" && section.state.code === "runtime_unavailable" ? "outputs.failed_timeout" : "outputs.failed", { section: heading.toLowerCase() }),
             actions: [{ label: t("outputs.try_again"), onAction: () => onRegenerate(false) }, ...(section.state.type === "failed" && section.state.local_fallback_available ? [{ label: t("outputs.use_local"), onAction: () => onRegenerate(true) }] : [])],
           }}
         />

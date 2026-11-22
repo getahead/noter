@@ -40,8 +40,14 @@ fn attendee_people(
 
 impl Core {
     /// Adds the people to the call's participation, each once; nothing is written when they
-    /// all took part already.
-    fn add_participants(&self, call: &CallId, people: Vec<String>) -> Result<(), CoreError> {
+    /// all took part already. With the `batch` of the change that caused it (a speaker naming),
+    /// the rows join that batch and are undone with it (issue 1097).
+    fn add_participants(
+        &self,
+        call: &CallId,
+        people: Vec<String>,
+        batch: Option<BatchId>,
+    ) -> Result<(), CoreError> {
         if people.is_empty() {
             return Ok(());
         }
@@ -51,7 +57,8 @@ impl Core {
             "Recorded who took part".into(),
             "call_participants",
         );
-        meta.undoable = false;
+        meta.undoable = batch.is_some();
+        meta.batch_id = batch;
         let done = self.store().write_with(meta, move |tx| {
             let mut log = Vec::new();
             for person in &people {
@@ -86,6 +93,15 @@ impl Core {
 
     /// The call's named speakers (not You) join its participation.
     pub(crate) fn sync_participants(&self, call: &CallId) -> Result<(), CoreError> {
+        self.sync_participants_in(call, None)
+    }
+
+    /// `sync_participants` inside the batch of the naming that caused it.
+    pub(crate) fn sync_participants_in(
+        &self,
+        call: &CallId,
+        batch: Option<BatchId>,
+    ) -> Result<(), CoreError> {
         let id = call.as_str().to_string();
         let named: Vec<String> = crate::profiles::rd(self.store(), move |c| {
             c.prepare(
@@ -95,7 +111,7 @@ impl Core {
             .and_then(|mut q| q.query_map([id], |r| r.get(0))?.collect())
             .map_err(internal)
         })?;
-        self.add_participants(call, named)
+        self.add_participants(call, named, batch)
     }
 
     /// The calendar event running at the call's start: its attendees who are known people.
@@ -116,7 +132,7 @@ impl Core {
             .map(|e| e.attendees)
             .unwrap_or_default();
         let people = crate::profiles::rd(self.store(), move |c| attendee_people(c, &attendees))?;
-        self.add_participants(call, people)?;
+        self.add_participants(call, people, None)?;
         self.sync_participants(call)
     }
 

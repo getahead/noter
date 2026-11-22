@@ -108,6 +108,22 @@ describe("OutputSection", () => {
     expect(ready).not.toContain("Regenerating…");
   });
 
+  it("cpt-noter-seq-call-page-review-outputs — names why a section failed: no assistant set up, a timed-out run, or any other failure (issue 1170)", async () => {
+    await open([]);
+    const failed = (code: string) => sec("summary", { state: { type: "failed", code, local_fallback_available: false } as never });
+    expect(renderToString(<OutputSection {...props(failed("runtime_unavailable"))} />)).toContain("(Claude Code timed out)");
+    const rejected = renderToString(<OutputSection {...props(failed("key_rejected"))} />);
+    expect(rejected).toContain("Couldn&#x27;t write the summary");
+    expect(rejected).not.toContain("timed out");
+    bridge.store.setState((s) => ({ whole: { ...s.whole, degraded: { ...s.whole.degraded!, states: [{ type: "no_assistant" }] } } }));
+    const none = renderToString(<OutputSection {...props(failed("runtime_unavailable"))} />);
+    expect(none).toContain("Couldn&#x27;t write the summary (no assistant is set up)");
+    expect(none).not.toContain("timed out");
+    expect(none).not.toContain("Try Again");
+    expect(none).toContain("Add an Assistant…");
+    expect(none).not.toContain("Use Local Model");
+  });
+
   it("notices what the regeneration returned: written by the local model, and names updated with a way to regenerate", async () => {
     await open([]);
     const local = { runtime: "local", model: "qwen3-14b", skill: "planning", skill_version: "1", generated_at: 1, from_pass: "live" } as never;

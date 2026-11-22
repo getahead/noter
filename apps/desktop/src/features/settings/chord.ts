@@ -1,4 +1,5 @@
 import type { CoreError, HotkeyStatus } from "../../core/bindings";
+import { en, type MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 
 export interface ChordModifiers {
@@ -60,9 +61,15 @@ export function checkChord({ code, modifiers: m, variant }: ChordInput): ChordRe
   // @cpt-end:cpt-noter-algo-ui-settings-check-chord:p1:inst-physical
 }
 
+/** The core names another Noter action by its id (`start_stop`): show its label (issue 1143). */
+function ownerName(owner: string): string {
+  const key = `settings.hotkey.${owner}`;
+  return key in en ? t(key as MsgKey) : owner;
+}
+
 /** The line under a row the core reports a refusal for; null when the row has none. */
 export function conflictLine(status: HotkeyStatus): string | null {
-  if (status.type === "conflict") return t("settings.hotkeys.used_by", { owner: status.owner ?? "another app" });
+  if (status.type === "conflict") return t("settings.hotkeys.used_by", { owner: status.owner ? ownerName(status.owner) : "another app" });
   return status.type === "reserved_by_system" ? t("settings.hotkeys.used_by_macos") : null;
 }
 
@@ -70,6 +77,6 @@ export function conflictLine(status: HotkeyStatus): string | null {
 export function refusalLine(error: CoreError): string | null {
   if (error.code !== "hotkey_conflict" && error.code !== "hotkey_reserved") return null;
   const owner = error.detail?.type === "hotkey_owner" ? error.detail.owner : null;
-  if (owner) return t("settings.hotkeys.used_by", { owner });
+  if (owner) return t("settings.hotkeys.used_by", { owner: ownerName(owner) });
   return error.code === "hotkey_reserved" ? t("settings.hotkeys.used_by_macos") : t("settings.hotkeys.used_by", { owner: "another app" });
 }

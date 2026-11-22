@@ -276,7 +276,10 @@ export function replaySpeakerChangeAroundEditedSections(
   const createdPeople = new Set(after.speakers.flatMap((speaker) => speaker.label.type === "person" && !beforePeople.has(speaker.label.person.id) ? [speaker.label.person.id] : []));
   // The real action batch has a separate speaker/person association row beside each
   // speaker row; keep its skipped count visible even though the fake stores one snapshot.
-  return { undone: changedSpeakers.length + createdPeople.size, skipped: editedSections.size + changedSpeakers.length };
+  // It also holds the participant row the naming added for a person not on the call yet (#1097).
+  const onCall = new Set((world.call_details.find((d) => d.call.id === before.callId)?.call.participants ?? []).map((p) => p.id));
+  const addedParticipants = [...createdPeople].filter((id) => !onCall.has(id)).length;
+  return { undone: changedSpeakers.length + createdPeople.size + addedParticipants, skipped: editedSections.size + changedSpeakers.length };
 }
 
 /** A change whose field no longer holds its `after` was edited later, as the core's replay checks it (where the fake keeps the field). */

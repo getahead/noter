@@ -79,7 +79,8 @@ describe("fake core stream and record parity", () => {
     if (!undoneSummary?.rev) return;
     expect((await api.outputEdit({ call_id: "call_backend", summary_id: summaryId, rev: undoneSummary.rev, body_md: "My later edit must survive." })).status).toBe("ok");
 
-    expect(await api.changeRedo({ target })).toEqual({ status: "ok", data: { undone: 2, skipped_edited_later: 2 } });
+    // the naming's batch also holds the participant row it added (#1097)
+    expect(await api.changeRedo({ target })).toEqual({ status: "ok", data: { undone: 3, skipped_edited_later: 2 } });
     const redoneCall = await api.callGet({ call_id: "call_backend" });
     expect(redoneCall.status).toBe("ok");
     if (redoneCall.status !== "ok") return;

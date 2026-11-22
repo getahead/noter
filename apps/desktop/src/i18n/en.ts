@@ -1346,6 +1346,8 @@ export const en = {
   "outputs.conflict": "The text changed since you started editing. Your draft is kept; save again to replace it.",
   "outputs.failed": "Couldn't write the {section}",
   "outputs.failed_timeout": "Couldn't write the {section} (Claude Code timed out)",
+  "outputs.failed_no_assistant": "Couldn't write the {section} (no assistant is set up)",
+  "outputs.add_assistant": "Add an Assistant…",
   "outputs.try_again": "Try Again",
   "outputs.use_local": "Use Local Model",
   "outputs.written_local_after_timeout": "Written by the local model after Claude Code timed out",

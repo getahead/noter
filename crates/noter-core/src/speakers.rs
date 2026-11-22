@@ -391,8 +391,9 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-no-audio
         // @cpt-end:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-correct
         // @cpt-begin:cpt-noter-flow-core-speakers-audio-name:p1:inst-name-publish
-        // A speaker named as a person takes part in the call.
-        self.sync_participants(call_id)?;
+        // A speaker named as a person takes part in the call, undone with the naming.
+        let batch = written.first().and_then(|w| w.batch_id.clone());
+        self.sync_participants_in(call_id, batch)?;
         let speakers = self.publish_corrected(call_id, &plan.segments)?;
         for row in &written {
             if row.entity_type == "summary" {
