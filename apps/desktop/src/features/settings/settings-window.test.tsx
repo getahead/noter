@@ -7,7 +7,7 @@ import { FakeCore } from "../../core/fake/fake-core";
 import { t } from "../../i18n/format";
 import { find, rendered } from "../../ui/testing";
 import { checkForUpdate, loadHotkeys, loadSettings, pauseHotkeys, saveSection, setHotkey, resetHotkeys, unignoreKey } from "./actions";
-import { AudioPane } from "./AudioPane";
+import { AudioPane, MicrophoneRow } from "./AudioPane";
 import { CallScreenPane } from "./CallScreenPane";
 import { GeneralPane } from "./GeneralPane";
 import { HotkeysPane } from "./HotkeysPane";
@@ -205,10 +205,10 @@ describe("panes", () => {
     expect(html).toContain("Restart Now");
   });
 
-  it("Audio: the current output can be marked as headphones; the backends and own sounds save", async () => {
-    await ready((w) => (w.app.environment.output_device = { uid: "uid-1", name: "AirPods Pro" } as never));
+  it("Audio: a not-identified output device can be treated as headphones; the backends and own sounds save", async () => {
+    await ready((w) => (w.app.environment.output_devices = [{ uid: "uid-1", name: "AirPods Pro", route: "unknown", marked_headphones: false }]));
     const tree = rendered(AudioPane, { bridge, settings: stored() });
-    control(tree, "Treat AirPods Pro as headphones")(true);
+    control(tree, "Treat as headphones")(true);
     control(tree, "Exclude Noter’s own sounds")(false);
     control(tree, "Live transcription")("parakeet_tdt_v3");
     await vi.waitFor(() => {
@@ -218,6 +218,39 @@ describe("panes", () => {
     expect(stored().audio.output.headphones_devices).toContain("uid-1");
     expect(stored().audio.exclude_own_sounds).toBe(false);
     expect(stored().audio.live_backend).toBe("parakeet_tdt_v3");
+  });
+
+  // #1125-#1130: the new controls save what DESIGN 3.2 lists
+  it("Audio: Microphone, Languages and Treat as headphones save; Call Screen: Show latency and Text size save", async () => {
+    await ready((w) => (w.app.environment.output_devices = [{ uid: "uid-9", name: "Living Room", route: "unknown", marked_headphones: false }]));
+    const picked = vi.fn();
+    const mic = rendered(MicrophoneRow, { bridge, value: null, error: null, onChange: picked });
+    control(mic, "Microphone")("StudioDisplayMicrophone");
+    control(mic, "Microphone")("");
+    expect(picked.mock.calls).toEqual([["StudioDisplayMicrophone"], [null]]);
+    control(rendered(AudioPane, { bridge, settings: stored() }), "German")(false);
+    await vi.waitFor(() => expect(stored().audio.languages).toEqual(["en", "ru"]));
+    const row = find(rendered(AudioPane, { bridge, settings: stored() }), (_p, type) => type === MicrophoneRow);
+    (row.props.onChange as (uid: string | null) => void)("StudioDisplayMicrophone");
+    await vi.waitFor(() => expect(stored().audio.mic_device).toBe("StudioDisplayMicrophone"));
+    control(rendered(AudioPane, { bridge, settings: stored() }), "Treat as headphones")(true);
+    await vi.waitFor(() => expect(stored().audio.output.headphones_devices).toContain("uid-9"));
+    const screen = rendered(CallScreenPane, { bridge, settings: stored() });
+    control(screen, "Show latency")(true);
+    await vi.waitFor(() => expect(stored().call_screen.show_latency).toBe(true));
+    control(rendered(CallScreenPane, { bridge, settings: stored() }), "Text size")(125);
+    await vi.waitFor(() => expect(stored().call_screen.text_size_pct).toBe(125));
+  });
+
+  it("Performance: Stages sampled stores the explicit list; Updates: Release notes opens the notes", async () => {
+    await ready();
+    control(rendered(PerformancePane, { bridge, settings: stored() }), "Retrieval")(false);
+    await vi.waitFor(() => expect(stored().performance.sampled_stages).toEqual(["confirmed_text", "signals", "first_token", "full_card", "merge"]));
+    control(rendered(PerformancePane, { bridge, settings: stored() }), "Retrieval")(true);
+    await vi.waitFor(() => expect(stored().performance.sampled_stages).toContain("retrieval"));
+    const open = vi.spyOn(bridge.core, "openExternal");
+    control(rendered(UpdatesPane, { bridge, settings: stored() }), "Release notes")();
+    expect(open).toHaveBeenCalledWith({ target: { type: "url", url: expect.stringMatching(/^https:\/\/github\.com\/getahead\/noter\/releases/) } });
   });
 
   it("Hotkeys: a recorded chord goes to hotkey_set, a refused key stays local, the card key modifiers save", async () => {

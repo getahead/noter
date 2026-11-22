@@ -2,6 +2,7 @@ import type { HotkeyAction } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { PopupButton } from "../../ui/primitives/popup-button";
+import { Slider } from "../../ui/primitives/slider";
 import { Toggle } from "../../ui/primitives/toggle";
 import { saveSection, useRowErrors } from "./actions";
 import { DisplayPicker } from "../../ui/setup/display-picker";
@@ -42,6 +43,12 @@ export function CallScreenPane({ bridge, settings }: PaneProps) {
         </Row>
         <Row label={t("settings.call.auto_open")} error={rowError("call_screen", "open_automatically")} note={t("settings.call.auto_open_note")}>
           <Toggle on={call.open_automatically} ariaLabel={t("settings.call.auto_open")} onAction={(open_automatically) => void saveSection(bridge, "call_screen", { open_automatically })} />
+        </Row>
+        <Row label={t("settings.call.latency")} error={rowError("call_screen", "show_latency")}>
+          <Toggle on={call.show_latency ?? false} size="small" ariaLabel={t("settings.call.latency")} onAction={(show_latency) => void saveSection(bridge, "call_screen", { show_latency })} />
+        </Row>
+        <Row label={t("settings.call.text_size")} error={rowError("call_screen", "text_size_pct")}>
+          <Slider value={call.text_size_pct ?? 100} min={85} max={150} step={5} unit="%" label={t("settings.call.text_size")} onAction={(text_size_pct) => void saveSection(bridge, "call_screen", { text_size_pct })} />
         </Row>
       </Group>
       <Group title={t("settings.call.menu_bar")}>

@@ -141,3 +141,18 @@
 .f-bind__h { font-weight: 600; }
 .f-bind__row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 4px 0; }
 .st-cred__head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+
+/* Output devices: one row per device with its route and, when not identified, Treat as headphones */
+.st-devices { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.st-device { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-device__name { min-width: 0; }
+.st-device__name { font-weight: 600; }
+.st-devices { width: 100%; }
+/* Microphone: the level meter beside the pop-up */
+.st-mic { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; max-width: 100%; }
+/* a long input name ("System Default (MacBook Pro Microphone)") tail-truncates; the menu and the help tag keep it whole */
+.st-mic__popup { position: relative; display: inline-flex; max-width: 200px; min-width: 0; flex: 0 1 auto; }
+.st-mic__popup .np-popup { max-width: 100%; min-width: 0; }
+.st-mic__popup .np-popup select { max-width: 100%; color: transparent; }
+.st-mic__value { position: absolute; left: 10px; right: 26px; top: 50%; transform: translateY(-50%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; pointer-events: none; color: var(--label); }
+.st-mic .np-meter { flex: none; }
