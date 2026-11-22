@@ -2,6 +2,7 @@
 // shows without activating Noter. RP-R1 holds the app icon, the title and the source line; RP-R3 the buttons of
 // the variant. It never takes focus: the core places it and ⌃⌥⌘R is the core's hotkey.
 import { useEffect, useReducer, useRef, useState } from "react";
+import appIcon from "../../../src-tauri/icons/icon.png";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -339,9 +340,7 @@ export function RecordPrompt({ bridge }: { bridge: Bridge }) {
   return (
     <div {...root} aria-label={t("prompt.title")}>
       <div className="rp-r1" data-region="RP-R1">
-        <span className="rp-appicon" aria-hidden="true">
-          <Icon name={browser ? "globe" : "people"} size={20} />
-        </span>
+        <img className="rp-appicon" src={appIcon} width={32} height={32} alt="" />
         <div className="rp-r1__text">
           <div className="rp-title">{t("prompt.title")}</div>
           <div className="rp-sub">{sourceLine(detection)}</div>
