@@ -447,6 +447,8 @@ pub enum AuditWhat {
     EvidenceLookup,
     LiveMcpQuery,
     HandoffPrompt,
+    /// The short test request of an API key or own-account check: none of the user's text.
+    CredentialCheck,
 }
 
 /// One row of `audit_log`: one per LLM run (the packet) plus, for a run on a cloud runtime,

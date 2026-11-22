@@ -490,7 +490,9 @@ export type AuditListArgs = {
 	page: PageRequest,
 };
 
-export type AuditWhat = "transcript_delta" | "full_transcript" | "outputs" | "document_excerpts" | "search_question" | "evidence_lookup" | "live_mcp_query" | "handoff_prompt";
+export type AuditWhat = "transcript_delta" | "full_transcript" | "outputs" | "document_excerpts" | "search_question" | "evidence_lookup" | "live_mcp_query" | "handoff_prompt" | 
+/**  The short test request of an API key or own-account check: none of the user's text. */
+"credential_check";
 
 export type BannerDismissArgs = {
 	banner: BannerKind,
@@ -3773,7 +3775,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.25";
+export const CONTRACT_VERSION = "2.26";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

@@ -1001,6 +1001,11 @@ async fn verifying_a_key_runs_once_on_its_runtime_with_the_candidate_through_the
     assert_eq!(f.count("SELECT COUNT(*) FROM llm_runs"), 1);
     let audit = f.row("SELECT * FROM audit_log").to_string();
     assert!(!audit.contains("sk-ant-candidate"));
+    // #1100: the audit names it a key check, never call content such as a summary
+    assert_eq!(
+        f.row("SELECT what FROM audit_log")["what"],
+        json!("credential_check")
+    );
     // The router never stores a candidate: the caller does, once it is accepted.
     assert_eq!(f.secrets.get("anthropic").unwrap(), None);
 }

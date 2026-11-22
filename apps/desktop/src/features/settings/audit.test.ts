@@ -26,6 +26,10 @@ describe("audit rows", () => {
     expect(r.what).toContain("Call 1");
     expect(auditRows([row("t", { kind: "tool_result" })], undefined)[0].what).toContain("Tool result");
   });
+  // #1100: a key or account check is named as such, never as call content
+  it("names a key or account check as what it is", () => {
+    expect(auditRows([row("k", { what: "credential_check" })], undefined)[0].what).toBe("Key or account check");
+  });
 });
 
 describe("audit commands", () => {

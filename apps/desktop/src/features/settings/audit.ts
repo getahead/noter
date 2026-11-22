@@ -13,6 +13,7 @@ const WHAT: Record<AuditWhat, MsgKey> = {
   evidence_lookup: "audit.what.evidence",
   live_mcp_query: "audit.what.lookup",
   handoff_prompt: "audit.what.handoff",
+  credential_check: "audit.what.credential_check",
 };
 
 export interface AuditRow {
