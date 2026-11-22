@@ -110,6 +110,24 @@ impl Harness {
         if w.app.capture.phase != CapturePhase::Idle {
             noter_core::testing::seed_capture(&self.core, w.app.capture.clone()).await?;
         }
+        // The fixture's configured API keys, as stand-ins in the scripted Keychain: the core
+        // then reads them as configured (never sent anywhere; the runtimes are scripted).
+        for key in &w.app.accounts.keys {
+            if matches!(key.status, KeyStatus::Configured { .. }) {
+                let runtime = match key.provider {
+                    KeyProvider::Anthropic => noter_protocol::RuntimeChoice::ClaudeApiKey,
+                    KeyProvider::Codex => noter_protocol::RuntimeChoice::CodexApiKey,
+                };
+                if let Some(account) = noter_core::key_account(runtime) {
+                    use noter_core::SecretStore;
+                    let stand_in = noter_core::Secret::new("harness-seeded-key".into());
+                    let _ = self.secrets.set(account, &stand_in);
+                }
+            }
+        }
+        // The launch read saw the accounts before the seeded settings and keys (issue 1139):
+        // read again.
+        noter_core::testing::refresh_accounts(&self.core).await;
         Ok(())
     }
 

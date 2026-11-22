@@ -80,8 +80,8 @@ pub use noter_knowledge::{
 /// The one model-download allow-list check: noter-llm's, the egress gate (decision D14).
 pub use noter_llm::allowed_download_url;
 pub use noter_llm::{
-    AccountCli, Adapters, CliAccounts, CliConfig, KeychainLocked, Llm, MemorySecrets, NoAccountCli,
-    OllamaConfig, Scripted, ScriptedAccountCli, Secret, SecretStore, ToolScript,
+    key_account, AccountCli, Adapters, CliAccounts, CliConfig, KeychainLocked, Llm, MemorySecrets,
+    NoAccountCli, OllamaConfig, Scripted, ScriptedAccountCli, Secret, SecretStore, ToolScript,
 };
 use noter_protocol::ipc::Sink;
 pub use notify::{Notification, NotificationKind};
@@ -241,6 +241,8 @@ pub struct Core {
     downloads: Mutex<models::Downloads>,
     /// This core, for the tasks first run spawns (set by `start_first_run`).
     this: Arc<std::sync::OnceLock<std::sync::Weak<Core>>>,
+    /// True once the accounts read `start_first_run` spawns has finished (issue 1139).
+    accounts_read: tokio::sync::watch::Sender<bool>,
     /// The async runtime first run started on, for work that macOS notices start on its own
     /// threads.
     runtime: std::sync::OnceLock<tokio::runtime::Handle>,
@@ -477,6 +479,7 @@ impl Core {
             first_run: Mutex::new(first_run),
             downloads: Mutex::new(downloads),
             this,
+            accounts_read: tokio::sync::watch::channel(false).0,
             runtime: std::sync::OnceLock::new(),
             engine,
             self_test_hub: std::sync::OnceLock::new(),

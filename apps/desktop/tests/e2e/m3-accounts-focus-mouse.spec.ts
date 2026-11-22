@@ -75,7 +75,8 @@ test.describe("cpt-noter-seq-settings-sign-in-account — focus with the mouse",
       const steer = await openWindow(page, "settings", {
         world: (w) => {
           W.idle(w);
-          for (const a of w.app.accounts.accounts) Object.assign(a.cli, { installed: true, path: `/bin/${a.cli.tool}`, version: "1.0.0", supported: true });
+          // the fake core's CLIs; the real core's are scripted below with harness.account_cli (#1139)
+          if (process.env.NOTER_CORE !== "stdio") for (const a of w.app.accounts.accounts) Object.assign(a.cli, { installed: true, path: `/bin/${a.cli.tool}`, version: "1.0.0", supported: true });
         },
       });
       if (process.env.NOTER_CORE === "stdio") { // the real core needs its account CLIs scripted

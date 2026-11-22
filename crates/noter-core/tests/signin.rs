@@ -846,3 +846,33 @@ async fn a_stale_provider_probe_cannot_end_a_replacement_identity() {
         }
     );
 }
+
+#[tokio::test]
+// issue 1139 (Delivery B's report): the harness seeds its world only after the core's own launch
+// read of the accounts; a CLI probe still running must keep that read pending.
+async fn the_launch_read_of_the_accounts_can_be_awaited() {
+    let dir = tempfile::tempdir().unwrap();
+    let cli = ScriptedAccountCli::new();
+    let gated_cli = Arc::new(GatedStatusCli {
+        inner: cli.clone(),
+        ..GatedStatusCli::default()
+    });
+    gated_cli.hold_next.store(true, Ordering::SeqCst);
+    let deps = CoreDeps {
+        secrets: Arc::new(MemorySecrets::default()),
+        account_cli: gated_cli.clone(),
+        ..CoreDeps::new(
+            Arc::new(TickClock(AtomicI64::new(T0))),
+            Arc::new(Events::default()),
+        )
+    };
+    let core = Arc::new(Core::open(dir.path(), deps).expect("core opens"));
+    core.start_first_run();
+    gated_cli.started.notified().await;
+    let pending = tokio::time::timeout(Duration::from_millis(200), core.accounts_read_at_launch());
+    assert!(pending.await.is_err(), "the probe is still running");
+    gated_cli.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(5), core.accounts_read_at_launch())
+        .await
+        .expect("the launch read ends once the probe answers");
+}

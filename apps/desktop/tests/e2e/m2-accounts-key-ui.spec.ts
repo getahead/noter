@@ -135,16 +135,27 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
     await expect(footer).toHaveText("Idle · local model only");
   });
 
+  const real = process.env.NOTER_CORE === "stdio";
   const atAssistants = (w: Parameters<typeof W.firstRun>[0]) => {
     W.firstRun(w);
     w.app.setup.steps.forEach((s) => (s.state = s.step === "assistants" ? "todo" : "done"));
-    w.app.accounts.keys.forEach((k) => (k.status = { type: "not_set" }));
+    // the fake world's keys; the real core's seeded key is removed by `openAtAssistants` (#1139)
+    if (!real) w.app.accounts.keys.forEach((k) => (k.status = { type: "not_set" }));
+  };
+  /** First run on Assistants with no API key: the real core's fixture key goes through api_key_remove (not a page call). */
+  const openAtAssistants = async (page: Page, world: (w: Parameters<typeof W.firstRun>[0]) => void = atAssistants) => {
+    const steer = await openWindow(page, "first-run", { world });
+    if (real) {
+      await steer.invoke("api_key_remove", { provider: "anthropic" }, "first-run");
+      await page.reload();
+    }
+    return steer;
   };
   const step = (page: Page) => page.locator('[data-region="FR-R2"]');
   const keyField = (page: Page) => step(page).getByLabel("Anthropic API key", { exact: true });
 
   test("happy path: Verify stores the key, the field shows the Keychain line, Finish opens Today", async ({ page }) => {
-    await openWindow(page, "first-run", { world: atAssistants });
+    await openAtAssistants(page);
     await expect(step(page).getByRole("heading", { name: "Assistants" })).toBeVisible();
     await keyField(page).fill(GOOD);
     await step(page).getByRole("button", { name: "Verify" }).first().click();
@@ -156,7 +167,9 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
   });
 
   test("empty path — No key and no local runtime: Not Now folds the offer, the explanation stays, Finish still leads on", async ({ page }) => {
-    const steer = await openWindow(page, "first-run", { world: (w) => (atAssistants(w), (w.app.accounts.local.running = false), (w.app.accounts.local.cli.installed = false)) });
+    // the fake world says no local runtime; the real core's is scripted away below (#1139)
+    const fake = process.env.NOTER_CORE !== "stdio";
+    const steer = await openAtAssistants(page, (w) => (atAssistants(w), fake && ((w.app.accounts.local.running = false), (w.app.accounts.local.cli.installed = false))));
     // the real core finds Ollama when the step asks it (accounts_get): script it away there; the fake world already says so
     if (process.env.NOTER_CORE === "stdio") {
       await steer.invoke("harness.account_cli", { tool: "ollama", installed: false });
@@ -171,7 +184,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
 
   test("other path — #1057: Remove on a stored key in first run removes it (api_key_remove allows FirstRun), and the empty field comes back", async ({ page }) => {
     await watchAlerts(page);
-    await openWindow(page, "first-run", { world: atAssistants });
+    await openAtAssistants(page);
     await keyField(page).fill(GOOD);
     await step(page).getByRole("button", { name: "Verify" }).first().click();
     await expect(step(page)).toContainText("Stored in the Keychain");
@@ -184,7 +197,7 @@ test.describe("cpt-noter-seq-first-run-connect-assistant", () => {
   });
 
   test("error path — API key rejected: the field is invalid with the reason in one line; the corrected key verifies", async ({ page }) => {
-    const steer = await openWindow(page, "first-run", { world: atAssistants });
+    const steer = await openAtAssistants(page);
     await steer.failNext("api_key_set", "key_rejected");
     await keyField(page).fill("sk-ant-bad");
     await step(page).getByRole("button", { name: "Verify" }).first().click();

@@ -499,6 +499,9 @@ impl Harness {
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-build-core
         let core = Arc::new(Core::open(&dir, deps).map_err(|e| e.to_string())?);
         core.start_first_run();
+        // The core reads the accounts once at launch on its own (issue 1139): the world is
+        // seeded only after that read, so a CLI probe answering late never overwrites it.
+        core.accounts_read_at_launch().await;
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-build-core
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-open-store
         let harness = Arc::new(Harness {

@@ -7,6 +7,12 @@ use noter_protocol::CoreError;
 
 use crate::Core;
 
+/// Reads the accounts again, as the launch read does: after a seed changed the settings and
+/// keys that view stands on (issue 1139).
+pub async fn refresh_accounts(core: &Core) {
+    core.refresh_accounts().await;
+}
+
 /// Seeds the self-test state as `harness.world_set` asks; the setup status, the system-audio
 /// row and the detection rule follow it.
 pub fn seed_self_test(core: &Core, state: SelfTestState) {
