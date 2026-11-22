@@ -43,6 +43,8 @@ pub trait Surfaces: Send + Sync {
     fn open_external(&self, target: &ExternalTarget);
     /// Shows a window (the main window, Settings, First run) without moving its content.
     fn show_window(&self, window: WindowLabel);
+    /// Hides a window that has handed over to another (first run after **Finish**).
+    fn hide_window(&self, _window: WindowLabel) {}
     /// The call window or the floating panel is on screen.
     fn call_surface_visible(&self) -> bool;
     /// Delivers a notification now (`UNUserNotificationCenter`); when is the core's rule.
