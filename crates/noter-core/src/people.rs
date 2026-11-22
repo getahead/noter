@@ -345,15 +345,16 @@ fn unnamed_of(c: &Connection) -> Db<Vec<UnnamedSpeaker>> {
     // @cpt-end:cpt-noter-algo-core-people-page:p1:inst-page-unnamed
 }
 
-/// Topics of the items from the person's calls (the topics table is retrieval's, 2.22).
+/// Topics of the items from the person's calls, counted as the Topics list counts them (`topics::row`):
+/// rejected items nowhere, only `open` ones as open (the topics table is retrieval's, 2.22).
 fn topics_of(c: &Connection, person_id: &str) -> Db<Vec<TopicRow>> {
     c.prepare(&format!(
         "SELECT t.id, t.rev, t.name, t.last_seen, count(DISTINCT i.call_id),
                 coalesce(sum(i.kind = 'decision'), 0),
-                coalesce(sum(i.kind != 'decision' AND i.status IN ('open', 'carried')), 0),
-                coalesce(sum(i.kind = 'open_question' AND i.status IN ('open', 'carried')), 0)
+                coalesce(sum(i.status = 'open'), 0),
+                coalesce(sum(i.kind = 'open_question' AND i.status = 'open'), 0)
          FROM topics t JOIN items i ON i.topic_id = t.id
-         WHERE i.call_id IN ({THEIR_CALLS})
+         WHERE i.call_id IN ({THEIR_CALLS}) AND i.review_state != 'rejected'
          GROUP BY t.id ORDER BY t.last_seen DESC, t.id"
     ))?
     .query_map([person_id], |r| {
