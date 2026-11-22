@@ -207,3 +207,15 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await expect(line.locator('[data-component="cpt-noter-component-ui-mode-indicator"][data-variant="settings"]')).toBeVisible();
   });
 });
+
+test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
+  test("UI — design — #1120 an own-account row has its state tag beside the name, like the API-key rows", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Models & Runtimes", { exact: true }).click();
+    const row = page.locator('[data-component="cpt-noter-component-ui-credential-row"][data-variant="account-login"]').first();
+    const name = (await row.locator(".e-status__title").boundingBox())!;
+    const tag = (await row.locator(".st-cred__tag").boundingBox())!;
+    expect(Math.abs(tag.y + tag.height / 2 - (name.y + name.height / 2))).toBeLessThan(4);
+    expect(tag.x).toBeGreaterThan(name.x + name.width);
+  });
+});

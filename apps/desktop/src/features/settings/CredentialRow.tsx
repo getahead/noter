@@ -183,8 +183,11 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
   return (
     <div className="e-status st-cred" role="group" aria-label={t(a.title)} data-component={COMPONENT} data-variant="account-login" data-provider={view.provider} data-state={state}>
       <div className="e-status__main">
-        <span className="e-status__title">{t(a.title)}</span>
-        <Badge text={tagText} tone={ACCOUNT_TAG[state].tone} icon={ACCOUNT_TAG[state].icon} cls="st-cred__tag" />
+        {/* the state tag beside the name, as on the API-key rows */}
+        <span className="st-cred__head">
+          <span className="e-status__title">{t(a.title)}</span>
+          <Badge text={tagText} tone={ACCOUNT_TAG[state].tone} icon={ACCOUNT_TAG[state].icon} cls="st-cred__tag" />
+        </span>
         {status.type === "signed_in" ? (
           <>
             <span className="e-status__sub">{`${status.identity.email} · ${t("settings.accounts.through", { plan: status.identity.plan, tool: toolName(view.provider) })}`}</span>
