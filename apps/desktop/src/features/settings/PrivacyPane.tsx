@@ -3,12 +3,11 @@ import { useState } from "react";
 import { useWindow } from "../../app/use-window";
 import type { NavTarget, PrivacyMode } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { Badge } from "../../ui/primitives/badge";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { Toggle } from "../../ui/primitives/toggle";
-import { MODE_MSG } from "../shell/mode-indicator-view";
+import { ModeIndicator } from "../shell/mode-indicator-view";
 import { modeIndicator } from "../shell/mode-indicator";
 import { saveSection, useRowErrors } from "./actions";
 import { Group, Row } from "./form";
@@ -45,7 +44,8 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
         <Row label={t("settings.privacy.mode")} error={rowError("privacy", "mode")}>
           <RadioGroup name="st-pmode" label={t("settings.privacy.mode")} options={MODES} value={privacy.mode} onAction={(mode) => void saveSection(bridge, "privacy", { mode: mode as PrivacyMode })} />
           <div className="st-modenow">
-            <Badge text={t("settings.privacy.in_force", { mode: t(MODE_MSG[inForce.state].word) })} tone={inForce.warning ? "warning" : "info"} />
+            {/* a plain secondary line with the mode indicator, as in the prototype (st-modenow) */}
+            {t("settings.privacy.in_force_prefix")} <ModeIndicator view={inForce} variant="settings" />
           </div>
         </Row>
         <Row label={t("settings.privacy.retention")} error={rowError("audio", "retention")} note={due ? t("settings.privacy.retention_due", { count: due }) : t("settings.privacy.retention_none")}>
@@ -63,7 +63,7 @@ export function PrivacyPane({ bridge, settings }: PaneProps) {
         />
         {/* @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-case-calendar */}
         <Row label={t("settings.privacy.metrics")} error={rowError("privacy", "behaviour_metrics")} note={t("settings.privacy.metrics_note")}>
-          <Toggle on={privacy.behaviour_metrics} size="small" ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
+          <Toggle on={privacy.behaviour_metrics} ariaLabel={t("settings.privacy.metrics")} onAction={(behaviour_metrics) => void saveSection(bridge, "privacy", { behaviour_metrics })} />
         </Row>
         <Row label={t("settings.privacy.voice_profiles")}>
           <PushButton label={t("settings.privacy.voice_profiles_manage")} size="small" disabled help={t("settings.privacy.voice_profiles_later")} />

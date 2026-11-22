@@ -156,3 +156,54 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     expect(await sent(page, "hotkey_set")).toHaveLength(0);
   });
 });
+
+// Design fixes against the prototype of record (Settings window, General pane).
+test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
+  test("UI — design — #1113 a 40-pt title bar names the pane, and the switches are 34×20", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    const bar = page.locator(".st-titlebar");
+    await expect(bar).toHaveText("General");
+    expect(Math.round((await bar.boundingBox())!.height)).toBe(40);
+    await expect(bar).toHaveCSS("border-bottom-width", "1px");
+    const track = page.locator('[data-region="ST-R2"] .np-toggle__track').first();
+    const box = (await track.boundingBox())!;
+    expect([Math.round(box.width), Math.round(box.height)]).toEqual([34, 20]);
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Hotkeys", { exact: true }).click();
+    await expect(bar).toHaveText("Hotkeys");
+  });
+  test("UI — design — #1121 Bottleneck thresholds are a Status · When p95 is above table", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Performance", { exact: true }).click();
+    const table = page.getByRole("table", { name: "Bottleneck thresholds" });
+    await expect(table.getByRole("columnheader")).toHaveText(["Status", "When p95 is above"]);
+    await expect(table.getByRole("row", { name: /Near/ }).getByRole("spinbutton", { name: "Near" })).toHaveValue(/^\d+$/);
+    await expect(table.getByRole("row", { name: /Over/ })).toContainText("% of budget");
+  });
+  test("UI — design — #1120 the Models list is in Audio & Transcription only; Models & Runtimes starts with API keys", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    const nav = page.getByRole("navigation", { name: "Settings panes" });
+    const groups = page.locator('[data-region="ST-R2"] .st-group__h');
+    await nav.getByText("Models & Runtimes", { exact: true }).click();
+    await expect(groups.first()).toHaveText("API keys");
+    await expect(groups.filter({ hasText: /^Models$/ })).toHaveCount(0);
+    await nav.getByText("Audio & Transcription", { exact: true }).click();
+    await expect(groups.filter({ hasText: /^Models$/ })).toHaveCount(1);
+  });
+  test("UI — design — #1120 an API-key row has its state tag beside the name, the use line under it, actions trailing", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Models & Runtimes", { exact: true }).click();
+    const row = page.locator('[data-component="cpt-noter-component-ui-credential-row"][data-variant="row"]').first();
+    const name = (await row.locator(".e-status__title").boundingBox())!;
+    const tag = (await row.locator(".st-cred__tag").boundingBox())!;
+    expect(Math.abs(tag.y + tag.height / 2 - (name.y + name.height / 2))).toBeLessThan(4); // on the name's line
+    expect(tag.x).toBeGreaterThan(name.x + name.width);
+  });
+  test("UI — design — #1121 Privacy's In force is a plain secondary line with the mode indicator, not a tag", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Privacy", { exact: true }).click();
+    const line = page.locator(".st-modenow");
+    await expect(line).toContainText(/^In force:/);
+    await expect(line.locator(".np-badge")).toHaveCount(0);
+    await expect(line.locator('[data-component="cpt-noter-component-ui-mode-indicator"][data-variant="settings"]')).toBeVisible();
+  });
+});

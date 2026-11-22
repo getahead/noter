@@ -15,7 +15,6 @@ import { Group, Row } from "./form";
 import { KeySheet } from "./KeySheet";
 import { keyConfigured, removeAlert, runtimeChoices, TASKS } from "./keys";
 import type { PaneProps } from "./pane-props";
-import { ModelsGroup } from "./ModelsGroup";
 
 // @cpt-dod:cpt-noter-dod-ui-accounts-keys:p1
 export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
@@ -44,7 +43,6 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
   // @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-return-manage
   return (
     <>
-      <ModelsGroup bridge={bridge} />
       {keychainLocked && (
         <div className="st-banner" role="alert">
           {t("settings.keys.locked_banner")}

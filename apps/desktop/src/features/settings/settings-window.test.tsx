@@ -148,8 +148,8 @@ describe("panes", () => {
     await vi.waitFor(() => expect(stored()).toMatchObject({ audio: { retention: "days7" }, privacy: { behaviour_metrics: true } }));
     const html = renderToString(<PrivacyPane bridge={bridge} settings={stored()} />);
     expect(html).toContain("Local only");
-    expect(html).toContain("In force: Local only");
-    expect(t("settings.privacy.in_force", { mode: "Local only" })).toBe("In force: Local only");
+    expect(html).toMatch(/In force:(<!-- -->)? <[^>]*data-component="cpt-noter-component-ui-mode-indicator" data-variant="settings"/); // a plain line with the indicator (#1121)
+    expect(t("settings.privacy.in_force_prefix")).toBe("In force:"); // then the mode indicator (#1121)
   });
 
   it("Privacy: Manage on Person Pages is disabled and names the later version; it sends no command", async () => {

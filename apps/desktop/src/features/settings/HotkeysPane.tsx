@@ -73,7 +73,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
         }
       >
         <Row label={t("settings.hotkeys.use_card_keys")} error={rowError("copilot", "card_keys.enabled")}>
-          <Toggle on={copilot.card_keys.enabled} size="small" ariaLabel={t("settings.hotkeys.use_card_keys")} onAction={(enabled) => void cardKeys({ card_keys: { enabled } })} />
+          <Toggle on={copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.use_card_keys")} onAction={(enabled) => void cardKeys({ card_keys: { enabled } })} />
         </Row>
         <HotkeyRecorder id="hk-pin" variant="modifier-set" label={t("settings.hotkeys.pin")} caps={modifierCaps(pin!.modifiers!)} disabled={pin!.disabled} onRecord={recordModifiers} />
         {cardKeyConflictCaps(cardConflicts).map((caps) => (
@@ -83,7 +83,7 @@ export function HotkeysPane({ bridge }: { bridge: Bridge }) {
           </div>
         ))}
         <Row label={t("settings.hotkeys.dismiss_keys")} error={rowError("copilot", "dismiss_with_keys")}>
-          <Toggle on={copilot.dismiss_with_keys} size="small" disabled={!copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.dismiss_keys")} onAction={(v) => void saveSection(bridge, "copilot", { dismiss_with_keys: v })} />
+          <Toggle on={copilot.dismiss_with_keys} disabled={!copilot.card_keys.enabled} ariaLabel={t("settings.hotkeys.dismiss_keys")} onAction={(v) => void saveSection(bridge, "copilot", { dismiss_with_keys: v })} />
         </Row>
         <HotkeyRecorder id="hk-dismiss" variant="derived" label={t("settings.hotkeys.dismiss")} caps={modifierCaps(dismiss!.modifiers!)} disabled={dismiss!.disabled} />
         {undo && <HotkeyRecorder id="hk-undo" label={t("settings.hotkeys.undo")} caps={undo.caps} conflict={undo.conflict} disabled={!copilot.card_keys.enabled} onRecord={record("undo_card_action")} onClear={clear("undo_card_action")} />}
