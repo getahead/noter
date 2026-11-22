@@ -271,6 +271,8 @@ Noter follows the macOS 27 design language and the HIG: the system font; an edge
 
 **Source**: PRD › UI prototype; D14, D58, D60, PM-03, PM-57 (Apple Design Resources › macOS 27 UI Kit).
 
+**App icon.** The app icon is the prototype's `noter` mark: a rounded document with three text lines, the last one shorter, in white on a blue rounded-square tile on the macOS icon grid (1024 canvas, 824 tile, corner radius 185). It ships as `icon.icns` from `apps/desktop/src-tauri/icons/source/app-icon-light.svg`. Finder, the Dock, ⌘-Tab, alerts (AL), notification banners (NT) and the record prompt (RP-R1) show it. A dark variant (graphite tile) is drawn for review; macOS dark and tinted app icons need an asset catalog, which the bundle does not carry yet (#1164, artwork pending the owner's approval).
+
 ### 2.2 Constraints
 
 Each constraint names its type and source. Legacy integration constraints are not applicable because Noter is a new product: the UI replaces no existing system and reads no legacy data format.
