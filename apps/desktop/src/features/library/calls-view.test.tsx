@@ -211,6 +211,17 @@ describe("CallsView context menu", () => {
     expect(menu.props.tags).toEqual(["release", "hotfix"]);
     expect(menu.props.onRemoveTag).toBe(onRemoveTag);
   });
+
+  // issue 1053: calls still recording have nothing to export yet; the menu's Export… is disabled like the toolbar's
+  it("disables the menu's Export… while only calls still recording are selected", () => {
+    const rows = [{ ...call("a"), status: "recording" as const }, { ...call("b"), status: "paused" as const }, call("c")];
+    const menuFor = (ids: string[]) =>
+      find(rendered(CallsView, props({ state: state({ status: "LISTED", rows, total: 3 }), selected: new Set(ids), menu: { x: 1, y: 2 }, onExport: vi.fn() })), (_p, type) => type === ContextMenu);
+    expect(menuFor(["a", "b"]).props.exportDisabled).toBe(true);
+    expect(menuFor(["a", "c"]).props.exportDisabled).toBe(false);
+    const items = find(rendered(ContextMenu, { onClose: vi.fn(), single: null, onOpen: vi.fn(), onDelete: vi.fn(), onExport: vi.fn(), exportDisabled: true }), (p) => Array.isArray(p.items)).props.items as { label?: string; disabled?: boolean }[];
+    expect(items.find((i) => i.label === "Export…")!.disabled).toBe(true);
+  });
 });
 
 describe("CallsView with filters (cpt-noter-state-ui-library-search-topics-view)", () => {
