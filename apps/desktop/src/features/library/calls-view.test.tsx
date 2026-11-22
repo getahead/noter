@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CallRow } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import type { CallsState } from "./calls-list";
-import { CallsView, ContextMenu, type CallsViewProps } from "./calls-view";
+import { CallsView, callsSubtitle, ContextMenu, type CallsViewProps } from "./calls-view";
 import { NONE } from "./selection";
 
 const call = (id: string, o: Partial<CallRow> = {}) =>
@@ -64,11 +64,11 @@ const html = (o: Partial<CallsViewProps>) =>
   renderToString(<CallsView {...props(o)} />);
 
 describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
-  it("renders LC-R1 with the counts and the table with a month header and the sorted column", () => {
+  it("gives the toolbar (LC-R1) the counts and renders the table with a month header and the sorted column", () => {
     const h = html({});
-    expect(h).toContain('data-region="LC-R1"');
-    expect(h).toContain("2 calls · 2 hours · since Oct 2");
-    expect(h).toContain("October 2026");
+    expect(h).not.toContain('data-region="LC-R1"'); // the counts are the toolbar's subtitle, not a content header (#1077)
+    expect(callsSubtitle(props({}))).toBe("2 calls · 2 hours · since Oct 2");
+    expect(h).toMatch(/>October( 2026)?</);
     expect(h).toContain('aria-sort="descending"');
     expect(h).toContain("Call a");
     expect(h).toContain('data-variant="table-row"');
@@ -87,7 +87,7 @@ describe("CallsView (cpt-noter-dod-ui-library-calls-table)", () => {
 
   it("adds the selection count to the subtitle and marks the rows", () => {
     const h = html({ selection: { ids: ["a", "b"], anchor: "a" } });
-    expect(h).toContain("· 2 selected");
+    expect(callsSubtitle(props({ selection: { ids: ["a", "b"], anchor: "a" } }))).toContain("· 2 selected");
     expect(h).toContain('aria-selected="true"');
   });
 
@@ -218,6 +218,7 @@ describe("CallsView with filters (cpt-noter-state-ui-library-search-topics-view)
     const empty = renderToString(<CallsView {...props({ state: state({ status: "EMPTY", rows: [], total: 0 }), filtered: true })} />);
     expect(empty).toContain("No calls match these filters");
     expect(empty).toContain('data-state="filter-empty"');
-    expect(renderToString(<CallsView {...props({ filtered: true })} />)).toContain("2 calls match");
+    expect(callsSubtitle(props({ filtered: true }))).toBe("2 calls match");
+    expect(callsSubtitle(props({ state: state({ status: "LOADING", rows: [] }) }))).toBeNull();
   });
 });

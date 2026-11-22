@@ -34,11 +34,16 @@ describe("groupByMonth", () => {
     const g = groupByMonth(
       [at(2026, 10, 5), at(2026, 10, 1), at(2026, 9, 30)],
       prefs("UTC"),
+      at(2027, 1, 5).started_at,
     );
     expect(g.map((x) => [x.label, x.rows.length])).toEqual([
       ["October 2026", 2],
       ["September 2026", 1],
     ]);
+  });
+  it("names the current year's months without the year (#1079)", () => {
+    const g = groupByMonth([at(2026, 10, 5), at(2025, 12, 1)], prefs("UTC"), at(2026, 11, 22).started_at);
+    expect(g.map((x) => x.label)).toEqual(["October", "December 2025"]);
   });
 });
 

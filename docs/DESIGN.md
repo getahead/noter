@@ -6577,7 +6577,7 @@ The call list filters by person, date, call type, tag, language and “has open 
 
 ##### Responsibility scope
 
-- Shows **People**, **Type**, **Tags**, **Language** and **Date** pop-up buttons, the **Has Open Items** toggle button and **Clear**, in one row 36 pt high.
+- Shows **People**, **Type**, **Tags**, **Language** and **Date** filter buttons (small glass capsules with a single ˅ that open a menu, as in the prototype), the **Has Open Items** toggle button and **Clear**, in one row 36 pt high directly under the toolbar, with a hairline under it.
 - Shows each set filter's value in its button (**Anna +1**, **release +1**, **Last 7 Days**) in accent text.
 - Keeps filters and search tokens in step: setting a filter adds its token, and removing a token clears its filter.
 - **Clear** removes every filter and its token; typed words stay in the search field.
