@@ -1,6 +1,6 @@
 // PC-R2: the call page's banner slot. After the first recorded call it offers the macOS notifications prompt;
 // the app's banners (MW-R5) come first, one banner at a time, and a call being recorded shows none.
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
@@ -34,11 +34,16 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   });
   const [asked, setAsked] = useState(false);
   const [, redraw] = useState(0);
-  const review = useReviewBanner(bridge, callId);
+  const outputs = useOutputs(callId);
+  // the items the sections list; before any section lists one, the store's count stands
+  const listed = useMemo(() => {
+    const items = outputs?.sections.flatMap((s) => s.items) ?? [];
+    return items.length ? items : undefined;
+  }, [outputs]);
+  const review = useReviewBanner(bridge, callId, listed);
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
   const offer = !!extras?.first_recorded_call && !!call && notAsked && !live && !asked && !closed.has("notify") && appBanners === 0;
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-notifications-banner:p1:inst-core-not-asked
-  const outputs = useOutputs(callId);
   const openRegenerate = useRegenerate(bridge, callId);
   const tab = parseCallKey(route.key)!.tab;
   const list: Banner[] = [];

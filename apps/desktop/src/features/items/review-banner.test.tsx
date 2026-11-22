@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
 import type { Banner } from "../../ui/feedback/inline-banner";
+import type { ItemView } from "../../core/bindings";
 import { find, rendered } from "../../ui/testing";
 import { loadOutputs } from "../call-page/outputs-actions";
 import { holdOutputs, resetOutputsCache } from "../call-page/outputs-cache";
@@ -32,14 +33,26 @@ async function ready() {
   await bridge.open();
 }
 /** The banner the hook returns for `callId` (the hook runs inside a render). */
-function bannerOf(callId: string) {
+function bannerOf(callId: string, listed?: readonly ItemView[]) {
   let out: ReturnType<typeof useReviewBanner> = null;
-  const Grab = () => ((out = useReviewBanner(bridge, callId)), null);
+  const Grab = () => ((out = useReviewBanner(bridge, callId, listed)), null);
   renderToString(<Grab />);
   return out as ReturnType<typeof useReviewBanner>;
 }
 
 describe("review banner (PC-R2)", () => {
+  // #1063: after Regenerate the replaced suggestions are not on the page, so they are not counted
+  it("cpt-noter-seq-call-page-review-outputs — #1063: counts only the suggestions the call's sections show, each in its newer copy", async () => {
+    await ready();
+    const rows = await loadItems(bridge, "call_live");
+    const suggested = rows.filter((r) => r.review === "suggested");
+    expect(bannerOf("call_live")?.text).toBe(`${suggested.length} suggested items to review before sharing`);
+    expect(bannerOf("call_live", [suggested[0]!])?.text).toBe("1 suggested item to review before sharing");
+    expect(bannerOf("call_live", [])).toBeNull();
+    // #1063 retest: the section's newer copy says rejected while the store still holds the older suggested one
+    expect(bannerOf("call_live", [{ ...suggested[0]!, rev: suggested[0]!.rev + 1, review: "rejected" }])).toBeNull();
+  });
+
   it("keeps the writing banner before item review when both are present", async () => {
     await ready();
     await loadItems(bridge, "call_live");

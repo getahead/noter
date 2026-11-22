@@ -3,6 +3,8 @@
 // alert, Cancel by default) and Delete Old Audio… (the sheet opened by the core's `nav:request`). Fake and real core.
 import type { Page } from "@playwright/test";
 
+import * as W from "../support/world-presets";
+import { openWindow } from "./support/app";
 import { openSummary, sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
 import { alerts, alertText, answerAlerts, watchAlerts } from "./support/native-alert";
@@ -57,6 +59,18 @@ test.describe("cpt-noter-seq-call-page-share-outputs", () => {
     expect(await sent(page, "audio_delete")).toEqual([{ call_ids: [call] }]);
     await toolbar(page).getByRole("button", { name: "More" }).click();
     await expect(page.getByRole("menuitem", { name: "Delete Audio Now…" })).toHaveCount(0); // the audio is gone
+  });
+
+  test("UI — #1050: Call info of a call whose audio is not stored says so and offers no Delete Audio Now…", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: (w) => {
+        O.written(w);
+        for (const c of [...w.calls, ...w.call_details.map((d) => d.call)]) if (c.id === W.PAST_CALL) c.audio_kept_until = null;
+      },
+    });
+    await openSummary(page, W.PAST_CALL);
+    await expect(page.getByText("Audio not stored", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Delete Audio Now…" })).toHaveCount(0);
   });
 
   test("UI — other path: Delete Old Audio… — the sheet, Recording goes on, 30 days, Freed … MB across … calls from the result", async ({ page }) => {

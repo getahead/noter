@@ -91,6 +91,14 @@ describe("callInfo (PC-R4)", () => {
   it("says until when the audio is kept", () => {
     expect(callInfo(row(), { audio_not_stored: false }, NOW, PREFS, "x").audio).toBe("Kept until Nov 15");
   });
+  // #1050: no stored audio, nothing to delete (Delete Audio Now… stays hidden)
+  it("offers no audio to delete when none is stored", () => {
+    for (const [c, extra] of [[row({ audio_kept_until: null }), false], [row(), true]] as const) {
+      const i = callInfo(c, { audio_not_stored: extra }, NOW, PREFS, "x");
+      expect(i.audio).toBe("Audio not stored");
+      expect(i.audioKept).toBe(false);
+    }
+  });
   it("says the audio is deleted and the transcript kept", () => {
     const i = callInfo(row({ audio_deleted: true, audio_kept_until: null }), { audio_not_stored: false }, NOW, PREFS, "x");
     expect(i.audio).toBe("Audio deleted on Oct 24 · transcript kept"); // no date from the core: the call's own day
