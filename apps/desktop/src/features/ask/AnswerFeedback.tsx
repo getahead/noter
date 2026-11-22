@@ -2,11 +2,12 @@ import { useRef, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AskAnswer, AskRating } from "../../core/bindings";
 import { t } from "../../i18n/format";
-import { PushButton } from "../../ui/primitives/push-button";
+import { IconButton } from "../../ui/primitives/icon-button";
 
 // @cpt-dod:cpt-noter-dod-ui-ask-citations:p1
-/** Measured answer work and acknowledged, persisted feedback. Keyed by turn and stored rating. */
-export function AnswerFeedback({ bridge, answer }: { bridge: Bridge; answer: AskAnswer }) {
+/** Measured answer work and acknowledged, persisted feedback. Keyed by turn and stored rating. `part` draws the meta line
+ * or the thumbs alone: the thumbs sit on the **Copy with Citations** row, as in the prototype. */
+export function AnswerFeedback({ bridge, answer, part }: { bridge: Bridge; answer: AskAnswer; part?: "meta" | "rate" }) {
   const [rating, setRating] = useState(answer.rating ?? null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -27,15 +28,19 @@ export function AnswerFeedback({ bridge, answer }: { bridge: Bridge; answer: Ask
     }
   };
   const m = answer.meta;
+  const thumbs = !answer.stopped && (
+    <>
+      <IconButton icon="thumbUp" label={t("ask.helpful")} disabled={saving} pressed={rating === "helpful"} onAction={() => void rate("helpful")} />
+      <IconButton icon="thumbDown" label={t("ask.not_helpful")} disabled={saving} pressed={rating === "not_helpful"} onAction={() => void rate("not_helpful")} />
+      {failed && <span role="alert" className="ak-status">{t("ask.rating_failed")}</span>}
+    </>
+  );
+  if (part === "rate") return thumbs || null;
   return <div>
     {m && <div className="ak-status">{t("ask.meta", {
       calls: t("ask.meta_calls", { count: m.call_hits }), items: t("ask.meta_items", { count: m.item_hits }),
       documents: t("ask.meta_documents", { count: m.document_hits }), elapsed: m.elapsed_ms,
     })}</div>}
-    {!answer.stopped && <div className="ak-actions">
-      <PushButton label={t("ask.helpful")} size="small" variant="quiet" disabled={saving} attrs={{ "aria-pressed": String(rating === "helpful") }} onAction={() => void rate("helpful")} />
-      <PushButton label={t("ask.not_helpful")} size="small" variant="quiet" disabled={saving} attrs={{ "aria-pressed": String(rating === "not_helpful") }} onAction={() => void rate("not_helpful")} />
-    </div>}
-    {failed && <div role="alert" className="ak-status">{t("ask.rating_failed")}</div>}
+    {part !== "meta" && thumbs && <div className="ak-actions">{thumbs}</div>}
   </div>;
 }

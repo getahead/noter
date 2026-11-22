@@ -363,12 +363,13 @@ export function Answer({ view, bridge, onAskAgain, onPlay, onRetry, onSearch, on
       {view.runtime && view.mode && <div className="ak-status">{t("mode.runtime", { runtime: runtimeLabel(view.runtime), mode: t(MODE[view.mode]) })}</div>}
       {phase === "streaming" && !view.text && <div className="ak-status">{t(view.runtime ? "ask.reading" : "ask.searching")}</div>}
       {/* @cpt-begin:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
-      {view.text && <CitedAnswer bridge={bridge} text={view.text} citations={view.citations} live={phase === "streaming"} onAskAgain={onAskAgain} onPlay={onPlay} />}
+      {view.text && <CitedAnswer bridge={bridge} text={view.text} citations={view.citations} live={phase === "streaming"} onAskAgain={onAskAgain} onPlay={onPlay} extra={answer && <AnswerFeedback key={`${answer.turn_id}:${answer.rating}`} bridge={bridge} answer={answer} part="rate" />} />}
       {/* @cpt-end:cpt-noter-flow-ui-ask-question:p1:inst-ready */}
       {phase === "stopped" && <div className="ak-status">{t("ask.stopped")}</div>}
       {phase === "interrupted" && <div className="ak-status">{t("ask.interrupted")}</div>}
       {phase === "error" && <ErrorBanner view={view} onRetry={onRetry} onLocal={() => void bridge.act("window:navigate", "window_navigate", () => bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } }))} />}
-      {answer && <AnswerFeedback key={`${answer.turn_id}:${answer.rating}`} bridge={bridge} answer={answer} />}
+      {/* the thumbs are on Copy with Citations' row when there is an answer text; otherwise under the meta line */}
+      {answer && <AnswerFeedback key={`${answer.turn_id}:${answer.rating}:meta`} bridge={bridge} answer={answer} part={view.text ? "meta" : undefined} />}
     </div>
   );
 }

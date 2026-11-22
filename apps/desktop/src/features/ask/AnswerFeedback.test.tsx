@@ -14,7 +14,10 @@ describe("answer feedback (cpt-noter-dod-ui-ask-citations)", () => {
     expect(h).toContain("0 item matches");
     expect(h).toContain("2 document matches");
     expect(h).toContain("123 ms");
-    expect(h).toMatch(/aria-pressed="true"[^>]*><span>Not helpful/);
+    expect(h).toMatch(/aria-label="Not helpful"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*aria-label="Not helpful"/); // a pressed thumb icon button (#1116)
+    expect(h).not.toContain("<span>Not helpful</span>");
+    expect(renderToString(<AnswerFeedback bridge={{} as never} answer={a} part="rate" />)).not.toContain("transcript match"); // the thumbs alone, for the Copy row
+    expect(renderToString(<AnswerFeedback bridge={{} as never} answer={a} part="meta" />)).not.toContain("<button");
     const stopped = renderToString(<AnswerFeedback bridge={{} as never} answer={{ ...answer(), stopped: true }} />);
     expect(stopped).not.toContain("<button");
     expect(stopped).not.toContain("matches");

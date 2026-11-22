@@ -347,3 +347,20 @@ test("cpt-noter-seq-ask-cited-answer — Medium toolbar keeps the search field u
   await search.fill("websocket");
   await expect(search).toHaveValue("websocket");
 });
+
+// Design fixes against the prototype of record (Ask › answered).
+test.describe("cpt-noter-seq-ask-follow-up-and-copy", () => {
+  test("UI — design — #1116 answer feedback is two thumb icon buttons on the Copy with Citations row", async ({ page }) => {
+    await openAsk(page);
+    await ask(page, "What did we decide about the drawer?");
+    const copy = page.getByRole("button", { name: "Copy with Citations" }).first();
+    await expect(copy).toBeVisible({ timeout: 15000 });
+    for (const name of ["Helpful", "Not helpful"]) {
+      const b = page.getByRole("button", { name, exact: true }).first();
+      await expect(b.locator("svg")).toBeVisible();
+      await expect(b).toHaveText(""); // an icon, no text label
+      const [cb, bb] = [(await copy.boundingBox())!, (await b.boundingBox())!];
+      expect(Math.abs(cb.y + cb.height / 2 - (bb.y + bb.height / 2))).toBeLessThan(4); // on the same row
+    }
+  });
+});
