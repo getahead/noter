@@ -63,6 +63,23 @@ test.describe("cpt-noter-seq-library-search-calls", () => {
     await expect(page.locator('[data-state="highlighted"], .np-hl-evidence').first()).toContainText("notification service");
   });
 
+  test("UI — layout: item hits are compact rows 32 pt apart, and every section heading has the gap that Items has above it", async ({ page }) => {
+    await openCalls(page);
+    await search(page, "drawer");
+    await expect(page.getByRole("region", { name: "Transcripts", exact: true })).toBeVisible();
+    const m = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll(".lb-hit--item")].map((e) => e.getBoundingClientRect().top);
+      const gaps = [...document.querySelectorAll("section[aria-label] > h3")].map((h) => {
+        const prev = h.parentElement!.previousElementSibling!;
+        return Math.round(h.getBoundingClientRect().top - prev.getBoundingClientRect().bottom);
+      });
+      return { pitch: rows.slice(1).map((t, i) => Math.round(t - rows[i]!)), gaps };
+    });
+    expect(m.pitch.length).toBeGreaterThan(0);
+    for (const p of m.pitch) expect(p).toBeLessThanOrEqual(33); // the Person page's compact rows (#1198 review)
+    expect(m.gaps.length).toBeGreaterThan(1);
+    for (const g of m.gaps.slice(1)) expect(Math.abs(g - m.gaps[0]!)).toBeLessThanOrEqual(2);
+  });
   test("UI — AC2: a search with no matches says so in the live region, as results are counted there", async ({ page }) => {
     await openCalls(page);
     await search(page, "Lizenzprüfung im Installer");
