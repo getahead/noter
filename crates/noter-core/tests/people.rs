@@ -839,6 +839,36 @@ async fn a_person_page_lists_topics_of_their_calls_once_retrieval_has_made_the_t
     assert_eq!(topics[0].last_seen, TimestampMs(5));
 }
 
+/// `cpt-noter-seq-people-prepare-one-on-one` step 4 (#1109): a topic on the person's page counts
+/// its items the way the Topics list does: rejected items nowhere, only open ones as open.
+#[tokio::test]
+async fn a_person_topic_counts_its_items_the_way_topics_does() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    world(&core);
+    core.store()
+        .insert_batch(vec![
+            item("itm_dec", "call_a", "decision", None),
+            item("itm_carried", "call_a", "action_item", Some("per_dima")),
+            item("itm_rejected", "call_b", "decision", None),
+        ])
+        .unwrap();
+    exec(
+        dir.path(),
+        "INSERT INTO topics VALUES ('top_drawer', 1, 'Drawer redesign', NULL, 1, 5);
+         UPDATE items SET topic_id = 'top_drawer'
+           WHERE id IN ('itm_dima', 'itm_q', 'itm_dec', 'itm_carried', 'itm_rejected');
+         UPDATE items SET review_state = 'rejected' WHERE id IN ('itm_q', 'itm_rejected');
+         UPDATE items SET status = 'carried' WHERE id = 'itm_carried';",
+    )
+    .unwrap();
+    let counts = |t: &TopicRow| (t.calls, t.decisions, t.open_items, t.open_questions);
+    let listed = core.topics_list(&ctx(), NoArgs {}).await.unwrap().topics;
+    let page = get(&core, "per_dima").await.unwrap().topics;
+    assert_eq!(counts(&page[0]), counts(&listed[0]));
+    assert_eq!(counts(&page[0]), (1, 1, 2, 0));
+}
+
 #[tokio::test]
 async fn a_rename_reaches_the_speakers_of_a_call_without_rewriting_text() {
     let dir = tempfile::tempdir().unwrap();
