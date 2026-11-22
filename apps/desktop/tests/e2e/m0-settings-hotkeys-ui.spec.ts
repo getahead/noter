@@ -179,6 +179,16 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await expect(table.getByRole("row", { name: /Near/ }).getByRole("spinbutton", { name: "Near" })).toHaveValue(/^\d+$/);
     await expect(table.getByRole("row", { name: /Over/ })).toContainText("% of budget");
   });
+  test("UI — design — #1120 the Models list is in Audio & Transcription only; Models & Runtimes starts with API keys", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    const nav = page.getByRole("navigation", { name: "Settings panes" });
+    const groups = page.locator('[data-region="ST-R2"] .st-group__h');
+    await nav.getByText("Models & Runtimes", { exact: true }).click();
+    await expect(groups.first()).toHaveText("API keys");
+    await expect(groups.filter({ hasText: /^Models$/ })).toHaveCount(0);
+    await nav.getByText("Audio & Transcription", { exact: true }).click();
+    await expect(groups.filter({ hasText: /^Models$/ })).toHaveCount(1);
+  });
   test("UI — design — #1121 Privacy's In force is a plain secondary line with the mode indicator, not a tag", async ({ page }) => {
     await openWindow(page, "settings", {});
     await page.getByRole("navigation", { name: "Settings panes" }).getByText("Privacy", { exact: true }).click();
