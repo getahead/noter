@@ -27,25 +27,35 @@ export function accentTokens(rgb: RGB, appearance: Appearance, base: Tokens): To
 
 /** Each WebView observes its own media queries; env:changed replaces the native RGB on every window. */
 // @cpt-flow:cpt-noter-flow-ui-tokens-theming-follow-appearance:p1
-export function installNativeAccent(rgb: RGB, root = document.documentElement): () => void {
+export function installNativeAccent(rgb: RGB, root = document.documentElement, report?: (error: Error) => void): () => void {
   const dark = matchMedia("(prefers-color-scheme: dark)");
   const more = matchMedia("(prefers-contrast: more)");
   const media = [dark, more, matchMedia("(prefers-reduced-transparency: reduce)")];
   let keys: string[] = [];
+  const clear = () => {
+    root.removeAttribute("data-native-accent");
+    for (const key of keys) root.style.removeProperty(key);
+    keys = [];
+  };
   const update = () => {
-    const style = getComputedStyle(root);
-    const base = Object.fromEntries(["--content-bg", "--card-bg", "--win-bg", "--side-bg"].map((key) => [key, style.getPropertyValue(key).trim()]));
-    const appearance: Appearance = dark.matches ? more.matches ? "DARK_CONTRAST" : "DARK" : more.matches ? "LIGHT_CONTRAST" : "LIGHT";
-    const tokens = accentTokens(rgb, appearance, base);
-    keys = Object.keys(tokens);
-    for (const [key, value] of Object.entries(tokens)) root.style.setProperty(key, value);
+    try {
+      const style = getComputedStyle(root);
+      const base = Object.fromEntries(["--content-bg", "--card-bg", "--win-bg", "--side-bg"].map((key) => [key, style.getPropertyValue(key).trim()]));
+      const appearance: Appearance = dark.matches ? more.matches ? "DARK_CONTRAST" : "DARK" : more.matches ? "LIGHT_CONTRAST" : "LIGHT";
+      const tokens = accentTokens(rgb, appearance, base);
+      keys = Object.keys(tokens);
+      for (const [key, value] of Object.entries(tokens)) root.style.setProperty(key, value);
+    } catch (error) {
+      // a failed accent keeps the default theme; it must not take the window down (#1036)
+      clear();
+      report?.(error instanceof Error ? error : new Error(String(error)));
+    }
   };
   root.setAttribute("data-native-accent", "");
   update();
   for (const query of media) query.addEventListener("change", update);
   return () => {
     for (const query of media) query.removeEventListener("change", update);
-    root.removeAttribute("data-native-accent");
-    for (const key of keys) root.style.removeProperty(key);
+    clear();
   };
 }
