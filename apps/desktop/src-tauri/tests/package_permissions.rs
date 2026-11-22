@@ -17,10 +17,12 @@ fn plist_value(path: &Path, key: &str) -> String {
 
 // @cpt-dod:cpt-noter-dod-core-first-run-permissions:p1
 #[test]
-fn host_bundle_declares_microphone_and_calendar_access() {
+fn host_bundle_declares_microphone_system_audio_and_calendar_access() {
     let host = Path::new(env!("CARGO_MANIFEST_DIR"));
     for key in [
         "NSMicrophoneUsageDescription",
+        // macOS asks for System Audio Recording on behalf of the app that spawns the engine (#1140).
+        "NSAudioCaptureUsageDescription",
         "NSCalendarsFullAccessUsageDescription",
     ] {
         assert!(
