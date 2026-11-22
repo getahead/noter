@@ -10,7 +10,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { LevelMeter } from "../../ui/primitives/level-meter";
 import { PushButton } from "../../ui/primitives/push-button";
 import { SearchField } from "../../ui/primitives/search-field";
-import { holdFollow, LogScroller, newLines, onScroll, viewState, type Follow, type RowList } from "./follow";
+import { atEnd, holdFollow, LogScroller, newLines, onScroll, viewState, type Follow, type RowList } from "./follow";
 import { findMatches, lineKey, meterLevel, tabStop, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
 import { SegmentRow } from "./segment-row";
@@ -95,7 +95,8 @@ export function TranscriptView(p: TranscriptViewProps) {
     // @cpt-begin:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-return-replay
     setFollow({ following: true, base: confirmed });
     // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-return-replay
-    el()?.scrollTo({ top: el()!.scrollHeight, behavior: smooth() });
+    log.current.arrived();
+    if (el()) log.current.toEnd(el()!, smooth());
   };
   // @cpt-end:cpt-noter-flow-ui-live-transcript-replay-line:p1:inst-jump
   const moveMatch = (by: number) => setFind((f) => f && { ...f, at: f.at + by });
@@ -165,6 +166,7 @@ export function TranscriptView(p: TranscriptViewProps) {
     const at = { scrollTop: area.scrollTop, clientHeight: area.clientHeight, scrollHeight: area.scrollHeight };
     const previousTop = log.current.prevTop;
     log.current.prevTop = at.scrollTop;
+    if (atEnd(at, 0) || at.scrollTop < previousTop) log.current.arrived(); // there, or the user took over
     const estimate = log.current.est;
     // Native notifications can share a render; compose from the latest queued follow state.
     setFollow((current) => onScroll(current, at, previousTop, estimate, confirmed));
