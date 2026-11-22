@@ -99,7 +99,7 @@ export function MainToolbar(p: ToolbarProps) {
       {(shown.length > 0 || overflow.length > 0) && (
         <div className="np-toolbar__actions">
           {shown.map((a) => (
-            <PushButton key={a.label} label={a.label} variant={a.primary ? "primary" : "secondary"} onAction={a.onAction} />
+            <PushButton key={a.label} label={a.label} icon={a.icon} variant={a.primary ? "primary" : "secondary"} onAction={a.onAction} />
           ))}
           {overflow.length > 0 && (
             <>

@@ -243,3 +243,29 @@ test.describe("cpt-noter-seq-dialogs-set-up-voice-profile", () => {
     await expect(button(page, "Set Up Voice Profile…")).toBeVisible();
   });
 });
+
+// Design fixes against the prototype of record (People list and Person page, State ▾ Normal).
+test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
+  test("UI — design — #1087 #1088 the monogram is neutral grey, and the search field comes before +", async ({ page }) => {
+    await openPeople(page);
+    const ini = page.locator('[data-region="MW-R3"] .np-person__ini').first();
+    await expect(ini).toHaveCSS("color", "rgba(0, 0, 0, 0.5)"); // secondary label
+    await expect(ini).not.toHaveCSS("background-color", "rgb(0, 122, 255)"); // not the accent fill (systemBlue)
+    const bar = page.locator('[data-region="PL-R1"]');
+    const field = (await bar.getByRole("searchbox", { name: "Search people" }).boundingBox())!;
+    const plus = (await bar.getByRole("button", { name: /Add Person|New person|Add/ }).boundingBox())!;
+    expect(field.x).toBeLessThan(plus.x);
+  });
+  test("UI — design — #1086 #1090 group and section headers are 13-pt semibold with the count at 400 in the tertiary colour", async ({ page }) => {
+    await openPerson(page, /Anna/);
+    const h = page.locator('[data-region="MW-R3"] h2.np-section-h').first();
+    await expect(h).toHaveCSS("font-size", "13px");
+    await expect(h).toHaveCSS("font-weight", "600");
+    const count = h.locator(".np-dim");
+    if (await count.count()) await expect(count).toHaveCSS("font-weight", "400");
+  });
+  test("UI — design — #1094 the Person page toolbar has the main window's search field", async ({ page }) => {
+    await openPerson(page, /Anna/);
+    await expect(page.locator('[data-region="PE-R1"]').getByRole("searchbox")).toBeVisible();
+  });
+});

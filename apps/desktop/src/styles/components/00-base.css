@@ -13,6 +13,9 @@ h1, h2, h3, h4, p { margin: 0; }
 .np-ic { flex: none; display: inline-block; vertical-align: -2px; }
 .np-muted { color: var(--label-2); }
 .np-dim { color: var(--label-3); }
+/* a section header (prototype .np-section-h): 13-pt semibold, its count in the tertiary colour at regular weight */
+.np-section-h { font: 600 13px/18px var(--font); display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }
+.np-section-h .np-dim { font-weight: 400; }
 .np-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-radius: 4px; }
 
