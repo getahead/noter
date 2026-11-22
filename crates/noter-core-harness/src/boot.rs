@@ -901,12 +901,21 @@ impl Harness {
         }
         // A live call whose hypotheses the world empties waits for speech again: the engine fed
         // the fixture's hypotheses since boot (detection runs it once the self-test passed).
-        for t in parsed
-            .transcripts
-            .iter()
-            .filter(|t| t.hypotheses.is_empty())
-        {
-            noter_core::testing::clear_hypotheses(&self.core, &t.call_id);
+        // Only a change clears: a world that kept no hypotheses leaves pushed ones alone.
+        let had_hypotheses = |call: &str| {
+            accepted["transcripts"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .any(|t| {
+                    t["call_id"] == call
+                        && t["hypotheses"].as_array().is_some_and(|h| !h.is_empty())
+                })
+        };
+        for t in parsed.transcripts.iter() {
+            if t.hypotheses.is_empty() && had_hypotheses(t.call_id.as_str()) {
+                noter_core::testing::clear_hypotheses(&self.core, &t.call_id);
+            }
         }
         if current["app"]["setup"]["self_test"] != wanted["app"]["setup"]["self_test"] {
             noter_core::testing::seed_self_test(&self.core, parsed.app.setup.self_test.clone());
