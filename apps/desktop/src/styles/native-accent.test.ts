@@ -44,6 +44,19 @@ describe("native accent (cpt-noter-flow-ui-tokens-theming-follow-appearance)", (
     }
   });
 
+  // #1036: a failed accent keeps the default theme instead of throwing out of the window's effect
+  it("keeps the default theme and reports the error when the accent cannot be applied", () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    vi.stubGlobal("getComputedStyle", () => { throw new Error("no computed style"); });
+    const root = { setAttribute: vi.fn(), removeAttribute: vi.fn(), style: { setProperty: vi.fn(), removeProperty: vi.fn() } } as unknown as HTMLElement;
+    const report = vi.fn();
+    const stop = installNativeAccent([0, 122, 255], root, report);
+    expect(report).toHaveBeenCalledWith(expect.objectContaining({ message: "no computed style" }));
+    expect(root.style.setProperty).not.toHaveBeenCalled();
+    expect(root.removeAttribute).toHaveBeenCalledWith("data-native-accent");
+    expect(() => stop()).not.toThrow();
+  });
+
   it("updates on appearance changes, replaces an accent and cleans up listeners and overrides", () => {
     let dark = false;
     const listeners = new Map<string, () => void>();

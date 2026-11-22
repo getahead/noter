@@ -137,6 +137,8 @@ for (const s of states) {
     await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
     await s.ready(page);
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    // the pointer stays where the last click was (Continue in Browser sits over the row's Cancel): park it, or a hover pill flips the shot (#962)
+    await page.mouse.move(0, 0);
     await settled(page);
     await expect(s.target(page)).toHaveScreenshot(`accounts-own-${s.id}-light.png`);
   });

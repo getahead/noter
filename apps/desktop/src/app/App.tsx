@@ -17,7 +17,8 @@ export function App({ bridge }: { bridge: Bridge }) {
   const status = useWindow(bridge, (s) => s.status);
   const error = useWindow(bridge, (s) => s.error);
   const accent = useWindow(bridge, (s) => s.whole.environment?.native?.accent_rgb);
-  useEffect(() => accent ? installNativeAccent(accent) : undefined, [accent]);
+  // a failed accent keeps the default theme; its error goes to the log, not out of the effect
+  useEffect(() => accent ? installNativeAccent(accent, document.documentElement, (e) => void bridge.core.logUi({ level: "error", screen: bridge.label, code: null, message: e.message })) : undefined, [accent, bridge]);
   return (
     <div data-region="window" data-window={bridge.label} data-state={status.toLowerCase()} aria-busy={status === "LOADING"}>
       <LiveRegions />

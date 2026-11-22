@@ -16,6 +16,13 @@ function audioGranted(w: Parameters<typeof W.firstRun>[0]): void {
 }
 
 test.describe("cpt-noter-seq-first-run-complete-setup", () => {
+  // #1062: the fixture world says the audio self-test passed, so the seeded core must say so too (Settings › General
+  // then offers to record when a call starts instead of asking for a self-test)
+  test("cpt-noter-seq-first-run-complete-setup — the fixture's passed self-test is the core's from the start", async ({ scenario }) => {
+    const status = ok(await scenario.core("settings").setupStatus({}));
+    expect(status.self_test.type).toBe("passed");
+  });
+
   test("happy path: allow both permissions, Run Test, Self-test passed with a live line, Call display next", async ({ scenario }) => {
     await given(scenario, (w) => W.firstRun(w));
     const fr = scenario.core("first-run");

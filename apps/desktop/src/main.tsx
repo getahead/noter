@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import "./styles/tokens";
 
 import { App } from "./app/App";
+import { WindowBoundary } from "./app/WindowBoundary";
 import { BridgeProvider } from "./app/bridge/context";
 import { DialogsProvider } from "./ui/dialogs/host";
 import { createBridge } from "./app/bridge/bridge";
@@ -57,7 +58,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BridgeProvider value={bridge}>
       <DialogsProvider>
-        <App bridge={bridge} />
+        <WindowBoundary bridge={bridge}>
+          <App bridge={bridge} />
+        </WindowBoundary>
       </DialogsProvider>
     </BridgeProvider>
   </StrictMode>,

@@ -98,6 +98,9 @@ impl Harness {
                 .await?;
         }
         self.write_setup(&wanted["app"]["setup"]).await?;
+        // The self-test result lives in the core, not in settings: without this a fixture that
+        // says `passed` boots `not_run` (#1062).
+        noter_core::testing::seed_self_test(&self.core, w.app.setup.self_test.clone());
         self.seed_people(&wanted)?;
         self.seed_calls(&wanted)?;
         self.native.set_calendar(&w.today);

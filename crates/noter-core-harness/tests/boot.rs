@@ -121,6 +121,20 @@ async fn topics_slice_and_centroids_drive_real_core_library_states() {
     r.finish().await;
 }
 
+/// The fixture says the self-test passed, so detection runs an engine from boot; a test that needs
+/// no engine running turns detection off (self-test `not_run`), stops the live call and kills the engine.
+async fn without_detection(r: &mut Runner) {
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    world["app"]["setup"]["self_test"] = json!({ "type": "not_run" });
+    world["app"]["setup"]["detection_enabled"] = json!(false);
+    // the fixture records a live call, which also keeps an engine running
+    world["app"]["capture"]["phase"] = json!("idle");
+    world["app"]["capture"]["call_id"] = json!(null);
+    r.ok("main", "harness.world_set", json!({ "world": world }))
+        .await;
+    r.ok("main", "harness.engine_kill", json!({})).await;
+}
+
 async fn start() -> Runner {
     start_with(Options {
         fixture: true,
@@ -1141,6 +1155,7 @@ async fn system_audio_permission_probes_never_interrupt_a_live_capture() {
 #[tokio::test]
 async fn engine_fact_reaches_a_running_engine_and_kill_is_accepted() {
     let mut r = start().await;
+    without_detection(&mut r).await;
     let fact =
         json!({ "event": { "type": "levels", "call_id": null, "mic_db": -30.0, "sys_db": -30.0 } });
     // No command has started the engine yet.
@@ -1325,7 +1340,9 @@ async fn world_set_sets_the_degraded_set() {
         })
         .cloned()
         .collect();
-    assert!(!own.is_empty(), "the fixture's setup is incomplete");
+    // With the self-test not run, the core computes setup incomplete itself (the fixture's passed).
+    world["app"]["setup"]["self_test"] = json!({ "type": "not_run" });
+    world["app"]["setup"]["detection_enabled"] = json!(false);
     world["app"]["degraded"]["states"] = json!([{ "type": "disk_low", "free_mb": 1024 }]);
     let (set, events) = r
         .call("main", "harness.world_set", json!({ "world": world }))
@@ -1338,7 +1355,10 @@ async fn world_set_sets_the_degraded_set() {
     let states = r.ok("main", "app_snapshot", json!({})).await["degraded"]["states"].clone();
     let mut expected = vec![json!({ "type": "disk_low", "free_mb": 1024 })];
     expected.extend(own);
-    assert_eq!(states, json!(expected));
+    expected.push(json!({ "type": "setup_incomplete" }));
+    let states = states.as_array().unwrap();
+    assert_eq!(states.len(), expected.len(), "{states:?}");
+    assert!(expected.iter().all(|e| states.contains(e)), "{states:?}");
     r.finish().await;
 }
 
@@ -2297,10 +2317,20 @@ async fn push_refuses_streams_and_events_nothing_scripted_plays() {
 
 #[tokio::test]
 async fn a_push_with_no_engine_running_is_refused() {
-    let mut r = start().await;
-    // Nothing subscribed to a stream yet, so no engine runs to take the line.
-    let world = r.ok("main", "harness.world_get", json!({})).await;
-    let segment = world["transcripts"][0]["segments"][0].clone();
+    // A fixture line, pushed to a core booted without the fixture: no call records and the
+    // self-test hasn't run, so no engine runs to take the line.
+    let segment = {
+        let mut f = start().await;
+        let world = f.ok("main", "harness.world_get", json!({})).await;
+        f.finish().await;
+        world["transcripts"][0]["segments"][0].clone()
+    };
+    let mut r = start_with(Options {
+        fixture: false,
+        fixed_clock: true,
+        ..Options::default()
+    })
+    .await;
     let code = r
         .code(
             "main",
