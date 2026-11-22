@@ -393,7 +393,7 @@ export const en = {
   "settings.privacy.mode_cloud_note": "Text goes as is",
   "settings.privacy.mode_local": "Local only",
   "settings.privacy.mode_local_note": "Every task runs on the local runtime",
-  "settings.privacy.in_force": "In force: {mode}",
+  "settings.privacy.in_force_prefix": "In force:",
   "settings.privacy.retention": "Audio retention",
   "settings.privacy.retention_7": "7 days",
   "settings.privacy.retention_30": "30 days",

@@ -171,4 +171,12 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await page.getByRole("navigation", { name: "Settings panes" }).getByText("Hotkeys", { exact: true }).click();
     await expect(bar).toHaveText("Hotkeys");
   });
+  test("UI — design — #1121 Privacy's In force is a plain secondary line with the mode indicator, not a tag", async ({ page }) => {
+    await openWindow(page, "settings", {});
+    await page.getByRole("navigation", { name: "Settings panes" }).getByText("Privacy", { exact: true }).click();
+    const line = page.locator(".st-modenow");
+    await expect(line).toContainText(/^In force:/);
+    await expect(line.locator(".np-badge")).toHaveCount(0);
+    await expect(line.locator('[data-component="cpt-noter-component-ui-mode-indicator"][data-variant="settings"]')).toBeVisible();
+  });
 });
