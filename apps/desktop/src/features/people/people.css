@@ -28,7 +28,9 @@
 /* Compact action rows are one flex line of fixed-size parts; in the narrower column they wrap instead of spilling into the next column. */
 .pe-block .it-row__line { flex-wrap: wrap; row-gap: 2px; }
 /* Last calls: When and Call only; the full table is the Calls view */
-.pe-calls--compact :is(th, td):nth-child(n + 3) { display: none; }
+/* PE-R6: five compact call rows (when, title, type, length, chevron), no header or participants line, as in the prototype */
+.pe-calls--compact thead { display: none; }
+.pe-calls--compact :is(th, td):nth-child(5), .pe-calls--compact :is(th, td):nth-child(6), .pe-calls--compact .lb-crow__l2 { display: none; }
 .pe-ctx { position: fixed; z-index: 40; }
 /* Add Person: padded, and opaque so the table behind never shows through */
 .pe-add { padding: 12px; }

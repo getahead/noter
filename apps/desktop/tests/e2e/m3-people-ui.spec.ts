@@ -269,3 +269,17 @@ test.describe("cpt-noter-seq-people-name-unnamed-speaker", () => {
     await expect(page.locator('[data-region="PE-R1"]').getByRole("searchbox")).toBeVisible();
   });
 });
+
+// Design fixes against the prototype of record (Person › Overview).
+test.describe("cpt-noter-seq-people-prepare-one-on-one", () => {
+  test("UI — design — #1090 topic chips carry their call count; Last calls are compact rows with no header and a Show All button", async ({ page }) => {
+    await openPerson(page, /Anna/);
+    const chip = page.locator('[data-region="PE-R4"] [data-primitive="topic-chip"]').first();
+    await expect(chip).toContainText(/· \d+ calls?$/);
+    const last = page.locator('[data-region="PE-R6"]');
+    await expect(last.locator("thead")).toBeHidden();
+    await expect(last.locator(".lb-crow__l2").first()).toBeHidden(); // no participants line in the compact row
+    await expect(last.locator("tbody tr").first().locator("td").nth(2)).toBeVisible(); // the type column
+    await expect(last.getByRole("button", { name: "Show All" })).toHaveClass(/np-btn/);
+  });
+});
