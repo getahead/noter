@@ -1,7 +1,8 @@
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { effects, refs, stateWrites } = vi.hoisted(() => ({
+const { effects, refs, stateWrites, fold } = vi.hoisted(() => ({
+  fold: { forced: undefined as number | undefined },
   effects: [] as (() => void)[],
   refs: [] as { current: unknown }[],
   stateWrites: [] as unknown[],
@@ -27,6 +28,11 @@ vi.mock("react", async (importOriginal) => {
   };
 });
 
+vi.mock("./header-fold", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./header-fold")>();
+  return { ...actual, useHeaderFold: (...a: Parameters<typeof actual.useHeaderFold>) => fold.forced ?? actual.useHeaderFold(...a) };
+});
+
 import { App } from "../../app/App";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import type { CallWindowState, CaptureState, CommandName, DegradedState, EventName, Transport } from "../../core/bindings";
@@ -47,6 +53,7 @@ afterEach(async () => {
   bridge = null;
   sent.length = 0;
   effects.length = 0;
+  fold.forced = undefined;
   refs.length = 0;
   stateWrites.length = 0;
   vi.unstubAllGlobals();
@@ -283,6 +290,17 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(args("window_set_collapsed")).toEqual([{ collapsed: true }, { collapsed: true }]);
     expect(args("window_hide_call")).toEqual([{}]);
     expect(args("window_share_warning_seen")).toEqual([{}]);
+  });
+
+  it("moves Move to Display 2, Collapse and the shield into More when the floating title can't keep 8 em (#1186)", async () => {
+    fold.forced = 3;
+    await open({}, { layout: "floating" });
+    expect(() => icon("Collapse Panel")).toThrow();
+    expect(() => icon("Move to Display 2")).toThrow();
+    expect(more()("Open Call Screen on Display 2")).toBeDefined();
+    more()("Collapse Panel").onSelect!();
+    await settle();
+    expect(args("window_set_collapsed")).toEqual([{ collapsed: true }]);
   });
 
   it("answers the call-ended notice, holds it, and shows the countdown", async () => {
