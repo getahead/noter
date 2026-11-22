@@ -151,6 +151,8 @@
 /* Microphone: the level meter beside the pop-up */
 .st-mic { display: inline-flex; align-items: center; gap: 10px; flex-wrap: nowrap; max-width: 100%; }
 /* a long input name ("System Default (MacBook Pro Microphone)") tail-truncates; the menu and the help tag keep it whole */
-.st-mic .np-popup { max-width: 200px; min-width: 0; flex: 0 1 auto; }
-.st-mic .np-popup select { max-width: 100%; text-overflow: ellipsis; }
+.st-mic__popup { position: relative; display: inline-flex; max-width: 200px; min-width: 0; flex: 0 1 auto; }
+.st-mic__popup .np-popup { max-width: 100%; min-width: 0; }
+.st-mic__popup .np-popup select { max-width: 100%; color: transparent; }
+.st-mic__value { position: absolute; left: 10px; right: 26px; top: 50%; transform: translateY(-50%); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; pointer-events: none; color: var(--label); }
 .st-mic .np-meter { flex: none; }

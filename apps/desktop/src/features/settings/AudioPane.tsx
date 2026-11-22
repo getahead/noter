@@ -66,7 +66,13 @@ export function MicrophoneRow({ bridge, value, error, onChange }: { bridge: Brid
   return (
     <Row label={t("settings.audio.microphone")} error={error}>
       <span className="st-mic">
-        <PopupButton options={options} value={value ?? ""} label={t("settings.audio.microphone")} onAction={(v) => onChange(v || null)} />
+        {/* WebKit's select ignores text-overflow: the shown value is drawn over it so a long name ends in an ellipsis */}
+        <span className="st-mic__popup">
+          <PopupButton options={options} value={value ?? ""} label={t("settings.audio.microphone")} onAction={(v) => onChange(v || null)} />
+          <span className="st-mic__value" aria-hidden="true">
+            {options.find((o) => o.value === (value ?? ""))?.label ?? options[0]!.label}
+          </span>
+        </span>
         <LevelMeter level={dbToLevel(micDb ?? null)} label={t("settings.audio.mic_level")} />
       </span>
     </Row>
