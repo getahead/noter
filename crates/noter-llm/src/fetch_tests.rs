@@ -4,6 +4,7 @@
 
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpListener;
+use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 
@@ -11,8 +12,7 @@ use crate::{allowed_download_url, FetchError, RangeFetcher};
 
 /// Serves until the test ends. Routes: /file (honours Range), /norange (ignores Range),
 /// /redirect-ok (to /file), /redirect-off (to another host), /missing (404), /done (416),
-/// /early (206 from the start, not the asked byte), /late (206 three bytes past it),
-/// /stall (sends part of the body, then nothing while keeping the connection open).
+/// /early (206 from the start, not the asked byte), /late (206 three bytes past it).
 fn server(body: &'static [u8]) -> u16 {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
@@ -49,14 +49,6 @@ fn server(body: &'static [u8]) -> u16 {
                     body.len()
                 )
             };
-            if path == "/stall" {
-                let head = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len());
-                let _ = out.write_all(head.as_bytes());
-                let _ = out.write_all(&body[..5]);
-                let _ = out.flush();
-                thread::sleep(Duration::from_secs(5));
-                continue;
-            }
             let reply = match path.as_str() {
                 "/file" if from > 0 => response("206 Partial Content", &range(from), &body[from..]),
                 "/early" => response("206 Partial Content", &range(0), body),
@@ -234,10 +226,38 @@ async fn a_206_from_an_earlier_byte_is_skipped_to_the_asked_one_and_a_later_one_
     assert!(got.is_empty());
 }
 
-#[tokio::test]
+/// Answers one request with the head and the first 5 body bytes, says so on the channel, then
+/// sends nothing more while it keeps the connection open.
+fn stalling_server(body: &'static [u8]) -> (u16, mpsc::Receiver<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (sent, wrote) = mpsc::channel();
+    thread::spawn(move || {
+        let (mut out, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(out.try_clone().unwrap());
+        let mut line = String::new();
+        while reader.read_line(&mut line).unwrap() > 0 && line != "\r\n" {
+            line.clear();
+        }
+        let mut reply =
+            format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n", body.len()).into_bytes();
+        reply.extend_from_slice(&body[..5]);
+        out.write_all(&reply).unwrap();
+        sent.send(()).unwrap();
+        let _ = reader.read_to_end(&mut Vec::new());
+    });
+    (port, wrote)
+}
+
+// cpt-noter-seq-first-run-download-models (#1183): the stall is measured on the paused clock, which moves
+// only while the runtime idles. Waiting for the server on the blocking pool keeps it from idling
+// until the first bytes are on the socket, so a slow server thread can never look like a stall.
+#[tokio::test(start_paused = true)]
 async fn a_transfer_that_stalls_mid_body_ends_offline() {
-    let port = server(BODY);
-    let (r, got) = get_with_stall(port, "/stall", 0, Duration::from_millis(500)).await;
+    let (port, wrote) = stalling_server(BODY);
+    let written = tokio::task::spawn_blocking(move || wrote.recv().unwrap());
+    let (r, got) = get_with_stall(port, "/", 0, Duration::from_millis(500)).await;
+    written.await.unwrap();
     assert_eq!((r, got), (Err(FetchError::Offline), BODY[..5].to_vec()));
 }
 
