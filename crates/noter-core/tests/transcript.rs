@@ -224,6 +224,23 @@ async fn a_hypothesis_is_streamed_and_never_stored() {
     assert_eq!(after_snapshot.lock().unwrap()[0].seq, Seq(3));
 }
 
+// Test support for the harness's world_set (#1062): dropping the hypotheses leaves the call waiting for speech.
+#[tokio::test(start_paused = true)]
+async fn cleared_hypotheses_leave_the_call_waiting_for_speech() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open(dir.path());
+    new_call(&r.core, "recording");
+    let _ = subscribe(&r).await;
+    engine_up(&r).await;
+    assert!(r
+        .engine
+        .inject(hypothesis(AudioChannel::Sys, "spk_0", 0, "hello")));
+    settle(500).await;
+    assert_eq!(subscribe(&r).await.0.hypotheses.len(), 1);
+    testing::clear_hypotheses(&r.core, &CallId::new("call_live"));
+    assert!(subscribe(&r).await.0.hypotheses.is_empty());
+}
+
 #[tokio::test(start_paused = true)]
 // cpt-noter-flow-core-speakers-audio-name; cpt-noter-algo-core-live-transcript-speakers
 async fn naming_a_live_speaker_updates_later_hypotheses_and_confirmed_lines() {

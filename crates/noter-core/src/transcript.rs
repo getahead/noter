@@ -85,6 +85,13 @@ impl Transcript {
             .get(call_id)
             .is_some_and(|live| !live.unpublished.is_empty())
     }
+
+    /// Test support: the call's current hypotheses are dropped, as if nobody had spoken yet.
+    pub(crate) fn clear_hypotheses(&self, call_id: &CallId) {
+        if let Some(live) = lock(&self.state).calls.get_mut(call_id) {
+            live.hypotheses.clear();
+        }
+    }
 }
 
 #[derive(Default)]

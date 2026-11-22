@@ -174,6 +174,7 @@ test.describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
     await given(scenario, W.idle, (w) => {
       W.permission(w, "microphone", "not_asked");
       W.permission(w, "system_audio", "not_asked");
+      w.app.setup.self_test = { type: "not_run" }; // no self-test can have passed before audio access was asked for
       w.app.setup.detection_enabled = false;
     });
     const main = scenario.core("main");

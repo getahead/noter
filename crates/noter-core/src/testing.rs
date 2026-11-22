@@ -80,6 +80,11 @@ pub fn transcript_has_unpublished(core: &Core, call_id: &noter_protocol::CallId)
     core.transcript.has_unpublished(call_id)
 }
 
+/// The call's current hypotheses are dropped (a fixture world whose live call has none yet).
+pub fn clear_hypotheses(core: &Core, call_id: &noter_protocol::CallId) {
+    core.transcript.clear_hypotheses(call_id);
+}
+
 /// One pass of the scheduler's loop now, as its minute tick would (scheduled triggers).
 pub fn jobs_tick(core: &Core) {
     core.jobs.tick();
