@@ -166,7 +166,8 @@
     o = o || {};
     const variant = o.variant || 'setup';
     const st = row.status || 'not-asked';
-    const word = { granted: 'Granted', missing: 'not allowed yet', 'not-asked': 'Not allowed yet', denied: 'not allowed', checking: 'Checking…' }[st];
+    /* system audio: macOS can't report the permission before the first capture, so it reads Not verified yet until the self-test finds out (#1115) */
+    const word = st === 'missing' && row.id === 'sys' ? 'Not verified yet' : { granted: 'Granted', missing: 'not allowed yet', refused: 'not allowed yet', 'not-asked': 'Not allowed yet', denied: 'not allowed', checking: 'Checking…' }[st];
     const ic = st === 'granted' ? icon('checkCircle', { size: 15 }) : st === 'checking' ? P.progress({ variant: 'spinner', label: 'Checking' }) : st === 'not-asked' ? icon('info', { size: 15 }) : icon('warning', { size: 15 });
     let action = '';
     if (variant !== 'status' || st !== 'granted') {
@@ -220,7 +221,7 @@
       </ul>${P.disclosure('Details', !!L.details, { variant: 'row', action: ['fr.stDetails', { key }] })}${L.details ? html`<div class="fr-st__details np-tnum">Lag between streams 38 ms · alignment ±12 ms · clip heard after 420 ms</div>` : ''}` : ''}
       <div class="fr-st__actions">
         <div class="fr-st__clip">${P.button('Play Test Clip', { icon: 'play', action: ['fr.stClip', { key }], disabled: st === 'permission-missing' || st === 'waiting' })}<span class="fr-st__hint">Or play any sound in another app<br>Say a few words while the clip plays.</span></div>
-        ${P.button('Run Test', { variant: variant === 'step' ? 'secondary' : 'primary', action: ['fr.stRun', { key }], loading: st === 'running', disabled: st === 'waiting' || st === 'permission-missing' })}
+        ${P.button('Run Test', { variant: variant === 'step' ? 'secondary' : 'primary', action: ['fr.stRun', { key }], loading: st === 'running', disabled: st === 'waiting' || (st === 'permission-missing' && !o.retry) })}
       </div>`);
   };
 

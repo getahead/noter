@@ -352,3 +352,25 @@ test.describe("cpt-noter-seq-first-run-download-models", () => {
     await expect(selfTest(page).getByRole("status")).toContainText("Self-test passed", { timeout: 15_000 }); // runs by itself once the model is in
   });
 });
+
+// #1115 (coordinator decision): macOS can't report System Audio Recording before the first capture, so the row says
+// "Not verified yet" until the self-test hears zero buffers; then the prototype's warning and "not allowed yet" return.
+test.describe("cpt-noter-seq-first-run-complete-setup", () => {
+  test("UI — error path: System audio not allowed — Not verified yet before the test, the not-allowed warning after silent zero buffers", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: (w) => (W.firstRun(w), W.permission(w, "microphone", "granted")) });
+    const sys = permissionRow(page, "System audio recording");
+    await expect(sys).toContainText("Not verified yet");
+    await expect(selfTest(page)).not.toContainText("System audio recording is not allowed yet.");
+    // start while system audio is still unverified (startSelfTest would allow it first)
+    await steer.holdNextSelfTest();
+    await button(page, "Run Test").click();
+    await expect.poll(async () => (await sent(page, "self_test_run")).length).toBe(1);
+    await steer.push("self_test_run", { event: { type: "failed", reason: { type: "zero_buffers" } } });
+    await steer.push("self_test_run", { event: { type: "ended", reason: "call_stopped" } });
+    await expect(selfTest(page)).toContainText("System audio recording is not allowed yet.");
+    await expect(selfTest(page).getByRole("button", { name: "Open System Settings…" })).toBeVisible();
+    await expect(sys).toContainText("not allowed yet");
+    await expect(sys).not.toContainText("Not verified yet");
+    await expect(button(page, "Run Test")).toBeEnabled(); // still retryable after allowing it
+  });
+});

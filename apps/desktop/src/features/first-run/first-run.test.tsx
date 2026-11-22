@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../app/App";
 import { find, rendered } from "../../ui/testing";
-import { Assistants, FirstRun } from "./first-run";
+import { Assistants, FirstRun, Permissions } from "./first-run";
 import { createWizard } from "./wizard";
 import { createBridge, type Bridge } from "../../app/bridge/bridge";
 import { FakeCore } from "../../core/fake/fake-core";
@@ -99,6 +99,24 @@ describe("first-run window (cpt-noter-component-screen-first-run)", () => {
     const html = await screen((w) => (W.firstRun(w, { modelsReady: false }), at("models")(w), w.app.setup.models.bundles.forEach((b, i) => (b.state = i === 0 ? "ready" : "paused"))));
     expect(html).toContain(">Resume<");
     expect(html).toContain(">Ready<");
+  });
+
+  it("the Permissions step wires the self-test to the wizard and tells it whether system audio is allowed (#1115)", async () => {
+    const fake = new FakeCore({ window: "first-run" });
+    fake.setWorld((w: World) => (W.firstRun(w, { modelsReady: true }), W.permission(w, "microphone", "granted"), W.permission(w, "system_audio", "not_asked")));
+    bridge = createBridge("first-run", fake);
+    await bridge.open();
+    const seen: string[] = [];
+    const invoke = fake.invoke.bind(fake);
+    fake.invoke = ((cmd: string, ...rest: unknown[]) => (seen.push(cmd), (invoke as (...a: unknown[]) => unknown)(cmd, ...rest))) as typeof fake.invoke;
+    const wizard = createWizard(bridge, () => {});
+    const tree = rendered(Permissions, { bridge, wizard, w: wizard.store.getState() });
+    const panel = find(tree, (p) => typeof p.onRun === "function" && "sysAllowed" in p).props as Record<string, unknown>;
+    expect(panel.sysAllowed).toBe(false); // not_asked: the permission is unverified
+    (panel.onOpenSettings as () => void)();
+    (panel.onRun as () => void)();
+    (panel.onPlayClip as () => void)();
+    await vi.waitFor(() => expect(seen).toContain("open_external"));
   });
 
   it("shows the permission rows by state", async () => {

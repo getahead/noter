@@ -20,6 +20,9 @@ export interface SelfTestPanelProps {
   onPlayClip?: () => void;
   onRun?: () => void;
   onOpenSettings?: () => void;
+  /** System Audio Recording is known to be allowed. Before that, a test that hears only zero buffers means macOS is
+   * withholding system audio: the panel names it as not allowed (#1115). */
+  sysAllowed?: boolean;
 }
 
 /** The sentences of the live transcript line, each a content block with a lang: Cyrillic is Russian, the rest "und" (the core sends no language). */
@@ -45,7 +48,10 @@ const OWN_ICON: Record<OwnSounds, IconName> = { pending: "ring", excluded: "chec
 // @cpt-dod:cpt-noter-dod-ui-first-run-components:p1
 // @cpt-component:cpt-noter-component-ui-self-test-panel:p1
 /** self-test-panel: the You and Others meters, the live transcript line, what is wrong or still to wait for, the result lines and the two ways to run it. */
-export function SelfTestPanel({ panel, variant = "step", waitingPercent = 0, playClip, onPlayClip, onRun, onOpenSettings }: SelfTestPanelProps) {
+/** Zero buffers from a permission not yet known to be allowed: macOS is withholding system audio (#1115). */
+export const sysRefused = (panel: Panel, sysAllowed: boolean): boolean => !sysAllowed && panel.state === "FAILED" && panel.failure === "self_test.sys_unverified";
+
+export function SelfTestPanel({ panel, variant = "step", waitingPercent = 0, playClip, onPlayClip, onRun, onOpenSettings, sysAllowed = true }: SelfTestPanelProps) {
   const { state } = panel;
   const running = state === "RUNNING";
   const passed = state === "PASSED";
@@ -108,14 +114,22 @@ export function SelfTestPanel({ panel, variant = "step", waitingPercent = 0, pla
           <span>{playClip && !(panel.arrived.mic && panel.arrived.sys) ? <Msg id="self_test.listening" /> : <Msg id="self_test.checking_own" />}</span>
         </div>
       )}
-      {state === "FAILED" && panel.failure && (
+      {state === "FAILED" && panel.failure && (sysRefused(panel, sysAllowed) ? (
+        <div className="fr-st__fail">
+          <Icon name="warning" size={14} />
+          <span>
+            <Msg id={SYSTEM_AUDIO_MISSING} />
+          </span>
+          <PushButton label={t("permission.open_settings")} size="small" onAction={onOpenSettings} />
+        </div>
+      ) : (
         <div className="fr-st__fail">
           <Icon name="warning" size={14} />
           <span>
             <Msg id={panel.failure} />
           </span>
         </div>
-      )}
+      ))}
       {state === "PERMISSION_MISSING" && (
         <div className="fr-st__fail">
           <Icon name="warning" size={14} />

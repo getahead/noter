@@ -23,6 +23,8 @@ export interface PermissionCheckRowProps {
   hearing?: { level: number };
   onAllow?: () => void;
   onOpenSettings?: () => void;
+  /** The self-test found system audio withheld: the row says not allowed yet instead of Not verified yet (#1115). */
+  detected?: boolean;
 }
 
 const WORD: Record<PermissionRowState, MsgKey> = {
@@ -37,7 +39,7 @@ const WORD: Record<PermissionRowState, MsgKey> = {
 // @cpt-dod:cpt-noter-dod-ui-first-run-components:p1
 // @cpt-component:cpt-noter-component-ui-permission-check-row:p1
 /** permission-check-row: one macOS permission with its state word, the reason, the how-to and the one button that moves it on. */
-export function PermissionCheckRow({ id, label, allowLabel, state, variant = "setup", why, howto, hearing, onAllow, onOpenSettings }: PermissionCheckRowProps) {
+export function PermissionCheckRow({ id, label, allowLabel, state, variant = "setup", why, howto, hearing, onAllow, onOpenSettings, detected = false }: PermissionCheckRowProps) {
   const icon =
     state === "GRANTED" ? <Icon name="checkCircle" size={15} /> : state === "CHECKING" ? <Progress variant="spinner" label={t("permission.checking_label")} /> : state === "NOT_ASKED" ? <Icon name="info" size={15} /> : <Icon name="warning" size={15} />;
   let action: React.ReactNode = null;
@@ -58,7 +60,8 @@ export function PermissionCheckRow({ id, label, allowLabel, state, variant = "se
       <div className="fr-perm__main">
         <div className="fr-perm__head">
           <span className="fr-perm__name">{label}</span>
-          <span className="fr-perm__word"> · <Msg id={state === "MISSING" && id === "sys" ? "permission.unverified" : WORD[state]} /></span>
+          <span className="fr-perm__word"> · {/* macOS gives no way to read this permission before a capture: Not verified yet until the self-test finds out */}
+          <Msg id={state === "MISSING" && id === "sys" && !detected ? "permission.unverified" : WORD[state]} /></span>
         </div>
         {variant !== "status" && why && <div className="fr-perm__why">{why}</div>}
         {variant !== "status" && howto && state !== "GRANTED" && <div className="fr-perm__how">{howto}</div>}

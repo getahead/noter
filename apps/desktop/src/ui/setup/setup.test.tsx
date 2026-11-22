@@ -7,7 +7,7 @@ import { applySelfTestEvent, initialSelfTestPanel, runSelfTest, type SelfTestPan
 import { find, rendered } from "../testing";
 import { DisplayPicker, layoutDisplays } from "./display-picker";
 import { PermissionCheckRow } from "./permission-check-row";
-import { lineParts, SelfTestPanel } from "./self-test-panel";
+import { lineParts, SelfTestPanel, sysRefused } from "./self-test-panel";
 import { stepLabel, WizardStepper, type StepperEntry } from "./wizard-stepper";
 
 /** Call a handler of an element of a rendered tree, as the browser would. */
@@ -212,5 +212,24 @@ describe("display-picker (cpt-noter-component-ui-display-picker)", () => {
     fire(find(tree, (p) => p["aria-label"] === "Studio Display"), "onClick");
     fire(find(tree, (p) => typeof p.onAction === "function" && Array.isArray(p.options)), "onAction", "builtin");
     expect(pick.mock.calls).toEqual([["studio"], ["builtin"]]);
+  });
+});
+
+describe("system audio before and after the self-test (#1115)", () => {
+  const zeroBuffers = (): Panel => applySelfTestEvent(runSelfTest(initialSelfTestPanel("IDLE", false), true), { type: "failed", reason: { type: "zero_buffers" } });
+  it("names zero buffers as not allowed while the permission is unverified, and keeps the silence hint once it is allowed", () => {
+    const p = zeroBuffers();
+    expect(sysRefused(p, false)).toBe(true);
+    expect(sysRefused(p, true)).toBe(false);
+    const unverified = renderToString(<SelfTestPanel panel={p} sysAllowed={false} onOpenSettings={() => {}} />);
+    expect(unverified).toContain("System audio recording is not allowed yet.");
+    expect(unverified).toContain("Open System Settings…");
+    expect(renderToString(<SelfTestPanel panel={p} sysAllowed />)).toContain("No system audio was heard.");
+  });
+  it("the system-audio row says Not verified yet until the test detects a refusal", () => {
+    expect(renderToString(<PermissionCheckRow id="sys" label="System audio recording" state="MISSING" />)).toContain("Not verified yet");
+    const detected = renderToString(<PermissionCheckRow id="sys" label="System audio recording" state="MISSING" detected />);
+    expect(detected).toContain("not allowed yet");
+    expect(detected).not.toContain("Not verified yet");
   });
 });
