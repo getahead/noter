@@ -374,8 +374,8 @@ async fn run_probe(
 
 // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
 /// Who the CLI is signed in as: `Some(None)` for an explicit sign-out, `None` when unknown.
-/// `claude auth status` prints JSON and exits 1 when signed out; `codex login status` prints one
-/// line on stderr (exit 1 when signed out) and no email, which the id token in its home carries.
+/// `claude auth status` prints JSON and exits 1 when signed out; Codex answers through its
+/// app-server, or `codex login status` (one line on stderr, exit 1 when signed out) without one.
 async fn auth_state(
     tool: CliTool,
     program: &Path,
@@ -458,9 +458,9 @@ async fn codex_account(program: &Path, codex_home: &Path) -> Option<Option<Accou
 /// The page (and Codex's one-time code) a login printed so far; `None` until complete. Claude
 /// prints the page as an OSC 8 link, Codex both in ANSI colour.
 fn login_page(provider: AccountProvider, text: &str) -> Option<(String, Option<String>)> {
-    let url = regex::Regex::new(r"https://[^\s\x07\x1b]+[\s\x07\x1b]").ok()?;
-    let url = url.find(text)?.as_str();
-    let url = url[..url.len() - 1].to_owned();
+    // The page is complete once a terminator follows it (a read may end mid-URL).
+    let url = regex::Regex::new(r"(https://[^\s\x07\x1b]+)[\s\x07\x1b]").ok()?;
+    let url = url.captures(text)?.get(1)?.as_str().to_owned();
     if provider == AccountProvider::Claude {
         return Some((url, None));
     }
@@ -805,6 +805,21 @@ mod account_tests {
         let started = Instant::now();
         assert!(cli.probe().is_none());
         assert!(started.elapsed() < PROBE_TIMEOUT + Duration::from_secs(2));
+    }
+
+    #[test]
+    fn a_login_page_needs_its_terminator_and_survives_a_multibyte_one() {
+        assert_eq!(
+            login_page(AccountProvider::Claude, "visit: https://claude.com/a?b=c"),
+            None
+        );
+        assert_eq!(
+            login_page(
+                AccountProvider::Claude,
+                "visit: https://claude.com/a?b=c\u{a0}next"
+            ),
+            Some(("https://claude.com/a?b=c".into(), None))
+        );
     }
 
     #[tokio::test]
