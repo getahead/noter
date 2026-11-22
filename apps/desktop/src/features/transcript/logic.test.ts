@@ -152,6 +152,27 @@ describe("LogScroller (the view's scroll bookkeeping)", () => {
     expect(el.scrollTo).toHaveBeenLastCalledWith({ top: 3000, behavior: "smooth" });
   });
 
+  it("asks for a smooth scroll to the end once while it runs, again once it arrived or the end moved (#1154)", () => {
+    // WebKit stalls a smooth scroll that is asked again for the same end while it runs: ⌘J then never reached live.
+    const log = new LogScroller(30);
+    log.prevTop = 0;
+    const el = area(0);
+    log.toEnd(el, "smooth"); // Jump to Live
+    log.afterRender(el, list(0), keys, true, "smooth"); // the render it causes, and the timer's renders after it
+    log.afterRender(el, list(0), keys, true, "smooth");
+    expect(el.scrollTo).toHaveBeenCalledTimes(1);
+    el.scrollHeight = 3040; // a new line: the end moved
+    log.afterRender(el, list(0), keys, true, "smooth");
+    expect(el.scrollTo).toHaveBeenLastCalledWith({ top: 3040, behavior: "smooth" });
+    expect(el.scrollTo).toHaveBeenCalledTimes(2);
+    log.arrived(); // the scroll reached the end or the user took over: the next ask goes through
+    log.toEnd(el, "smooth");
+    expect(el.scrollTo).toHaveBeenCalledTimes(3);
+    log.toEnd(el, "instant"); // a jump is never skipped
+    log.toEnd(el, "instant");
+    expect(el.scrollTo).toHaveBeenCalledTimes(5);
+  });
+
   it("detached, scrolls by how much the rows above the view grew, so the rows in view stay put", () => {
     const log = new LogScroller(30);
     const el = area(600);

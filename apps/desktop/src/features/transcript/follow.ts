@@ -137,6 +137,8 @@ export const OVERSCAN = 8;
 export class LogScroller {
   readonly heights = new Map<string, number>();
   prevTop = -1;
+  /** Where a smooth scroll to the end is heading (its scrollHeight), or -1. */
+  heading = -1;
   focusKey: string | null = null;
   constructor(readonly est: number) {}
 
@@ -160,7 +162,7 @@ export class LogScroller {
     // A render may precede the wheel's scroll event: preserve its upward pixel for the handler.
     const pendingUp = el.scrollTop < this.prevTop && !atEnd(el, 0);
     if (follow && !pendingUp) {
-      el.scrollTo({ top: el.scrollHeight, behavior: m.changed || this.prevTop < 0 ? "instant" : behavior });
+      this.toEnd(el, m.changed || this.prevTop < 0 ? "instant" : behavior);
       this.prevTop = el.scrollTop;
     }
     // @cpt-end:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-keep-end
@@ -174,6 +176,22 @@ export class LogScroller {
       if (row) this.focusKey = null;
     }
     return m.changed;
+  }
+
+  /**
+   * Scroll to the end. A smooth scroll already on its way to this end is not asked for again: WebKit stalls one that
+   * is asked again while it runs, and the view, following again, stayed where it was (#1154).
+   */
+  toEnd(el: ScrollArea, behavior: ScrollBehavior): void {
+    const top = el.scrollHeight;
+    if (behavior === "smooth" && this.heading === top) return;
+    this.heading = behavior === "smooth" ? top : -1;
+    el.scrollTo({ top, behavior });
+  }
+
+  /** The scroll reached the end, or the user moved it: the next smooth scroll to the end is asked for. */
+  arrived(): void {
+    this.heading = -1;
   }
 
   /** Scroll a row to a third of the way down the view (evidence, the current find match). */
