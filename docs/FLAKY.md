@@ -10,6 +10,8 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 
 | Issue | Check | Seen | Fix | State |
 | --- | --- | ---: | --- | --- |
+| [#1160](https://github.com/getahead/noter/issues/1160) | Call window close button: the call page never loads (`CallWindowTests`, native). Its web process hung before the first page committed, and the watch's reload after the restart had no page to reload | retried on 1 run; both new stall tests 3 / 3 on the unfixed code | [#1178](https://github.com/getahead/noter/pull/1178) | closed |
+| [#1123](https://github.com/getahead/noter/issues/1123) | Record prompt hotkey: no record prompt (`RecordPromptTests`, native), the same blank panel as #1160 | retried on 1 run | [#1178](https://github.com/getahead/noter/pull/1178) | closed |
 | [#869](https://github.com/getahead/noter/issues/869) | Settings search clear-by-Escape: first Escape after typing is not applied (`WindowSizeTests`, native) | 4 / 4 | [#875](https://github.com/getahead/noter/pull/875) | closed |
 | [#882](https://github.com/getahead/noter/issues/882) | Core harness boot Q7 engine-kill drill: restart inside 1 ms recorded a zero-length gap, which the core drops | 7 / 150 under 12-process local load | [#883](https://github.com/getahead/noter/pull/883) | closed |
 | [#890](https://github.com/getahead/noter/issues/890) | Core models `refresh_models_rereads_the_models_folder`: refresh ran while the finishing download task still counted as running, so it was ignored | 1 / 1 CI run (#889), 0 / 300 locally under 24-process load | [#891](https://github.com/getahead/noter/pull/891) | closed |

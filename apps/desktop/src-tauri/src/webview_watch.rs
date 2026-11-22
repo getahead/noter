@@ -178,16 +178,23 @@ fn recover_terminated<R: Runtime>(app: &AppHandle<R>, watch: &Watch, label: &str
     });
 }
 
-/// Ends the webview's content process and reloads its page in a new one.
+/// Ends the webview's content process and loads its page again in a new one. A first load whose
+/// process hung before the page committed leaves WebKit nothing to reload once the web view is
+/// reset: the panel stayed blank in a fresh process (#1123, #1160). So the page's address is read
+/// before the process ends, and loaded again.
 fn restart<R: Runtime>(app: &AppHandle<R>, label: &str) {
     let Some(webview) = app.get_webview_window(label) else {
         return;
     };
     eprintln!("noter: the {label} page did not load in {BOUND:?}; its web process is restarted");
+    let url = webview.url().ok();
     let reload = webview.clone();
     let _ = webview.with_webview(move |platform| {
         end_content_process(platform.inner());
-        let _ = reload.reload();
+        let _ = match url {
+            Some(url) => reload.navigate(url),
+            None => reload.reload(),
+        };
     });
 }
 
