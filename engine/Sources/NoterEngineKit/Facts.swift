@@ -32,8 +32,9 @@ public struct Detector: Sendable {
     private var detected: Set<String> = []
     private var session: (callId: String, seen: Set<String>)?
     private var excluded: Set<String> = []
-    /// A known app plays audio: zeros on the system channel then likely mean no permission.
-    public private(set) var meetingAppPlaying = false
+    /// An app other than an excluded one plays audio: zeros on the system channel then likely mean
+    /// no permission. Any app, not only a meeting app: speech from `say` or a video counts (#1142).
+    public private(set) var outputPlaying = false
 
     public init() {}
 
@@ -66,7 +67,7 @@ public struct Detector: Sendable {
         var events: [EngineEvent] = []
         let byApp = Dictionary(grouping: processes) { owner($0.bundleId) }
         func main(_ id: String) -> ProcessAudio? { byApp[id].flatMap { ps in ps.first { $0.bundleId == id } ?? ps.first } }
-        meetingAppPlaying = known.contains { byApp[$0]?.contains(where: \.output) == true }
+        outputPlaying = byApp.contains { id, ps in !Exclusion.matches(id, excluded) && ps.contains(where: \.output) }
         if enabled {
             for id in known {
                 let ps = byApp[id] ?? []
@@ -98,7 +99,7 @@ public struct Detector: Sendable {
 // @cpt-algo:cpt-noter-algo-core-engine-capture-zero-detect:p1
 // @cpt-dod:cpt-noter-dod-core-engine-capture-facts:p1
 /// A run of exact digital zeros on the system channel. A real quiet room is never exact zero;
-/// zeros while a meeting app plays mean the System Audio Recording permission is likely off.
+/// zeros while an app plays mean the System Audio Recording permission is likely off.
 public struct ZeroRun: Sendable {
     /// How long the zeros last before each report, and how sure it is then.
     static let steps: [(ms: Int, confidence: Float)] = [(5_000, 0.6), (15_000, 0.8), (30_000, 0.95)]
@@ -108,7 +109,7 @@ public struct ZeroRun: Sendable {
     public init() {}
 
     /// One system-channel chunk at `atMs` of call time; the fact to report, if any.
-    public mutating func feed(zeros: Bool, atMs: Int, meetingApp: Bool) -> (sinceMs: Int, confidence: Float)? {
+    public mutating func feed(zeros: Bool, atMs: Int, playing: Bool) -> (sinceMs: Int, confidence: Float)? {
         // @cpt-begin:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-count-zeros
         guard zeros else {
             (since, reported) = (nil, 0)
@@ -118,7 +119,7 @@ public struct ZeroRun: Sendable {
         since = start
         // @cpt-end:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-count-zeros
         // @cpt-begin:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-emit-silent
-        guard meetingApp, reported < Self.steps.count, atMs - start >= Self.steps[reported].ms else { return nil }
+        guard playing, reported < Self.steps.count, atMs - start >= Self.steps[reported].ms else { return nil }
         reported += 1
         return (start, Self.steps[reported - 1].confidence)
         // @cpt-end:cpt-noter-algo-core-engine-capture-zero-detect:p1:inst-emit-silent

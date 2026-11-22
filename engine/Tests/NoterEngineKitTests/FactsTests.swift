@@ -60,36 +60,44 @@ final class DetectorTests: XCTestCase {
         XCTAssertEqual(d.update([app("com.apple.Safari", output: true)]), [])
     }
 
-    func testAKnownAppPlayingCountsAsAMeetingAppForSilenceDetection() {
+    // cpt-noter-seq-call-screen-recover-capture — #1142: any app playing counts, not only a known meeting app
+    func testAnyAppPlayingCountsForSilenceDetection() {
         var d = Detector()
         d.rule(enabled: false, known: [zoom])
         _ = d.update([app(zoom, input: true)])
-        XCTAssertFalse(d.meetingAppPlaying)
+        XCTAssertFalse(d.outputPlaying)
         _ = d.update([app("\(zoom).helper", output: true)])
-        XCTAssertTrue(d.meetingAppPlaying)
+        XCTAssertTrue(d.outputPlaying)
+        // issue 1142: speech from `say` is not a meeting app, but zeros while it plays still mean no permission
+        _ = d.update([app("com.apple.speech.speechsynthesisd", output: true)])
+        XCTAssertTrue(d.outputPlaying)
+        d.startSession(callId: "call_1", current: [], excluded: ["com.apple.speech.speechsynthesisd"])
+        _ = d.update([app("com.apple.speech.speechsynthesisd", output: true)])
+        XCTAssertFalse(d.outputPlaying, "an app the user excluded is not heard on purpose")
     }
 }
 
 final class ZeroRunTests: XCTestCase {
-    func testExactZerosWhileTheMeetingAppPlaysRaiseAGrowingConfidence() {
+    // cpt-noter-seq-call-screen-recover-capture — #1142: any app playing counts, not only a known meeting app
+    func testExactZerosWhileSomethingPlaysRaiseAGrowingConfidence() {
         var z = ZeroRun()
-        XCTAssertNil(z.feed(zeros: true, atMs: 1_000, meetingApp: true))
-        XCTAssertNil(z.feed(zeros: true, atMs: 5_900, meetingApp: true))
-        XCTAssertEqual(z.feed(zeros: true, atMs: 6_000, meetingApp: true)?.sinceMs, 1_000)
-        XCTAssertNil(z.feed(zeros: true, atMs: 6_100, meetingApp: true), "once per step")
-        XCTAssertEqual(z.feed(zeros: true, atMs: 16_000, meetingApp: true)?.confidence, 0.8)
-        XCTAssertEqual(z.feed(zeros: true, atMs: 31_000, meetingApp: true)?.confidence, 0.95)
-        XCTAssertNil(z.feed(zeros: true, atMs: 90_000, meetingApp: true))
+        XCTAssertNil(z.feed(zeros: true, atMs: 1_000, playing: true))
+        XCTAssertNil(z.feed(zeros: true, atMs: 5_900, playing: true))
+        XCTAssertEqual(z.feed(zeros: true, atMs: 6_000, playing: true)?.sinceMs, 1_000)
+        XCTAssertNil(z.feed(zeros: true, atMs: 6_100, playing: true), "once per step")
+        XCTAssertEqual(z.feed(zeros: true, atMs: 16_000, playing: true)?.confidence, 0.8)
+        XCTAssertEqual(z.feed(zeros: true, atMs: 31_000, playing: true)?.confidence, 0.95)
+        XCTAssertNil(z.feed(zeros: true, atMs: 90_000, playing: true))
     }
 
-    func testSoundOrNoMeetingAppEndsOrHoldsTheRun() {
+    func testSoundOrNothingPlayingEndsOrHoldsTheRun() {
         var z = ZeroRun()
-        _ = z.feed(zeros: true, atMs: 0, meetingApp: false)
-        XCTAssertNil(z.feed(zeros: true, atMs: 10_000, meetingApp: false), "a silent room without a call app is not a permission problem")
-        XCTAssertEqual(z.feed(zeros: true, atMs: 10_100, meetingApp: true)?.sinceMs, 0)
-        XCTAssertNil(z.feed(zeros: false, atMs: 10_200, meetingApp: true))
-        XCTAssertNil(z.feed(zeros: true, atMs: 10_300, meetingApp: true))
-        XCTAssertEqual(z.feed(zeros: true, atMs: 15_300, meetingApp: true)?.confidence, 0.6, "a new run starts over")
+        _ = z.feed(zeros: true, atMs: 0, playing: false)
+        XCTAssertNil(z.feed(zeros: true, atMs: 10_000, playing: false), "a silent Mac with nothing playing is not a permission problem")
+        XCTAssertEqual(z.feed(zeros: true, atMs: 10_100, playing: true)?.sinceMs, 0)
+        XCTAssertNil(z.feed(zeros: false, atMs: 10_200, playing: true))
+        XCTAssertNil(z.feed(zeros: true, atMs: 10_300, playing: true))
+        XCTAssertEqual(z.feed(zeros: true, atMs: 15_300, playing: true)?.confidence, 0.6, "a new run starts over")
     }
 }
 

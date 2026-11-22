@@ -90,11 +90,11 @@ public final class EngineLoop: @unchecked Sendable {
     }
 
     // @cpt-begin:cpt-noter-flow-core-engine-capture-detect:p1:inst-listen
-    /// One look at the processes: the facts it brings out, and the meeting app for the zero check.
+    /// One look at the processes: the facts it brings out, and whether anything plays, for the zero check.
     func poll() {
         let snapshot = processes()
-        let (events, capture, meetingApp) = facts.withLock { (detector.update(snapshot), capturing, detector.meetingAppPlaying) }
-        capture?.meetingApp(meetingApp)
+        let (events, capture, playing) = facts.withLock { (detector.update(snapshot), capturing, detector.outputPlaying) }
+        capture?.outputPlaying(playing)
         events.forEach(writer.emit)
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-listen

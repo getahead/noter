@@ -269,6 +269,15 @@ impl Core {
                 state: degraded,
                 since_ms,
             } if ours(&call_id) => {
+                // Microphone off names an access problem (DESIGN: "when microphone access is off").
+                // With access granted, mic zeros are a silent device that System Settings can't fix
+                // (issue 1172: a VM's virtual mic on the first call after the grant).
+                if degraded == Degraded::MicrophoneOff
+                    && self.deps.native.permission(PermissionKind::Microphone)
+                        == PermissionState::Granted
+                {
+                    return;
+                }
                 // @cpt-begin:cpt-noter-algo-core-capture-session-degraded:p1:inst-publish-engine-states
                 let since = TimestampMs(session.at(i64::from(since_ms.0)));
                 let failed = degraded == Degraded::CaptureFailed;

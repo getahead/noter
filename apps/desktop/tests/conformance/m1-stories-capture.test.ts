@@ -183,6 +183,10 @@ describe("cpt-noter-seq-call-screen-recover-capture", () => {
     await fact({ type: "levels", call_id: callId, mic_db: -30, sys_db: -30 }); // allowed again
     await until(async () => !types(await degraded()).includes("system_audio_silent"), "silent cleared");
 
+    // Microphone off names an access problem: it shows only while macOS reports the access not granted (#1172)
+    const world = (await wire().invoke("main", "harness.world_get", {})) as unknown as { app: { setup: { permissions: { kind: string; state: unknown }[] } } };
+    world.app.setup.permissions.find((p) => p.kind === "microphone")!.state = "denied";
+    await wire().invoke("main", "harness.world_set", { world });
     await fact({ type: "levels", call_id: callId, mic_db: -120, sys_db: -30 });
     await until(async () => types(await degraded()).includes("microphone_off"), "microphone_off");
     await fact({ type: "levels", call_id: callId, mic_db: -30, sys_db: -30 });

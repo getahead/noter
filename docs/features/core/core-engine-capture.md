@@ -223,7 +223,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Steps**:
 1. [x] - `p1` - Count consecutive buffers made of exact digital zeros (a real quiet room is never exact zero) - `inst-count-zeros`
-2. [x] - `p1` - **IF** zeros persist past the threshold while the meeting app is detected, emit the fact with a confidence that grows with the duration - `inst-emit-silent`
+2. [x] - `p1` - **IF** zeros persist past 5, 15 and 30 s while any app the user did not exclude plays audio (a meeting app, a video, speech from `say`; owner decision, #1142), emit the fact with a confidence that grows with the duration - `inst-emit-silent`
 3. [x] - `p1` - **RETURN** - `inst-return-zero`
 
 ### Translate engine facts into degraded states
