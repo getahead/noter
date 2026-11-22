@@ -359,6 +359,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "people, aliases, participants and voice profiles",
         sql: include_str!("../migrations/0010_people.sql"),
     },
+    Migration {
+        owner: "noter-core",
+        version: 11,
+        name: "the recorded length of a stopped call",
+        sql: include_str!("../migrations/0011_recorded_length.sql"),
+    },
 ];
 
 impl Core {

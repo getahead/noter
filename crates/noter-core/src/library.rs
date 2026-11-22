@@ -70,11 +70,13 @@ struct Stored {
     audio_not_stored: bool,
     mode_used: String,
     audio_deleted_at: Option<i64>,
+    /// What a stopped call recorded, pauses excluded (written at Stop).
+    recorded_ms: Option<i64>,
 }
 
 const STORED: &str = "c.id, c.rev, c.started_at, c.ended_at, c.title, c.call_type, c.platform, \
     c.privacy_class, c.status, c.outputs_status, c.archive_status, c.audio_retention_until, \
-    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at";
+    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at, c.recorded_ms";
 
 fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
     Ok(Stored {
@@ -94,6 +96,7 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
         audio_not_stored: r.get(13)?,
         mode_used: r.get(14)?,
         audio_deleted_at: r.get(15)?,
+        recorded_ms: r.get(16)?,
     })
 }
 
@@ -350,9 +353,12 @@ fn assemble_with_details(
         title: s.title,
         call_type: CallTypeId(s.call_type),
         started_at: TimestampMs(s.started_at),
-        // A call still recording lasts until the clock's now.
+        // What it recorded once stopped; a call still recording lasts until the clock's now (and
+        // `live_length` gives it its recorded time); older calls, end minus start.
         duration_ms: DurationMs(
-            (s.ended_at.unwrap_or(now) - s.started_at).clamp(0, u32::MAX.into()) as u32,
+            s.recorded_ms
+                .unwrap_or(s.ended_at.unwrap_or(now) - s.started_at)
+                .clamp(0, u32::MAX.into()) as u32,
         ),
         platform: s.platform,
         participants: details.participants,
@@ -410,7 +416,10 @@ fn order_of(sort: CallSort) -> (&'static str, bool) {
     match sort {
         CallSort::Newest => ("c.started_at", true),
         CallSort::Oldest => ("c.started_at", false),
-        CallSort::Longest => ("(COALESCE(c.ended_at, ?1) - c.started_at)", true),
+        CallSort::Longest => (
+            "COALESCE(c.recorded_ms, COALESCE(c.ended_at, ?1) - c.started_at)",
+            true,
+        ),
         CallSort::Title => ("c.title COLLATE NOCASE", false),
     }
 }
@@ -554,7 +563,7 @@ impl Core {
             let mut stmt = c.prepare(&sql)?;
             let mut rows = stmt
                 .query_map(params_from_iter(page.params.iter()), |r| {
-                    Ok((stored(r)?, r.get::<_, Sql>(16)?))
+                    Ok((stored(r)?, r.get::<_, Sql>(17)?))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-select

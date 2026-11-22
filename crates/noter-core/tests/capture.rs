@@ -3881,7 +3881,7 @@ async fn a_snapshot_read_mid_recording_carries_the_time_recorded_so_far() {
     assert_eq!(snapshot.capture.recorded_ms, DurationMs(74_000));
 }
 
-// #1077 / #1081: a call still recording lasts as long as it has recorded (pauses excluded), as its
+// cpt-noter-seq-menu-bar-control-recording — #1149 (#1077, #1081): a call still recording lasts as long as it has recorded (pauses excluded), as its
 // clocks say, not the wall-clock time since it started.
 #[tokio::test(start_paused = true)]
 async fn a_live_call_lasts_its_recorded_time_not_the_wall_clock() {
@@ -3908,4 +3908,39 @@ async fn a_live_call_lasts_its_recorded_time_not_the_wall_clock() {
         .await
         .unwrap();
     assert_eq!(got.call.duration_ms, DurationMs(60_000));
+}
+
+// cpt-noter-seq-menu-bar-control-recording — #1081 (after Stop): a stopped call keeps the length it recorded (pauses excluded), not the
+// wall-clock time from its start to its end.
+#[tokio::test(start_paused = true)]
+async fn a_stopped_call_keeps_its_recorded_length() {
+    let r = rig();
+    let call_id = r.recording().await;
+    r.advance(60_000);
+    let pause = |paused| CapturePauseArgs {
+        call_id: call_id.clone(),
+        paused,
+    };
+    r.core
+        .capture_set_paused(&main_window(), pause(true))
+        .await
+        .unwrap();
+    r.advance(600_000); // ten minutes paused
+    r.core
+        .capture_set_paused(&main_window(), pause(false))
+        .await
+        .unwrap();
+    r.advance(30_000);
+    r.stop(&main_window(), &call_id).await;
+    let got = r
+        .core
+        .call_get(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(got.call.duration_ms, DurationMs(90_000));
 }
