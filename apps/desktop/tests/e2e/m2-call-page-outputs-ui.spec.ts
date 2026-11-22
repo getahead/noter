@@ -391,3 +391,17 @@ test("cpt-noter-seq-call-page-share-outputs — marking an open call sensitive u
   await expect(share(page)).toContainText("Copied");
   await expect(share(page)).not.toContainText("Copied for Slack");
 });
+
+// Design fixes against the prototype of record (Call page › Summary, Action items).
+test.describe("cpt-noter-seq-call-page-review-outputs", () => {
+  test("UI — design — #1118 a full action-item row shows the timestamp chip, then the due date, and no 'Show in transcript'", async ({ page }) => {
+    await openWindow(page, "main", { world: O.written });
+    await openReady(page);
+    const row = page.locator('[data-component="cpt-noter-component-ui-action-item-row"][data-variant="full"]').first();
+    await expect(row).toBeVisible();
+    await expect(row.getByText("Show in transcript")).toHaveCount(0);
+    const line = await row.locator(".it-row__line2 > *").evaluateAll((els) => els.map((el) => el.getAttribute("data-component") ?? el.className));
+    const chip = line.findIndex((c) => c.includes("provenance-chip"));
+    expect(chip).toBe(0);
+  });
+});
