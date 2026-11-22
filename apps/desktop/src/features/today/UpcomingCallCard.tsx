@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useWindow } from "../../app/use-window";
-import { clock, t, zoned } from "../../i18n/format";
+import { callTime, clock, t, zoned } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
 import { Disclosure } from "../../ui/primitives/disclosure";
 import { Menu } from "../../ui/primitives/menu";
@@ -30,7 +30,7 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   const [menu, setMenu] = useState<HTMLElement | null>(null);
   const live = card.variant === "live" || card.variant === "unmatched";
   const capture = useWindow(bridge, (s) => s.whole.capture);
-  const elapsed = useRecordingClock(live ? capture : undefined);
+  const elapsed = callTime(useRecordingClock(live ? capture : undefined)); // HH:MM:SS on the card
   // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-live
   const details = expanded || live;
   // @cpt-end:cpt-noter-state-ui-today-card:p1:inst-live
@@ -57,12 +57,13 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
   ];
   // @cpt-end:cpt-noter-flow-ui-today-review:p1:inst-menu
   return (
-    <article data-today-group={id} className="td-card" data-component="cpt-noter-component-ui-upcoming-call-card" data-variant={card.variant} data-state={live ? "live" : expanded ? "expanded" : "collapsed"} aria-label={title}>
+    <article data-today-group={id} className="td-card np-card" data-component="cpt-noter-component-ui-upcoming-call-card" data-variant={card.variant} data-state={live ? "live" : expanded ? "expanded" : "collapsed"} aria-label={title}>
       <header className="td-card__head">
-        {e && <time className="td-card__time">{live && <RecordingIndicator variant="dot" status={capture?.phase === "paused" ? "paused" : "recording"} />}{week ? zoned(e.starts_at, { weekday: "short" }, prefs) : clock(e.starts_at, prefs)}</time>}
+        {/* the live marker is the dot in the time gutter; an unmatched call has no time beside it */}
+        {(e || card.variant === "unmatched") && <time className="td-card__time">{live && <RecordingIndicator variant="dot" status={capture?.phase === "paused" ? "paused" : "recording"} />}{e && (week ? zoned(e.starts_at, { weekday: "short" }, prefs) : clock(e.starts_at, prefs))}</time>}
         {card.variant === "unmatched" ? (
-          <h3 className="td-card__title td-card__recording">
-            <RecordingIndicator variant="dot-text" status={capture?.phase === "paused" ? "paused" : "recording"} />
+          <h3 className="td-card__title">
+            {t(capture?.phase === "paused" ? "cw.indicator.paused" : "cw.indicator.recording")}
             {card.live?.platform && <span> · {card.live.platform}</span>}
             <span className="td-card__elapsed"> · {elapsed}</span>
           </h3>

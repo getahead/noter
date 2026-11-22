@@ -56,11 +56,11 @@ describe("Sidebar (cpt-noter-dod-ui-main-window-shell-frame)", () => {
     const live = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: false, seconds: () => 1394 } })} />);
     expect(live).toContain('data-variant="live-row"');
     expect(live).toContain("Planning");
-    expect(live).toContain("00:23:14");
+    expect(live).toContain(">23:14<"); // MM:SS in the live row (#1070)
     const paused = renderToString(<Sidebar {...props({ live: { title: "Planning", paused: true, seconds: () => 1394 } })} />);
     expect(paused).toContain("Paused");
     expect(paused).toContain("np-recdot is-paused");
-    expect(paused).not.toContain("00:23:14");
+    expect(paused).not.toContain("23:14");
   });
 
   it("runs the owner's handlers: select a section, show the call, toggle, open privacy", () => {

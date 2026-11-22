@@ -15,8 +15,10 @@
 .pc-md p, .pc-md ul { margin: 0 0 8px; }
 .pc-md ul { padding-left: 20px; }
 .pc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.pc-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
-.pc-item__text { flex: 1 1 auto; min-width: 0; }
+/* one line: the text wraps inside its column and a long topic tag truncates, so share and ⓘ stay on the row */
+.pc-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.pc-item > .np-badge { flex: 0 1 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pc-item__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-regen { display: grid; gap: 12px; }
 .pc-regen__row { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; }
 

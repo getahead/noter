@@ -48,7 +48,9 @@ test.describe("cpt-noter-dod-ui-today-dashboard today", () => {
   test("the day's calls, the next expanded and Local only on the later one", async ({ page }) => {
     await open(page, day());
     await expect(page.getByText("Today · 2 calls")).toBeVisible();
-    await expect(page.locator(".td-card").first()).toHaveCSS("border-top-style", "solid");
+    // the prototype's card (np-card): no border, a 0.5-pt ring and a soft shadow (#1071)
+    await expect(page.locator(".td-card").first()).toHaveCSS("border-top-style", "none");
+    await expect(page.locator(".td-card").first()).toHaveCSS("box-shadow", /0\.5px/);
     await shot(page, "today-calls");
   });
   test("a live call no event matches is the first card", async ({ page }) => {

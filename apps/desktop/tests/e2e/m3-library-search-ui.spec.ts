@@ -289,3 +289,24 @@ test.describe("cpt-noter-seq-library-follow-topic", () => {
     await expect(name.locator(".np-th__sort")).toBeVisible();
   });
 });
+
+test.describe("cpt-noter-seq-library-follow-topic", () => {
+  for (const [width, px] of [["Medium", 1000], ["Narrow", 700]] as const)
+    test(`UI — design — thread rows at ${width}: time, review buttons, share and ⓘ stay inside the row; the call link and text truncate`, async ({ page }) => {
+      await page.setViewportSize({ width: px, height: 800 });
+      await openTopics(page);
+      await page.getByRole("table").getByRole("row", { name: /Drawer redesign/ }).click();
+      await page.keyboard.press("Enter");
+      await expect(page.getByRole("heading", { name: "Drawer redesign" })).toBeVisible();
+      const rows = page.locator(".lb-throw");
+      await expect(rows.first()).toBeVisible();
+      await expect(page.locator(".lb-throw").getByRole("button", { name: "Accept" }).first()).toBeVisible(); // a suggested row with its review buttons
+      const content = (await page.locator(".np-content").boundingBox())!;
+      for (const row of await rows.all()) {
+        const last = (await row.locator(":scope > *").last().boundingBox())!;
+        expect(last.x + last.width).toBeLessThanOrEqual(content.x + content.width + 1); // nothing runs past the content pane
+        const tag = row.locator(":scope > .np-badge").first();
+        expect(await tag.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true); // the kind tag is never cut
+      }
+    });
+});

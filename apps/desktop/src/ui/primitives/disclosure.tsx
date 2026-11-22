@@ -4,7 +4,8 @@ import { Icon } from "../icons";
 import { base, cx, type Common } from "./attrs";
 
 export interface DisclosureProps extends Common {
-  label: string;
+  /** Text, or text with a dimmed count beside it (Today's **Done today · 2**). */
+  label: ReactNode;
   open: boolean;
   /** section or row. */
   variant?: "section" | "row";

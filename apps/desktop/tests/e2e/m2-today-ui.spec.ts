@@ -314,3 +314,77 @@ test("cpt-noter-seq-today-tick-item — Escape keeps a handed-off item open", as
   await expect.poll(() => sent(page, "item_answer_handoff_landed")).toContainEqual(expect.objectContaining({ answer: "keep_open" }));
   await expect(row.getByRole("checkbox")).not.toBeChecked();
 });
+
+// Design fixes against the prototype of record (docs/prototype/clickable, Today › State ▾ Live call with no calendar match).
+test.describe("cpt-noter-seq-today-review-before-call", () => {
+  test("UI — design — #1069 the toolbar recording button is the dot and the MM:SS clock only", async ({ page }) => {
+    await openToday(page, () => {});
+    const indicator = page.locator('[data-region="TD-R1"]').getByRole("button", { name: "Show the call window" });
+    await expect(indicator).toHaveText(/^\d{2}:\d{2}$/);
+    await expect(indicator.locator(".np-recdot")).toBeVisible();
+  });
+  test("UI — design — #1070 the sidebar live row reads MM:SS and the unmatched card HH:MM:SS", async ({ page }) => {
+    await openToday(page, () => {});
+    await expect(page.locator('[data-variant="live-row"] .np-tnum')).toHaveText(/^\d{2}:\d{2}$/);
+    await expect(cards(page).first().locator(".td-card__elapsed")).toHaveText(/^ · \d{2}:\d{2}:\d{2}$/);
+  });
+  test("UI — design — #1071 the unmatched card has no outline, a red leading bar, the dot in the time gutter and the label-coloured Recording", async ({ page }) => {
+    await openToday(page, () => {});
+    const card = cards(page).first();
+    await expect(card).toHaveAttribute("data-variant", "unmatched");
+    await expect(card).toHaveCSS("border-top-width", "0px");
+    await expect(card).toHaveCSS("box-shadow", /inset/);
+    await expect(card.locator(".td-card__time .np-recdot")).toBeVisible();
+    const title = card.locator(".td-card__title");
+    await expect(title).toHaveText(/^Recording( · .+)? · \d{2}:\d{2}:\d{2}$/);
+    await expect(title).toHaveCSS("color", "rgba(0, 0, 0, 0.85)");
+    await expect(title).toHaveCSS("font-size", "13px");
+    await expect(title.locator(".np-recdot")).toHaveCount(0);
+    // the title starts where the other cards' titles do: 14-pt padding, 52-pt time gutter, 12-pt gap
+    const c = await card.boundingBox();
+    const tb = await title.boundingBox();
+    expect(Math.round(tb!.x - c!.x)).toBe(78);
+  });
+  test("UI — design — #1074 the review line starts 24 pt from the sidebar and 20 pt under the toolbar", async ({ page }) => {
+    await openToday(page, () => {});
+    const content = await page.locator(".np-content").boundingBox();
+    const first = await page.locator('[data-component="cpt-noter-component-screen-today"] > :first-child').boundingBox();
+    expect(Math.round(first!.x - content!.x)).toBe(24);
+    expect(Math.round(first!.y - content!.y)).toBe(20);
+  });
+  test("UI — design — #1076 the toolbar subtitle is the long date without the year", async ({ page }) => {
+    await openToday(page, () => {});
+    await expect(page.locator('[data-region="TD-R1"] .np-toolbar__sub')).toHaveText(/^[A-Z][a-z]+day, [A-Z][a-z]+ \d{1,2}$/);
+  });
+});
+
+test.describe("cpt-noter-seq-today-tick-item", () => {
+  test("UI — design — #1072 a due row is checkbox, owner, text, the timestamp chip, then the due date, in a grouped card", async ({ page }) => {
+    await openToday(page, dueWorld);
+    const row = due(page).locator('[data-item-id="itm_spec"]');
+    await expect(row.getByText("Show in transcript")).toHaveCount(0);
+    await expect(row.locator('[data-component="cpt-noter-component-ui-provenance-chip"]')).toHaveText(/^\d{2}:\d{2}:\d{2}\s?↗$/);
+    const order = await row.locator(".it-row__line > *").evaluateAll((els) => els.map((el) => el.getAttribute("data-component") ?? el.className));
+    expect(order.findIndex((c) => c.includes("provenance-chip"))).toBeLessThan(order.findIndex((c) => c.includes("it-row__due")));
+    await expect(due(page).locator(".np-card")).toHaveCount(1);
+  });
+  test("UI — design — #1073 section counts are regular weight in the tertiary label colour", async ({ page }) => {
+    await openToday(page, dueWorld);
+    for (const region of ["TD-R6", "TD-R7"]) {
+      const count = page.locator(`[data-region="${region}"] .np-dim`).first();
+      await expect(count).toHaveText(/^· \d+$/);
+      await expect(count).toHaveCSS("font-weight", "400");
+      await expect(count).toHaveCSS("color", "rgba(0, 0, 0, 0.3)");
+    }
+  });
+  test("UI — design — #1075 Show All in Activity is an enabled leading link that opens Activity", async ({ page }) => {
+    await openToday(page, dueWorld);
+    const region = page.locator('[data-region="TD-R6"]');
+    const link = region.getByRole("link", { name: "Show All in Activity" });
+    const r = await region.boundingBox();
+    const l = await link.boundingBox();
+    expect(Math.round(l!.x - r!.x)).toBe(0);
+    await link.click();
+    await expect(page.getByRole("heading", { name: "Activity", level: 1 })).toBeVisible();
+  });
+});
