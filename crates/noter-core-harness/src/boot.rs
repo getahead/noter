@@ -69,6 +69,9 @@ pub struct Options {
     pub folder_panels: Option<VecDeque<Option<PathBuf>>>,
     /// `--hotkey-conflict <shortcut>=<owner>`: the scripted host refuses one initial chord.
     pub hotkey_conflict: Option<(String, String)>,
+    /// `NOTER_TEST_DATA_DIR`: open the core in this folder instead of a new temporary one, so a
+    /// relaunch keeps the data (a fresh install restarted mid-download, issue 1141).
+    pub data_dir: Option<PathBuf>,
 }
 
 impl Options {
@@ -127,6 +130,7 @@ impl Options {
     /// `NOTER_TEST_LAUNCH_WORLD` is the JSON accepted by `harness.launch_world`;
     /// `NOTER_TEST_FOLDER_PANELS` is a JSON array of absolute chosen paths or null cancellations.
     /// Chosen folders must already exist: these answers never create them.
+    /// `NOTER_TEST_DATA_DIR=<absolute folder>` keeps the core's data across launches.
     pub fn from_env(var: impl Fn(&str) -> Option<String>) -> Result<Option<Options>, String> {
         let Some(fixture) = var("NOTER_TEST_FIXTURE") else {
             return Ok(None);
@@ -163,6 +167,13 @@ impl Options {
                 return Err("NOTER_TEST_FOLDER_PANELS: chosen paths must be absolute".into());
             }
             options.folder_panels = Some(answers);
+        }
+        if let Some(dir) = var("NOTER_TEST_DATA_DIR") {
+            let dir = PathBuf::from(dir);
+            if !dir.is_absolute() {
+                return Err("NOTER_TEST_DATA_DIR: the folder must be absolute".into());
+            }
+            options.data_dir = Some(dir);
         }
         Ok(Some(options))
     }
@@ -370,6 +381,7 @@ pub struct Harness {
     /// The last world `world_set` accepted, for the slices no M0 service owns.
     world: Mutex<FakeWorld>,
     dir: PathBuf,
+    keep_dir: bool,
 }
 
 impl Harness {
@@ -389,11 +401,15 @@ impl Harness {
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-temp-dir
         static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
         let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!(
-            "noter-core-harness-{}-{}-{n}",
-            std::process::id(),
-            nanos()
-        ));
+        let dir = options.data_dir.clone().unwrap_or_else(|| {
+            std::env::temp_dir().join(format!(
+                "noter-core-harness-{}-{}-{n}",
+                std::process::id(),
+                nanos()
+            ))
+        });
+        // a relaunch on a kept data folder finds its models as the last launch left them (1141)
+        let relaunch = options.data_dir.is_some() && dir.join("models").is_dir();
         std::fs::create_dir_all(dir.join("models")).map_err(|e| e.to_string())?;
         // @cpt-end:cpt-noter-algo-core-harness-boot:p1:inst-temp-dir
         let w = if options.fixture {
@@ -408,9 +424,11 @@ impl Harness {
             failure: Mutex::new(None),
         });
         let models = Arc::new(TinyModels::new(&w.app.setup.models, native.clone()));
-        models
-            .place(&dir.join("models"), &w.app.setup.models)
-            .map_err(|e| e.to_string())?;
+        if !relaunch {
+            models
+                .place(&dir.join("models"), &w.app.setup.models)
+                .map_err(|e| e.to_string())?;
+        }
         let skew = Arc::new(AtomicI64::new(0));
         let base: Arc<dyn Clock> = if options.fixed_clock {
             Arc::new(Fixed(w.now))
@@ -499,6 +517,7 @@ impl Harness {
             panel,
             world: Mutex::new(w.clone()),
             dir,
+            keep_dir: options.data_dir.is_some(),
         });
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-if-fixture
         // @cpt-begin:cpt-noter-algo-core-harness-boot:p1:inst-seed
@@ -1402,7 +1421,10 @@ impl Controls for Harness {
             // @cpt-begin:cpt-noter-state-core-harness-process:p1:inst-st-shutdown
             self.core.shutdown().await;
             // @cpt-end:cpt-noter-state-core-harness-process:p1:inst-st-shutdown
-            let _ = std::fs::remove_dir_all(&self.dir);
+            // a folder the launch named outlives it (NOTER_TEST_DATA_DIR); a temporary one goes
+            if !self.keep_dir {
+                let _ = std::fs::remove_dir_all(&self.dir);
+            }
         })
     }
 }

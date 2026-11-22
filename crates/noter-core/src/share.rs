@@ -29,8 +29,8 @@ struct Line {
     /// `Some(done)` for an action item's checkbox.
     check: Option<bool>,
     facts: Vec<String>,
-    /// Evidence: the time label and the link to that moment.
-    links: Vec<(String, String)>,
+    /// Evidence: the call time of each moment (v1 has no URL scheme, D17: no links, issue 1053).
+    times: Vec<String>,
 }
 
 enum Block {
@@ -68,17 +68,12 @@ fn line_of(item: &ItemView) -> Line {
     if item.status == ItemStatus::ClosedByEvidence {
         facts.push("closed by evidence".into());
     }
-    // shortcut: no deep-link scheme is registered yet, so evidence links are `noter://` URLs the
-    // app will own; point them at the registered handler when the scheme lands.
-    let links = item
+    let times = item
         .spans
         .iter()
         .map(|s| {
             let s0 = s.t0_ms.0 / 1000;
-            (
-                format!("{}:{:02}", s0 / 60, s0 % 60),
-                format!("noter://call/{}?t={}", s.call_id, s.t0_ms.0),
-            )
+            format!("{}:{:02}", s0 / 60, s0 % 60)
         })
         .collect();
     Line {
@@ -88,7 +83,7 @@ fn line_of(item: &ItemView) -> Line {
             ItemStatus::Done | ItemStatus::ClosedByEvidence
         )),
         facts,
-        links,
+        times,
     }
 }
 
@@ -254,11 +249,7 @@ fn markdown(blocks: &[Block]) -> String {
                     Some(false) => "[ ] ",
                     None => "",
                 };
-                let links: String = l
-                    .links
-                    .iter()
-                    .map(|(t, u)| format!(" [{t}]({u})"))
-                    .collect();
+                let links: String = l.times.iter().map(|t| format!(" [{t}]")).collect();
                 format!(
                     "- {check}{}{}{links}",
                     escape(&l.text, "\\`*_[]<>"),
@@ -287,7 +278,7 @@ fn slack(blocks: &[Block]) -> String {
                     Some(false) => "☐ ",
                     None => "",
                 };
-                let links: String = l.links.iter().map(|(t, u)| format!(" <{u}|{t}>")).collect();
+                let links: String = l.times.iter().map(|t| format!(" [{t}]")).collect();
                 format!("• {check}{}{}{links}", esc(&l.text), esc(&facts_of(l)))
             }
         });
@@ -312,7 +303,8 @@ fn jira(blocks: &[Block]) -> String {
                     Some(false) => "(?) ",
                     None => "",
                 };
-                let links: String = l.links.iter().map(|(t, u)| format!(" [{t}|{u}]")).collect();
+                // brackets are link markup in Jira
+                let links: String = l.times.iter().map(|t| format!(" ({t})")).collect();
                 format!("* {check}{}{}{links}", esc(&l.text), esc(&facts_of(l)))
             }
         });
@@ -340,11 +332,7 @@ fn html(blocks: &[Block]) -> String {
                 ),
             },
             Block::Item(l) => {
-                let links: String = l
-                    .links
-                    .iter()
-                    .map(|(t, u)| format!(" <a href=\"{}\">{}</a>", esc(u), esc(t)))
-                    .collect();
+                let links: String = l.times.iter().map(|t| format!(" [{}]", esc(t))).collect();
                 (
                     true,
                     format!("<li>{}{}{links}</li>", esc(&l.text), esc(&facts_of(l))),
@@ -383,6 +371,8 @@ struct ExportCall {
 enum ExportPayload {
     Markdown {
         name: String,
+        /// Title, date and participants: a pasted export says which call it is (issue 1053).
+        header: String,
         outputs: CallOutputs,
         scope: ShareScope,
     },
@@ -461,11 +451,13 @@ fn write_payload(
     match payload {
         ExportPayload::Markdown {
             name,
+            header,
             outputs,
             scope,
         } => {
             let shared = render(&outputs, &scope, ShareFormat::Markdown)?;
-            std::fs::write(folder.join(name), shared.markdown).map_err(export_io_error)?;
+            std::fs::write(folder.join(name), header + &shared.markdown)
+                .map_err(export_io_error)?;
             Ok(1)
         }
         ExportPayload::Transcript { call_id, base } => {
@@ -481,6 +473,29 @@ fn write_payload(
             Ok(1)
         }
     }
+}
+
+/// `# Title`, then the date and the participants, for the top of an exported Markdown file.
+fn markdown_header(
+    c: &noter_db::rusqlite::Connection,
+    id: &str,
+) -> noter_db::rusqlite::Result<String> {
+    let (title, started_at): (String, i64) = c.query_row(
+        "SELECT title, started_at FROM calls WHERE id = ?1",
+        [id],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )?;
+    let mut line = vec![crate::history::date_of(started_at)];
+    let mut people = c.prepare(
+        "SELECT p.display_name FROM call_participants cp JOIN people p ON p.id = cp.person_id \
+         WHERE cp.call_id = ?1 ORDER BY p.display_name",
+    )?;
+    for name in people.query_map([id], |r| r.get::<_, String>(0))? {
+        line.push(name?);
+    }
+    let esc = |t: &str| escape(t, "\\`*_[]<>#");
+    let line: Vec<String> = line.iter().map(|t| esc(t)).collect();
+    Ok(format!("# {}\n\n{}\n\n", esc(&title), line.join(" · ")))
 }
 
 impl Core {
@@ -596,6 +611,11 @@ impl Core {
                     "the audio is no longer kept",
                 ));
             }
+            // A call with nothing to export yet is refused before the panel opens, so no folder
+            // is made for it (issue 1053); the render is dropped, the writer renders again.
+            if want.summary_and_items {
+                render(&self.outputs_for_share(id)?, &scope, ShareFormat::Markdown)?;
+            }
             // @cpt-end:cpt-noter-flow-core-items-today-share:p1:inst-share-fail
             // @cpt-begin:cpt-noter-flow-core-items-today-share:p1:inst-share-export
             let mut audio = vec![];
@@ -634,6 +654,7 @@ impl Core {
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         let destination = folder.clone();
         let store = self.store_handle();
+        let created = !folder.exists();
         let writer = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&destination).map_err(export_io_error)?;
             let mut count = 0;
@@ -647,8 +668,12 @@ impl Core {
             let send = async {
                 if call.markdown {
                     let outputs = self.outputs_for_share(&call.id)?;
+                    let header = self
+                        .store()
+                        .read(|c| markdown_header(c, call.id.as_str()))?;
                     tx.send(ExportPayload::Markdown {
                         name: format!("{}.md", call.base),
+                        header,
                         outputs,
                         scope: scope.clone(),
                     })
@@ -680,10 +705,17 @@ impl Core {
             }
         }
         drop(tx);
-        let files = writer.await.map_err(internal)??;
-        if let Some(error) = failed {
-            return Err(error);
-        }
+        let written = writer.await.map_err(internal).and_then(|r| r);
+        let files = match (written, failed) {
+            (Ok(files), None) => files,
+            (Err(error), _) | (_, Some(error)) => {
+                // a refused export leaves no folder behind, only one it made itself (issue 1053)
+                if created {
+                    let _ = std::fs::remove_dir_all(&folder);
+                }
+                return Err(error);
+            }
+        };
         Ok(ExportResult {
             path: folder.display().to_string(),
             files,
@@ -803,11 +835,9 @@ mod tests {
         );
         assert!(r.text.contains("Anna"), "{}", r.text);
         assert!(r.text.contains("2026-10-16"), "{}", r.text);
-        assert!(
-            r.text.contains("(noter://call/call_1?t=83000)"),
-            "{}",
-            r.text
-        );
+        // #1053: v1 has no URL scheme (D17), so evidence is a plain call time, never a dead link
+        assert!(r.text.contains(" [1:23]"), "{}", r.text);
+        assert!(!r.text.contains("noter://"), "{}", r.text);
         assert_eq!((r.sections, r.items, r.unreviewed), (2, 1, 0));
     }
 
@@ -857,14 +887,15 @@ mod tests {
         assert!(slack.contains("*agreed*"), "{slack}");
         assert!(slack.contains("&lt;script&gt;"), "{slack}");
         assert!(
-            slack.contains("<noter://call/call_1?t=83000|1:23>"),
+            slack.contains(" [1:23]") && !slack.contains("noter://"),
             "{slack}"
         );
         assert!(slack.contains("• "), "{slack}");
         let jira = render(&call(), &all(), ShareFormat::Jira).unwrap().text;
         assert!(jira.contains("h2. Action items"), "{jira}");
+        // brackets are link markup in Jira: the time goes in parentheses
         assert!(
-            jira.contains("[1:23|noter://call/call_1?t=83000]"),
+            jira.contains(" (1:23)") && !jira.contains("noter://"),
             "{jira}"
         );
         assert!(jira.contains(r"\[now\]"), "{jira}");

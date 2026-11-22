@@ -1308,3 +1308,33 @@ async fn a_call_that_starts_mid_download_pauses_it_and_the_run_waits_paused() {
     })
     .await;
 }
+
+// cpt-noter-seq-first-run-download-models — #1141: quitting while the first of two bundles downloads resumes BOTH after the relaunch: the bundle
+// queued behind the one in progress used to stay at 0 % with nothing saying so.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn a_relaunch_mid_download_resumes_the_queued_bundles_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let s = open(dir.path(), two_bundles(), 90_000);
+    *s.source.hold_after.lock().unwrap() = Some(CHUNK);
+    s.source
+        .hold
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    download(&s.core, DownloadAction::Start).await.unwrap();
+    let partial = dir
+        .path()
+        .join("models/whisper-turbo.partial/model.bin.part");
+    for _ in 0..500 {
+        if std::fs::metadata(&partial).map(|m| m.len()).unwrap_or(0) >= CHUNK as u64 {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    // Quit mid-download: the held fetch never finishes in this core.
+    drop(s);
+    let s = open(dir.path(), two_bundles(), 90_000);
+    until(&s.core, "both ready after the relaunch", |st| {
+        state(st, "whisper-turbo") == BundleState::Ready
+            && state(st, "bge-m3") == BundleState::Ready
+    })
+    .await;
+}

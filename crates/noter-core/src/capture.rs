@@ -912,7 +912,13 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-stop:p1:inst-update-call
         // @cpt-begin:cpt-noter-state-core-library-calls-status:p1:inst-st-processing
         // "processing" stays until the post-call job (M2): there is no "ready" write in M1.
-        let values = vec![("status", json!("processing")), ("ended_at", json!(ended))];
+        // the length it recorded, pauses excluded, stays the call's length (issue 1081)
+        let recorded = self.capture_for_reader(state).recorded_ms.0;
+        let values = vec![
+            ("status", json!("processing")),
+            ("ended_at", json!(ended)),
+            ("recorded_ms", json!(recorded)),
+        ];
         self.write_call(&ctx, call_id, "Stopped recording", false, values)?;
         // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-processing
         self.capture_event(CaptureEvent::Stopped {

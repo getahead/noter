@@ -592,6 +592,65 @@ async fn export_validates_the_calls_before_the_panel_opens() {
     assert!(native.folder_asked.lock().unwrap().is_empty());
 }
 
+// cpt-noter-seq-call-page-share-outputs — #1053
+#[tokio::test]
+async fn exported_markdown_opens_with_the_call_title_date_and_participants() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("out");
+    let (core, _) = open(dir.path(), Some(out.clone()));
+    world(&core);
+    core.store()
+        .insert_batch(vec![
+            row(
+                "people",
+                &[
+                    ("id", json!("per_dana")),
+                    ("rev", json!(1)),
+                    ("display_name", json!("Dana Ito")),
+                    ("short_name", json!("Dana")),
+                ],
+            ),
+            row(
+                "call_participants",
+                &[
+                    ("id", json!("cp_1")),
+                    ("call_id", json!("call_a")),
+                    ("person_id", json!("per_dana")),
+                ],
+            ),
+        ])
+        .unwrap();
+    export(&core, &["call_a"], (true, false, false))
+        .await
+        .unwrap();
+    let md = names(&out)
+        .into_iter()
+        .find(|f| f.ends_with(".md"))
+        .unwrap();
+    let text = std::fs::read_to_string(out.join(md)).unwrap();
+    // a pasted export says which call it is (issue 1053)
+    assert!(
+        text.starts_with("# Call call\\_a\n\n2026-10-14 · Dana Ito\n\n"),
+        "{text}"
+    );
+}
+
+// cpt-noter-seq-call-page-share-outputs — #1053
+#[tokio::test]
+async fn a_refused_export_leaves_no_folder_it_created() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = dir.path().join("Noter export");
+    let (core, native) = open(dir.path(), Some(out.clone()));
+    world(&core);
+    let e = export(&core, &["call_new"], (true, false, false))
+        .await
+        .unwrap_err();
+    assert_eq!(e.code, ErrorCode::OutputsNotReady);
+    assert!(!out.exists(), "issue 1053: an empty export folder was left");
+    // refused before the panel: a panel that makes the folder it answers never opens (issue 1053)
+    assert!(native.folder_asked.lock().unwrap().is_empty());
+}
+
 #[tokio::test]
 async fn export_that_cannot_write_returns_an_error_and_no_count() {
     let dir = tempfile::tempdir().unwrap();

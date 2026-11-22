@@ -70,11 +70,13 @@ struct Stored {
     audio_not_stored: bool,
     mode_used: String,
     audio_deleted_at: Option<i64>,
+    /// What a stopped call recorded, pauses excluded (written at Stop).
+    recorded_ms: Option<i64>,
 }
 
 const STORED: &str = "c.id, c.rev, c.started_at, c.ended_at, c.title, c.call_type, c.platform, \
     c.privacy_class, c.status, c.outputs_status, c.archive_status, c.audio_retention_until, \
-    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at";
+    c.audio_deleted, c.audio_not_stored, c.mode_used, c.audio_deleted_at, c.recorded_ms";
 
 fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
     Ok(Stored {
@@ -94,6 +96,7 @@ fn stored(r: &Row<'_>) -> noter_db::rusqlite::Result<Stored> {
         audio_not_stored: r.get(13)?,
         mode_used: r.get(14)?,
         audio_deleted_at: r.get(15)?,
+        recorded_ms: r.get(16)?,
     })
 }
 
@@ -350,9 +353,12 @@ fn assemble_with_details(
         title: s.title,
         call_type: CallTypeId(s.call_type),
         started_at: TimestampMs(s.started_at),
-        // A call still recording lasts until the clock's now.
+        // What it recorded once stopped; a call still recording lasts until the clock's now (and
+        // `live_length` gives it its recorded time); older calls, end minus start.
         duration_ms: DurationMs(
-            (s.ended_at.unwrap_or(now) - s.started_at).clamp(0, u32::MAX.into()) as u32,
+            s.recorded_ms
+                .unwrap_or(s.ended_at.unwrap_or(now) - s.started_at)
+                .clamp(0, u32::MAX.into()) as u32,
         ),
         platform: s.platform,
         participants: details.participants,
@@ -410,7 +416,10 @@ fn order_of(sort: CallSort) -> (&'static str, bool) {
     match sort {
         CallSort::Newest => ("c.started_at", true),
         CallSort::Oldest => ("c.started_at", false),
-        CallSort::Longest => ("(COALESCE(c.ended_at, ?1) - c.started_at)", true),
+        CallSort::Longest => (
+            "COALESCE(c.recorded_ms, COALESCE(c.ended_at, ?1) - c.started_at)",
+            true,
+        ),
         CallSort::Title => ("c.title COLLATE NOCASE", false),
     }
 }
@@ -449,6 +458,12 @@ impl Core {
     // @cpt-flow:cpt-noter-flow-core-library-calls-list:p1
     // @cpt-dod:cpt-noter-dod-core-library-calls-read:p1
     pub(crate) fn list_calls(&self, args: CallsListArgs) -> Result<Page<CallRow>, CoreError> {
+        let mut page = self.list_calls_stored(args)?;
+        page.rows = page.rows.into_iter().map(|r| self.live_length(r)).collect();
+        Ok(page)
+    }
+
+    fn list_calls_stored(&self, args: CallsListArgs) -> Result<Page<CallRow>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-call
         self.ready()?;
         // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-call
@@ -548,7 +563,7 @@ impl Core {
             let mut stmt = c.prepare(&sql)?;
             let mut rows = stmt
                 .query_map(params_from_iter(page.params.iter()), |r| {
-                    Ok((stored(r)?, r.get::<_, Sql>(16)?))
+                    Ok((stored(r)?, r.get::<_, Sql>(17)?))
                 })?
                 .collect::<Result<Vec<_>, _>>()?;
             // @cpt-end:cpt-noter-flow-core-library-calls-list:p1:inst-list-select
@@ -638,6 +653,7 @@ impl Core {
                 .calendar_event_near(detail.call.started_at)
                 .filter(|event| event.id.0 == id)
         });
+        detail.call = self.live_length(detail.call);
         Ok(detail)
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-return
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-missing
@@ -712,6 +728,7 @@ impl Core {
                     .transpose()
             })?
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
+        let call = self.live_length(call);
         // @cpt-begin:cpt-noter-flow-core-library-calls-update:p1:inst-update-emit
         self.emit_entity_changed(&EntityChanged::Call { call: call.clone() });
         // @cpt-end:cpt-noter-flow-core-library-calls-update:p1:inst-update-emit
@@ -723,15 +740,30 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-library-calls-update:p1:inst-update-return
     }
 
+    /// A call still recording lasts as long as it has recorded (pauses excluded), as its clocks say,
+    /// not the wall-clock time since it started (issues 1077, 1081).
+    pub(crate) fn live_length(&self, mut row: CallRow) -> CallRow {
+        let capture = self.capture_for_reader(self.capture_now());
+        let live = matches!(
+            capture.phase,
+            CapturePhase::Recording | CapturePhase::Paused
+        );
+        if live && capture.call_id.as_ref() == Some(&row.id) {
+            row.duration_ms = capture.recorded_ms;
+        }
+        row
+    }
+
     /// The call as the Library shows it, `None` when it is gone.
     pub(crate) fn call_row(&self, id: &str) -> Result<Option<CallRow>, CoreError> {
         let now = self.deps.clock.now().0;
-        self.store().read(|c| {
+        let row = self.store().read(|c| {
             let retention_days = retention_days(c)?;
             select_call(c, id)?
                 .map(|s| assemble(c, s, now, retention_days))
                 .transpose()
-        })
+        })?;
+        Ok(row.map(|r| self.live_length(r)))
     }
 
     // @cpt-flow:cpt-noter-flow-core-library-calls-types:p2

@@ -77,8 +77,10 @@ export function appBanners(whole: Pick<Partial<WholeSlices>, "banners" | "setup"
     }
   }
   const test = whole.setup?.self_test.type;
+  // a test never run once setup is finished (Continue past it, issue 1122) keeps detection off too
+  const finished = !!whole.setup?.steps?.length && whole.setup.steps.every((s) => s.state !== "todo");
   // @cpt-begin:cpt-noter-flow-ui-today-capture:p1:inst-setup
-  if (test === "skipped" || test === "failed")
+  if (test === "skipped" || test === "failed" || (test === "not_run" && finished))
     out.push({
       id: "self-test",
       severity: "warning",
