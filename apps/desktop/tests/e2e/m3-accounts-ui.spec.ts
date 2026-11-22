@@ -32,7 +32,7 @@ const codexCli = (steer: Steer, fields: Record<string, unknown> = {}) =>
   steer.invoke("harness.account_cli", { tool: "codex", installed: true, path: "/bin/codex", version: "0.163.0", login_identity: BOB, login: { url: "https://chatgpt.com/device" }, ...fields });
 
 async function openModels(page: Page) {
-  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Models & Runtimes" }).click();
+  await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
   await expect(pane(page).getByRole("heading", { name: "Models & Runtimes", exact: true })).toBeVisible();
 }
 

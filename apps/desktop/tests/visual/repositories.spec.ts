@@ -8,7 +8,7 @@ for (const state of ["empty", "missing", "add", "edit"] as const) {
       if (state === "empty" || state === "add") w.repos.mappings = [];
       if (state === "missing") w.repos.mappings[0]!.path_exists = false;
     } });
-    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("listitem").filter({ hasText: "Repositories" }).click();
+    await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Repositories" }).click();
     const pane = page.locator('[data-region="ST-R2"]');
     if (state === "add") await pane.getByRole("button", { name: "Add Mapping…" }).click();
     else if (state === "edit") {

@@ -17,7 +17,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
       W.idle(w);
       W.permission(w, "system_audio", "denied");
     } });
-    await panes(page).getByRole("listitem").filter({ hasText: "Audio & Transcription" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Audio & Transcription" }).click();
     await page.getByRole("button", { name: "Run Audio Self-Test…" }).click();
     const sheet = page.getByRole("dialog", { name: "Run Audio Self-Test" });
     await expect(sheet).toContainText("System audio recording is not allowed yet.");
@@ -35,7 +35,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 
   test("a refused Screen Share Test table read shows Try Again and recovers", async ({ page }) => {
     await openWindow(page, "settings", { fail: [{ cmd: "share_test_run", code: "offline" }] });
-    await panes(page).getByRole("listitem").filter({ hasText: "Privacy" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Privacy" }).click();
     await page.getByRole("button", { name: "Screen Share Test…" }).click();
     const sheet = page.getByRole("dialog", { name: "Screen Share Test" });
     await expect(sheet.getByRole("alert")).toContainText("Couldn’t load the Screen Share Test.");
@@ -57,7 +57,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await openWindow(page, "settings");
     await panes(page).getByPlaceholder("Search").fill("hotkeys");
     await page.keyboard.press("ArrowDown");
-    await expect(panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" })).toBeFocused();
+    await expect(panes(page).getByRole("option").filter({ hasText: "Hotkeys" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(pane(page).getByRole("heading", { name: "Hotkeys", exact: true })).toBeVisible();
   });
@@ -66,7 +66,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
     await openWindow(page, "settings");
     await panes(page).getByPlaceholder("Search").fill("hotkeys");
     await page.keyboard.press("Tab");
-    await expect(panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" })).toBeFocused();
+    await expect(panes(page).getByRole("option").filter({ hasText: "Hotkeys" })).toBeFocused();
   });
 
   test("a refused change shows under its row, the stored value stays, and a later save clears it", async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 
   test("two fast quick-action changes save against successive settings revisions", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Call Screen & Menu Bar" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Call Screen & Menu Bar" }).click();
     await page.getByRole("checkbox", { name: "Pause or resume" }).click({ force: true });
     await page.getByRole("checkbox", { name: "Mark moment" }).click({ force: true });
     await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(2);
@@ -95,7 +95,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 
   test("the card-key modifier set is saved once, when the keys are released", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Hotkeys" }).click();
     await page.getByRole("button", { name: /^Pin a card: / }).click();
     await page.keyboard.down("Control");
     await page.keyboard.down("Alt");
@@ -108,7 +108,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 
   test("Esc takes away the red hint of an invalid attempt and the old chord stays", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Hotkeys" }).click();
     const field = page.getByRole("button", { name: /^Mark moment: / });
     await field.click();
     await page.keyboard.press("KeyN");
@@ -120,7 +120,7 @@ test.describe("cpt-noter-flow-ui-settings-change-setting", () => {
 
   test("modifiers held when the field loses focus are not saved later", async ({ page }) => {
     await openWindow(page, "settings");
-    await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "Hotkeys" }).click();
     await page.getByRole("button", { name: /^Pin a card: / }).click();
     await page.keyboard.down("Control");
     await page.getByRole("button", { name: /^Mark moment: / }).focus(); // focus leaves while Control is down
@@ -154,7 +154,7 @@ test.describe("cpt-noter-seq-settings-check-privacy", () => {
       w.app.environment.permissions.forEach((p) => p.kind === "screen_recording" && (p.state = "not_asked"));
     };
     const steer = await openWindow(page, "settings", { world: notAsked });
-    await panes(page).getByRole("listitem").filter({ hasText: "Privacy" }).first().click();
+    await panes(page).getByRole("option").filter({ hasText: "Privacy" }).first().click();
     await page.getByRole("button", { name: "Screen Share Test…" }).click();
     await page.getByRole("button", { name: "Run Capture Test" }).click();
     await steer.failNext("permission_request", "permission_denied");

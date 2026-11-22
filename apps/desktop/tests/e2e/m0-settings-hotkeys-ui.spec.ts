@@ -23,11 +23,26 @@ const pane = (page: Page) => page.locator('[data-region="ST-R2"]');
 const field = (page: Page, row: string) => pane(page).getByRole("button", { name: new RegExp(`^${row}: `) });
 
 async function openHotkeys(page: Page): Promise<void> {
-  await panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" }).click();
+  await panes(page).getByRole("option").filter({ hasText: "Hotkeys" }).click();
   await expect(pane(page).getByRole("heading", { name: "Hotkeys", exact: true })).toBeVisible();
 }
 
 test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
+  // #1061: the pane list is one listbox of named options with the open pane selected; ↓ and Return reach Hotkeys by keyboard
+  test("UI — keyboard only: the pane list is a listbox, ↓ moves through the named panes and Return opens Hotkeys", async ({ page }) => {
+    await openWindow(page, "settings");
+    const list = panes(page).getByRole("listbox", { name: "Settings panes" });
+    const selected = list.getByRole("option", { selected: true });
+    await expect(selected).toHaveCount(1);
+    await selected.focus();
+    const hotkeys = list.getByRole("option", { name: "Hotkeys" });
+    for (let i = 0; i < 12 && !(await hotkeys.evaluate((el) => el === document.activeElement)); i++) await page.keyboard.press("ArrowDown");
+    await expect(hotkeys).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(pane(page).getByRole("heading", { name: "Hotkeys", exact: true })).toBeVisible();
+    await expect(hotkeys).toHaveAttribute("aria-selected", "true");
+  });
+
   test("UI — happy path: the Catch me up field reads Type a shortcut…, ⌃⌥⌘U is pressed and shown in the row", async ({ page }) => {
     await openWindow(page, "settings");
     await openHotkeys(page);
@@ -73,7 +88,7 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
     await expect(pane(page)).toContainText(/Card key\s*⌃⌥⌘3\s*is used by another app/);
 
     await steer.change((w) => (w.copilot.card_keys.conflicts = [])); // a different shortcut chosen in Raycast
-    await panes(page).getByRole("listitem").filter({ hasText: "General" }).click();
+    await panes(page).getByRole("option").filter({ hasText: "General" }).click();
     await openHotkeys(page);
     await expect(pane(page)).not.toContainText("is used by another app");
   });
@@ -110,9 +125,9 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
 
     await search.fill(NO_MATCH);
     await expect(panes(page)).toContainText(`No settings match “${NO_MATCH}”`);
-    await expect(panes(page).getByRole("listitem")).toHaveCount(0);
+    await expect(panes(page).getByRole("option")).toHaveCount(0);
     await search.fill(""); // ×
-    await expect(panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" })).toBeVisible();
+    await expect(panes(page).getByRole("option").filter({ hasText: "Hotkeys" })).toBeVisible();
 
     await openHotkeys(page);
     await field(page, "Pause or resume").click();
@@ -125,8 +140,8 @@ test.describe("cpt-noter-seq-settings-set-hotkeys", () => {
 
   test("UI — keyboard only: ↓ to Hotkeys, Return on a chord field records, Esc cancels with the old chord and focus kept", async ({ page }) => {
     await openWindow(page, "settings");
-    const hotkeys = panes(page).getByRole("listitem").filter({ hasText: "Hotkeys" });
-    await panes(page).getByRole("listitem").first().focus();
+    const hotkeys = panes(page).getByRole("option").filter({ hasText: "Hotkeys" });
+    await panes(page).getByRole("option").first().focus();
     for (let i = 0; i < 12 && !(await hotkeys.evaluate((e) => e === document.activeElement)); i++) await page.keyboard.press("ArrowDown");
     await expect(hotkeys).toBeFocused();
     await page.keyboard.press("Enter");

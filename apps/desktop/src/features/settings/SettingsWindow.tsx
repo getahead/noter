@@ -77,7 +77,7 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-end:cpt-noter-flow-ui-settings-change-setting:p1:inst-open-pane
   // ↑ and ↓ move between the panes; Return opens the one in focus
   const onListKey = (e: KeyboardEvent<HTMLElement>) => {
-    const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=listitem]")];
+    const items = [...e.currentTarget.querySelectorAll<HTMLElement>("[role=option]")];
     const at = items.indexOf(document.activeElement as HTMLElement);
     const act = listKeyAction(e.key, (e.target as HTMLElement).tagName, at, items.length);
     if (!act) return;
@@ -100,9 +100,10 @@ export function SettingsWindow({ bridge }: { bridge: Bridge }) {
               {t("settings.no_match", { text: found.text })}
             </div>
           ) : (
-            <div className="st-panelist" role="list" data-variant="settings-panes">
+            // a single-select list of named options, the open pane selected (WCAG 4.1.2, issue 1061)
+            <div className="st-panelist" role="listbox" aria-label={t("settings.panes")} data-variant="settings-panes">
               {found.panes.map((p) => (
-                <a key={p.id} href="#" role="listitem" tabIndex={p.id === tabStop ? 0 : -1} className={p.id === win.pane ? "st-pane-item is-sel" : "st-pane-item"} aria-current={p.id === win.pane ? "page" : "false"} onClick={(e) => (e.preventDefault(), open(p.id))}>
+                <a key={p.id} href="#" role="option" tabIndex={p.id === tabStop ? 0 : -1} className={p.id === win.pane ? "st-pane-item is-sel" : "st-pane-item"} aria-selected={p.id === win.pane} onClick={(e) => (e.preventDefault(), open(p.id))}>
                   <Icon name={ICONS[p.id]} size={15} />
                   <span>{paneLabel(p.id)}</span>
                 </a>

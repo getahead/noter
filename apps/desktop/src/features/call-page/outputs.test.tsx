@@ -292,6 +292,12 @@ describe("CallBanners on the Summary view", () => {
 });
 
 describe("OutputItemRow", () => {
+  // #1059: the focusable row carries the item's text as its name
+  it("names the row with the item's text", () => {
+    const html = renderToString(<OutputItemRow bridge={{ store: { getState: () => ({ entities: { item: {} } }), subscribe: () => () => {} } } as never} item={{ ...row("Ship it"), spans: [] } as ItemView} />);
+    expect(html).toMatch(/<li[^>]*aria-label="Ship it"/);
+  });
+
   it("surfaces a refused evidence route through the shell command state", async () => {
     await open([]);
     fake.failNext("window_navigate", "internal");

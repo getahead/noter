@@ -209,6 +209,9 @@ export function ActionItemRow({ bridge, item, variant = "full" }: ActionItemRowP
     lang: langOf(it.lang),
     id: rowId,
     tabIndex: -1,
+    // a focusable row is a named group: VoiceOver says which item it is (WCAG 4.1.2, issue 1059)
+    role: "group",
+    "aria-label": it.text,
     onKeyDown: (e: KeyboardEvent) => rowKey(bridge, it, local, e, variant),
   };
   if (state === "EDITING" || state === "SAVING")

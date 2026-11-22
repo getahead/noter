@@ -73,3 +73,20 @@ describe("historyMove", () => {
     expect(go(r.history, { type: "section", section: "ask" }).history.inspectorOpen).toBe(false);
   });
 });
+
+// #1044, owner decision 21 Nov: choosing the section you are in returns to its root list as a new
+// entry (Back returns to the page); another section still opens where it was left (D17).
+describe("re-choosing the current section", () => {
+  const call: Route = { section: "library", key: "call:c1" };
+  const run = (moves: HistoryMove[]) => moves.reduce((h, m) => historyMove(h, m).history, INITIAL_HISTORY as History);
+  const at = (h: History) => h.entries[h.index];
+  it("goes to its root from a pushed page, and Back returns to the page", () => {
+    const h = run([{ type: "section", section: "library" }, { type: "push", route: call }, { type: "section", section: "library" }]);
+    expect(at(h)).toEqual({ section: "library", key: "root" });
+    expect(at(historyMove(h, { type: "back" }).history)).toEqual(call);
+  });
+  it("leaves another section's remembered page as it was", () => {
+    const h = run([{ type: "section", section: "library" }, { type: "push", route: call }, { type: "section", section: "today" }, { type: "section", section: "library" }]);
+    expect(at(h)).toEqual(call);
+  });
+});
