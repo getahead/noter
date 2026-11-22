@@ -22,7 +22,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::process::Command;
 
 use super::{Invocation, Reply};
-use crate::account_cli::{AccountCli, CliError, CliStatus, LoginStart};
+use crate::account_cli::{tool_of, AccountCli, CliError, CliStatus, LoginOutcome, LoginStart};
 use crate::runtime::{lock, Availability, BoxFuture, Tested};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(5);
@@ -74,12 +74,12 @@ impl Cli {
     }
 
     // @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
-    /// Asks `claude auth status` whether the user is signed in. A probe that failed or printed
-    /// something unreadable is unknown and keeps the last answer.
-    pub async fn observe_claude_sign_in(&self) {
-        let status = run_text(&self.config.program, &["auth", "status"])
-            .await
-            .and_then(|text| claude_auth_status(&text));
+    /// Asks the CLI whether the user is signed in (`claude auth status`, `codex login status`
+    /// against the home the account runs use). A probe that failed or printed something
+    /// unreadable is unknown and keeps the last answer.
+    pub async fn observe_sign_in(&self, tool: CliTool) {
+        let codex_home = self.config.home.join(".codex");
+        let status = auth_state(tool, &self.config.program, &codex_home).await;
         if let Some(identity) = status {
             *lock(&self.signed_in) = Some(identity.is_some());
         }
@@ -288,8 +288,10 @@ pub(crate) fn effort(effort: Effort) -> &'static str {
 }
 
 // ── the account seam over the pinned CLIs (TL-32) ──
-// shortcut: status and install only; the CLIs' own browser sign-in and sign-out are driven on
-// the owner's Mac (owner-gated, TL-32), until then they report `Failed`.
+// Formats recorded from the real CLIs in `tests/fixtures/cli-auth` (`tests/cli_auth_contract.rs`).
+
+/// How long a login may take to print its page.
+const LOGIN_PAGE_TIMEOUT: Duration = Duration::from_secs(20);
 
 /// The official install command of each tool, pinned to the version the adapter was tested with
 /// (the lower end of its `TESTED` range), and the hosts it reaches, all in the `cli_install`
@@ -318,6 +320,8 @@ pub struct CliAccounts {
     pub claude: PathBuf,
     pub codex: PathBuf,
     pub ollama: PathBuf,
+    /// The `CODEX_HOME` whose sign-in own-account Codex runs use (`~/.codex`).
+    pub codex_home: PathBuf,
 }
 
 impl CliAccounts {
@@ -346,6 +350,126 @@ async fn run_text(program: &Path, args: &[&str]) -> Option<String> {
     out.status
         .success()
         .then(|| String::from_utf8_lossy(&out.stdout).trim().to_owned())
+}
+
+/// One run of a CLI subcommand: whether it exited 0, its stdout and its stderr. `None` when it
+/// did not start or did not end within the probe deadline.
+async fn run_probe(
+    program: &Path,
+    args: &[&str],
+    codex_home: Option<&Path>,
+) -> Option<(bool, String, String)> {
+    let mut command = Command::new(program);
+    command.args(args).stdin(Stdio::null()).kill_on_drop(true);
+    if let Some(home) = codex_home {
+        command.env("CODEX_HOME", home);
+    }
+    let out = tokio::time::timeout(PROBE_TIMEOUT, command.output())
+        .await
+        .ok()?
+        .ok()?;
+    let text = |b: &[u8]| String::from_utf8_lossy(b).trim().to_owned();
+    Some((out.status.success(), text(&out.stdout), text(&out.stderr)))
+}
+
+// @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+/// Who the CLI is signed in as: `Some(None)` for an explicit sign-out, `None` when unknown.
+/// `claude auth status` prints JSON and exits 1 when signed out; `codex login status` prints one
+/// line on stderr (exit 1 when signed out) and no email, which the id token in its home carries.
+async fn auth_state(
+    tool: CliTool,
+    program: &Path,
+    codex_home: &Path,
+) -> Option<Option<AccountIdentity>> {
+    match tool {
+        CliTool::ClaudeCode => {
+            let (_, stdout, _) = run_probe(program, &["auth", "status"], None).await?;
+            claude_auth_status(&stdout)
+        }
+        CliTool::Codex => match codex_account(program, codex_home).await {
+            Some(account) => Some(account),
+            // An app-server that did not answer: `login status` can still say signed out.
+            None => {
+                let (_, stdout, stderr) =
+                    run_probe(program, &["login", "status"], Some(codex_home)).await?;
+                format!("{stdout}\n{stderr}")
+                    .contains("Not logged in")
+                    .then_some(None)
+            }
+        },
+        CliTool::Ollama => None,
+    }
+}
+// @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+
+// @cpt-begin:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+// @cpt-begin:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
+/// Asks Codex itself who is signed in: one `account/read` to a one-shot `codex app-server`
+/// (JSON lines on stdio), which never refreshes the token. Noter reads no token file.
+async fn codex_account(program: &Path, codex_home: &Path) -> Option<Option<AccountIdentity>> {
+    use tokio::io::{AsyncBufReadExt, BufReader};
+    let mut child = Command::new(program)
+        .arg("app-server")
+        .env("CODEX_HOME", codex_home)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .spawn()
+        .ok()?;
+    let mut stdin = child.stdin.take()?;
+    let mut lines = BufReader::new(child.stdout.take()?).lines();
+    let ask = async {
+        for request in [
+            r#"{"id":1,"method":"initialize","params":{"clientInfo":{"name":"noter","version":"0"}}}"#,
+            r#"{"method":"initialized"}"#,
+            r#"{"id":2,"method":"account/read","params":{"refreshToken":false}}"#,
+        ] {
+            stdin
+                .write_all(format!("{request}\n").as_bytes())
+                .await
+                .ok()?;
+        }
+        // stdin stays open until the answer: the app-server ends on EOF before answering.
+        while let Some(line) = lines.next_line().await.ok()? {
+            let reply: serde_json::Value = serde_json::from_str(&line).unwrap_or_default();
+            if reply["id"] == 2 {
+                return Some(reply);
+            }
+        }
+        None
+    };
+    let reply = tokio::time::timeout(PROBE_TIMEOUT, ask).await.ok()??;
+    let account = &reply["result"]["account"];
+    match account["type"].as_str() {
+        _ if reply["result"].is_null() => None,
+        None | Some("apiKey") => Some(None),
+        Some("chatgpt") => Some(Some(AccountIdentity {
+            // shortcut: an account without an email shows none; the plan still decides.
+            email: account["email"].as_str().unwrap_or_default().to_owned(),
+            plan: account["planType"].as_str().unwrap_or_default().to_owned(),
+        })),
+        Some(_) => Some(None),
+    }
+}
+// @cpt-end:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
+// @cpt-end:cpt-noter-algo-core-credentials-privacy-availability:p1:inst-availability-clis
+
+/// The page (and Codex's one-time code) a login printed so far; `None` until complete. Claude
+/// prints the page as an OSC 8 link, Codex both in ANSI colour.
+fn login_page(provider: AccountProvider, text: &str) -> Option<(String, Option<String>)> {
+    let url = regex::Regex::new(r"https://[^\s\x07\x1b]+[\s\x07\x1b]").ok()?;
+    let url = url.find(text)?.as_str();
+    let url = url[..url.len() - 1].to_owned();
+    if provider == AccountProvider::Claude {
+        return Some((url, None));
+    }
+    let plain = regex::Regex::new(r"\x1b\[[0-9;]*m")
+        .ok()?
+        .replace_all(text, "");
+    let code = regex::Regex::new(r"\b[A-Z0-9]{4,8}-[A-Z0-9]{4,8}\s").ok()?;
+    let code = code.find(&plain)?.as_str().trim_end().to_owned();
+    Some((url, Some(code)))
 }
 
 /// The identity `claude auth status` prints (JSON with `email` and `subscriptionType`).
@@ -387,17 +511,9 @@ impl AccountCli for CliAccounts {
                 CliTool::Codex => Some(super::codex::TESTED),
                 CliTool::Ollama => None,
             };
-            // shortcut: `codex login status` prints no email, so a signed-in Codex shows no
-            // identity until the owner-Mac check reads it from the CLI's own files.
-            let (identity, auth_known) = match tool {
-                CliTool::ClaudeCode => match run_text(program, &["auth", "status"])
-                    .await
-                    .and_then(|text| claude_auth_status(&text))
-                {
-                    Some(identity) => (identity, true),
-                    None => (None, false),
-                },
-                CliTool::Codex | CliTool::Ollama => (None, false),
+            let (identity, auth_known) = match auth_state(tool, program, &self.codex_home).await {
+                Some(identity) => (identity, true),
+                None => (None, false),
             };
             CliStatus {
                 installed: true,
@@ -410,19 +526,96 @@ impl AccountCli for CliAccounts {
         })
     }
 
-    fn login(&self, _: AccountProvider) -> BoxFuture<'_, Result<LoginStart, CliError>> {
-        Box::pin(async {
-            Err(CliError::Failed(
-                "sign-in sessions arrive with slice 2".into(),
-            ))
+    // @cpt-begin:cpt-noter-flow-core-credentials-privacy-signin:p1:inst-signin-start
+    // @cpt-begin:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
+    /// Runs the CLI's own browser login (`claude auth login`, `codex login --device-auth` into
+    /// the account home) and hands back the page it printed; the CLI keeps the sign-in.
+    fn login(&self, provider: AccountProvider) -> BoxFuture<'_, Result<LoginStart, CliError>> {
+        Box::pin(async move {
+            use tokio::io::AsyncReadExt;
+            let tool = tool_of(provider);
+            let program = self.program(tool).to_path_buf();
+            let mut command = Command::new(&program);
+            match provider {
+                AccountProvider::Claude => command.args(["auth", "login", "--claudeai"]),
+                AccountProvider::Chatgpt => command
+                    .args(["login", "--device-auth"])
+                    .env("CODEX_HOME", &self.codex_home),
+            };
+            // stdin stays open: Claude Code waits on it for a pasted code.
+            command
+                .stdin(Stdio::piped())
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .kill_on_drop(true);
+            let mut child = command.spawn().map_err(|_| CliError::Missing)?;
+            let stdin = child.stdin.take();
+            let mut stdout = child
+                .stdout
+                .take()
+                .ok_or(CliError::Failed("stdout".into()))?;
+            let mut seen = Vec::new();
+            let read_page = async {
+                let mut buf = [0u8; 4096];
+                loop {
+                    let n = stdout.read(&mut buf).await.ok()?;
+                    if n == 0 {
+                        return None;
+                    }
+                    seen.extend_from_slice(&buf[..n]);
+                    if let Some(page) = login_page(provider, &String::from_utf8_lossy(&seen)) {
+                        return Some(page);
+                    }
+                }
+            };
+            let Ok(Some((url, code))) = tokio::time::timeout(LOGIN_PAGE_TIMEOUT, read_page).await
+            else {
+                return Err(CliError::Failed("the login printed no page".into()));
+            };
+            let codex_home = self.codex_home.clone();
+            // Dropping `done` (cancel, timeout, a new sign-in) kills the CLI.
+            let done: BoxFuture<'static, LoginOutcome> = Box::pin(async move {
+                let _stdin = stdin;
+                let mut sink = tokio::io::sink();
+                let drain = tokio::io::copy(&mut stdout, &mut sink);
+                let (exit, _) = tokio::join!(child.wait(), drain);
+                match exit {
+                    Ok(exit) if exit.success() => {
+                        match auth_state(tool, &program, &codex_home).await {
+                            Some(Some(identity)) => LoginOutcome::SignedIn(identity),
+                            _ => LoginOutcome::Failed("not signed in after the login".into()),
+                        }
+                    }
+                    Ok(exit) => LoginOutcome::Failed(format!("login exit {:?}", exit.code())),
+                    Err(_) => LoginOutcome::Failed("login wait".into()),
+                }
+            });
+            Ok(LoginStart { url, code, done })
         })
     }
+    // @cpt-end:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
+    // @cpt-end:cpt-noter-flow-core-credentials-privacy-signin:p1:inst-signin-start
 
+    /// Nothing to do: the core ends a pending sign-in by dropping its `done`, which kills the CLI.
     fn cancel(&self, _: AccountProvider) {}
 
-    fn logout(&self, _: AccountProvider) -> BoxFuture<'_, Result<(), CliError>> {
-        Box::pin(async { Err(CliError::Failed("sign-out arrives with slice 2".into())) })
+    // @cpt-begin:cpt-noter-flow-core-credentials-privacy-bind-signout:p1:inst-signout-apply
+    fn logout(&self, provider: AccountProvider) -> BoxFuture<'_, Result<(), CliError>> {
+        Box::pin(async move {
+            let program = self.program(tool_of(provider));
+            let ran = match provider {
+                AccountProvider::Claude => run_probe(program, &["auth", "logout"], None).await,
+                AccountProvider::Chatgpt => {
+                    run_probe(program, &["logout"], Some(&self.codex_home)).await
+                }
+            };
+            match ran {
+                Some((true, _, _)) => Ok(()),
+                _ => Err(CliError::Failed("the CLI's logout failed".into())),
+            }
+        })
     }
+    // @cpt-end:cpt-noter-flow-core-credentials-privacy-bind-signout:p1:inst-signout-apply
 
     fn install(&self, tool: CliTool) -> BoxFuture<'_, Result<CliStatus, CliError>> {
         Box::pin(async move {
@@ -532,27 +725,27 @@ mod account_tests {
         );
 
         std::fs::write(&status, SIGNED_IN).unwrap();
-        cli.observe_claude_sign_in().await;
+        cli.observe_sign_in(CliTool::ClaudeCode).await;
         assert_eq!(unavailable(&cli), None);
 
         // An unreadable answer is unknown: the last one stays.
         std::fs::write(&status, "not json").unwrap();
-        cli.observe_claude_sign_in().await;
+        cli.observe_sign_in(CliTool::ClaudeCode).await;
         assert_eq!(unavailable(&cli), None);
 
         std::fs::write(&status, r#"{"loggedIn":false}"#).unwrap();
-        cli.observe_claude_sign_in().await;
+        cli.observe_sign_in(CliTool::ClaudeCode).await;
         assert_eq!(
             unavailable(&cli),
             Some(RuntimeUnavailableReason::AccountSignedOut)
         );
 
         std::fs::write(&status, SIGNED_IN).unwrap();
-        cli.observe_claude_sign_in().await;
+        cli.observe_sign_in(CliTool::ClaudeCode).await;
         assert_eq!(unavailable(&cli), None);
         // The API-key runtime never depended on the account.
         std::fs::write(&status, r#"{"loggedIn":false}"#).unwrap();
-        cli.observe_claude_sign_in().await;
+        cli.observe_sign_in(CliTool::ClaudeCode).await;
         assert_eq!(
             cli.availability(RuntimeChoice::ClaudeApiKey, true)
                 .unavailable,
@@ -615,32 +808,6 @@ mod account_tests {
     }
 
     #[tokio::test]
-    async fn shipped_account_adapter_keeps_placeholder_login_and_logout_visible() {
-        use std::os::unix::fs::PermissionsExt;
-
-        let dir = tempfile::tempdir().unwrap();
-        let marker = dir.path().join("invoked");
-        let program = dir.path().join("claude");
-        std::fs::write(&program, format!("#!/bin/sh\ntouch {}\n", marker.display())).unwrap();
-        std::fs::set_permissions(&program, std::fs::Permissions::from_mode(0o755)).unwrap();
-        let cli = CliAccounts {
-            claude: program.clone(),
-            codex: program.clone(),
-            ollama: program,
-        };
-        assert!(matches!(
-            cli.login(AccountProvider::Claude).await,
-            Err(CliError::Failed(message)) if message == "sign-in sessions arrive with slice 2"
-        ));
-        cli.cancel(AccountProvider::Claude);
-        assert!(matches!(
-            cli.logout(AccountProvider::Claude).await,
-            Err(CliError::Failed(message)) if message == "sign-out arrives with slice 2"
-        ));
-        assert!(!marker.exists(), "placeholder methods must not run the CLI");
-    }
-
-    #[tokio::test]
     async fn failed_and_malformed_auth_probes_are_unknown_but_logged_out_is_explicit() {
         use std::os::unix::fs::PermissionsExt;
 
@@ -662,6 +829,7 @@ mod account_tests {
             claude: program.clone(),
             codex: program.clone(),
             ollama: program,
+            codex_home: dir.path().join("codex-home"),
         };
         std::fs::write(&auth, "{}").unwrap();
         std::fs::write(&exit, "1").unwrap();

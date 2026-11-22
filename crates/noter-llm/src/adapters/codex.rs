@@ -6,6 +6,7 @@
 //! own-account runs reach the sign-in Codex keeps through a link to its `auth.json`, which Noter
 //! never opens.
 
+use noter_protocol::model::CliTool;
 use noter_protocol::{Effort, RuntimeChoice};
 use serde_json::Value;
 use tokio::process::Command;
@@ -152,6 +153,10 @@ impl RuntimeAdapter for Codex {
 
     fn refresh(&self) {
         self.0.refresh();
+    }
+
+    fn probe(&self) -> BoxFuture<'_, ()> {
+        Box::pin(self.0.observe_sign_in(CliTool::Codex))
     }
 
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>> {
