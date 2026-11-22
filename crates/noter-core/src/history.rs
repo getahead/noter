@@ -162,6 +162,9 @@ impl Core {
         let mut glossary = false;
         let mut transcripts = BTreeSet::new();
         let mut speakers = BTreeSet::new();
+        // Calls whose participants a naming added or removed: their row goes out again (1097).
+        let mut participant_calls = BTreeSet::new();
+        let mut participants_moved = false;
         let mut topics = vec![];
         for (kind, id) in touched {
             match kind.as_str() {
@@ -194,6 +197,20 @@ impl Core {
                     }),
                 },
                 "topic" => topics.push(id.clone()),
+                // A redo brings the row back; an undone one is gone, its naming's speaker names the call.
+                "call_participant" => {
+                    participants_moved = true;
+                    let id = id.clone();
+                    let call_id: Option<String> = self.store().read(move |c| {
+                        c.query_row(
+                            "SELECT call_id FROM call_participants WHERE id = ?1",
+                            [id],
+                            |r| r.get(0),
+                        )
+                        .optional()
+                    })?;
+                    participant_calls.extend(call_id);
+                }
                 "summary" => self.publish_section(id)?,
                 "segment" | "speaker" => {
                     let table = if kind == "segment" {
@@ -245,6 +262,14 @@ impl Core {
         self.items_files(item_calls);
         for call_id in transcripts {
             self.write_transcript_file(&CallId::new(call_id))?;
+        }
+        if participants_moved {
+            participant_calls.extend(speakers.iter().cloned());
+        }
+        for call_id in participant_calls {
+            if let Some(call) = self.call_row(&call_id)? {
+                self.emit_entity_changed(&EntityChanged::Call { call });
+            }
         }
         for call_id in speakers {
             self.write_constraints_file(&CallId::new(call_id.clone()))?;
