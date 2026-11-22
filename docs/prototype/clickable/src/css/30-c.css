@@ -62,6 +62,7 @@
 .it-row--compact .it-row__line { overflow: hidden; }
 .it-row--compact .it-row__meta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 5em; }
 .it-row--compact .it-row__call { flex: 0 100 auto; min-width: 4em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.it-row--compact .it-row__call > .np-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .it-row__call { flex: none; font-size: 12px; }
 .it-row__outcome { padding: 2px 0 0 24px; }
 .it-row.is-outcome { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--sep); }
