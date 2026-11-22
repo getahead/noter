@@ -70,9 +70,19 @@ struct World {
 }
 
 fn open(dir: &Path, script: Option<&str>) -> World {
+    open_with_cli(dir, script, |_| {})
+}
+
+/// `open`, with the account CLIs scripted before the core starts.
+fn open_with_cli(
+    dir: &Path,
+    script: Option<&str>,
+    setup: impl FnOnce(&ScriptedAccountCli),
+) -> World {
     let events = Arc::new(Events::default());
     let secrets = Arc::new(MemorySecrets::default());
     let cli = ScriptedAccountCli::new();
+    setup(&cli);
     let clock = Arc::new(TickClock(AtomicI64::new(1_790_000_000_000)));
     let panel = Arc::new(Panel(Mutex::new(None)));
     let scripted = script.map_or_else(Scripted::new, |s| Scripted::parse(s).unwrap());
@@ -836,4 +846,28 @@ async fn no_assistant_follows_what_is_set_up() {
         nothing(&view),
         "no key, no account and no local model are left"
     );
+}
+
+// cpt-noter-seq-first-run-connect-assistant — #1139: with nothing set up at all, the footer says so from launch, before anyone reads accounts
+#[tokio::test]
+async fn no_assistant_is_raised_at_launch_with_nothing_set_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open_with_cli(dir.path(), None, |cli| {
+        cli.set(tool(r#"{"tool":"ollama","installed":false}"#));
+    });
+    let mut raised = false;
+    for _ in 0..200 {
+        let app = w.core.app_snapshot(&settings(), NoArgs {}).await.unwrap();
+        if app
+            .degraded
+            .states
+            .iter()
+            .any(|s| matches!(s, DegradedState::NoAssistant))
+        {
+            raised = true;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+    }
+    assert!(raised, "no_assistant at launch, before any accounts_get");
 }

@@ -81,6 +81,8 @@ describe.skipIf(isFake)("the real core's scripted runtime and Keychain stand-in 
 
   it("a scripted rejection makes api_key_set answer key_rejected and keeps no key", async () => {
     run = scripted([{ on: "ask-answer", fail: "key_rejected" }]);
+    // no stored key to start from: the fixture's configured key is seeded into the scripted Keychain (#1139)
+    await run.core.invoke("settings", "api_key_remove", { provider: "anthropic" });
     await expect(run.core.invoke("settings", "api_key_set", { provider: "anthropic", key: KEY })).rejects.toMatchObject({ code: "key_rejected" });
     const view = (await run.core.invoke("settings", "accounts_get", {})) as AccountsView;
     expect(status(view, "anthropic")).toEqual({ type: "rejected", reason: "key_rejected" });

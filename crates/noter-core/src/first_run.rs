@@ -345,6 +345,13 @@ impl Core {
                 core.native_changed(reading);
             }
         }));
+        // The accounts are read once at launch, so no_assistant (and the footer) is right before
+        // anyone opens Settings (issue 1139).
+        let accounts = self.clone();
+        self.spawn(async move {
+            accounts.refresh_accounts().await;
+            accounts.accounts_read.send_replace(true);
+        });
         let launch = lock(&self.settings).general.launch_at_login;
         self.apply_login_item(launch);
         self.environment_changed(self.deps.native.environment());
@@ -359,6 +366,14 @@ impl Core {
                 "level": "error", "module": "capture", "code": e.code
             })));
         }
+    }
+
+    /// Resolves once the accounts read `start_first_run` spawned has finished: the harness
+    /// seeds its world after it, so a CLI probe that answers late never overwrites the
+    /// seeded accounts (issue 1139).
+    pub async fn accounts_read_at_launch(&self) {
+        let mut read = self.accounts_read.subscribe();
+        let _ = read.wait_for(|done| *done).await;
     }
 
     fn apply_login_item(&self, on: bool) {

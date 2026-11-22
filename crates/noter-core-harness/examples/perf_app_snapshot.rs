@@ -24,7 +24,9 @@ const WINDOWS: [WindowLabel; 5] = [
 
 /// Runs `rounds` snapshots of every window; returns the serialized bytes as a checksum.
 fn snapshots(rounds: usize) -> usize {
+    // the core's launch work (its accounts read, issue 1139) uses timers, as the app's runtime has
     let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
         .build()
         .expect("runtime");
     runtime.block_on(async {

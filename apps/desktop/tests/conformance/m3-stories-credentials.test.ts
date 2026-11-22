@@ -78,6 +78,10 @@ const persisted = async () => {
 const containsSecret = async (secret: string) => (await persisted()).some((file) => file.includes(Buffer.from(secret)));
 
 const accounts = async (window: "settings" | "first-run" = "settings"): Promise<AccountsView> => ok(await s.core(window).accountsGet({}));
+/** No stored key to start from: the real core seeds the fixture's configured keys into its scripted Keychain (#1139). */
+const removeSeededKeys = async (window: "settings" | "first-run" = "first-run") => {
+  for (const k of (await accounts(window)).keys) if (k.status.type === "configured") ok(await s.core(window).apiKeyRemove({ provider: k.provider }));
+};
 const keyStatus = (view: AccountsView, provider: KeyProvider) => view.keys.find((k) => k.provider === provider)!.status;
 const accountStatus = (view: AccountsView, provider: AccountProvider) => view.accounts.find((a) => a.provider === provider)!.status;
 const roles = async () => ok(await s.core("settings").settingsGet({})).runtimes;
@@ -136,6 +140,7 @@ describe.skipIf(isFake)("cpt-noter-seq-first-run-connect-assistant on the real c
 
   it("error — the key is rejected: the field shows the refusal and nothing is stored", async () => {
     open(['{"on": "ask-answer", "fail": "key_rejected"}'], firstRun);
+    await removeSeededKeys();
     expect(refused(await s.core("first-run").apiKeySet({ provider: "anthropic", key: BAD })).code).toBe("key_rejected");
     expect(keyStatus(await accounts("first-run"), "anthropic")).toEqual({ type: "rejected", reason: "key_rejected" });
     expect(await containsSecret(BAD)).toBe(false);
@@ -156,6 +161,7 @@ describe.skipIf(isFake)("cpt-noter-seq-first-run-connect-assistant on the real c
 
   it("empty — no key and no local runtime: Finish without an assistant still completes, Today opens and capture works", async () => {
     open([], firstRun);
+    await removeSeededKeys();
     const view = await accounts("first-run");
     expect(view.keys.every((k) => k.status.type === "not_set")).toBe(true);
     expect(view.accounts.every((a) => a.status.type === "not_signed_in")).toBe(true);
