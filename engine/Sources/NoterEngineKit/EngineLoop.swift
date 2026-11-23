@@ -12,6 +12,8 @@ public final class EngineLoop: @unchecked Sendable {
     private let sandboxed: Bool
     let source: (StartSession?) -> AudioSource?
     let play: @Sendable ([Float]) -> Void
+    /// Plays a sound from another process, one the tap hears (#1217).
+    let playOutside: @Sendable ([Float]) -> Void
     let container: URL?
     private let now: () -> Int64
     private let encoder: (URL) throws -> AudioEncoder
@@ -59,6 +61,7 @@ public final class EngineLoop: @unchecked Sendable {
         container: URL? = nil, now: @escaping () -> Int64 = EngineClock.epochMilliseconds,
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
         play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
+        playOutside: (@Sendable ([Float]) -> Void)? = nil,
         player: Player = FilePlayer(),
         processes: @escaping @Sendable () -> [ProcessAudio] = { [] },
         transcriber: (() throws -> Transcriber)? = nil,
@@ -74,6 +77,7 @@ public final class EngineLoop: @unchecked Sendable {
         self.encoder = encoder
         self.source = source
         self.play = play
+        self.playOutside = playOutside ?? { [container] in Clip.playOutside($0, in: container) }
         self.player = player
         self.processes = processes
         model = transcriber.map(ModelCache.init)

@@ -97,6 +97,41 @@ public enum Clip {
     // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
 
     private static let playing = OSAllocatedUnfairLock<AVAudioPlayer?>(uncheckedState: nil)
+
+    /// The Others sound: 0.8 s at 600 Hz, a pitch the leak check never mistakes for the clip.
+    public static let othersHz: Float = 600
+    public static let othersSeconds = 0.8
+
+    public static func others() -> [Float] {
+        let n = Int(16_000 * othersSeconds)
+        return (0..<n).map { i in
+            let fade = Float(min(i, n - 1 - i, 320)) / 320
+            return 0.25 * fade * sin(Float(i) * 2 * .pi * othersHz / 16_000)
+        }
+    }
+
+    /// The WAV for afplay, written under `engine-io/` in `container`; nil without a data folder or
+    /// when the path leaves it.
+    static func outsideFile(_ samples: [Float], in container: URL?) -> URL? {
+        guard let container, let file = ContainerPath.resolve("engine-io/self-test-\(UUID().uuidString).wav", in: container),
+            (try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil,
+            (try? WAV.encode(samples: samples, sampleRate: 16_000, float: false).write(to: file)) != nil
+        else { return nil }
+        return file
+    }
+
+    /// Plays `samples` with afplay, a process of its own: the tap, which leaves out this engine and
+    /// the app, hears it as it hears any other app (#1217). The WAV afplay reads goes under
+    /// `engine-io/` in the data folder, the only place the engine writes scratch files (#1173);
+    /// without a data folder nothing plays.
+    public static func playOutside(_ samples: [Float], in container: URL?) {
+        guard let file = outsideFile(samples, in: container) else { return }
+        let afplay = Process()
+        afplay.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
+        afplay.arguments = [file.path]
+        afplay.terminationHandler = { _ in try? FileManager.default.removeItem(at: file) }
+        if (try? afplay.run()) == nil { try? FileManager.default.removeItem(at: file) }
+    }
 }
 
 
@@ -142,6 +177,10 @@ extension EngineLoop {
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
         if playClip, audio != nil, openedInTime {
+            // The tap leaves out this engine's and the app's own sounds, so the Others channel is
+            // proven by a sound another process plays (#1217); then the engine's own clip must stay out.
+            playOutside(Clip.others())
+            Thread.sleep(until: min(deadline, Date().addingTimeInterval(Clip.othersSeconds + 0.2)))
             state.clipStarted()
             play(Clip.samples())
             // The tap is listened to until the clip is over, however soon both channels arrive.

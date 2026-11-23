@@ -294,7 +294,7 @@ export const en = {
   "first_run.refused_value": "Noter couldn't save this choice. Change it and try again.",
   "self_test.awaiting_prompt": "Answer the macOS prompt to continue. The test starts once you do.",
   "self_test.no_audio":
-    "macOS gave Noter no sound from the microphone or system audio. If Noter was just updated, turn it off and on again in System Settings › Privacy & Security, under Microphone and Screen & System Audio Recording, then try again.",
+    "Noter heard nothing from the microphone or system audio. Speak, or play sound in any app, and try again. If it keeps happening, check Noter under Microphone and Screen & System Audio Recording in System Settings › Privacy & Security.",
   "display.title": "Call screen display",
   "display.auto": "The display without the call app",
   "display.recommended": "Recommended",
