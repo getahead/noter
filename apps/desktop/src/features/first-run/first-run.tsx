@@ -25,7 +25,7 @@ import { useAlert } from "../../ui/dialogs/host";
 import { installCli, installKey, loadAccounts, removeKey } from "../settings/accounts";
 import { AccountRow, KeyFieldRow } from "../settings/CredentialRow";
 import { keyConfigured, removeAlert } from "../settings/keys";
-import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
+import { AUTO_DISPLAY, defaultDisplay, refusalKey } from "./default-display";
 import { dbToLevel, hearing } from "./self-test";
 import { STEP_ORDER, stepperItems, type StepperItemState } from "./steps";
 import { allReady, bundlePercent, bundleRowState, createWizard, downloadPaused, gigabytes, overallPercent, rowStateFor, speechPercent, wholeGigabytes, type Wizard, type WizardState } from "./wizard";
@@ -352,6 +352,7 @@ function FirstRunWindow({ bridge }: { bridge: Bridge }) {
   const refused = useSelect(bridge.store, (s) => SAVES.find((k) => s.commands[k]?.state === "ERROR"));
   // a refusal that cannot succeed on a second try gets no Try Again
   const canRetry = useSelect(bridge.store, (s) => (refused ? !!s.commands[refused]?.error?.tryAgain : false));
+  const refusedCode = useSelect(bridge.store, (s) => (refused ? s.commands[refused]?.error?.code : null));
   const step = w.current === "done" ? "assistants" : w.current;
   const index = STEP_ORDER.indexOf(step);
   // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-open-step
@@ -371,7 +372,7 @@ function FirstRunWindow({ bridge }: { bridge: Bridge }) {
       </aside>
       <div className="fr-main">
         <div className="fr-r2" data-region="FR-R2" aria-label={stepLabel(step)} ref={body}>
-          {refused && <InlineBanner banner={{ id: "refused", severity: "error", text: t("window.error"), actions: canRetry ? [{ label: t("action.try_again"), onAction: () => void wizard.retry() }] : [] }} />}
+          {refused && <InlineBanner banner={{ id: "refused", severity: "error", text: t(refusalKey(refused, refusedCode)), actions: canRetry ? [{ label: t("action.try_again"), onAction: () => void wizard.retry() }] : [] }} />}
           {step === "welcome" && <Welcome />}
           {/* @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-models-step */}
           {step === "models" && <Models bridge={bridge} wizard={wizard} w={w} />}

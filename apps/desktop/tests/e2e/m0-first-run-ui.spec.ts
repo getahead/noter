@@ -96,6 +96,26 @@ test.describe("cpt-noter-seq-first-run-complete-setup", () => {
     await expect(step(page, "Call display")).toHaveAttribute("aria-current", "step");
   });
 
+  test("UI — other path: on a one-display Mac, Continue on Call display saves the display without the call app and moves on (#1215)", async ({ page }) => {
+    await openWindow(page, "first-run", {
+      world: (w) => {
+        W.firstRun(w);
+        audioGranted(w);
+        w.app.setup.self_test = { type: "passed", at: Date.now() };
+        w.app.setup.steps.find((s) => s.step === "permissions")!.state = "done";
+        w.app.setup.detection_enabled = true; // what the core switches on after a pass
+        w.app.setup.call_display = W.STUDIO_DISPLAY; // remembered from when the studio display was plugged in
+        W.laptopOnly(w);
+      },
+    });
+    await expect(step(page, "Call display")).toHaveAttribute("aria-current", "step");
+    await expect(page.getByRole("radio", { name: /The display without the call app/ })).toBeChecked();
+    await button(page, "Continue").click();
+    await expect(step(page, "Audio storage")).toHaveAttribute("aria-current", "step");
+    await expect(page.getByText("Something went wrong")).toHaveCount(0);
+    expect((await sent(page, "setup_set_call_display")).at(-1)).toEqual({ display_id: null });
+  });
+
   test("UI — other path: Finish the remaining steps — Call display, Audio storage, Assistants, Finish", async ({ page }) => {
     await openWindow(page, "first-run", {
       world: (w) => {
