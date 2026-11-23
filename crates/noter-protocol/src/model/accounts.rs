@@ -37,7 +37,7 @@ pub struct KeyView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountProvider {
-    /// Your Claude account, through Claude Code (Pro or Max, personal use only).
+    /// Your Claude account, through Claude Code (Pro, Max or Team, personal use only).
     Claude,
     /// Your ChatGPT account, through Codex (Plus, Pro, Business or Enterprise).
     Chatgpt,

@@ -156,19 +156,38 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await expect(button(dlg, "Continue in Browser")).toBeDisabled();
   });
 
-  // ET 22 Nov: the owner's Claude Code is signed in to a Team plan; the refusal must say whose plan and which
-  test("error path — Use This Account on a Team plan names the account and its plan, with the API key instead", async ({ page }) => {
+  // ET 22 Nov: a refused plan says whose plan and which; since #1218 the accepted plans are Pro, Max or Team
+  test("error path — Use This Account on a Free plan names the account, its plan and the accepted plans, with the API key instead", async ({ page }) => {
     const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
-    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "free" } });
     await openModels(page);
     await button(row(page, "Your Claude account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your Claude account/);
-    await dlg.getByRole("checkbox").click({ force: true });
+    await dlg.getByRole("checkbox", { name: "Personal use" }).click({ force: true });
     await button(dlg, "Use This Account").click();
-    await expect(dlg.getByRole("alert")).toContainText("ann@example.com has no Claude Pro or Max plan");
-    await expect(dlg.getByRole("alert")).toContainText("team");
+    await expect(dlg.getByRole("alert")).toContainText("ann@example.com has no Claude Pro, Max or Team plan");
+    await expect(dlg.getByRole("alert")).toContainText("free");
     await expect(button(dlg, "Use an API Key Instead")).toBeVisible();
     await expect(row(page, "Your Claude account")).toContainText("Not signed in");
+  });
+
+  // Owner decision, 23 Nov (#1218): a Claude Team plan is accepted; the Personal use box is the required confirmation
+  test("other path: Use This Account on a Team plan connects once Personal use is ticked", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await openModels(page);
+    await expect(row(page, "Your Claude account")).toContainText("Use your Claude Pro, Max or Team plan through Claude Code. Personal use only.");
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your Claude account/);
+    await expect(dlg).toContainText("Pro, Max or Team plan");
+    const personal = dlg.getByRole("checkbox", { name: "Personal use" });
+    await expect(personal).not.toBeChecked();
+    await expect(button(dlg, "Use This Account")).toBeDisabled(); // the box is required
+    await personal.click({ force: true });
+    await button(dlg, "Use This Account").click();
+    expect(await sent(page, "account_use_existing")).toEqual([{ provider: "claude", personal_use_confirmed: true }]);
+    await expect(dlg).toContainText("Connected to your Claude account");
+    await expect(dlg).toContainText("ann@example.com");
   });
 
   test("other path: Esc hides the waiting sheet, the row keeps Finishing in your browser…, Cancel ends the session", async ({ page }) => {
@@ -237,18 +256,30 @@ describeReal("cpt-noter-seq-first-run-connect-assistant", () => {
   });
 
   // ET 22 Nov: the same refusals in the wizard's Assistants step, both providers
-  test("error path: Assistants — a Team plan and an unsupported Codex each say why on the sheet", async ({ page }) => {
+  test("error path: Assistants — a Free plan and an unsupported Codex each say why on the sheet", async ({ page }) => {
     const steer = await openWindow(page, "first-run", { world: assistantsOpen });
-    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "free" } });
     await codexCli(steer, { version: "0.171.0", supported: false });
     await button(row(page, "Your Claude account"), /Sign In/).click();
     const claude = sheet(page, /Sign in with your Claude account/);
-    await claude.getByRole("checkbox").click({ force: true });
+    await claude.getByRole("checkbox", { name: "Personal use" }).click({ force: true });
     await button(claude, "Use This Account").click();
-    await expect(claude.getByRole("alert")).toContainText("ann@example.com has no Claude Pro or Max plan");
+    await expect(claude.getByRole("alert")).toContainText("ann@example.com has no Claude Pro, Max or Team plan");
     await button(claude, "Cancel").click();
     await button(row(page, "Your ChatGPT account"), /Sign In/).click();
     await expect(sheet(page, /Sign in with your ChatGPT account/)).toContainText(/Codex 0\.171\.0 isn[’']t supported yet/);
+  });
+
+  // #1218: the wizard's Assistants step accepts a Team plan behind the same Personal use box
+  test("other path: Assistants — a Claude Team plan connects once Personal use is ticked", async ({ page }) => {
+    const steer = await openWindow(page, "first-run", { world: assistantsOpen });
+    await claudeCli(steer, { identity: { email: "ann@example.com", plan: "team" } });
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const claude = sheet(page, /Sign in with your Claude account/);
+    await expect(button(claude, "Use This Account")).toBeDisabled();
+    await claude.getByRole("checkbox", { name: "Personal use" }).click({ force: true });
+    await button(claude, "Use This Account").click();
+    await expect(claude).toContainText("Connected to your Claude account");
   });
 
   test("other path: Install Ollama… installs the local runtime through cli_install and the offer goes away", async ({ page }) => {

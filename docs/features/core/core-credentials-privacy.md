@@ -258,7 +258,7 @@ Q4: does not ship (decided 20 Oct; TL-29). `storage_move` returns `not_implement
 
 **Steps**:
 1. [x] - `p1` - Reject an expired or cancelled session before applying its result; use only provider identity and plan status supplied by the CLI - `inst-check-session`
-2. [x] - `p1` - Require confirmed personal use for Claude and a Pro or Max plan; ChatGPT accepts Plus, Pro, Business or Enterprise independently - `inst-check-plan`
+2. [x] - `p1` - Require confirmed personal use for Claude and a Pro, Max or Team plan; ChatGPT accepts Plus, Pro, Business or Enterprise independently - `inst-check-plan`
 3. [ ] - `p1` - Use the M3 Q8 spike's verified Claude plan signal when available; otherwise use the short test-request fallback rather than reading a stored token or guessing from email (owner-Mac item: M3 ships the test-request fallback only, TL-31) - `inst-check-spike`
 4. [x] - `p1` - Run a short test through the router, with the same per-run isolation, tool restrictions and egress audit as other own-account requests - `inst-check-test`
 5. [x] - `p1` - Map cancellation, five-minute timeout, ineligible plan, offline and provider-ended session to the contract errors; failed checks leave agent bindings unchanged - `inst-check-error`

@@ -291,6 +291,6 @@ describe("account rows (cpt-noter-flow-ui-accounts-manage)", () => {
     await loadAccounts(bridge);
     const html = renderToString(<ModelsRuntimesPane settings={bridge.store.getState().whole.settings!} bridge={bridge} />);
     expect(html).toContain("Codex isn’t installed. Sign in will offer to install it.");
-    expect(html).toContain("Use your Claude Pro or Max plan through Claude Code");
+    expect(html).toContain("Use your Claude Pro, Max or Team plan through Claude Code");
   });
 });
