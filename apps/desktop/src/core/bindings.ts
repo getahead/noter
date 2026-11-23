@@ -20,7 +20,7 @@ export type AccountIdentity = {
 };
 
 export type AccountProvider = 
-/**  Your Claude account, through Claude Code (Pro or Max, personal use only). */
+/**  Your Claude account, through Claude Code (Pro, Max or Team, personal use only). */
 "claude" | 
 /**  Your ChatGPT account, through Codex (Plus, Pro, Business or Enterprise). */
 "chatgpt";

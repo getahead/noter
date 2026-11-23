@@ -38,13 +38,14 @@ fn key_provider(provider: AccountProvider) -> KeyProvider {
     }
 }
 
-/// Claude: Pro or Max. ChatGPT: Plus, Pro, Business or Enterprise.
+/// Claude: Pro, Max or Team (owner decision, 23 Nov: Team for personal use, confirmed in the
+/// sheet). ChatGPT: Plus, Pro, Business or Enterprise.
 // shortcut: the plan is matched by name as the CLI reports it; the Q8 spike (owner Mac) may add
 // a verified signal for Claude.
 fn eligible(provider: AccountProvider, plan: &str) -> bool {
     let plan = plan.to_lowercase();
     let plans: &[&str] = match provider {
-        AccountProvider::Claude => &["pro", "max"],
+        AccountProvider::Claude => &["pro", "max", "team"],
         AccountProvider::Chatgpt => &["plus", "pro", "business", "enterprise"],
     };
     plans.iter().any(|p| plan.contains(p))
@@ -654,5 +655,26 @@ impl Core {
             self.settings_written(&mut settings, section, rev);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Owner decision, 23 Nov (#1218): Claude accepts Pro, Max and Team; anything else is refused
+    #[test]
+    fn claude_accepts_pro_max_and_team_and_chatgpt_its_paid_plans() {
+        for plan in ["pro", "max", "team", "Team", "Claude Max"] {
+            assert!(eligible(AccountProvider::Claude, plan), "{plan}");
+        }
+        for plan in ["free", "", "enterprise", "unknown"] {
+            assert!(!eligible(AccountProvider::Claude, plan), "{plan}");
+        }
+        assert!(eligible(
+            AccountProvider::Chatgpt,
+            "self_serve_business_prolite"
+        ));
+        assert!(!eligible(AccountProvider::Chatgpt, "free"));
     }
 }

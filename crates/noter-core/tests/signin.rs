@@ -460,6 +460,39 @@ async fn offline_and_ineligible_plans_leave_everything_unchanged() {
     assert_eq!(after.keys, before.keys);
 }
 
+// Owner decision, 23 Nov (#1218): a Claude Team plan is accepted for personal use, confirmed by the
+// sheet's Personal use box. The plan is the one real Claude Code 2.1.325 reported (redacted fixture).
+#[tokio::test(start_paused = true)]
+async fn a_recorded_claude_team_plan_is_accepted_once_personal_use_is_confirmed() {
+    let recorded = include_str!(
+        "../../noter-llm/tests/fixtures/cli-auth/claude-2.1.325/auth-status-signed-in.stdout"
+    );
+    let status: serde_json::Value = serde_json::from_str(recorded).unwrap();
+    let plan = status["subscriptionType"].as_str().unwrap();
+    assert_eq!(plan, "team");
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    bare(
+        &w,
+        &format!(
+            r#"{{"tool":"claude_code","installed":true,"version":"2.1.325",
+                "identity":{{"email":"user@example.com","plan":"{plan}"}}}}"#
+        ),
+    );
+    let err = w
+        .core
+        .account_use_existing(&settings(), reuse(CLAUDE, None))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::PersonalUseNotConfirmed);
+    let ok = w
+        .core
+        .account_use_existing(&settings(), reuse(CLAUDE, Some(true)))
+        .await
+        .unwrap();
+    assert!(is_signed_in(&ok, CLAUDE));
+}
+
 #[tokio::test(start_paused = true)]
 async fn use_existing_runs_the_same_checks_and_claude_needs_a_recorded_confirmation() {
     let dir = tempfile::tempdir().unwrap();

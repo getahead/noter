@@ -2877,7 +2877,7 @@ Questions this design could not settle alone. Q1, Q2 and Q5 were answered by the
 | Q5 | Where do call types come from in v1? **Decided 17 Oct: the built-in list plus skill folders the user adds.** `CallTypeInfo` carries `builtin` and `skill_path` | Owner | Nothing (decided) |
 | Q6 | Should the UI or the core compute version diffs for very long summaries? This design says the UI (C7); revisit if diffs of role reviews become slow | UI | Nothing now |
 | Q7 | Should capture run in its own minimal process, apart from the ML models? The capture ring in a memory-mapped file and the capture-first restart keep a crash gap at about 2 s; the M1 week-one test (engine kills during capture) decides whether that holds the 99 % no-dropout target | Core | Engine process layout; no contract change |
-| Q8 | How is the plan of an own Claude account detected from the CLI (Pro or Max)? Not verified; an M3 spike decides it, and the plan check falls back to the test request | Core | `plan_not_eligible` accuracy only |
+| Q8 | How is the plan of an own Claude account detected from the CLI (Pro, Max or Team)? Not verified; an M3 spike decides it, and the plan check falls back to the test request | Core | `plan_not_eligible` accuracy only |
 
 ### 4.4 Risks, technical debt and quality approach
 

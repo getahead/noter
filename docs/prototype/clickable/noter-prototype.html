@@ -9438,11 +9438,11 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
   /* ---------------- providers ---------------- */
   const PROVIDERS = {
     claude: {
-      id: 'claude', name: 'Claude', account: 'Claude account', tool: 'Claude Code', site: 'claude.ai', plans: 'Pro or Max',
+      id: 'claude', name: 'Claude', account: 'Claude account', tool: 'Claude Code', site: 'claude.ai', plans: 'Pro, Max or Team',
       plan: 'Max', email: 'mikhail@example.com', freeEmail: 'mikhail.personal@example.com', path: '~/.local/bin/claude',
       keyRuntime: 'claude-key', accRuntime: 'claude-account', keyName: 'Anthropic API key', keyCred: 'anthropic',
       personalUse: true,
-      what: 'Noter runs Claude Code with your Claude Pro or Max plan instead of the Anthropic API key. Requests count against your plan’s usage limits.',
+      what: 'Noter runs Claude Code with your Claude Pro, Max or Team plan instead of the Anthropic API key. Requests count against your plan’s usage limits.',
     },
     chatgpt: {
       id: 'chatgpt', name: 'ChatGPT', account: 'ChatGPT account', tool: 'Codex', site: 'chatgpt.com', plans: 'Plus, Pro, Business or Enterprise',
@@ -9549,7 +9549,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
         <div class="f-acct__use">${users.length ? `Used by ${users.length} agent${users.length === 1 ? '' : 's'}: ${users.map((u) => u.name).join(', ')}` : 'No agent uses it yet. Choose it in Agents, or for a task below.'}</div>`
       : st === 'expired'
         ? html`<div class="e-cred__reason">${icon('warning', { size: 12 })} ${p.name} ended the session for ${a.email}. ${users.length ? `${users.length} agent${users.length === 1 ? '' : 's'} paused until you sign in again.` : ''}</div>`
-        : html`<div class="e-cred__use">${pid === 'claude' ? 'Use your Claude Pro or Max plan through Claude Code. Personal use only.' : 'Use your ChatGPT plan through Codex.'}</div>`;
+        : html`<div class="e-cred__use">${pid === 'claude' ? 'Use your Claude Pro, Max or Team plan through Claude Code. Personal use only.' : 'Use your ChatGPT plan through Codex.'}</div>`;
     const actions = st === 'signed-in'
       ? html`${P.button('Test', { size: 'small', flashKey: 'acct-test-' + pid, action: ['auth.test', { p: pid }] })}${P.button('Sign Out…', { size: 'small', action: ['auth.signOut', { p: pid }] })}`
       : st === 'signing-in'
@@ -9609,7 +9609,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
             <li>${icon('agent', { size: 13 })}<span>You choose which agents and tasks use it. Everything else keeps its current runtime.</span></li>
             <li>${icon('cloudLock', { size: 13 })}<span>Your privacy mode still applies: with Cloud, redacted, names and PII are replaced before anything is sent.</span></li>
           </ul>
-          ${p.personalUse ? P.checkbox(`I’ll use my ${p.account} only for my own work`, f.ack, { id: 'auth-ack-' + pid, bind: 'auth.' + pid + '.flow.ack' }) : ''}
+          ${p.personalUse ? P.checkbox('Personal use', f.ack, { id: 'auth-ack-' + pid, bind: 'auth.' + pid + '.flow.ack' }) : ''}
           ${p.personalUse ? html`<div class="f-fine">${p.name} plans are for personal use. Heavy automated use may be throttled. For a team rollout, use an API key.</div>` : ''}
         </div>
         ${foot(html`${cancel}<span class="np-tb__spacer"></span>${P.button(useExisting ? 'Use This Account' : 'Continue in Browser', { variant: 'primary', disabled: !ackOk || f.cli !== 'found', icon: useExisting ? null : 'external', action: ['auth.continue', { p: pid }] })}`)}`;

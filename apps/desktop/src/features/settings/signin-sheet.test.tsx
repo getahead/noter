@@ -43,11 +43,11 @@ describe("AccountSignInSheet", () => {
     const claude = html("claude");
     expect(claude).toContain("Sign in with your Claude account");
     expect(claude).toContain("Noter never sees your password");
-    expect(claude).toContain("I’ll use my Claude account only for my own work");
+    expect(claude).toMatch(/>Personal use</); // #1218: the owner's wording for the required box
     expect(claude).toContain('data-variant="sign-in-claude"');
     expect(html("chatgpt")).toBe(""); // the other provider is independent
     await m().open("chatgpt");
-    expect(html("chatgpt")).not.toContain("only for my own work");
+    expect(html("chatgpt")).not.toMatch(/>Personal use</);
   });
 
   it("keeps Continue disabled until the box is ticked, then starts the browser step and shows the returned code", async () => {
@@ -140,11 +140,11 @@ describe("AccountSignInSheet", () => {
     fake.failNext("account_use_existing", "personal_use_not_confirmed");
     await m().proceed("claude");
     expect(m().state.claude.phase).toBe("SIGNIN_ERROR");
-    expect(html("claude")).toContain("Tick the personal-use box");
+    expect(html("claude")).toContain("Tick Personal use");
     press("claude", "Try Again");
     await vi.waitFor(() => expect(m().state.claude.prepare).not.toBeNull());
     expect(m().state.claude.phase).toBe("PREPARE");
-    expect(html("claude")).toContain("I’ll use my Claude account only for my own work");
+    expect(html("claude")).toMatch(/>Personal use</);
     expect(canContinue(m().state.claude)).toBe(false);
   });
 
@@ -238,13 +238,14 @@ describe("AccountSignInSheet", () => {
   it("ET 22 Nov: a refused plan names the account and the plan the CLI reported", async () => {
     const { fake } = await ready();
     await m().open("claude");
-    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, existing: { email: "ann@example.com", plan: "team" } } });
+    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, existing: { email: "ann@example.com", plan: "free" } } });
     m().dispatch("claude", { type: "confirm", on: true });
     m().dispatch("claude", { type: "choose", choice: "existing" });
     fake.failNext("account_use_existing", "plan_not_eligible");
     await m().proceed("claude");
-    expect(html("claude")).toContain("ann@example.com has no Claude Pro or Max plan");
-    expect(html("claude")).toContain("Claude Code reports the “team” plan");
+    // #1218: the accepted plans are Pro, Max or Team
+    expect(html("claude")).toContain("ann@example.com has no Claude Pro, Max or Team plan");
+    expect(html("claude")).toContain("Claude Code reports the “free” plan");
   });
 
   it("recovers a signing_in row after a reload with Show and no code", async () => {
