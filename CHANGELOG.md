@@ -1,5 +1,62 @@
 # Changelog
 
+## [0.25.0](https://github.com/getahead/noter/compare/v0.24.2...v0.25.0) (2026-11-22)
+
+
+### Features
+
+* **call-screen:** latency line and text size on the call screen ([#1181](https://github.com/getahead/noter/issues/1181)) ([7f81939](https://github.com/getahead/noter/commit/7f819397a93877d5d12e2f63f56f3e00fef36536))
+* **contract:** contract 2.28 and the Claude sign-in code, from exploratory testing ([#1195](https://github.com/getahead/noter/issues/1195)) ([1edd076](https://github.com/getahead/noter/commit/1edd076e9b7cf2499d54b6c149d0a4ba411ddbc9))
+* **contract:** device lists, transcription languages, latency and text size for Settings ([#1175](https://github.com/getahead/noter/issues/1175)) ([efb9779](https://github.com/getahead/noter/commit/efb977910ecdd8b774e2787dd5f115fa3f76473b))
+* **contract:** pause hotkeys while recording a shortcut and audit key checks, from exploratory testing ([#1171](https://github.com/getahead/noter/issues/1171)) ([5deb79f](https://github.com/getahead/noter/commit/5deb79f93c0b36964175e2516d54deb300865c6e))
+* **contract:** topic open questions and first-run API key removal from exploratory testing ([#1099](https://github.com/getahead/noter/issues/1099)) ([18e82f8](https://github.com/getahead/noter/commit/18e82f8181fc032dad0cc075f879bdd4b008bf76))
+
+
+### Bug fixes
+
+* **accounts:** sign in to Claude and ChatGPT through the real CLIs, and say why a sign-in is refused ([#1135](https://github.com/getahead/noter/issues/1135)) ([99e2bfe](https://github.com/getahead/noter/commit/99e2bfea59b679d1974548d4766b8a90bcb1e7c9))
+* call page and export fixes from exploratory testing ([#1107](https://github.com/getahead/noter/issues/1107)) ([d0e90e5](https://github.com/getahead/noter/commit/d0e90e57ae69c4c101654e3f7c1b676777c2d377))
+* capture clocks, pause and the call window from exploratory testing ([#1110](https://github.com/getahead/noter/issues/1110)) ([d304715](https://github.com/getahead/noter/commit/d3047154cf3beb6794bb22e6739c6d638942a145))
+* capture warnings for silent system audio and a granted silent microphone, from exploratory testing ([#1192](https://github.com/getahead/noter/issues/1192)) ([407dd12](https://github.com/getahead/noter/commit/407dd12616061ecad225c461f5d9aaf539f84447))
+* **core:** call length, first run, model resume and export fixes from exploratory testing ([#1176](https://github.com/getahead/noter/issues/1176)) ([095b995](https://github.com/getahead/noter/commit/095b995ee9e1644c615348d6fb0a8cfdeb0b85c3))
+* **core:** read the accounts at launch so no_assistant is right from the start ([#1185](https://github.com/getahead/noter/issues/1185)) ([e8bc25d](https://github.com/getahead/noter/commit/e8bc25de64fae2bda215f4a3e8cdb4e9bec7e601))
+* **core:** the setup window closes when Finish opens Today ([#1148](https://github.com/getahead/noter/issues/1148)) ([1e2bc50](https://github.com/getahead/noter/commit/1e2bc50283222cf02f6b83a9f3b087f0673e8508))
+* **desktop:** ship the Voice to note app icon ([#1189](https://github.com/getahead/noter/issues/1189)) ([b4db2c7](https://github.com/getahead/noter/commit/b4db2c756c49433af4c41f711b28a16583d1a118))
+* **engine:** keep engine paths under audio/, models/ and engine-io/ ([#1203](https://github.com/getahead/noter/issues/1203)) ([caf1aa3](https://github.com/getahead/noter/commit/caf1aa39bfdad283bf0e0cb2332541d22f80c02b))
+* **engine:** never lose the first recording to a permission prompt ([#1168](https://github.com/getahead/noter/issues/1168)) ([f3ea019](https://github.com/getahead/noter/commit/f3ea0195e755201f6067a961d2230297aeff77e7))
+* **export:** write a call as the PRD's folder with call.json, summary.md, transcript.md, SRT, JSON and audio ([#1202](https://github.com/getahead/noter/issues/1202)) ([75ab5e4](https://github.com/getahead/noter/commit/75ab5e4ab555585c17f96ac717ff93a3300466d6))
+* **handoff:** pick the folder only on Choose…; Add Mapping saves the mapping ([#1174](https://github.com/getahead/noter/issues/1174)) ([3070bca](https://github.com/getahead/noter/commit/3070bca9621fe046166d58c6cef345eb5457bfba))
+* **host:** a panel whose first load hung loads again after the watch restart ([#1178](https://github.com/getahead/noter/issues/1178)) ([2ff7f78](https://github.com/getahead/noter/commit/2ff7f784dd710e73e7aa76f14105743c1dbc0e7d))
+* library and topics fixes from exploratory testing ([#1114](https://github.com/getahead/noter/issues/1114)) ([d70fc34](https://github.com/getahead/noter/commit/d70fc34a8a117e7aea3512fb5bf05e1fcd6cdd2e))
+* library search item rows and people details from exploratory testing ([#1198](https://github.com/getahead/noter/issues/1198)) ([347c5f1](https://github.com/getahead/noter/commit/347c5f1f25d277214ff705d2579a694235f1012f))
+* **llm:** make the CLI availability and lockdown tests deterministic under load ([#1182](https://github.com/getahead/noter/issues/1182)) ([b68ccca](https://github.com/getahead/noter/commit/b68ccca7aaadafd02d4ce31d90878c0bd14f6944))
+* **macos:** ask for System Audio Recording in the app's Info.plist ([#1145](https://github.com/getahead/noter/issues/1145)) ([7bc5daa](https://github.com/getahead/noter/commit/7bc5daafa9e63d38dab88f44c577b595ff86a254))
+* **macos:** drop the App Group and the engine sandbox for ad-hoc releases ([#1095](https://github.com/getahead/noter/issues/1095)) ([d7d4858](https://github.com/getahead/noter/commit/d7d485816f5595299b38373ce4ad12e7b171b452))
+* **macos:** hide the call panel on close instead of destroying it ([#1108](https://github.com/getahead/noter/issues/1108)) ([06feb5e](https://github.com/getahead/noter/commit/06feb5e375b405b1f23cf7a7abd2a5a91b99a58c))
+* **people:** count a person's topics the way Topics does ([#1177](https://github.com/getahead/noter/issues/1177)) ([f5dc7fd](https://github.com/getahead/noter/commit/f5dc7fd45f29de8dbbad10d26034bb35816de54e))
+* shell, navigation, first-run and accessibility fixes from exploratory testing ([#1137](https://github.com/getahead/noter/issues/1137)) ([9cd2ab0](https://github.com/getahead/noter/commit/9cd2ab036df6dc7d46a70303247835df6faeecae))
+* silent system audio for command-line players and launch at login in first run, from exploratory testing ([#1197](https://github.com/getahead/noter/issues/1197)) ([484c17c](https://github.com/getahead/noter/commit/484c17caeed87ada55dd5691fe39679d1ac37a4a))
+* six verified exploratory-testing fixes that never reached main ([#1205](https://github.com/getahead/noter/issues/1205)) ([2d33e1f](https://github.com/getahead/noter/commit/2d33e1fc91df1848e534c58a2c4ad7ef2567ed83))
+* speaker naming undo, no-assistant section and hotkey conflict label, from exploratory testing ([#1193](https://github.com/getahead/noter/issues/1193)) ([771ece8](https://github.com/getahead/noter/commit/771ece88af7797e8c77462e4d614506fc8e275f0))
+* **test:** the model-download stall and bundle-resume tests wait on handshakes, not wall clock ([#1204](https://github.com/getahead/noter/issues/1204)) ([46394af](https://github.com/getahead/noter/commit/46394af2b54eae7c9cd95b60086b18fd43495bd5))
+* **ui,native:** the first-run footer names the running macOS version ([#1199](https://github.com/getahead/noter/issues/1199)) ([c770605](https://github.com/getahead/noter/commit/c770605f7870af2c2378bc733f64c71024fbec03))
+* **ui:** ⌘J reaches live even while the transcript view keeps re-rendering ([#1184](https://github.com/getahead/noter/issues/1184)) ([d811b4c](https://github.com/getahead/noter/commit/d811b4c1a49ac53f83d76d89b6b388d023b72f52))
+* **ui:** add the Settings controls for microphone, output devices, languages, latency, text size, stages, release notes and model bundle ([#1179](https://github.com/getahead/noter/issues/1179)) ([5944518](https://github.com/getahead/noter/commit/594451810b9bdef63b8e3e6d6bcb434ac54c6a14))
+* **ui:** delete-audio and key-removal follow-ups from exploratory testing ([#1165](https://github.com/getahead/noter/issues/1165)) ([a9cab42](https://github.com/getahead/noter/commit/a9cab42ae5689b08ff067f8b22d830d34f61e8db))
+* **ui:** disable Library Export… while only calls still recording are selected ([#1206](https://github.com/getahead/noter/issues/1206)) ([63d37b1](https://github.com/getahead/noter/commit/63d37b1b11696fd451c1b143a35343b3e299e15c))
+* **ui:** first run says Not verified yet before the self-test and names withheld system audio after it ([#1166](https://github.com/getahead/noter/issues/1166)) ([24f691d](https://github.com/getahead/noter/commit/24f691d881bc7fefafadca7227c293dddafe2769))
+* **ui:** make item rows, Ask feedback and search hits match the approved prototype ([#1156](https://github.com/getahead/noter/issues/1156)) ([4d0adf9](https://github.com/getahead/noter/commit/4d0adf9bbe1fab2ad5a814e63ac36abe4e3cec3b))
+* **ui:** make People, the Person page and the Ask toolbar match the approved prototype ([#1153](https://github.com/getahead/noter/issues/1153)) ([fbfa84c](https://github.com/getahead/noter/commit/fbfa84cc2e57320dedf48b29d90740898330ba6f))
+* **ui:** make the Call page, Call info and page headings match the approved prototype ([#1147](https://github.com/getahead/noter/issues/1147)) ([8efec07](https://github.com/getahead/noter/commit/8efec072dfa1ed60992272564deca5fb7db3826e))
+* **ui:** make the Calls page match the approved prototype ([#1105](https://github.com/getahead/noter/issues/1105)) ([30588a2](https://github.com/getahead/noter/commit/30588a2a51c895ea7f5ae2983fee4a8cb880918d))
+* **ui:** make the Settings window match the approved prototype ([#1150](https://github.com/getahead/noter/issues/1150)) ([eb0be64](https://github.com/getahead/noter/commit/eb0be64023d80d58bf6b76899b1dc7808848d0cd))
+* **ui:** make the Today page match the approved prototype ([#1101](https://github.com/getahead/noter/issues/1101)) ([7ad43c5](https://github.com/getahead/noter/commit/7ad43c5d5ad39a684409263c618a3126c375ba58))
+* **ui:** match the Person overview, own-account tags and prototype to the design ([#1157](https://github.com/getahead/noter/issues/1157)) ([d9414b2](https://github.com/getahead/noter/commit/d9414b248bdf49552375f39360d54990c59449b0))
+* **ui:** menus from the call window keep system size and stay inside the window at Text size 150 % ([#1191](https://github.com/getahead/noter/issues/1191)) ([9c74926](https://github.com/getahead/noter/commit/9c74926caa1a0869bc565021db92301f9e352785))
+* **ui:** root error boundary, seeded self-test and steady account shots ([#1138](https://github.com/getahead/noter/issues/1138)) ([53c9d4a](https://github.com/getahead/noter/commit/53c9d4adb097237530110bbc28015c7e33029007))
+* **ui:** scale the floating panel's header with Text size, like the call screen's ([#1187](https://github.com/getahead/noter/issues/1187)) ([7699720](https://github.com/getahead/noter/commit/7699720d56f747a2dac56903aefcce217e10987f))
+* **ui:** toolbar inset and readable history from exploratory testing ([#1119](https://github.com/getahead/noter/issues/1119)) ([8cb116d](https://github.com/getahead/noter/commit/8cb116d2f57447848165a3c8993c4ede346a60a2))
+
 ## [0.24.2](https://github.com/getahead/noter/compare/v0.24.1...v0.24.2) (2026-11-21)
 
 
