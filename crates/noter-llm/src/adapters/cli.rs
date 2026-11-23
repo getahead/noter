@@ -249,7 +249,8 @@ pub(crate) fn command(cli: &Cli, cwd: &Path, run: &RunDir) -> Command {
         .current_dir(cwd)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        // read only to tell a rejected lockdown flag from other failures; never kept or logged
+        .stderr(Stdio::piped())
         // shortcut: kills the CLI itself, not processes it spawned; noter-mcp under it ends on its
         // stdio EOF and its socket token is revoked when the run ends. Kill the process group if
         // a CLI ever keeps its MCP child alive.
@@ -273,9 +274,30 @@ async fn output(mut command: Command, stdin: &[u8]) -> Result<Vec<u8>, String> {
         .await
         .map_err(|_| "cli_failed".to_owned())?;
     if !out.status.success() {
-        return Err("cli_failed".into());
+        // A newer CLI that dropped or renamed a lockdown flag fails closed (#1219).
+        let code = if usage_error(&out.stderr) {
+            "cli_incompatible"
+        } else {
+            "cli_failed"
+        };
+        return Err(code.into());
     }
     Ok(out.stdout)
+}
+
+/// Whether a CLI's stderr is a command-line usage error: an option it does not know.
+pub(crate) fn usage_error(stderr: &[u8]) -> bool {
+    let text = String::from_utf8_lossy(stderr).to_lowercase();
+    [
+        "unexpected argument",
+        "unknown option",
+        "unrecognized option",
+        "unknown argument",
+        "unrecognized argument",
+        "invalid option",
+    ]
+    .iter()
+    .any(|p| text.contains(p))
 }
 
 pub(crate) fn effort(effort: Effort) -> &'static str {
@@ -519,6 +541,8 @@ impl AccountCli for CliAccounts {
                 installed: true,
                 path: Some(program.display().to_string()),
                 supported: tested.map_or(true, |t| t.admits(&version)),
+                untested: tested.is_some_and(|t| t.untested(&version)),
+                tested: tested.map(|t| t.version.to_owned()),
                 version: Some(version),
                 identity,
                 auth_known,

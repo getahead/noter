@@ -729,10 +729,10 @@ async fn ollama_off_localhost_is_never_reached() {
 }
 
 #[tokio::test]
-async fn unknown_majors_and_versions_outside_the_tested_range_are_refused() {
+async fn versions_older_than_the_tested_ones_are_refused() {
     for (claude, codex) in [
-        ("3.0.0 (Claude Code)", "codex-cli 1.0.0"),
         ("2.0.9 (Claude Code)", "codex-cli 0.150.0"),
+        ("1.9.0 (Claude Code)", "codex-cli 0.162.9"),
     ] {
         let world = World::new();
         let claude_stub = Stub::new(claude);
@@ -753,6 +753,73 @@ async fn unknown_majors_and_versions_outside_the_tested_range_are_refused() {
 }
 
 #[tokio::test]
+// #1219 (owner, 23 Nov): a version newer than the tested one runs, with the same lockdown flags.
+async fn newer_untested_versions_run_with_the_lockdown_flags() {
+    for (runtime, version) in [
+        (RuntimeChoice::ClaudeApiKey, "3.0.0 (Claude Code)"),
+        (RuntimeChoice::ClaudeApiKey, "2.4.1 (Claude Code)"),
+        (RuntimeChoice::CodexApiKey, "codex-cli 0.171.0"),
+        (RuntimeChoice::CodexApiKey, "codex-cli 1.0.0"),
+    ] {
+        let world = World::new();
+        let stub = Stub::new(version);
+        let llm = if runtime == RuntimeChoice::ClaudeApiKey {
+            world.claude_only(&stub, Some("sk-test"), false)
+        } else {
+            world.codex_only(&stub, Some("sk-test"), false)
+        };
+        ok(llm.run_once(world.request(runtime)).await);
+        let run = stub.only();
+        if runtime == RuntimeChoice::ClaudeApiKey {
+            assert!(
+                run.has("--bare") && run.has("--strict-mcp-config"),
+                "{version}"
+            );
+        } else {
+            assert!(
+                run.has("--ignore-user-config") && run.has("--output-schema"),
+                "{version}"
+            );
+        }
+        assert_nothing_hostile_loaded(&run);
+    }
+}
+
+#[tokio::test]
+// #1219: a CLI that rejects a lockdown flag (a usage error) or answers in a shape the adapter
+// cannot read fails closed with cli_incompatible, after one run: never retried without the flags.
+async fn a_cli_that_rejects_or_ignores_the_lockdown_fails_closed() {
+    for mode in ["usage", "shape"] {
+        for runtime in [RuntimeChoice::ClaudeApiKey, RuntimeChoice::CodexApiKey] {
+            let world = World::new();
+            let claude = runtime == RuntimeChoice::ClaudeApiKey;
+            let stub = Stub::new(if claude {
+                "3.0.0 (Claude Code)"
+            } else {
+                "codex-cli 0.171.0"
+            });
+            stub.set("mode", mode);
+            let llm = if claude {
+                world.claude_only(&stub, Some("sk-test"), false)
+            } else {
+                world.codex_only(&stub, Some("sk-test"), false)
+            };
+            let failed = llm.run_once(world.request(runtime)).await.unwrap_err();
+            assert!(
+                matches!(&failed, Failure::Runtime { code } if code == "cli_incompatible"),
+                "{mode} {runtime:?}: {failed:?}"
+            );
+            assert_eq!(
+                stub.records().len(),
+                1,
+                "{mode} {runtime:?}: one run, with the flags"
+            );
+            assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
+        }
+    }
+}
+
+#[tokio::test]
 async fn open_session_and_resume_check_the_version_again() {
     let world = World::new();
     let stub = Stub::new(CLAUDE_OK);
@@ -760,8 +827,8 @@ async fn open_session_and_resume_check_the_version_again() {
     let req = world.request(RuntimeChoice::ClaudeApiKey);
     let session = llm.open_session(&req).await.unwrap();
     llm.close_session(&session);
-    // The CLI was updated since: a session neither opens nor resumes on it.
-    stub.set("version", "3.1.0 (Claude Code)");
+    // The CLI was replaced by an older one since: a session neither opens nor resumes on it.
+    stub.set("version", "2.0.0 (Claude Code)");
     let refused = llm.open_session(&req).await.unwrap_err();
     let Failure::Unavailable(e) = refused else {
         panic!("{refused:?}")

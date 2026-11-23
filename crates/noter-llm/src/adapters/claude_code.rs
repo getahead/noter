@@ -15,11 +15,12 @@ use super::cli::{self, Cli, CliConfig, RunDir};
 use super::{instructions, Invocation, Reply, RuntimeAdapter};
 use crate::runtime::{Availability, BoxFuture, Tested};
 
-/// Tested with 2.1.296. Widen only after the network-monitor runbook
-/// (`.plans/backend/m2-network-monitor-runbook.md`) passes on the new version.
+/// Tested with 2.1.296. 2.2.0 and later run with a warning (#1219); move the range only after the
+/// network-monitor runbook (`.plans/backend/m2-network-monitor-runbook.md`) passes on a new version.
 pub(crate) const TESTED: Tested = Tested {
     min: [2, 1, 0],
     below: [2, 2, 0],
+    version: "2.1.296",
 };
 const NEVER: [&str; 3] = ["WebFetch", "WebSearch", "Bash"];
 
@@ -99,7 +100,12 @@ impl ClaudeCode {
 
 /// The `--output-format json` result.
 fn parse(stdout: &[u8]) -> Result<Reply, String> {
-    let result: Value = serde_json::from_slice(stdout).map_err(|_| "cli_output".to_owned())?;
+    // Output that is not the `--output-format json` result means a flag was ignored (#1219).
+    let result: Value =
+        serde_json::from_slice(stdout).map_err(|_| "cli_incompatible".to_owned())?;
+    if result["type"] != "result" {
+        return Err("cli_incompatible".to_owned());
+    }
     if result["is_error"].as_bool() != Some(false) {
         let subtype = result["subtype"].as_str().unwrap_or("cli_failed");
         return Err(subtype.to_owned());

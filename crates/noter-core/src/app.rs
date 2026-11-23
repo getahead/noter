@@ -146,6 +146,8 @@ pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
                     path: None,
                     version: None,
                     supported: false,
+                    untested: false,
+                    tested: None,
                 },
                 running: false,
                 models: vec![],

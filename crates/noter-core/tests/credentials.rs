@@ -679,6 +679,46 @@ async fn prepare_names_a_missing_or_unsupported_cli() {
     assert_eq!(err.code, ErrorCode::CliVersionUnsupported);
 }
 
+#[tokio::test]
+// #1219 (owner, 23 Nov): a Codex newer than the tested one is shown with the tested version for
+// the warning, sign-in is not refused, and noter.log notes the version once.
+async fn a_newer_untested_cli_is_shown_as_untested_and_logged_once() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    w.cli.set(tool(
+        r#"{"tool":"codex","installed":true,"version":"0.171.0","supported":true,"untested":true,"tested":"0.163.0"}"#,
+    ));
+    let mut view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    for _ in 0..200 {
+        if view.accounts.iter().any(|a| a.cli.untested) {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        view = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    }
+    let codex = view
+        .accounts
+        .iter()
+        .find(|a| a.provider == AccountProvider::Chatgpt)
+        .unwrap();
+    assert!(codex.cli.supported && codex.cli.untested);
+    assert_eq!(codex.cli.tested.as_deref(), Some("0.163.0"));
+    let prepared = w
+        .core
+        .account_signin_prepare(&settings(), provider(AccountProvider::Chatgpt))
+        .await;
+    // a bare assert: an account sign-in result never goes into a test message (CodeQL cleartext logging)
+    assert!(!matches!(&prepared, Err(e) if e.code == ErrorCode::CliVersionUnsupported));
+    let _ = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
+    let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
+    let lines: Vec<&str> = log
+        .lines()
+        .filter(|l| l.contains("cli_version_untested"))
+        .collect();
+    assert_eq!(lines.len(), 1, "{log}");
+    assert!(lines[0].contains("\"id\":\"0.171.0\""), "{}", lines[0]);
+}
+
 // ── cli_install ───────────────────────────────────────────────
 
 async fn settle() {

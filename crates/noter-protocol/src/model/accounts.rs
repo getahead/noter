@@ -58,6 +58,13 @@ pub struct CliInfo {
     pub path: Option<String>,
     pub version: Option<String>,
     pub supported: bool,
+    /// The installed version is newer than the one Noter was tested with: it runs, with a
+    /// warning (owner, 23 Nov, #1219). Absent in older payloads: not untested.
+    #[serde(default)]
+    pub untested: bool,
+    /// The version Noter was tested with (`0.163.0`), for the warning; None for Ollama.
+    #[serde(default)]
+    pub tested: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

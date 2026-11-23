@@ -241,8 +241,10 @@
             "installed": true,
             "path": "/opt/homebrew/bin/claude",
             "supported": true,
+            "tested": "2.1.296",
             "tool": "claude_code",
-            "version": "2.4.1"
+            "untested": false,
+            "version": "2.1.296"
           },
           "provider": "claude",
           "status": {
@@ -255,7 +257,9 @@
             "installed": false,
             "path": null,
             "supported": false,
+            "tested": "0.163.0",
             "tool": "codex",
+            "untested": false,
             "version": null
           },
           "provider": "chatgpt",
@@ -284,7 +288,9 @@
           "installed": true,
           "path": "/usr/local/bin/ollama",
           "supported": true,
+          "tested": null,
           "tool": "ollama",
+          "untested": false,
           "version": "0.12.3"
         },
         "default_model": "qwen3:8b",
@@ -316,7 +322,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.30",
+    "contract_version": "2.31",
     "copilot": {
       "agents": [
         {
@@ -1897,8 +1903,10 @@
         "installed": true,
         "path": "/opt/homebrew/bin/claude",
         "supported": true,
+        "tested": "2.1.296",
         "tool": "claude_code",
-        "version": "2.4.1"
+        "untested": false,
+        "version": "2.1.296"
       }
     ],
     "jobs": [

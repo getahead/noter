@@ -707,9 +707,12 @@ fn cli_info(tool: CliTool, a: Option<&Availability>) -> CliInfo {
         (None, _) => path.is_some(),
         (Some(_), None) => false,
     };
+    let tested = a.and_then(|a| a.tested);
     CliInfo {
         tool,
         installed: path.is_some(),
+        untested: matches!((tested, &version), (Some(t), Some(found)) if t.untested(found)),
+        tested: tested.map(|t| t.version.to_owned()),
         path,
         version,
         supported,

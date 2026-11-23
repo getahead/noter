@@ -617,7 +617,8 @@ fn routing_never_relaxes_privacy_and_names_the_reason() {
 }
 
 #[test]
-fn an_unknown_cli_major_is_refused() {
+fn a_newer_cli_major_runs_and_an_older_one_is_refused() {
+    // #1219: newer than the tested range runs (with a warning in the UI).
     let mut available = all_available();
     for a in available
         .iter_mut()
@@ -625,7 +626,20 @@ fn an_unknown_cli_major_is_refused() {
     {
         a.version = Some("9.0.1".into());
     }
-    // The untested CLIs are skipped, never run: the order falls through to local.
+    let newer = choose(
+        TaskKind::PostCall,
+        Some(RuntimeChoice::ClaudeApiKey),
+        &available,
+        cloud(),
+    );
+    assert_eq!(newer.unwrap(), RuntimeChoice::ClaudeApiKey);
+    for a in available
+        .iter_mut()
+        .filter(|a| a.runtime != RuntimeChoice::Local)
+    {
+        a.version = Some("0.0.1".into());
+    }
+    // The older CLIs are skipped, never run: the order falls through to local.
     let post = TaskKind::PostCall;
     let chosen = choose(post, Some(RuntimeChoice::ClaudeApiKey), &available, cloud());
     assert_eq!(chosen.unwrap(), RuntimeChoice::Local);
@@ -642,7 +656,7 @@ fn an_unknown_cli_major_is_refused() {
     };
     assert_eq!(e.code, ErrorCode::CliVersionUnsupported);
     assert!(
-        matches!(e.detail, Some(ErrorDetail::CliVersion { ref found, .. }) if found == "9.0.1")
+        matches!(e.detail, Some(ErrorDetail::CliVersion { ref found, .. }) if found == "0.0.1")
     );
 }
 
@@ -653,6 +667,7 @@ fn a_version_outside_the_tested_range_is_refused_within_a_tested_major() {
         a.tested = Some(Tested {
             min: [1, 2, 0],
             below: [1, 3, 0],
+            version: "1.2.7",
         });
         a.version = Some("1.1.9".into());
     }
@@ -665,9 +680,15 @@ fn a_version_outside_the_tested_range_is_refused_within_a_tested_major() {
     let Some(ErrorDetail::CliVersion { supported, .. }) = e.detail else {
         panic!("{:?}", e.detail)
     };
-    assert_eq!(supported, ">=1.2.0, <1.3.0");
+    assert_eq!(supported, ">=1.2.0");
     for a in &mut available {
         a.version = Some("1.2.7".into());
+    }
+    let chosen = choose(TaskKind::PostCall, configured, &available, cloud());
+    assert_eq!(chosen.unwrap(), RuntimeChoice::ClaudeApiKey);
+    // above the tested range: runs too (#1219)
+    for a in &mut available {
+        a.version = Some("1.4.0".into());
     }
     let chosen = choose(TaskKind::PostCall, configured, &available, cloud());
     assert_eq!(chosen.unwrap(), RuntimeChoice::ClaudeApiKey);
@@ -1696,4 +1717,20 @@ async fn a_cloud_tool_result_naming_one_normal_call_remains_releasable() {
         1
     );
     run.abort();
+}
+
+#[test]
+// #1219 (owner, 23 Nov): the tested version and newer run, newer than the tested range with a
+// warning; older is refused.
+fn a_tested_range_admits_newer_versions_and_marks_them_untested() {
+    let codex = Tested {
+        min: [0, 163, 0],
+        below: [0, 164, 0],
+        version: "0.163.0",
+    };
+    assert!(!codex.admits("0.162.9"));
+    assert!(codex.admits("0.163.5") && !codex.untested("0.163.5"));
+    assert!(codex.admits("0.171.0") && codex.untested("0.171.0"));
+    assert!(codex.admits("1.0.0-beta.1") && codex.untested("1.0.0-beta.1"));
+    assert!(!codex.admits("not a version") && !codex.untested("not a version"));
 }

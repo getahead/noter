@@ -422,9 +422,24 @@ impl Core {
             Arc::new(std::sync::OnceLock::new());
         let switched = this.clone();
         let assisted = this.clone();
+        // #1219: one noter.log line per untested CLI version (the version only)
+        let noted = std::sync::Mutex::new(std::collections::HashSet::new());
         accounts.on_view(move |view| {
             if let Some(core) = assisted.get().and_then(std::sync::Weak::upgrade) {
                 core.set_no_assistant(accounts::no_assistant(view));
+                for cli in view.accounts.iter().map(|a| &a.cli).filter(|c| c.untested) {
+                    let Some(version) = &cli.version else {
+                        continue;
+                    };
+                    if lock(&noted).insert((cli.tool, version.clone())) {
+                        core.log(object(serde_json::json!({
+                            "level": "warn",
+                            "module": "accounts",
+                            "code": "cli_version_untested",
+                            "id": version,
+                        })));
+                    }
+                }
             }
         });
         let llm = Llm::new(store.clone(), deps.llm.clone(), move || clock.now())

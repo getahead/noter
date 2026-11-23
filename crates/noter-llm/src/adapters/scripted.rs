@@ -158,6 +158,7 @@ impl RuntimeAdapter for Scripted {
             tested: Some(Tested {
                 min: [1, 0, 0],
                 below: [2, 0, 0],
+                version: "1.0.0",
             }),
             models: vec!["scripted".into()],
         }

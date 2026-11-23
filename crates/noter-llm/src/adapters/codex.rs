@@ -15,11 +15,13 @@ use super::cli::{self, Cli, CliConfig, RunDir};
 use super::{Invocation, Reply, RuntimeAdapter};
 use crate::runtime::{Availability, BoxFuture, Tested};
 
-/// Tested with 0.163.0; a 0.x minor may change flags. Widen only after the network-monitor
-/// runbook (`.plans/backend/m2-network-monitor-runbook.md`) passes on the new version.
+/// Tested with 0.163.0; a 0.x minor may change flags, so 0.164.0 and later run with a warning and
+/// fail closed if a lockdown flag is rejected (#1219). Move the range only after the network-monitor
+/// runbook (`.plans/backend/m2-network-monitor-runbook.md`) passes on a new version.
 pub(crate) const TESTED: Tested = Tested {
     min: [0, 163, 0],
     below: [0, 164, 0],
+    version: "0.163.0",
 };
 
 pub(crate) struct Codex(Cli);
@@ -118,10 +120,15 @@ fn parse(stdout: &[u8]) -> Result<Reply, String> {
         first_token_ms: None,
         session_id: None,
     };
+    let mut known = false;
     for line in stdout.split(|b| *b == b'\n') {
         let Ok(event) = serde_json::from_slice::<Value>(line) else {
             continue;
         };
+        known |= matches!(
+            event["type"].as_str(),
+            Some("thread.started" | "turn.started" | "item.completed" | "turn.completed")
+        );
         match event["type"].as_str() {
             Some("thread.started") => {
                 reply.session_id = event["thread_id"].as_str().map(String::from);
@@ -137,6 +144,10 @@ fn parse(stdout: &[u8]) -> Result<Reply, String> {
             Some("turn.failed" | "error") => return Err("cli_failed".into()),
             _ => {}
         }
+    }
+    // None of `--json`'s events: the CLI ignored the flag, so nothing it did can be trusted (#1219).
+    if !known {
+        return Err("cli_incompatible".into());
     }
     Ok(reply)
 }
