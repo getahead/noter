@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { DisplayInfo } from "../../core/bindings";
-import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
+import { AUTO_DISPLAY, defaultDisplay, refusalKey } from "./default-display";
 
 const d = (id: string, name: string, holds_call_app = false): DisplayInfo => ({ id, name, is_main: false, holds_call_app, width_pt: 1920, height_pt: 1080 });
 const two = [d("d1", "Built-in Retina Display", true), d("d2", "Studio Display")];
@@ -44,5 +44,14 @@ describe("defaultDisplay (cpt-noter-algo-ui-first-run-default-display)", () => {
     const p = defaultDisplay([], null);
     expect(p.variant).toBe("several");
     expect(p.options).toHaveLength(1);
+  });
+});
+
+describe("refusalKey (issue 1215)", () => {
+  it("names a refused display instead of the generic error", () => {
+    expect(refusalKey("setup_set_call_display", "invalid_input")).toBe("first_run.display.refused");
+    expect(refusalKey("setup_set_call_display", "internal")).toBe("window.error");
+    expect(refusalKey("settings_update", "invalid_input")).toBe("first_run.refused_value");
+    expect(refusalKey("settings_get", null)).toBe("window.error");
   });
 });

@@ -1,5 +1,6 @@
 // Options and selection of the call-display picker (docs/features/ui/first-run.md § 3).
-import type { DisplayId, DisplayInfo } from "../../core/bindings";
+import type { DisplayId, DisplayInfo, ErrorCode } from "../../core/bindings";
+import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 
 export const AUTO_DISPLAY = "auto";
@@ -33,4 +34,10 @@ export function defaultDisplay(displays: DisplayInfo[], remembered: DisplayId | 
   return { variant: absent ? "absent" : "several", options, selected: remembered ?? AUTO_DISPLAY };
   // @cpt-end:cpt-noter-algo-ui-first-run-default-display:p1:inst-return-display
   // @cpt-end:cpt-noter-algo-ui-first-run-default-display:p1:inst-select
+}
+
+/** The banner for a refused first-run save: a value the core rejected is named, never "Something went wrong" (#1215). */
+export function refusalKey(command: string, code: ErrorCode | null | undefined): MsgKey {
+  if (code !== "invalid_input") return "window.error";
+  return command === "setup_set_call_display" ? "first_run.display.refused" : "first_run.refused_value";
 }

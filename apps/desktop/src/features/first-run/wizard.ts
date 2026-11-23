@@ -6,6 +6,7 @@ import { createStore } from "zustand/vanilla";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { AudioRetention, DisplayId, ModelBundle, PermissionKind, PermissionState, PrivacyMode, SelfTestMsg, SetupStatus, SetupStep, StepRow, StepState } from "../../core/bindings";
 import { t } from "../../i18n/format";
+import { AUTO_DISPLAY, defaultDisplay } from "./default-display";
 import { initialPermissionRow, permissionRowNext, type PermissionRowState } from "./permission-row";
 import { applySelfTestEvent, initialSelfTestPanel, newAnnouncements, runSelfTest, selfTestNext, type SelfTestPanel } from "./self-test";
 import { nextStep, STEP_ORDER, type WizardAction, type WizardStep } from "./steps";
@@ -234,7 +235,10 @@ export function createWizard(bridge: Bridge, announce: (text: string, key: strin
     const s = store.getState();
     if (step === "call_display") {
       // @cpt-begin:cpt-noter-flow-ui-first-run-complete-setup:p1:inst-call-display
-      const res = await send("setup_set_call_display", "setup_set_call_display", () => bridge.core.setupSetCallDisplay({ display_id: s.display }), { slice: "setup" });
+      // what the picker shows: on one display only "the display without the call app", whatever was remembered (#1215)
+      const shown = defaultDisplay(win().whole.environment?.displays ?? [], s.display).selected;
+      const display_id = shown === AUTO_DISPLAY ? null : shown;
+      const res = await send("setup_set_call_display", "setup_set_call_display", () => bridge.core.setupSetCallDisplay({ display_id }), { slice: "setup" });
       const now = await settingsNow();
       if (res.status !== "ok" || !now) return false;
       return saveSettings({ section: "call_screen", value: { ...now.call_screen, open_automatically: s.autoOpen } });
