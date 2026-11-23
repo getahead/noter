@@ -82,6 +82,8 @@ fn reason(
             silent(arrived)
         }
         Some(EngineErrorCode::ZeroBuffers) => SelfTestFailure::ZeroBuffers,
+        // Not one buffer on either channel: macOS gave the engine no sound at all (#1211).
+        Some(EngineErrorCode::DeviceUnavailable) if arrived.is_empty() => SelfTestFailure::NoAudio,
         Some(EngineErrorCode::ModelMissing | EngineErrorCode::ModelLoadFailed) => {
             SelfTestFailure::ModelMissing
         }
@@ -94,6 +96,19 @@ fn reason(
 }
 
 // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-map-events
+
+/// The wire name of a code (`no_audio`, `device_unavailable`): an identifier, fit for noter.log.
+fn code_of(value: &impl serde::Serialize) -> String {
+    match serde_json::to_value(value) {
+        Ok(serde_json::Value::String(s)) => s,
+        Ok(serde_json::Value::Object(o)) => o
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("unknown")
+            .to_owned(),
+        _ => "unknown".to_owned(),
+    }
+}
 
 impl Core {
     fn self_test_hub(&self) -> Arc<StreamHub<SelfTestMsg>> {
@@ -168,9 +183,11 @@ impl Core {
             self.engine_self_test(play_clip, &send).await
         } else {
             // Decision E2: the core decides a missing permission before asking the engine.
-            Err(SelfTestFailure::PermissionMissing {
+            let outcome = Err(SelfTestFailure::PermissionMissing {
                 kind: PermissionKind::Microphone,
-            })
+            });
+            self.log_self_test(&outcome, "not_asked", 0);
+            outcome
         };
         // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-passed
         // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-failed-test
@@ -207,6 +224,7 @@ impl Core {
             timeout_ms: WINDOW_MS,
         };
         if self.engine.command(run).await.is_err() {
+            self.log_self_test(&Err(SelfTestFailure::TimedOut), "command_failed", 0);
             return Err(SelfTestFailure::TimedOut);
         }
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-send-self-test
@@ -217,7 +235,11 @@ impl Core {
             let line = match tokio::time::timeout_at(deadline, events.recv()).await {
                 Ok(Ok(line)) => line,
                 Ok(Err(RecvError::Lagged(_))) => continue,
-                _ => return Err(silent(&arrived)),
+                _ => {
+                    let outcome = Err(silent(&arrived));
+                    self.log_self_test(&outcome, "no_result", arrived.len());
+                    return outcome;
+                }
             };
             match line.event {
                 EngineEvent::SelfTestStream { channel } => {
@@ -237,12 +259,33 @@ impl Core {
                     passed,
                     failure,
                     own_sounds_leak,
-                } => return reason(passed, failure, own_sounds_leak, &arrived),
+                } => {
+                    let outcome = reason(passed, failure, own_sounds_leak, &arrived);
+                    let engine = failure.map_or("none".to_owned(), |f| code_of(&f));
+                    self.log_self_test(&outcome, &engine, arrived.len());
+                    return outcome;
+                }
                 _ => {}
             }
         }
     }
     // @cpt-end:cpt-noter-flow-core-first-run-self-test:p1:inst-map-events
+
+    /// One noter.log line per engine self-test: the result, what the engine reported and how many
+    /// channels delivered sound, so a failure is never silent (#1211).
+    fn log_self_test(&self, outcome: &Result<(), SelfTestFailure>, engine: &str, arrived: usize) {
+        let (level, code) = match outcome {
+            Ok(()) => ("info", "passed".to_owned()),
+            Err(failure) => ("warn", code_of(failure)),
+        };
+        self.log(crate::object(serde_json::json!({
+            "level": level,
+            "module": "self_test",
+            "code": code,
+            "id": engine,
+            "count": arrived,
+        })));
+    }
 
     async fn finish_self_test(&self, ctx: &CommandCtx, state: SelfTestState) {
         // @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-store-result
