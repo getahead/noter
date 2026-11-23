@@ -251,6 +251,27 @@ final class EngineLoopTests: XCTestCase {
         XCTAssertEqual(result["passed"] as? Bool, false)
         XCTAssertEqual(result["failure"] as? String, "device_unavailable")
     }
+
+    /// cpt-noter-seq-first-run-complete-setup — issue 1211: opening the audio waits on a permission request macOS never answers; the
+    /// self-test still ends with its result when its window closes, as nothing arrived.
+    func testTheSelfTestEndsOnTimeWhenOpeningTheAudioNeverReturns() throws {
+        let lines = Lines()
+        let source = BlockedSource()
+        defer { source.release.signal() }
+        let e = engine(lines, source: source)
+        e.start()
+        _ = e.handle(#"{"id":9,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":300}}"#)
+        let result = try XCTUnwrap(lines.waitFor("self_test_result", timeout: 2))
+        XCTAssertEqual(result["passed"] as? Bool, false)
+        XCTAssertEqual(result["failure"] as? String, "device_unavailable")
+    }
+}
+
+/// An audio source whose start blocks until released, as Core Audio does on an unanswered TCC request.
+private final class BlockedSource: AudioSource, @unchecked Sendable {
+    let release = DispatchSemaphore(value: 0)
+    func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws { release.wait() }
+    func stop() {}
 }
 
 final class FileModeTests: XCTestCase {
