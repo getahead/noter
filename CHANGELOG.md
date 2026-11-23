@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.26.0](https://github.com/getahead/noter/compare/v0.25.1...v0.26.0) (2026-11-23)
+
+
+### Features
+
+* **accounts:** accept a Claude Team plan, confirmed by the Personal use box ([#1223](https://github.com/getahead/noter/issues/1223)) ([4e1718c](https://github.com/getahead/noter/commit/4e1718c7f021bbca95cb5c66484f77aa3b0a3db0))
+
+
+### Bug fixes
+
+* a newer, untested Codex or Claude Code runs with a warning, and a rejected lockdown flag fails closed ([#1219](https://github.com/getahead/noter/issues/1219)) ([#1227](https://github.com/getahead/noter/issues/1227)) ([6202f96](https://github.com/getahead/noter/commit/6202f96c31629386b057b54915c39e27f11dc2a7))
+* **deps:** Bump rusqlite from 0.41.1 to 0.43.0 ([#1209](https://github.com/getahead/noter/issues/1209)) ([e197c6f](https://github.com/getahead/noter/commit/e197c6f67a72d3134f5ae114381739182f2fb8ad))
+* the self-test's Play Test Clip proves system audio without another app playing ([#1217](https://github.com/getahead/noter/issues/1217)) ([#1222](https://github.com/getahead/noter/issues/1222)) ([8ff8d73](https://github.com/getahead/noter/commit/8ff8d73140f03a06cb02d0e9fdd653a35d795869))
+* **ui:** a sheet never exceeds its window; the body scrolls, title and buttons stay in view ([#1224](https://github.com/getahead/noter/issues/1224)) ([2e5f7bb](https://github.com/getahead/noter/commit/2e5f7bba5d878ff6aaf1d945fcc9f766c67f11a9))
+* **ui:** keep the Models & Runtimes pop-ups inside the card; dim footnote; local runtime status row ([#1229](https://github.com/getahead/noter/issues/1229)) ([cf7ac4d](https://github.com/getahead/noter/commit/cf7ac4dbb562bc0c4e74c78fead1693932eea615))
+* **ui:** the Call display's Continue on a one-display Mac saves what it shows ([#1215](https://github.com/getahead/noter/issues/1215)) ([#1216](https://github.com/getahead/noter/issues/1216)) ([c2d4d4a](https://github.com/getahead/noter/commit/c2d4d4ad4bd02079e0b3ed16a4bbbcb51fcbca6c))
+
 ## [0.25.1](https://github.com/getahead/noter/compare/v0.25.0...v0.25.1) (2026-11-23)
 
 
