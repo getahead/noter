@@ -707,10 +707,8 @@ async fn a_newer_untested_cli_is_shown_as_untested_and_logged_once() {
         .core
         .account_signin_prepare(&settings(), provider(AccountProvider::Chatgpt))
         .await;
-    assert!(
-        !matches!(&prepared, Err(e) if e.code == ErrorCode::CliVersionUnsupported),
-        "{prepared:?}"
-    );
+    // a bare assert: an account sign-in result never goes into a test message (CodeQL cleartext logging)
+    assert!(!matches!(&prepared, Err(e) if e.code == ErrorCode::CliVersionUnsupported));
     let _ = w.core.accounts_get(&settings(), NoArgs {}).await.unwrap();
     let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
     let lines: Vec<&str> = log
