@@ -176,7 +176,7 @@ The UI calls only the IPC host. Services hold the product logic and never talk t
 
 - specta 2 is a release candidate; its exporter API changes between RCs. It is pinned exactly and only `noter-protocol` uses it (ADR-0001).
 - sqlite-vec is pre-1.0; vectors live as canonical BLOBs on the rows, so the vec tables are rebuildable (PRD).
-- Claude Code and Codex change flags between releases; each adapter pins a tested version range and refuses unknown majors (PRD › LLM orchestration).
+- Claude Code and Codex change flags between releases; each adapter has a tested version: an older CLI is refused, a newer one runs with a warning, and a run whose CLI rejects or ignores a lockdown flag fails closed as `cli_incompatible` (PRD › LLM orchestration, owner #1219).
 - Per-turn structured output in a long-lived Claude Code session is undocumented; `emit_card` on noter-mcp is the fallback (PRD › Open decisions).
 - Own-account Claude Code runs cannot use `--bare`, which ignores a subscription login, so every run is locked down by explicit flags instead (3.2 LLM router); a CI test proves no user hook, plugin or MCP server starts.
 - tauri-nspanel has no stable release; it is pinned to a commit.
@@ -1353,7 +1353,8 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `key_rejected` | "Key rejected" | `api_key_set` |
 | `keychain_locked` | "Keychain locked" | key and account commands |
 | `cli_missing` | "Tool not installed" | `account_signin_*` |
-| `cli_version_unsupported` | "Tool not installed" with the version line | `account_signin_*`, runtime availability |
+| `cli_version_unsupported` | "Tool not installed" with the version line (older than the tested version) | `account_signin_*`, runtime availability |
+| `cli_incompatible` | The run's error: the CLI rejected or ignored a lockdown flag; never retried without the flags (#1219) | LLM runs |
 | `sign_in_cancelled` | "Cancelled in the browser" | `signin:progress` |
 | `sign_in_timed_out` | "Sign-in timed out" | `signin:progress` |
 | `plan_not_eligible` | "No paid plan" | `signin:progress` |
@@ -1541,7 +1542,7 @@ flowchart BT
 
 **Dependency Rules** (per project conventions):
 
-- Version ranges of `claude`, `codex`, `acli`, `bkt`, `gh` and Ollama are pinned and checked at startup; an unknown major is reported as `cli_version_unsupported`, never guessed around.
+- Version ranges of `claude`, `codex`, `acli`, `bkt`, `gh` and Ollama are checked at startup; a version older than the tested one is reported as `cli_version_unsupported`; a newer `claude` or `codex` runs with a warning and fails closed (`cli_incompatible`) when a lockdown flag is rejected (#1219).
 - A missing or signed-out tool degrades to "not configured" or "no evidence found", never to a guess; an unreachable tracker is `tracker_unreachable` on the run.
 - SLAs and circuit breakers: each adapter has a timeout per task type (live tick 8 s per agent, Ask 60 s, post-call 10 min) and a breaker that switches to local after two consecutive failures within a call (PRD › Degraded states).
 
