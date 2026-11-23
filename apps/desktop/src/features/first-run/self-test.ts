@@ -129,6 +129,7 @@ export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): Self
       else if (e.reason.type === "permission_missing" && e.reason.kind === "microphone") next = { ...next, failure: "self_test.mic_missing" };
       else if (e.reason.type === "zero_buffers") next = { ...next, failure: "self_test.sys_unverified" };
       else if (e.reason.type === "timed_out") next = { ...next, failure: TIMED_OUT };
+      else if (e.reason.type === "no_audio") next = { ...next, failure: "self_test.no_audio" };
       // @cpt-end:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-case-failed
       break;
     case "ended":
