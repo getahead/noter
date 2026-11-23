@@ -202,6 +202,11 @@ pub struct ToolScript {
     pub version: Option<String>,
     #[serde(default = "yes")]
     pub supported: bool,
+    /// Newer than the tested version (#1219).
+    #[serde(default)]
+    pub untested: bool,
+    #[serde(default)]
+    pub tested: Option<String>,
     /// Who the CLI is signed in as now.
     #[serde(default)]
     pub identity: Option<AccountIdentity>,
@@ -230,8 +235,8 @@ impl ToolScript {
             path: self.path.clone(),
             version: self.version.clone(),
             supported: self.supported,
-            untested: false,
-            tested: None,
+            untested: self.untested,
+            tested: self.tested.clone(),
             identity: self.identity.clone(),
             auth_known: self.auth_known,
         }
@@ -386,6 +391,8 @@ impl AccountCli for ScriptedAccountCli {
                 path: None,
                 version: None,
                 supported: true,
+                untested: false,
+                tested: None,
                 identity: None,
                 auth_known: true,
                 login_identity: None,
