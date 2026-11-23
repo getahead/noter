@@ -121,6 +121,28 @@ test.describe("cpt-noter-seq-settings-replace-api-key", () => {
     await expect.poll(async () => (await sent(page, "settings_update")).length).toBe(1);
     expect((await sent(page, "settings_update"))[0]).toMatchObject({ section: { section: "runtimes", value: { post_call: "local" } } });
   });
+
+  test("UI — design — #1225 the runtime pop-ups stay inside the card, right-aligned, the footnote is tertiary, the local runtime is a status row", async ({ page }) => {
+    await openWindow(page, "settings");
+    await openModels(page);
+    for (const name of ["Live copilot", "Post-call analysis", "Search answers"]) {
+      const row = pane(page).locator(".st-row").filter({ hasText: name });
+      const [r, p] = [(await row.boundingBox())!, (await row.locator(".np-popup").boundingBox())!];
+      const chev = (await row.locator(".np-popup__chev").boundingBox())!;
+      // the pop-up and its ⌃⌄ end at the row's 12-pt inset, never past the card
+      expect(Math.abs(r.x + r.width - 12 - (p.x + p.width)), `${name} right inset`).toBeLessThan(1.5);
+      expect(chev.x + chev.width, `${name} chevron`).toBeLessThanOrEqual(p.x + p.width);
+    }
+    const foot = pane(page).locator(".st-group__foot").filter({ hasText: "Add either account, or both" });
+    const label3 = await page.evaluate(() => { const s = document.createElement("span"); s.style.color = "var(--label-3)"; document.body.append(s); const c = getComputedStyle(s).color; s.remove(); return c; });
+    expect(await foot.evaluate((f) => getComputedStyle(f.querySelector("span") ?? f).color)).toBe(label3);
+    const local = pane(page).locator(".st-group").filter({ hasText: "Local runtime" }).locator('[data-component="cpt-noter-component-ui-status-row"]');
+    await expect(local).toHaveAttribute("data-variant", "runtime");
+    await expect(local.locator(".e-status__icon svg")).toHaveCount(1);
+    // the dim status word comes before the title; a ready runtime is Up to date
+    if (/Ollama detected/.test(await local.locator(".e-status__title").innerText())) await expect(local.locator(".e-status__word")).toHaveText("Up to date");
+    else await expect(local.locator(".e-status__word")).not.toBeEmpty();
+  });
 });
 
 test.describe("cpt-noter-seq-first-run-connect-assistant", () => {

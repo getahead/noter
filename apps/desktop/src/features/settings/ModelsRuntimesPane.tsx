@@ -6,6 +6,7 @@ import { useWindow } from "../../app/use-window";
 import type { KeyProvider } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { useAlert } from "../../ui/dialogs/host";
+import { StatusRow } from "../../ui/feedback/status-row";
 import { PopupButton } from "../../ui/primitives/popup-button";
 import { PushButton } from "../../ui/primitives/push-button";
 import { installCli, installKey, loadAccounts, removeKey } from "./accounts";
@@ -65,28 +66,35 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
           // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-open-key
         ))}
       </Group>
-      <Group title={t("settings.accounts.title")} foot={t("settings.accounts.foot")}>
+      <Group title={t("settings.accounts.title")} foot={<span className="np-dim">{t("settings.accounts.foot")}</span>}>
         {(accounts?.accounts ?? []).map((a) => (
           <AccountRow key={a.provider} bridge={bridge} view={a} keyConfigured={keyConfigured(accounts, a.provider)} onUseKey={() => setSheet({ provider: a.provider === "claude" ? "anthropic" : "codex", mode: "add" })} />
         ))}
       </Group>
       <Group title={t("settings.local.title")}>
-        <div className="e-status" data-state={localReady ? "ready" : local?.cli.installed ? "stopped" : "missing"}>
-          <div className="e-status__main">
-            <span className="e-status__title">{localReady ? t(local?.default_model ? "settings.local.detected" : "settings.local.detected_no_model", { model: local?.default_model ?? "" }) : t("settings.local.not_configured")}</span>
-            <span className="e-status__sub">{localReady ? t("settings.local.fallback") : t("settings.local.not_configured_note")}</span>
+        <StatusRow
+          variant="runtime"
+          tone={localReady ? "ok" : local?.cli.installed ? "warn" : "off"}
+          icon={localReady ? "checkCircle" : local?.cli.installed ? "warning" : "info"}
+          word={t(localReady ? "settings.local.up_to_date" : "settings.local.not_ready")}
+          state={localReady ? "ready" : local?.cli.installed ? "stopped" : "missing"}
+          title={localReady ? t(local?.default_model ? "settings.local.detected" : "settings.local.detected_no_model", { model: local?.default_model ?? "" }) : t("settings.local.not_configured")}
+          subtitle={<>
+            {localReady ? t("settings.local.fallback") : t("settings.local.not_configured_note")}
             {installing === "ERROR" && <span className="st-row__err">{t("settings.local.install_failed")}</span>}
-          </div>
-          {/* @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
-          {!local?.cli.installed && <PushButton label={installing === "WAITING" ? t("settings.local.installing") : t("settings.local.install")} size="small" loading={installing === "WAITING"} onAction={() => void installCli(bridge, "ollama")} />}
-          {/* @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-if-local */}
-        </div>
+          </>}
+          actions={
+            // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-if-local
+            !local?.cli.installed && <PushButton label={installing === "WAITING" ? t("settings.local.installing") : t("settings.local.install")} size="small" loading={installing === "WAITING"} onAction={() => void installCli(bridge, "ollama")} />
+            // @cpt-end:cpt-noter-flow-ui-accounts-key:p1:inst-if-local
+          }
+        />
       </Group>
       <Group title={t("settings.runtimes.title")}>
         {TASKS.map(({ field, label }) => (
           <Row key={field} label={t(label)} error={rowError("runtimes", field)}>
             {/* @cpt-begin:cpt-noter-flow-ui-accounts-manage:p1:inst-save-task */}
-            <PopupButton options={runtimeChoices(accounts, settings.runtimes[field])} value={settings.runtimes[field]} label={t(label)} onAction={(v) => void saveSection(bridge, "runtimes", { [field]: v as typeof settings.runtimes.post_call })} />
+            <PopupButton cls="st-runtime__popup" options={runtimeChoices(accounts, settings.runtimes[field])} value={settings.runtimes[field]} label={t(label)} onAction={(v) => void saveSection(bridge, "runtimes", { [field]: v as typeof settings.runtimes.post_call })} />
             {/* @cpt-end:cpt-noter-flow-ui-accounts-manage:p1:inst-save-task */}
           </Row>
         ))}

@@ -712,6 +712,8 @@ export const en = {
   "settings.local.detected": "Ollama detected · {model} ready",
   "settings.local.detected_no_model": "Ollama detected · no model yet",
   "settings.local.fallback": "Local fallback for every task",
+  "settings.local.up_to_date": "Up to date",
+  "settings.local.not_ready": "Not ready",
   "settings.local.not_configured": "Not configured",
   "settings.local.not_configured_note": "Without Ollama, calls get no summary when a key or an account is not available.",
   "settings.local.install": "Install Ollama…",
