@@ -44,7 +44,25 @@ const progress = (page: Page, id: string, step: string, error: string | null = n
   page.evaluate(([i, st, er]) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.emit("signin:progress", { session_id: i, provider: "chatgpt", step: st, identity: st === "waiting_for_browser" ? null : { email: "you@example.com", plan: "Plus" }, error: er }), [id, step, error] as const);
 const chatgptDialog = (page: Page) => page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ });
 const codexReady = (w: World) => (W.idle(w), Object.assign(accountOf(w, "chatgpt").cli, { installed: true, path: "/opt/homebrew/bin/codex", version: "0.163.0", supported: true }));
+// #1219: a Codex newer than the tested 0.163 runs, with a warning on the row and in the sheet
+const codexUntested = (w: World) => (W.idle(w), Object.assign(accountOf(w, "chatgpt").cli, { installed: true, path: "/opt/homebrew/bin/codex", version: "0.171.0", supported: true, untested: true, tested: "0.163.0" }));
+const UNTESTED = "Codex 0.171.0 hasn’t been tested with Noter yet";
 const states: { id: string; world: (w: World) => void; ready: (page: Page) => Promise<void>; target: (page: Page) => ReturnType<Page["locator"]>; viewport?: { width: number; height: number } }[] = [
+  {
+    id: "untested-row",
+    world: codexUntested,
+    ready: async (page) => void (await expect(row(page, "Your ChatGPT account")).toContainText(UNTESTED)),
+    target: (page) => row(page, "Your ChatGPT account"),
+  },
+  {
+    id: "prepare-chatgpt-untested",
+    world: codexUntested,
+    ready: async (page) => {
+      await row(page, "Your ChatGPT account").getByRole("button", { name: /Sign In/ }).click();
+      await expect(chatgptDialog(page)).toContainText(UNTESTED);
+    },
+    target: chatgptDialog,
+  },
   {
     id: "signed-in",
     world: signedIn,

@@ -642,7 +642,7 @@ export const en = {
   "signin.cli_missing": "{tool} isn’t installed",
   "signin.cli_missing_note": "Noter signs in through {tool}. Installing it takes about a minute.",
   "settings.accounts.cli_untested":
-    "{tool} {version} hasn’t been tested with Noter yet. It should work; if something fails, use the API key or a tested version ({tested}).",
+    "{tool} {version} hasn’t been tested with Noter yet. It should work; if something fails, use your API key or {tool} {tested}.",
   "signin.cli_unsupported": "This version of {tool} isn’t supported",
   "signin.cli_unsupported_version": "{tool} {version} isn’t supported yet",
   "signin.cli_unsupported_note": "Noter runs only the {tool} versions it was tested with. Install a tested version, or use the {key} instead.",

@@ -255,6 +255,7 @@
       { id: 'self-test', label: 'General · Self-test not passed' },
       { id: 'notifications-off', label: 'General · Notifications off' },
       { id: 'icloud', label: 'General · Storage in iCloud Drive' },
+      { id: 'cli-untested', label: 'Models & Runtimes · Codex version not tested yet' },
       { id: 'model-downloading', label: 'Audio · Model downloading' },
       { id: 'display-absent', label: 'Call screen · Display not connected' },
       { id: 'one-display', label: 'Call screen · One display' },

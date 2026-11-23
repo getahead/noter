@@ -12,7 +12,7 @@ import { AccountSignInSheet } from "./AccountSignInSheet";
 import { AccountRow } from "./CredentialRow";
 import { signInMachines } from "./signin-store";
 
-const WARNING = "Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, use the API key or a tested version (0.163).";
+const WARNING = "Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, use your API key or Codex 0.163.";
 const codex = (over: Partial<CliInfo> = {}): CliInfo => ({ tool: "codex", installed: true, path: "/bin/codex", version: "0.171.0", supported: true, untested: true, tested: "0.163.0", ...over });
 
 let bridge: Bridge;
