@@ -1084,6 +1084,13 @@ export type CliInfo = {
 	path: string | null,
 	version: string | null,
 	supported: boolean,
+	/**
+	 *  The installed version is newer than the one Noter was tested with: it runs, with a
+	 *  warning (owner, 23 Nov, #1219). Absent in older payloads: not untested.
+	 */
+	untested?: boolean,
+	/**  The version Noter was tested with (`0.163.0`), for the warning; None for Ollama. */
+	tested?: string | null,
 };
 
 export type CliInstallArgs = {
@@ -1480,8 +1487,13 @@ export type ErrorCode =
 "keychain_locked" | 
 /**  Claude Code or Codex is not installed. */
 "cli_missing" | 
-/**  The installed CLI is outside the tested version range. */
+/**  The installed CLI is older than the tested version. */
 "cli_version_unsupported" | 
+/**
+ *  The CLI rejected or ignored a lockdown flag (a usage error, or output of an unknown
+ *  shape): the run fails closed and is never retried without the flags (#1219).
+ */
+"cli_incompatible" | 
 /**  Sign-in cancelled in the browser. */
 "sign_in_cancelled" | 
 /**  Sign-in timed out after 5 minutes. */
@@ -3838,7 +3850,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.30";
+export const CONTRACT_VERSION = "2.31";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -4489,7 +4501,7 @@ export const EVENTS = {
   "menu:fix_term": { stability: "frozen" },
 } as const satisfies Record<EventName, { stability: Stability }>;
 
-export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "output_invalid", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
+export const ERROR_CODES: readonly ErrorCode[] = ["not_found", "conflict", "invalid_input", "window_not_allowed", "feature_disabled", "not_ready", "not_implemented", "internal", "permission_missing", "permission_denied", "disk_full", "offline", "checksum_failed", "model_missing", "already_recording", "not_recording", "notice_expired", "continue_window_closed", "engine_unavailable", "detection_expired", "audio_deleted", "replay_needs_headphones", "own_sounds_not_excluded", "output_route_unknown", "transcript_upgraded", "no_such_card", "card_gone", "budget_paused", "copilot_off", "outputs_not_ready", "output_invalid", "unreviewed_in_scope", "repo_not_mapped", "repo_path_missing", "no_link_handler", "automation_denied", "prompt_not_ready", "calendar_unavailable", "index_rebuilding", "search_failed", "answer_stopped", "undo_expired", "already_undone", "not_undone", "not_undoable", "edited_later", "proposal_not_applicable", "change_log_unreadable", "job_blocked", "evidence_tool_missing", "tracker_unreachable", "runtime_unavailable", "key_rejected", "keychain_locked", "cli_missing", "cli_version_unsupported", "cli_incompatible", "sign_in_cancelled", "sign_in_timed_out", "plan_not_eligible", "account_signed_out", "personal_use_not_confirmed", "source_sync_failed", "source_sign_in_expired", "hotkey_conflict", "hotkey_reserved", "storage_in_cloud_folder", "cancelled"];
 
 /** Codes for which **Try Again** makes sense by default (`ErrorCode::default_retryable`). */
 export const DEFAULT_RETRYABLE: readonly ErrorCode[] = ["not_ready", "internal", "offline", "engine_unavailable", "calendar_unavailable", "search_failed", "change_log_unreadable", "tracker_unreachable", "keychain_locked", "source_sync_failed"];

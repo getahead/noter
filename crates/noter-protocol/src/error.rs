@@ -241,8 +241,11 @@ pub enum ErrorCode {
     KeychainLocked,
     /// Claude Code or Codex is not installed.
     CliMissing,
-    /// The installed CLI is outside the tested version range.
+    /// The installed CLI is older than the tested version.
     CliVersionUnsupported,
+    /// The CLI rejected or ignored a lockdown flag (a usage error, or output of an unknown
+    /// shape): the run fails closed and is never retried without the flags (#1219).
+    CliIncompatible,
     /// Sign-in cancelled in the browser.
     SignInCancelled,
     /// Sign-in timed out after 5 minutes.
@@ -348,6 +351,7 @@ impl ErrorCode {
         ErrorCode::KeychainLocked,
         ErrorCode::CliMissing,
         ErrorCode::CliVersionUnsupported,
+        ErrorCode::CliIncompatible,
         ErrorCode::SignInCancelled,
         ErrorCode::SignInTimedOut,
         ErrorCode::PlanNotEligible,

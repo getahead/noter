@@ -36,6 +36,8 @@ impl CliStatus {
             path: self.path.clone(),
             version: self.version.clone(),
             supported: self.supported,
+            untested: false,
+            tested: None,
         }
     }
 

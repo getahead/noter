@@ -713,6 +713,8 @@ fn cli_info(tool: CliTool, a: Option<&Availability>) -> CliInfo {
         path,
         version,
         supported,
+        untested: false,
+        tested: None,
     }
 }
 
