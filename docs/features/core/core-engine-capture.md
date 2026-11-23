@@ -191,7 +191,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [x] - `p1` - Engine opens the tap and the microphone for the self-test on one clock, as for a session - `inst-self-test-one-clock`
 2. [x] - `p1` - **IF** the live model is present, engine emits `self_test_line` per channel - `inst-self-test-lines`
-3. [x] - `p1` - **IF** `play_clip`, a sound played by another process (`afplay`, which the tap hears like any app, at 600 Hz) proves the Others channel without another app playing (#1217); then the engine plays its own clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
+3. [x] - `p1` - **IF** `play_clip`, a sound played by another process (`/usr/bin/afplay`, which the tap hears like any app, at 600 Hz, from a WAV under `engine-io/` in the data folder, #1173) proves the Others channel without another app playing (#1217); then the engine plays its own clip and checks the tap does not hear it; a leak fails with `OwnSoundsLeak` (moved from `cpt-noter-flow-core-engine-foundation-self-test`, decision D-12) - `inst-play-clip`
 4. [x] - `p1` - **RETURN** the events to the caller in order - `inst-return-self-test-capture`
 
 ## 3. Processes / Business Logic (CDSL)

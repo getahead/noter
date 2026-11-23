@@ -61,7 +61,7 @@ public final class EngineLoop: @unchecked Sendable {
         container: URL? = nil, now: @escaping () -> Int64 = EngineClock.epochMilliseconds,
         encoder: @escaping (URL) throws -> AudioEncoder = { try ADTSEncoder(url: $0) },
         play: @escaping @Sendable ([Float]) -> Void = { Clip.play($0) },
-        playOutside: @escaping @Sendable ([Float]) -> Void = { Clip.playOutside($0) },
+        playOutside: (@Sendable ([Float]) -> Void)? = nil,
         player: Player = FilePlayer(),
         processes: @escaping @Sendable () -> [ProcessAudio] = { [] },
         transcriber: (() throws -> Transcriber)? = nil,
@@ -77,7 +77,7 @@ public final class EngineLoop: @unchecked Sendable {
         self.encoder = encoder
         self.source = source
         self.play = play
-        self.playOutside = playOutside
+        self.playOutside = playOutside ?? { [container] in Clip.playOutside($0, in: container) }
         self.player = player
         self.processes = processes
         model = transcriber.map(ModelCache.init)

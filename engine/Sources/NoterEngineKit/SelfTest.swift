@@ -110,11 +110,22 @@ public enum Clip {
         }
     }
 
+    /// The WAV for afplay, written under `engine-io/` in `container`; nil without a data folder or
+    /// when the path leaves it.
+    static func outsideFile(_ samples: [Float], in container: URL?) -> URL? {
+        guard let container, let file = ContainerPath.resolve("engine-io/self-test-\(UUID().uuidString).wav", in: container),
+            (try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)) != nil,
+            (try? WAV.encode(samples: samples, sampleRate: 16_000, float: false).write(to: file)) != nil
+        else { return nil }
+        return file
+    }
+
     /// Plays `samples` with afplay, a process of its own: the tap, which leaves out this engine and
-    /// the app, hears it as it hears any other app (#1217).
-    public static func playOutside(_ samples: [Float]) {
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("noter-self-test-\(UUID().uuidString).wav")
-        guard (try? WAV.encode(samples: samples, sampleRate: 16_000, float: false).write(to: file)) != nil else { return }
+    /// the app, hears it as it hears any other app (#1217). The WAV afplay reads goes under
+    /// `engine-io/` in the data folder, the only place the engine writes scratch files (#1173);
+    /// without a data folder nothing plays.
+    public static func playOutside(_ samples: [Float], in container: URL?) {
+        guard let file = outsideFile(samples, in: container) else { return }
         let afplay = Process()
         afplay.executableURL = URL(fileURLWithPath: "/usr/bin/afplay")
         afplay.arguments = [file.path]

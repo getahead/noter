@@ -236,6 +236,24 @@ final class SelfTestClipTests: XCTestCase {
         XCTAssertLessThan(Clip.share(outside.value, rate: 16_000), 0.5, "not the engine's own pitch, which would read as a leak")
     }
 
+    /// issue 1217: the Others sound's WAV stays under engine-io/ in the data folder (#1173), never
+    /// in the system temp folder or out through a symlink, and nothing is written without a data folder.
+    func testTheOthersSoundIsWrittenOnlyUnderEngineIO() throws {
+        let container = try root()
+        defer { try? FileManager.default.removeItem(at: container) }
+        let file = try XCTUnwrap(Clip.outsideFile(Clip.others(), in: container))
+        XCTAssertTrue(file.path.hasPrefix(container.appendingPathComponent("engine-io").path + "/"))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertNil(Clip.outsideFile(Clip.others(), in: nil))
+        let outside = try root()
+        defer { try? FileManager.default.removeItem(at: outside) }
+        let linked = try root()
+        defer { try? FileManager.default.removeItem(at: linked) }
+        try FileManager.default.createSymbolicLink(at: linked.appendingPathComponent("engine-io"), withDestinationURL: outside)
+        XCTAssertNil(Clip.outsideFile(Clip.others(), in: linked))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: outside.path), [])
+    }
+
     func testWithoutPlayClipNothingIsPlayed() throws {
         let (lines, source, played) = (Lines(), DeviceSource(), Box(false))
         let e = EngineLoop(
