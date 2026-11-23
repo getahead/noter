@@ -339,6 +339,13 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-sheet-layer, .np-alert-layer { position: absolute; inset: 0; z-index: 20; display: flex; justify-content: center; align-items: flex-start; background: rgba(0,0,0,.18); padding-top: 52px; overflow: auto; }
 .np-alert-layer { align-items: center; padding-top: 0; z-index: 25; }
 .np-sheet { width: 520px; max-width: calc(100% - 32px); background: var(--card-bg); border-radius: 12px; box-shadow: var(--shadow-win); margin-bottom: 24px; }
+/* a sheet never exceeds its window (macOS sheets, issue 1220): capped at the layer's height less its bottom margin,
+   a column whose title and buttons stay in view while the body scrolls; one wrapper element passes the column on */
+.np-sheet, .np-sheet > :only-child:not(.np-sheet__head, .np-sheet__body, .np-sheet__foot) { display: flex; flex-direction: column; min-height: 0; }
+.np-sheet { max-height: calc(100% - 24px); }
+.np-sheet > :only-child:not(.np-sheet__head, .np-sheet__body, .np-sheet__foot) { flex: 1 1 auto; }
+.np-sheet__head, .np-sheet__foot { flex: none; }
+.np-sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 .np-sheet-layer.is-new .np-sheet { animation: np-sheet 200ms ease-out; }
 @keyframes np-sheet { from { transform: translateY(-14px); opacity: 0; } to { transform: none; opacity: 1; } }
 .np-sheet__head { padding: 18px 20px 6px; }
