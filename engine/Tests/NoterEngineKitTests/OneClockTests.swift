@@ -33,6 +33,8 @@ final class DeviceSource: AudioSource, @unchecked Sendable {
     var failExclude = false
     /// A leaky system: the tap hears what the engine itself plays.
     var leaky = false
+    /// No other app plays: the tap delivers silence unless another process plays (#1217).
+    var quiet = false
 
     func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws {
         lock.withLock { self.onChunk = onChunk }
@@ -63,7 +65,15 @@ final class DeviceSource: AudioSource, @unchecked Sendable {
     func play(_ clip: [Float]) {
         for at in stride(from: 0, to: clip.count, by: 1600) {
             let part = Array(clip[at..<min(at + 1600, clip.count)])
-            push(mic: part, sys: leaky ? part : tone(440, ms: part.count / 16))
+            push(mic: part, sys: leaky ? part : quiet ? [Float](repeating: 0, count: part.count) : tone(440, ms: part.count / 16))
+        }
+    }
+
+    /// A sound another process plays: the tap hears it, as does the microphone.
+    func playOutside(_ sound: [Float]) {
+        for at in stride(from: 0, to: sound.count, by: 1600) {
+            let part = Array(sound[at..<min(at + 1600, sound.count)])
+            push(mic: part, sys: part)
         }
     }
 }
@@ -179,7 +189,8 @@ final class SelfTestClipTests: XCTestCase {
             play: { clip in
                 played.value = true
                 source.play(clip)
-            }
+            },
+            playOutside: { source.playOutside($0) }
         ) { start in
             XCTAssertNil(start, "the self-test opens the source as a session does, without a call")
             return source
@@ -201,6 +212,28 @@ final class SelfTestClipTests: XCTestCase {
         let (result, _) = try run(leaky: true)
         XCTAssertEqual(result["passed"] as? Bool, false)
         XCTAssertEqual(result["own_sounds_leak"] as? Bool, true)
+    }
+
+    /// issue 1217: with nothing else playing, Play Test Clip alone passes: the Others sound is
+    /// played by another process the tap hears, the engine's own clip still stays out of it.
+    func testTheClipAlonePassesWhenNothingElsePlays() throws {
+        let (lines, source, outside) = (Lines(), DeviceSource(), Box<[Float]>([]))
+        source.quiet = true
+        let e = EngineLoop(
+            writer: writer(lines), engineVersion: "test", models: ["whisper-turbo"], sandboxed: false,
+            play: { source.play($0) },
+            playOutside: { sound in
+                outside.value = sound
+                source.playOutside(sound)
+            }
+        ) { _ in source }
+        e.start()
+        _ = e.handle(#"{"id":1,"cmd":{"type":"self_test","play_clip":true,"timeout_ms":3000}}"#)
+        let result = try XCTUnwrap(lines.waitFor("self_test_result"))
+        XCTAssertEqual(result["passed"] as? Bool, true)
+        XCTAssertEqual(result["own_sounds_leak"] as? Bool, false)
+        XCTAssertFalse(outside.value.isEmpty)
+        XCTAssertLessThan(Clip.share(outside.value, rate: 16_000), 0.5, "not the engine's own pitch, which would read as a leak")
     }
 
     func testWithoutPlayClipNothingIsPlayed() throws {
