@@ -243,8 +243,8 @@
             "supported": true,
             "tested": "2.1.296",
             "tool": "claude_code",
-            "untested": true,
-            "version": "2.4.1"
+            "untested": false,
+            "version": "2.1.296"
           },
           "provider": "claude",
           "status": {
@@ -1905,8 +1905,8 @@
         "supported": true,
         "tested": "2.1.296",
         "tool": "claude_code",
-        "untested": true,
-        "version": "2.4.1"
+        "untested": false,
+        "version": "2.1.296"
       }
     ],
     "jobs": [
