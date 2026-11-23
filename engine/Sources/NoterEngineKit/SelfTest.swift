@@ -104,15 +104,16 @@ extension EngineLoop {
     // @cpt-flow:cpt-noter-flow-core-engine-foundation-self-test:p1
     // @cpt-flow:cpt-noter-flow-core-engine-capture-self-test:p1
     func selfTest(timeout: TimeInterval, playClip: Bool) {
-        let deadline = Date().addingTimeInterval(timeout)
         let state = SelfTestState()
         let done = DispatchSemaphore(value: 0)
         let writer = self.writer
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
         let audio = source(nil)
-        // Opening the audio can wait on a permission request macOS never answers (#1211): it runs
-        // on its own queue, and the test ends with its window whether or not it returned.
+        // Opening the audio can wait behind macOS's permission prompt, or on a request it never
+        // answers (#1211): it runs on its own queue. A slow open says `self_test_waiting`, and the
+        // window starts once the audio is open, so the user's time on the prompt is not counted;
+        // audio still closed after `selfTestPromptWait` ends the test with nothing arrived.
         let opening = DispatchQueue(label: "ai.noter.engine.self-test.open")
         let opened = DispatchSemaphore(value: 0)
         opening.async {
@@ -128,10 +129,15 @@ extension EngineLoop {
             }
             opened.signal()
         }
-        let openedInTime = opened.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow)) == .success
+        var openedInTime = opened.wait(timeout: .now() + min(1, selfTestPromptWait)) == .success
         if !openedInTime {
-            FileHandle.standardError.write(Data("noter-engine: self-test audio did not open within the window\n".utf8))
+            writer.emit(.selfTestWaiting)
+            openedInTime = opened.wait(timeout: .now() + max(0, selfTestPromptWait - 1)) == .success
         }
+        if !openedInTime {
+            FileHandle.standardError.write(Data("noter-engine: self-test audio did not open\n".utf8))
+        }
+        let deadline = openedInTime ? Date().addingTimeInterval(timeout) : Date()
         // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
