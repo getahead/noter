@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.1](https://github.com/getahead/noter/compare/v0.25.0...v0.25.1) (2026-11-23)
+
+
+### Bug fixes
+
+* a self-test that gets no sound from macOS says so, ends on time and is logged ([#1211](https://github.com/getahead/noter/issues/1211)) ([#1212](https://github.com/getahead/noter/issues/1212)) ([8b0aa93](https://github.com/getahead/noter/commit/8b0aa93061a9f534e4fd6f913dfbfa309e688d7c))
+* the self-test waits for macOS's permission prompts and for a running probe ([#1211](https://github.com/getahead/noter/issues/1211)) ([#1214](https://github.com/getahead/noter/issues/1214)) ([5ba7308](https://github.com/getahead/noter/commit/5ba7308f277fb83b72b3423eac6904d40e177bba))
+
 ## [0.25.0](https://github.com/getahead/noter/compare/v0.24.2...v0.25.0) (2026-11-22)
 
 
