@@ -9617,7 +9617,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
             <li>${icon('cloudLock', { size: 13 })}<span>Your privacy mode still applies: with Cloud, redacted, names and PII are replaced before anything is sent.</span></li>
           </ul>
           ${p.personalUse ? P.checkbox('Personal use', f.ack, { id: 'auth-ack-' + pid, bind: 'auth.' + pid + '.flow.ack' }) : ''}
-          ${p.personalUse ? html`<div class="f-fine">${p.name} plans are for personal use. Heavy automated use may be throttled. For a team rollout, use an API key.</div>` : ''}
+          ${p.personalUse ? html`<div class="f-fine">Each ${p.name} plan seat is for one person. Heavy automated use may be throttled. To share Noter across a team, use an API key.</div>` : ''}
         </div>
         ${foot(html`${cancel}<span class="np-tb__spacer"></span>${P.button(useExisting ? 'Use This Account' : 'Continue in Browser', { variant: 'primary', disabled: !ackOk || f.cli !== 'found', icon: useExisting ? null : 'external', action: ['auth.continue', { p: pid }] })}`)}`;
     }

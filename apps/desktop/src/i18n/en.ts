@@ -656,7 +656,7 @@ export const en = {
   "signin.fact_agents": "You choose which agents and tasks use it. Everything else keeps its current runtime.",
   "signin.fact_privacy": "Your privacy mode still applies: with Cloud, redacted, names and PII are replaced before anything is sent.",
   "signin.personal_use": "Personal use",
-  "signin.personal_use_note": "Claude plans are for personal use. Heavy automated use may be throttled. For a team rollout, use an API key.",
+  "signin.personal_use_note": "Each Claude plan seat is for one person. Heavy automated use may be throttled. To share Noter across a team, use an API key.",
   "signin.continue": "Continue in Browser",
   "signin.use_this": "Use This Account",
   "signin.cancel": "Cancel",

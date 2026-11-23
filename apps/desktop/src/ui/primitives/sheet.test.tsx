@@ -2,7 +2,7 @@ import type { KeyboardEvent } from "react";
 import { renderToString } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FOCUSABLE } from "../../app/a11y/focus";
-import { Sheet, sheetKey } from "./sheet";
+import { Sheet, sheetKey, watchScroll } from "./sheet";
 
 describe("Sheet (cpt-noter-dod-ui-primitives-controls)", () => {
   it("renders the prototype's sheet layer and dialog", () => {
@@ -14,6 +14,48 @@ describe("Sheet (cpt-noter-dod-ui-primitives-controls)", () => {
     const html = renderToString(<Sheet title="Export" busy onCancel={() => {}} />);
     expect(html).toContain('data-state="busy"');
     expect(html).not.toContain("data-variant");
+  });
+});
+
+// issue 1220: a capped body says that it scrolls (hairline classes); a body that fits says nothing
+describe("watchScroll", () => {
+  const fakeBody = (scrollHeight: number, clientHeight: number) => {
+    const classes = new Set<string>();
+    const listeners = new Map<string, () => void>();
+    const body = {
+      scrollHeight, clientHeight, scrollTop: 0, children: [{ id: "child" }],
+      classList: { toggle: (c: string, on: boolean) => void (on ? classes.add(c) : classes.delete(c)) },
+      addEventListener: (t: string, f: () => void) => void listeners.set(t, f),
+      removeEventListener: (t: string) => void listeners.delete(t),
+    };
+    return { body: body as unknown as HTMLElement, classes, listeners, raw: body };
+  };
+  it("marks an overflowing body, then scrolled, and observes the body and its content until cleaned up", () => {
+    const observed: unknown[] = [];
+    let resized = () => {};
+    const disconnect = vi.fn();
+    class Observer { constructor(f: () => void) { resized = f; } observe(el: unknown) { observed.push(el); } disconnect = disconnect; }
+    const f = fakeBody(900, 400);
+    const stop = watchScroll(f.body, Observer as unknown as typeof ResizeObserver)!;
+    expect([...f.classes]).toEqual(["is-overflow"]);
+    expect(observed).toEqual([f.raw, { id: "child" }]);
+    f.raw.scrollTop = 30;
+    f.listeners.get("scroll")!();
+    expect([...f.classes].sort()).toEqual(["is-overflow", "is-scrolled"]);
+    f.raw.scrollHeight = 400; // the content shrank to fit
+    f.raw.scrollTop = 0;
+    resized();
+    expect([...f.classes]).toEqual([]);
+    stop();
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(f.listeners.has("scroll")).toBe(false);
+  });
+  it("leaves a body that fits unmarked, works without ResizeObserver, and ignores a sheet without a body", () => {
+    const f = fakeBody(300, 300);
+    const stop = watchScroll(f.body, undefined)!;
+    expect([...f.classes]).toEqual([]);
+    stop();
+    expect(watchScroll(null)).toBeUndefined();
   });
 });
 

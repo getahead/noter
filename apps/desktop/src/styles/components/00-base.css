@@ -218,6 +218,9 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-sheet > :only-child:not(.np-sheet__head, .np-sheet__body, .np-sheet__foot) { flex: 1 1 auto; }
 .np-sheet__head, .np-sheet__foot { flex: none; }
 .np-sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* a capped body that scrolls: a hairline above the buttons, one under the title once scrolled, and room below its last line */
+.np-sheet__body.is-overflow { border-bottom: 1px solid var(--sep); padding-bottom: 20px; }
+.np-sheet__body.is-scrolled { border-top: 1px solid var(--sep); }
 
 /* ---------------- Shared components ---------------- */
 .np-recdot { width: 9px; height: 9px; border-radius: 50%; background: var(--rec); display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--white); }
