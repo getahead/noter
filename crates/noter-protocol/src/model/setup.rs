@@ -187,6 +187,11 @@ pub enum SelfTestEvent {
     StreamArrived {
         channel: AudioChannel,
     },
+    /// macOS is showing its permission prompt for `kind`; the test window starts once it is
+    /// answered, so the time spent on the prompt never counts against it (#1211).
+    AwaitingPermission {
+        kind: PermissionKind,
+    },
     Passed,
     Failed {
         reason: SelfTestFailure,

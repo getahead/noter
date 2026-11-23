@@ -687,6 +687,8 @@ impl Harness {
             SelfTestEvent::StreamArrived { channel } => {
                 vec![EngineEvent::SelfTestStream { channel }]
             }
+            // The engine only says it is waiting on its audio; the core names the prompt.
+            SelfTestEvent::AwaitingPermission { .. } => vec![EngineEvent::SelfTestWaiting],
             SelfTestEvent::Passed => vec![result(true, None, false)],
             SelfTestEvent::Failed { reason } => match reason {
                 SelfTestFailure::OneStreamSilent { channel } => vec![
