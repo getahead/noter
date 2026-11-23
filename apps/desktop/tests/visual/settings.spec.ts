@@ -5,6 +5,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import type { SettingsPane } from "../../src/core/bindings";
 import { openWindow, type CorePlan } from "../e2e/support/app";
+import { freeze, settled } from "./freeze";
 
 const PANES: [SettingsPane, string][] = [
   ["general", "General"],
@@ -22,10 +23,14 @@ const PANES: [SettingsPane, string][] = [
 const title = (id: SettingsPane) => PANES.find(([p]) => p === id)![1];
 
 async function show(page: Page, pane: SettingsPane, plan: CorePlan = {}) {
+  // The Audio pane's live mic meter draws a random level every tick: hold it still for the capture (#1230).
+  const meter = pane === "audio_and_transcription";
+  if (meter) await freeze(page);
   const steer = await openWindow(page, "settings", plan);
   const nav = page.getByRole("navigation", { name: "Settings panes" });
   await nav.getByRole("option").filter({ hasText: title(pane) }).first().click();
   await expect(page.locator('[data-region="ST-R2"]').getByRole("heading", { name: title(pane), exact: true })).toBeVisible();
+  if (meter) await settled(page);
   return steer;
 }
 const shot = (page: Page, name: string) => expect(page).toHaveScreenshot(`${name}.png`, { fullPage: true });
