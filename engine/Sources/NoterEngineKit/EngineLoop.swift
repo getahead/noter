@@ -3,6 +3,9 @@
 import Foundation
 
 public final class EngineLoop: @unchecked Sendable {
+    /// How long a self-test waits for its audio to open behind a macOS prompt (the core's
+    /// `PROMPT_WAIT`); tests shorten it.
+    public var selfTestPromptWait: TimeInterval = 120
     let writer: EventWriter
     private let engineVersion: String
     let models: [String]

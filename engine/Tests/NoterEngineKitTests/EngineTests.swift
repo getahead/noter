@@ -252,26 +252,64 @@ final class EngineLoopTests: XCTestCase {
         XCTAssertEqual(result["failure"] as? String, "device_unavailable")
     }
 
-    /// cpt-noter-seq-first-run-complete-setup — issue 1211: opening the audio waits on a permission request macOS never answers; the
-    /// self-test still ends with its result when its window closes, as nothing arrived.
-    func testTheSelfTestEndsOnTimeWhenOpeningTheAudioNeverReturns() throws {
+    /// cpt-noter-seq-first-run-complete-setup — issue 1211: opening the audio waits behind macOS's prompt; the engine says so, and the
+    /// window starts once the user answers, so a slow answer is not a failure.
+    // cpt-noter-seq-first-run-complete-setup — #1211
+    func testTheSelfTestWindowStartsOnceTheAudioOpensBehindAPrompt() throws {
+        let lines = Lines()
+        let mic = try wav("mic", seconds: 1, amplitude: 0.3)
+        let sys = try wav("sys", seconds: 1, amplitude: 0.3)
+        let source = BlockedSource(then: FileAudioSource(mic: mic, sys: sys, realtime: false))
+        let e = engine(lines, source: source)
+        e.start()
+        _ = e.handle(#"{"id":9,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":300}}"#)
+        XCTAssertNotNil(lines.waitFor("self_test_waiting", timeout: 3))
+        Thread.sleep(forTimeInterval: 0.5) // the user reads the prompt, longer than the window
+        source.release.signal()
+        let result = try XCTUnwrap(lines.waitFor("self_test_result", timeout: 3))
+        XCTAssertEqual(result["passed"] as? Bool, true)
+    }
+
+    /// cpt-noter-seq-first-run-complete-setup — issue 1211: audio that never opens ends the test after the prompt wait, with nothing arrived.
+    // cpt-noter-seq-first-run-complete-setup — #1211
+    func testTheSelfTestEndsWhenTheAudioNeverOpens() throws {
         let lines = Lines()
         let source = BlockedSource()
         defer { source.release.signal() }
         let e = engine(lines, source: source)
+        e.selfTestPromptWait = 1.5
         e.start()
         _ = e.handle(#"{"id":9,"cmd":{"type":"self_test","play_clip":false,"timeout_ms":300}}"#)
-        let result = try XCTUnwrap(lines.waitFor("self_test_result", timeout: 2))
+        let result = try XCTUnwrap(lines.waitFor("self_test_result", timeout: 4))
         XCTAssertEqual(result["passed"] as? Bool, false)
         XCTAssertEqual(result["failure"] as? String, "device_unavailable")
     }
 }
 
-/// An audio source whose start blocks until released, as Core Audio does on an unanswered TCC request.
+final class SelfTestStateTests: XCTestCase {
+    /// #1212 review: once the window has closed, audio from a source that opened late is ignored,
+    /// so no stream or level follows a test that already gave up.
+    // cpt-noter-seq-first-run-complete-setup — #1211
+    func testAudioAfterTheWindowClosedIsIgnored() {
+        let state = SelfTestState()
+        let chunk = AudioChunk(channel: .mic, samples: [Float](repeating: 0.3, count: 160))
+        state.close()
+        XCTAssertNil(state.feed(chunk))
+        XCTAssertNil(state.levelsDue())
+    }
+}
+
+/// An audio source whose start blocks until released, as Core Audio does behind a TCC prompt;
+/// then it delivers `then`'s audio, if any.
 private final class BlockedSource: AudioSource, @unchecked Sendable {
     let release = DispatchSemaphore(value: 0)
-    func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws { release.wait() }
-    func stop() {}
+    private let then: AudioSource?
+    init(then: AudioSource? = nil) { self.then = then }
+    func start(_ onChunk: @escaping @Sendable (AudioChunk) -> Void) throws {
+        release.wait()
+        try then?.start(onChunk)
+    }
+    func stop() { then?.stop() }
 }
 
 final class FileModeTests: XCTestCase {

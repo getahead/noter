@@ -1,6 +1,6 @@
 // Self-test panel: the state machine and the reducer that renders each core message
 // (docs/features/ui/first-run.md § 3 › Render a self-test message, § 4 › Self-test panel).
-import type { AudioChannel, PermissionState, SelfTestEvent } from "../../core/bindings";
+import type { AudioChannel, PermissionKind, PermissionState, SelfTestEvent } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 
@@ -68,6 +68,8 @@ export type SelfTestPanel = {
   excludeOwnSounds: boolean;
   /** The catalogue message that names why the test failed. */
   failure: MsgKey | null;
+  /** macOS's prompt the test waits on before its window starts (#1211). */
+  awaiting: PermissionKind | null;
   runEnabled: boolean;
 };
 
@@ -85,7 +87,7 @@ export const hearing = (db: number | null | undefined) => db !== undefined && db
 const runEnabled = (s: SelfTestState) => s === "IDLE" || s === "FAILED" || s === "PASSED";
 
 export function initialSelfTestPanel(state: SelfTestState, excludeOwnSounds: boolean): SelfTestPanel {
-  return { state, micDb: null, sysDb: null, line: null, arrived: { mic: false, sys: false }, aligned: false, ownSounds: "pending", excludeOwnSounds, failure: null, runEnabled: runEnabled(state) };
+  return { state, micDb: null, sysDb: null, line: null, arrived: { mic: false, sys: false }, aligned: false, ownSounds: "pending", excludeOwnSounds, failure: null, awaiting: null, runEnabled: runEnabled(state) };
 }
 
 /** The panel after the user starts a test: results of the last run are cleared. */
@@ -99,7 +101,8 @@ export function applySelfTestEvent(panel: SelfTestPanel, e: SelfTestEvent): Self
   // a late message after the verdict changes nothing but the meters going quiet
   if (panel.state !== "RUNNING" && e.type !== "ended") return panel;
   const state = selfTestNext(panel.state, { type: "core", event: e });
-  let next: SelfTestPanel = { ...panel, state };
+  // any news from the test but the wait itself means macOS's prompt was answered
+  let next: SelfTestPanel = { ...panel, state, awaiting: e.type === "awaiting_permission" ? e.kind : null };
   // @cpt-begin:cpt-noter-algo-ui-first-run-self-test-result:p1:inst-match-event
   switch (e.type) {
     case "levels":

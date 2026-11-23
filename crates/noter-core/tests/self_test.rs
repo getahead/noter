@@ -35,6 +35,8 @@ struct Mac {
     states: Mutex<HashMap<PermissionKind, PermissionState>>,
     /// The core's change listener, to send it a notice as macOS would.
     changed: Mutex<Option<Listener>>,
+    /// macOS's prompt, answered this way after this long (the user reading it).
+    answer: Mutex<Option<(PermissionState, Duration)>>,
 }
 
 impl NativeServices for Mac {
@@ -47,8 +49,14 @@ impl NativeServices for Mac {
             .unwrap_or(&PermissionState::NotAsked)
     }
     fn request_permission(&self, kind: PermissionKind) -> BoxFuture<'_, PermissionState> {
-        let s = self.permission(kind);
-        Box::pin(async move { s })
+        let answer = *self.answer.lock().unwrap();
+        Box::pin(async move {
+            if let Some((state, after)) = answer {
+                tokio::time::sleep(after).await;
+                self.states.lock().unwrap().insert(kind, state);
+            }
+            self.permission(kind)
+        })
     }
     fn environment(&self) -> EnvironmentReading {
         // Room for the models, so models_download can start.
@@ -442,6 +450,117 @@ async fn no_sound_on_either_channel_fails_as_no_audio_and_is_logged() {
     assert_eq!(line["count"], 0);
 }
 
+/// The core of `open`, with macOS's microphone prompt answered `answer` after `after`.
+fn open_prompting(
+    dir: &Path,
+    engine: ScriptedEngine,
+    answer: PermissionState,
+    after: Duration,
+) -> Run {
+    let mac = Mac::default();
+    *mac.answer.lock().unwrap() = Some((answer, after));
+    let launcher: Arc<dyn EngineLauncher> = Arc::new(engine.clone());
+    let deps = CoreDeps {
+        native: Arc::new(mac),
+        engine: launcher,
+        models: live_model(dir),
+        ..CoreDeps::new(
+            Arc::new(FixedClock::at(1_790_000_000_000)),
+            Arc::new(NoEvents),
+        )
+    };
+    let core = Arc::new(Core::open(dir, deps).expect("core opens"));
+    core.start_first_run();
+    Run { core, engine }
+}
+
+fn self_tests_sent(engine: &ScriptedEngine) -> usize {
+    engine
+        .commands()
+        .iter()
+        .filter(|c| matches!(c, EngineCommand::SelfTest { .. }))
+        .count()
+}
+
+// cpt-noter-seq-first-run-complete-setup — #1211
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211: the microphone was never asked; macOS's prompt is answered 15 s later, longer than
+// the test window. The test asks first, says it waits, and only then runs: it passes.
+async fn the_microphone_prompt_is_answered_before_the_window_starts() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open_prompting(
+        dir.path(),
+        ScriptedEngine::new(),
+        PermissionState::Granted,
+        Duration::from_secs(15),
+    );
+    let (_, events) = run_to_end(&r, false).await;
+    assert_eq!(
+        events.first(),
+        Some(&SelfTestEvent::AwaitingPermission {
+            kind: PermissionKind::Microphone
+        })
+    );
+    assert!(events.contains(&SelfTestEvent::Passed), "{events:?}");
+    assert_eq!(self_tests_sent(&r.engine), 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211: Don't Allow on the microphone prompt is a clear result, not a timeout, and the
+// engine is never asked.
+async fn a_denied_microphone_prompt_fails_as_microphone_missing() {
+    let dir = tempfile::tempdir().unwrap();
+    let r = open_prompting(
+        dir.path(),
+        ScriptedEngine::new(),
+        PermissionState::Denied,
+        Duration::from_millis(50),
+    );
+    let (_, events) = run_to_end(&r, false).await;
+    assert_eq!(
+        failed(&events),
+        Some(SelfTestFailure::PermissionMissing {
+            kind: PermissionKind::Microphone
+        })
+    );
+    assert_eq!(self_tests_sent(&r.engine), 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211: the engine's audio waits behind the system-audio prompt for 15 s; the core says so
+// and waits for the result past its usual window instead of failing as 'didn't finish'.
+async fn the_system_audio_prompt_does_not_count_against_the_window() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new();
+    engine.hold_next_self_test();
+    let r = open(dir.path(), engine, PermissionState::Granted, None);
+    let inject = r.engine.clone();
+    let emitter = tokio::spawn(async move {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !inject.inject(EngineEvent::SelfTestWaiting) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the engine never started the held self-test");
+        tokio::time::sleep(Duration::from_secs(15)).await;
+        for channel in [AudioChannel::Mic, AudioChannel::Sys] {
+            assert!(inject.inject(EngineEvent::SelfTestStream { channel }));
+        }
+        assert!(inject.inject(EngineEvent::SelfTestResult {
+            passed: true,
+            failure: None,
+            own_sounds_leak: false,
+        }));
+    });
+    let (_, events) = run_to_end(&r, false).await;
+    emitter.await.unwrap();
+    assert!(events.contains(&SelfTestEvent::AwaitingPermission {
+        kind: PermissionKind::SystemAudio
+    }));
+    assert!(events.contains(&SelfTestEvent::Passed), "{events:?}");
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn an_engine_that_never_answers_times_out() {
     let dir = tempfile::tempdir().unwrap();
@@ -723,6 +842,59 @@ async fn until_probes(p: &Probing, n: usize) {
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     panic!("no probe");
+}
+
+// cpt-noter-seq-first-run-complete-setup — #1211
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211 (the owner's 'conflict' at 10:50): coming back to Noter starts the short system-audio
+// probe; Run Test pressed meanwhile waits for it and then runs, instead of being refused.
+async fn a_self_test_asked_for_during_the_background_probe_waits_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    unverified_by_a_self_test(&p).await;
+    tokio::time::sleep(Duration::from_secs(6)).await; // past the re-check's rate limit
+    p.run.engine.hold_next_self_test();
+    p.run.core.app_activated();
+    for _ in 0..500 {
+        if noter_core::testing::system_audio_probing(&p.run.core) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(noter_core::testing::system_audio_probing(&p.run.core));
+    let inject = p.run.engine.clone();
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(inject.inject(EngineEvent::SelfTestResult {
+            passed: false,
+            failure: Some(EngineErrorCode::DeviceUnavailable),
+            own_sounds_leak: false,
+        }));
+    });
+    let (_, events) = run_to_end(&p.run, false).await; // unwraps: never Conflict
+    release.await.unwrap();
+    assert_eq!(failed(&events), Some(SelfTestFailure::ZeroBuffers));
+}
+
+// cpt-noter-seq-first-run-complete-setup — #1211
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211: an Allow on system audio whose call is dropped mid-probe (the window went away)
+// leaves no probe flag behind for every later test to wait on.
+async fn a_dropped_system_audio_request_leaves_no_probe_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    p.run.engine.hold_next_self_test();
+    let ctx = first_run();
+    let request = p.run.core.permission_request(
+        &ctx,
+        PermissionArgs {
+            kind: PermissionKind::SystemAudio,
+        },
+    );
+    assert!(tokio::time::timeout(Duration::from_millis(300), request)
+        .await
+        .is_err());
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

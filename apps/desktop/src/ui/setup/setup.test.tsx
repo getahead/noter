@@ -121,6 +121,11 @@ describe("self-test-panel (cpt-noter-component-ui-self-test-panel)", () => {
     expect(html.match(/disabled=""/g)).toHaveLength(2);
   });
 
+  it("cpt-noter-seq-first-run-complete-setup — asks the user to answer macOS's prompt while the test waits on it (issue 1211)", () => {
+    const waiting = applySelfTestEvent(running, { type: "awaiting_permission", kind: "system_audio" });
+    expect(show(waiting)).toContain("Answer the macOS prompt to continue. The test starts once you do.");
+    expect(show(waiting)).not.toContain("Checking that Noter&#x27;s own sounds stay out…");
+  });
   it("shows the running state with its progress line, the pending result lines and a busy Run Test", () => {
     expect(show(running)).toContain("Checking that Noter&#x27;s own sounds stay out…");
     expect(show(running)).toContain('aria-busy="true"');

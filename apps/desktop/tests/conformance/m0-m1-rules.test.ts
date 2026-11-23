@@ -377,10 +377,14 @@ describe("snapshot, then stream (R23/R24)", () => {
     const before = ok(await core.setupStatus({}));
     expect(before.models.bundles.filter((b) => b.required_for_capture).every((b) => b.state === "ready")).toBe(true);
     expect(before.permissions.find((p) => p.kind === "system_audio")?.state).toBe("not_asked");
+    // #1211: the real core asks a never-asked microphone before the window starts; the user answers Don't Allow
+    const asks = !isFake && microphone === "not_asked";
+    if (asks) await (s as unknown as { process: { invoke(window: string, cmd: string, args: unknown): Promise<unknown> } }).process.invoke("main", "harness.native_fail", { op: "permission_request", code: "permission_denied" });
     const got: SelfTestMsg[] = [];
     const sub = ok(await core.selfTestRun({ play_clip: false }, (m) => got.push(m)));
     await until(() => got.some((m) => m.event.type === "ended"), "the missing-microphone self-test to end");
     expect(got.map((m) => m.event)).toEqual([
+      ...(asks ? [{ type: "awaiting_permission", kind: "microphone" }] : []),
       { type: "failed", reason: { type: "permission_missing", kind: "microphone" } },
       { type: "ended", reason: "call_stopped" },
     ]);

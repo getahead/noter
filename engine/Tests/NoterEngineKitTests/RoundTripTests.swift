@@ -142,6 +142,7 @@ extension EngineEvent: Decodable {
                 callId: try c.decode(String?.self, forKey: .call_id), micDb: try c.decode(Float.self, forKey: .mic_db),
                 sysDb: try c.decode(Float.self, forKey: .sys_db))
         case "self_test_stream": self = .selfTestStream(channel: try c.decode(Channel.self, forKey: .channel))
+        case "self_test_waiting": self = .selfTestWaiting
         case "self_test_result":
             self = .selfTestResult(
                 passed: try c.decode(Bool.self, forKey: .passed), failure: try c.decode(EngineErrorCode?.self, forKey: .failure),
@@ -250,7 +251,7 @@ final class RoundTripTests: XCTestCase {
             [
                 "ack", "audio_source_added", "call_audio_released", "call_detected", "device_changed", "embeddings", "error",
                 "levels", "no_segments", "offline_done", "offline_failed", "offline_progress", "playback_position", "pong",
-                "ready", "segment", "self_test_line", "self_test_result", "self_test_stream", "session_started",
+                "ready", "segment", "self_test_line", "self_test_result", "self_test_stream", "self_test_waiting", "session_started",
                 "session_stopped", "silence", "speaker_embedding_done", "system_audio_silent",
             ])
     }

@@ -559,11 +559,18 @@
     {
       "at": 1790000000000,
       "event": {
+        "type": "self_test_waiting"
+      },
+      "seq": 23
+    },
+    {
+      "at": 1790000000000,
+      "event": {
         "channel": "mic",
         "text": "one two three",
         "type": "self_test_line"
       },
-      "seq": 23
+      "seq": 24
     },
     {
       "at": 1790000000000,
@@ -573,7 +580,7 @@
         "passed": false,
         "type": "self_test_result"
       },
-      "seq": 24
+      "seq": 25
     },
     {
       "at": 1790000000000,
@@ -583,14 +590,14 @@
         "playing": true,
         "type": "playback_position"
       },
-      "seq": 25
+      "seq": 26
     },
     {
       "at": 1790000000000,
       "event": {
         "type": "pong"
       },
-      "seq": 26
+      "seq": 27
     }
   ],
   "words": [

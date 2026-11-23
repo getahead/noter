@@ -378,6 +378,9 @@ pub enum EngineEvent {
     SelfTestStream {
         channel: AudioChannel,
     },
+    /// Opening the self-test's audio is taking long: macOS is most likely showing a permission
+    /// prompt. The test window starts only once the audio is open (#1211).
+    SelfTestWaiting,
     SelfTestLine {
         channel: AudioChannel,
         text: String,

@@ -1333,6 +1333,19 @@
             "type": "object"
           },
           {
+            "description": "Opening the self-test's audio is taking long: macOS is most likely showing a permission\nprompt. The test window starts only once the audio is open (#1211).",
+            "properties": {
+              "type": {
+                "const": "self_test_waiting",
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ],
+            "type": "object"
+          },
+          {
             "properties": {
               "channel": {
                 "$ref": "#/$defs/AudioChannel"

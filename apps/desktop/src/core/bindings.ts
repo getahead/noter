@@ -3004,7 +3004,12 @@ export type SelfTestArgs = {
 
 export type SelfTestEvent = { type: "levels"; mic_db: number | null; sys_db: number | null } | 
 /**  A live transcript line proving the pipeline end to end. */
-{ type: "line"; channel: AudioChannel; text: string } | { type: "stream_arrived"; channel: AudioChannel } | { type: "passed" } | { type: "failed"; reason: SelfTestFailure } | { type: "ended"; reason: StreamEndReason };
+{ type: "line"; channel: AudioChannel; text: string } | { type: "stream_arrived"; channel: AudioChannel } | 
+/**
+ *  macOS is showing its permission prompt for `kind`; the test window starts once it is
+ *  answered, so the time spent on the prompt never counts against it (#1211).
+ */
+{ type: "awaiting_permission"; kind: PermissionKind } | { type: "passed" } | { type: "failed"; reason: SelfTestFailure } | { type: "ended"; reason: StreamEndReason };
 
 export type SelfTestFailure = { type: "one_stream_silent"; channel: AudioChannel } | 
 /**
@@ -3833,7 +3838,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.29";
+export const CONTRACT_VERSION = "2.30";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

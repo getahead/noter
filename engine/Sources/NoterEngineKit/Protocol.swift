@@ -283,6 +283,8 @@ public enum EngineEvent: Equatable, Sendable {
     case pong
     case levels(callId: String?, micDb: Float, sysDb: Float)
     case selfTestStream(channel: Channel)
+    /// Opening the self-test's audio is taking long, most likely behind a macOS permission prompt (#1211).
+    case selfTestWaiting
     case selfTestResult(passed: Bool, failure: EngineErrorCode?, ownSoundsLeak: Bool)
     case sessionStarted(callId: String, micDevice: String, outputDevice: String)
     case sessionStopped(callId: String, timelinePath: String, micPath: String?, sysPath: String?)
@@ -335,6 +337,8 @@ extension EngineEvent: Encodable {
         case let .selfTestStream(channel):
             try put("type", "self_test_stream")
             try put("channel", channel)
+        case .selfTestWaiting:
+            try put("type", "self_test_waiting")
         case let .selfTestResult(passed, failure, ownSoundsLeak):
             try put("type", "self_test_result")
             try put("passed", passed)

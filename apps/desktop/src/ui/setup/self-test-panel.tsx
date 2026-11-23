@@ -111,7 +111,8 @@ export function SelfTestPanel({ panel, variant = "step", waitingPercent = 0, pla
       {running && (
         <div className="fr-st__prog" title={playClip ? t("self_test.clip_title") : undefined}>
           <Progress variant="spinner" />
-          <span>{playClip && !(panel.arrived.mic && panel.arrived.sys) ? <Msg id="self_test.listening" /> : <Msg id="self_test.checking_own" />}</span>
+          {/* the window starts once macOS's prompt is answered (#1211) */}
+          <span>{panel.awaiting ? <Msg id="self_test.awaiting_prompt" /> : playClip && !(panel.arrived.mic && panel.arrived.sys) ? <Msg id="self_test.listening" /> : <Msg id="self_test.checking_own" />}</span>
         </div>
       )}
       {state === "FAILED" && panel.failure && (sysRefused(panel, sysAllowed) ? (

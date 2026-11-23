@@ -220,6 +220,7 @@ pub fn events() -> Vec<EngineEventLine> {
         EngineEvent::SelfTestStream {
             channel: AudioChannel::Sys,
         },
+        EngineEvent::SelfTestWaiting,
         EngineEvent::SelfTestLine {
             channel: AudioChannel::Mic,
             text: "one two three".into(),
