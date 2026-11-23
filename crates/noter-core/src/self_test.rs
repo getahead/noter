@@ -49,6 +49,9 @@ const WINDOW_MS: u32 = 10_000;
 /// The short test that brings up the System Audio Recording prompt.
 const PROMPT_MS: u32 = 3_000;
 const MARGIN: Duration = Duration::from_secs(2);
+/// How long the engine waits for its audio to open behind a macOS prompt before its window
+/// starts (`SelfTest.swift`, `promptWait`); the core waits as long once the engine says so.
+const PROMPT_WAIT: Duration = Duration::from_secs(120);
 /// One system-audio re-check per activation: notices within this window ask once (D-19).
 const RECHECK_EVERY: Duration = Duration::from_secs(5);
 static NEXT_RUN: AtomicU64 = AtomicU64::new(1);
@@ -178,7 +181,18 @@ impl Core {
         let send = |event| {
             hub.publish(&key, SelfTestMsg { seq: Seq(0), event });
         };
-        let microphone = self.deps.native.permission(PermissionKind::Microphone);
+        let mut microphone = self.deps.native.permission(PermissionKind::Microphone);
+        if microphone == PermissionState::NotAsked {
+            // #1211: macOS's prompt is answered before the test window starts, never inside it.
+            send(SelfTestEvent::AwaitingPermission {
+                kind: PermissionKind::Microphone,
+            });
+            microphone = self
+                .deps
+                .native
+                .request_permission(PermissionKind::Microphone)
+                .await;
+        }
         let result = if microphone == PermissionState::Granted {
             self.engine_self_test(play_clip, &send).await
         } else {
@@ -186,7 +200,7 @@ impl Core {
             let outcome = Err(SelfTestFailure::PermissionMissing {
                 kind: PermissionKind::Microphone,
             });
-            self.log_self_test(&outcome, "not_asked", 0);
+            self.log_self_test(&outcome, &code_of(&microphone), 0);
             outcome
         };
         // @cpt-begin:cpt-noter-state-core-first-run-self-test:p1:inst-st-passed
@@ -229,8 +243,8 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-send-self-test
         let mut arrived = Vec::new();
-        let deadline =
-            tokio::time::Instant::now() + Duration::from_millis(WINDOW_MS.into()) + MARGIN;
+        let window = Duration::from_millis(WINDOW_MS.into()) + MARGIN;
+        let mut deadline = tokio::time::Instant::now() + window;
         loop {
             let line = match tokio::time::timeout_at(deadline, events.recv()).await {
                 Ok(Ok(line)) => line,
@@ -242,6 +256,13 @@ impl Core {
                 }
             };
             match line.event {
+                // The engine's audio waits behind the system-audio prompt: its window starts later.
+                EngineEvent::SelfTestWaiting => {
+                    deadline = tokio::time::Instant::now() + PROMPT_WAIT + window;
+                    send(SelfTestEvent::AwaitingPermission {
+                        kind: PermissionKind::SystemAudio,
+                    });
+                }
                 EngineEvent::SelfTestStream { channel } => {
                     arrived.push(channel);
                     send(SelfTestEvent::StreamArrived { channel });
@@ -422,8 +443,8 @@ impl Core {
             return None;
         }
         let mut heard = false;
-        let deadline =
-            tokio::time::Instant::now() + Duration::from_millis(PROMPT_MS.into()) + MARGIN;
+        let window = Duration::from_millis(PROMPT_MS.into()) + MARGIN;
+        let mut deadline = tokio::time::Instant::now() + window;
         loop {
             let line = match tokio::time::timeout_at(deadline, events.recv()).await {
                 Ok(Ok(line)) => line,
@@ -437,6 +458,10 @@ impl Core {
                 }
             };
             match line.event {
+                // The prompt is up: the user's answer can take longer than the short test.
+                EngineEvent::SelfTestWaiting => {
+                    deadline = tokio::time::Instant::now() + PROMPT_WAIT + window
+                }
                 EngineEvent::SelfTestStream {
                     channel: AudioChannel::Sys,
                 } => heard = true,
