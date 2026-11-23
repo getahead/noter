@@ -144,10 +144,11 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-first-run-self-test:p1:inst-serialize-runs
         {
             let mut first_run = lock(&self.first_run);
-            if first_run.self_test_running || first_run.probing {
+            // A background system-audio probe is no reason to refuse: the test waits for it (#1211).
+            if first_run.self_test_running {
                 return Err(CoreError::new(
                     ErrorCode::Conflict,
-                    "a self-test or system-audio probe is already running",
+                    "a self-test is already running",
                 ));
             }
             first_run.self_test_running = true;
@@ -177,6 +178,12 @@ impl Core {
     }
 
     async fn drive_self_test(self: Arc<Self>, ctx: CommandCtx, key: String, play_clip: bool) {
+        // The short system-audio probe (re-check on activation, or Allow) holds the engine's
+        // self-test: this test starts when it is over, at most as long as a probe can last.
+        let probe_ends = tokio::time::Instant::now() + PROMPT_WAIT + Duration::from_secs(10);
+        while lock(&self.first_run).probing && tokio::time::Instant::now() < probe_ends {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
         let hub = self.self_test_hub();
         let send = |event| {
             hub.publish(&key, SelfTestMsg { seq: Seq(0), event });

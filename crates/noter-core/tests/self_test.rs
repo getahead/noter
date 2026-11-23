@@ -482,6 +482,7 @@ fn self_tests_sent(engine: &ScriptedEngine) -> usize {
         .count()
 }
 
+// cpt-noter-seq-first-run-complete-setup — #1211
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 // issue 1211: the microphone was never asked; macOS's prompt is answered 15 s later, longer than
 // the test window. The test asks first, says it waits, and only then runs: it passes.
@@ -841,6 +842,59 @@ async fn until_probes(p: &Probing, n: usize) {
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
     panic!("no probe");
+}
+
+// cpt-noter-seq-first-run-complete-setup — #1211
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211 (the owner's 'conflict' at 10:50): coming back to Noter starts the short system-audio
+// probe; Run Test pressed meanwhile waits for it and then runs, instead of being refused.
+async fn a_self_test_asked_for_during_the_background_probe_waits_for_it() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    unverified_by_a_self_test(&p).await;
+    tokio::time::sleep(Duration::from_secs(6)).await; // past the re-check's rate limit
+    p.run.engine.hold_next_self_test();
+    p.run.core.app_activated();
+    for _ in 0..500 {
+        if noter_core::testing::system_audio_probing(&p.run.core) {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert!(noter_core::testing::system_audio_probing(&p.run.core));
+    let inject = p.run.engine.clone();
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(inject.inject(EngineEvent::SelfTestResult {
+            passed: false,
+            failure: Some(EngineErrorCode::DeviceUnavailable),
+            own_sounds_leak: false,
+        }));
+    });
+    let (_, events) = run_to_end(&p.run, false).await; // unwraps: never Conflict
+    release.await.unwrap();
+    assert_eq!(failed(&events), Some(SelfTestFailure::ZeroBuffers));
+}
+
+// cpt-noter-seq-first-run-complete-setup — #1211
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// issue 1211: an Allow on system audio whose call is dropped mid-probe (the window went away)
+// leaves no probe flag behind for every later test to wait on.
+async fn a_dropped_system_audio_request_leaves_no_probe_behind() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = open_probing(dir.path(), ScriptedEngine::new());
+    p.run.engine.hold_next_self_test();
+    let ctx = first_run();
+    let request = p.run.core.permission_request(
+        &ctx,
+        PermissionArgs {
+            kind: PermissionKind::SystemAudio,
+        },
+    );
+    assert!(tokio::time::timeout(Duration::from_millis(300), request)
+        .await
+        .is_err());
+    assert!(!noter_core::testing::system_audio_probing(&p.run.core));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

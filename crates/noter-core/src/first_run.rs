@@ -803,9 +803,12 @@ impl Core {
                 }
                 fr.probing = true;
             }
+            // Cleared however the probe ends: a dropped call must not leave every later
+            // self-test waiting on it (#1211).
+            let probe = ProbeFlag(self);
             let heard = self.prompt_system_audio().await;
+            drop(probe);
             let mut fr = lock(&self.first_run);
-            fr.probing = false;
             if let Some(heard) = heard.filter(|heard| fr.stored.system_audio != Some(*heard)) {
                 let mut stored = fr.stored.clone();
                 stored.system_audio = Some(heard);
@@ -874,6 +877,15 @@ impl Core {
     pub(crate) fn take_pending_update(&self) -> bool {
         let mut first_run = lock(&self.first_run);
         std::mem::take(&mut first_run.install_pending)
+    }
+}
+
+/// Holds `first_run.probing` for a system-audio probe and clears it on drop.
+struct ProbeFlag<'a>(&'a Core);
+
+impl Drop for ProbeFlag<'_> {
+    fn drop(&mut self) {
+        lock(&self.0.first_run).probing = false;
     }
 }
 
