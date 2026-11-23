@@ -290,6 +290,7 @@ export const en = {
   "self_test.refused": "The test could not start. Try again.",
   "self_test.timed_out":
     "The test didn't finish. Check that sound is playing, then try again.",
+  "self_test.awaiting_prompt": "Answer the macOS prompt to continue. The test starts once you do.",
   "self_test.no_audio":
     "macOS gave Noter no sound from the microphone or system audio. If Noter was just updated, turn it off and on again in System Settings › Privacy & Security, under Microphone and Screen & System Audio Recording, then try again.",
   "display.title": "Call screen display",

@@ -80,6 +80,11 @@ describe("applySelfTestEvent (cpt-noter-algo-ui-first-run-self-test-result)", ()
     expect(fold(running(), { type: "failed", reason: { type: "one_stream_silent", channel: "sys" } })).toMatchObject({ state: "FAILED", failure: ONE_STREAM_SILENT.sys, runEnabled: true });
     expect(fold(running(), { type: "failed", reason: { type: "one_stream_silent", channel: "mic" } }).failure).toBe(ONE_STREAM_SILENT.mic);
     expect(fold(running(), { type: "failed", reason: { type: "timed_out" } })).toMatchObject({ state: "FAILED", failure: TIMED_OUT, runEnabled: true });
+    // cpt-noter-seq-first-run-complete-setup — issue 1211: while macOS's prompt is up the test waits for the answer, and says so; sound arriving ends the wait
+    const waiting = fold(running(), { type: "awaiting_permission", kind: "microphone" });
+    expect(waiting).toMatchObject({ state: "RUNNING", awaiting: "microphone", failure: null });
+    expect(fold(waiting, { type: "stream_arrived", channel: "mic" }).awaiting).toBeNull();
+    expect(fold(waiting, { type: "failed", reason: { type: "permission_missing", kind: "microphone" } }).awaiting).toBeNull();
     // cpt-noter-seq-first-run-complete-setup — issue 1211: no sound from either channel names macOS's grant, not "didn't finish"
     expect(fold(running(), { type: "failed", reason: { type: "no_audio" } })).toMatchObject({ state: "FAILED", failure: "self_test.no_audio", runEnabled: true });
   });
