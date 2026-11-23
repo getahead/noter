@@ -267,6 +267,8 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     const body = dlg.locator(".np-sheet__body");
     await expect(body).toHaveClass(/\bis-overflow\b/);
     await expect(body).toHaveCSS("border-bottom-width", "1px");
+    // focus may already have scrolled a short body to its first control: drive both states from the test
+    await body.evaluate((el) => el.scrollTo(0, 0));
     await expect(body).not.toHaveClass(/\bis-scrolled\b/);
     await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
     await expect(body).toHaveClass(/\bis-scrolled\b/); // and under the title once scrolled
