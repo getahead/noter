@@ -12,7 +12,7 @@ import { InlineStatus } from "../../ui/feedback/inline-status";
 import type { IconName } from "../../ui/icons";
 import { Badge, type BadgeProps } from "../../ui/primitives/badge";
 import { PushButton } from "../../ui/primitives/push-button";
-import { accountRowState, expiredNoteText, providerName, testResultText, toolName, usedByText, visibleTestLine, type AccountRowState } from "./account-rows";
+import { accountRowState, expiredNoteText, providerName, testResultText, toolName, untestedText, usedByText, visibleTestLine, type AccountRowState } from "./account-rows";
 import { removeKeyKey, signOutAccount, signOutKey, testAccount, testKey } from "./accounts";
 import { KeyField, useKeyDraft } from "./KeyField";
 import { AccountSignInSheet } from "./AccountSignInSheet";
@@ -205,6 +205,7 @@ export function AccountRow({ bridge, view, keyConfigured, onUseKey }: { bridge: 
         ) : (
           <span className="e-status__sub">{t(a.use)}</span>
         )}
+        {untestedText(view.provider, view.cli) && <span className="st-warnline">{untestedText(view.provider, view.cli)}</span>}
         {visibleTestLine(state, testLine) && <span className="st-cred__dots" role="status">{testLine}</span>}
         {signOutError && <span className="st-row__err" role="alert">{t("settings.accounts.signout_failed")}</span>}
       </div>

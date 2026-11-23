@@ -1,6 +1,6 @@
 // Pure rules of the account-login row, Test and Sign Out (docs/features/ui/accounts.md, manage flow): nothing
 // here talks to the core or holds a credential.
-import type { AccountProvider, AccountTestResult, AccountView, AgentRef } from "../../core/bindings";
+import type { AccountProvider, AccountTestResult, AccountView, AgentRef, CliInfo } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { t } from "../../i18n/format";
 
@@ -18,6 +18,14 @@ export const accountRowState = (v: AccountView): AccountRowState => STATE[v.stat
 const key = (p: AccountProvider, what: "provider" | "tool" | "key"): MsgKey => `settings.accounts.${what}_${p}`;
 export const providerName = (p: AccountProvider) => t(key(p, "provider"));
 export const toolName = (p: AccountProvider) => t(key(p, "tool"));
+
+/** The warning for a CLI newer than the version Noter was tested with (owner, 23 Nov, #1219); the tested
+ *  version is named by its major.minor (0.163), as the release notes do. Null when tested or unknown. */
+export function untestedText(p: AccountProvider, cli: CliInfo): string | null {
+  if (!cli.untested || !cli.version || !cli.tested) return null;
+  const tested = cli.tested.split(".").slice(0, 2).join(".");
+  return t("settings.accounts.cli_untested", { tool: toolName(p), version: cli.version, tested });
+}
 
 /** **Used by 2 agents: Product manager, Architect** or the hint that no agent uses it yet. */
 export const usedByText = (agents: AgentRef[]): string =>

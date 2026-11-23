@@ -16,7 +16,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { RadioGroup } from "../../ui/primitives/radio-group";
 import { TextField } from "../../ui/primitives/text-field";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
-import { providerName, toolName } from "./account-rows";
+import { providerName, toolName, untestedText } from "./account-rows";
 import { canContinue, secondsLeft, sheetOpen, stepIndex, type SignIn } from "./signin-session";
 import { useSignIn } from "./signin-store";
 
@@ -202,6 +202,13 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
             </div>
           </div>
         ) : null}
+        {/* a newer, untested version runs (owner, 23 Nov, #1219): it is named, never refused */}
+        {cli && !missing && !unsupported && untestedText(provider, cli) && (
+          <div className="f-check is-warn" role="note">
+            <Icon name="warning" size={14} />
+            <div className="np-dim">{untestedText(provider, cli)}</div>
+          </div>
+        )}
         {existing && (
           <div className="f-existing">
             <RadioGroup
