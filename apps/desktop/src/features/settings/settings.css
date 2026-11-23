@@ -26,6 +26,9 @@
 .st-row__label:empty { display: none; }
 .st-row__label:empty + .st-row__ctl { grid-column: 1 / -1; }
 .st-row__ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+/* a pop-up never runs past its row (#1225); Runtime per task sits at the row's trailing inset */
+.st-row__ctl > .np-popup { max-width: 100%; }
+.st-row__ctl > .st-runtime__popup { margin-left: auto; }
 .st-row__note { flex-basis: 100%; font-size: 12px; color: var(--label-3); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .st-warnline { color: var(--warning); display: inline-flex; gap: 4px; align-items: center; font-size: 12px; }
 .st-checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }

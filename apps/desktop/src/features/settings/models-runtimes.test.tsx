@@ -58,6 +58,7 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
     expect(html).toContain("Your ChatGPT account");
     expect(html).toContain("Not signed in");
     expect(html).toContain("Ollama detected · qwen3:8b ready");
+    expect(html).toMatch(/e-status__word">Up to date<\/span><span class="e-status__title"[^>]*>Ollama detected/);
     expect(html).toContain("Runtime per task");
     expect(html).toContain("Post-call analysis");
     expect(html).toContain("Codex · Codex API key — not connected");
@@ -99,7 +100,10 @@ describe("ModelsRuntimesPane (cpt-noter-dod-ui-accounts-keys)", () => {
       w.app.accounts.local.running = false;
     });
     const seen = sentCommands(fake);
-    on(rendered(ModelsRuntimesPane, props), "Install Ollama…")();
+    // the local runtime is a status row (#1225); its button is the row's action
+    const local = find(rendered(ModelsRuntimesPane, props), (p) => p.variant === "runtime");
+    expect(local.props).toMatchObject({ word: "Not ready", state: "missing", tone: "off" });
+    on(local.props.actions as Tree, "Install Ollama…")();
     await vi.waitFor(() => expect(seen.map(([cmd]) => cmd)).toContain("cli_install"));
   });
 });
