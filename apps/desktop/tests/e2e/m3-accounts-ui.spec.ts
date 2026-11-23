@@ -235,6 +235,48 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     expect((await sent(page, "account_sign_out"))[0]).toEqual({ provider: "claude", also_in_cli: false });
     await expect(claude).toContainText("Not signed in");
   });
+
+  // issue 1220: a sheet never exceeds its window; the body scrolls, the title and buttons stay in view
+  test("other path: a sheet that fits its window draws no scroll hairline", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { identity: ANN });
+    await openModels(page);
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const body = sheet(page, /Sign in with your Claude account/).locator(".np-sheet__body");
+    await expect(body).toBeVisible();
+    await expect(body).not.toHaveClass(/\bis-overflow\b/);
+    await expect(body).toHaveCSS("border-bottom-width", "0px");
+  });
+
+  // DESIGN 3522: the Settings window opens at 820×620 and can shrink to 700×480
+  for (const [width, height] of [[820, 620], [700, 480]] as const)
+  test(`other path: at ${width}×${height} the Claude sheet's title and buttons are fully visible and clickable`, async ({ page }) => {
+    await page.setViewportSize({ width, height });
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { identity: ANN }); // an existing account makes the Prepare step its tallest
+    await openModels(page);
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your Claude account/);
+    await expect(dlg).toBeVisible();
+    for (const name of ["Cancel", "Use This Account"]) await expect(button(dlg, name)).toBeInViewport({ ratio: 1 });
+    await expect(dlg.getByText(/Sign in with your Claude account/).first()).toBeInViewport({ ratio: 1 });
+    const box = await dlg.boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(height);
+    // a capped body shows that it scrolls: a 1 px hairline above the buttons (designer, PR 1224)
+    const body = dlg.locator(".np-sheet__body");
+    await expect(body).toHaveClass(/\bis-overflow\b/);
+    await expect(body).toHaveCSS("border-bottom-width", "1px");
+    // focus may already have scrolled a short body to its first control: drive both states from the test
+    await body.evaluate((el) => el.scrollTo(0, 0));
+    await expect(body).not.toHaveClass(/\bis-scrolled\b/);
+    await body.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+    await expect(body).toHaveClass(/\bis-scrolled\b/); // and under the title once scrolled
+    await expect(dlg).toContainText("Each Claude plan seat is for one person. Heavy automated use may be throttled. To share Noter across a team, use an API key.");
+    await dlg.getByRole("checkbox").click({ force: true });
+    await button(dlg, "Use This Account").click(); // reachable without scrolling the window
+    await expect(dlg).toContainText("Connected to your Claude account");
+  });
 });
 
 describeReal("cpt-noter-seq-first-run-connect-assistant", () => {

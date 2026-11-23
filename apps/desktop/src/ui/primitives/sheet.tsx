@@ -28,6 +28,26 @@ export function focusInside(root: HTMLElement | null, selector = FOCUSABLE) {
 
 export const useFocusInside = (root: { current: HTMLElement | null }, selector = FOCUSABLE) => useEffect(() => focusInside(root.current, selector), [root, selector]);
 
+/** A body capped by its window (issue 1220) says that it scrolls: `is-overflow` while its content is taller than it,
+ *  `is-scrolled` once it is scrolled; the stylesheet draws the hairlines. A body that fits gets neither. Returns the
+ *  cleanup. `Observer` is the platform's ResizeObserver (absent outside a browser). */
+export function watchScroll(body: HTMLElement | null | undefined, Observer: typeof ResizeObserver | undefined = globalThis.ResizeObserver) {
+  if (!body) return undefined;
+  const mark = () => {
+    body.classList.toggle("is-overflow", body.scrollHeight > body.clientHeight + 1);
+    body.classList.toggle("is-scrolled", body.scrollTop > 0);
+  };
+  mark();
+  body.addEventListener("scroll", mark, { passive: true });
+  const seen = Observer ? new Observer(mark) : null;
+  // the body keeps its capped size while its content grows: watch the content too
+  for (const el of [body, ...Array.from(body.children)]) seen?.observe(el);
+  return () => (body.removeEventListener("scroll", mark), seen?.disconnect());
+}
+
+// every render: a step can replace the body or its content
+const useScrollHairlines = (root: { current: HTMLElement | null }) => useEffect(() => watchScroll(root.current?.querySelector<HTMLElement>(".np-sheet__body")));
+
 export interface SheetProps {
   /** VoiceOver name of the dialog. */
   title: string;
@@ -44,6 +64,7 @@ export interface SheetProps {
 export function Sheet({ title, width, busy, onCancel, onDefault, children }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
   useFocusInside(ref);
+  useScrollHairlines(ref);
   return (
     // is-new: the slide-in plays once, when React mounts the sheet
     <div className="np-sheet-layer is-new">
