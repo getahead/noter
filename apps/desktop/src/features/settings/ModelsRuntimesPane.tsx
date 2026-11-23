@@ -79,10 +79,8 @@ export function ModelsRuntimesPane({ bridge, settings }: PaneProps) {
           word={t(localReady ? "settings.local.up_to_date" : "settings.local.not_ready")}
           state={localReady ? "ready" : local?.cli.installed ? "stopped" : "missing"}
           title={localReady ? t(local?.default_model ? "settings.local.detected" : "settings.local.detected_no_model", { model: local?.default_model ?? "" }) : t("settings.local.not_configured")}
-          subtitle={<>
-            {localReady ? t("settings.local.fallback") : t("settings.local.not_configured_note")}
-            {installing === "ERROR" && <span className="st-row__err">{t("settings.local.install_failed")}</span>}
-          </>}
+          subtitle={localReady ? t("settings.local.fallback") : t("settings.local.not_configured_note")}
+          message={installing === "ERROR" ? t("settings.local.install_failed") : undefined}
           actions={
             // @cpt-begin:cpt-noter-flow-ui-accounts-key:p1:inst-if-local
             !local?.cli.installed && <PushButton label={installing === "WAITING" ? t("settings.local.installing") : t("settings.local.install")} size="small" loading={installing === "WAITING"} onAction={() => void installCli(bridge, "ollama")} />
