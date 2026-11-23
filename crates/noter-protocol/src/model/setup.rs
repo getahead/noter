@@ -95,6 +95,11 @@ pub enum SelfTestFailure {
     },
     /// The live speech model is not downloaded.
     ModelMissing,
+    /// Neither the microphone nor system audio delivered a single buffer: macOS gave Noter no
+    /// sound at all. After an update this is most often a stale permission grant (the ad-hoc
+    /// signed build changed), which turning Noter off and on again in System Settings renews
+    /// (#1211).
+    NoAudio,
 }
 
 /// `setup_status` and event `setup:changed`. Setup state never gates a manual start (O1):

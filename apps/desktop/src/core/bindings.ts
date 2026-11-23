@@ -3014,7 +3014,14 @@ export type SelfTestFailure = { type: "one_stream_silent"; channel: AudioChannel
  */
 { type: "zero_buffers" } | { type: "own_sounds_leak" } | { type: "timed_out" } | { type: "permission_missing"; kind: PermissionKind } | 
 /**  The live speech model is not downloaded. */
-{ type: "model_missing" };
+{ type: "model_missing" } | 
+/**
+ *  Neither the microphone nor system audio delivered a single buffer: macOS gave Noter no
+ *  sound at all. After an update this is most often a stale permission grant (the ad-hoc
+ *  signed build changed), which turning Noter off and on again in System Settings renews
+ *  (#1211).
+ */
+{ type: "no_audio" };
 
 export type SelfTestMsg = {
 	seq: Seq,
@@ -3826,7 +3833,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.28";
+export const CONTRACT_VERSION = "2.29";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
