@@ -262,16 +262,20 @@ pub struct Availability {
     /// Where the runtime was found: the CLI that answered `--version`, or the Ollama URL that
     /// answered `/api/tags`; `None` when it was not found.
     pub path: Option<String>,
-    /// The CLI versions the adapter was tested with; any other is refused.
+    /// The CLI versions the adapter was tested with: an older one is refused, a newer one runs
+    /// with a warning (#1219).
     pub tested: Option<Tested>,
     pub models: Vec<String>,
 }
 
-/// A tested CLI version range: from `min` up to, not including, `below`.
+/// The versions a CLI adapter was tested with, from `min` up to, not including, `below`;
+/// `version` is the one the network-monitor runbook last passed on. Owner decision (23 Nov,
+/// #1219): `min` and anything newer is accepted, from `below` on with a warning; older is refused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Tested {
     pub min: [u64; 3],
     pub below: [u64; 3],
+    pub version: &'static str,
 }
 
 impl Tested {
@@ -283,16 +287,21 @@ impl Tested {
         parts.next().is_none().then_some(v)
     }
 
+    /// The version may run: `min` or newer (it has the flags the lockdown needs).
     pub fn admits(&self, version: &str) -> bool {
-        Self::parse(version).is_some_and(|v| self.min <= v && v < self.below)
+        Self::parse(version).is_some_and(|v| self.min <= v)
+    }
+
+    /// A version newer than the tested range: it runs, with a warning.
+    pub fn untested(&self, version: &str) -> bool {
+        Self::parse(version).is_some_and(|v| self.below <= v)
     }
 }
 
 impl std::fmt::Display for Tested {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let [a, b, c] = self.min;
-        let [x, y, z] = self.below;
-        write!(f, ">={a}.{b}.{c}, <{x}.{y}.{z}")
+        write!(f, ">={a}.{b}.{c}")
     }
 }
 

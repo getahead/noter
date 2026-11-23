@@ -94,6 +94,17 @@ if [ "$mode" = fail ]; then
     echo "stub failure" >&2
     exit 1
 fi
+# A newer CLI that dropped or renamed a lockdown flag (#1219).
+if [ "$mode" = usage ]; then
+    echo "error: unexpected argument '--strict-mcp-config' found" >&2
+    echo "Usage: claude [options] [command] [prompt]" >&2
+    exit 2
+fi
+# A newer CLI whose output no longer has the shape the adapter reads (#1219).
+if [ "$mode" = shape ]; then
+    echo '{"kind":"answer","text":"done"}'
+    exit 0
+fi
 output=$(tr '\n' ' ' <"$here/output.json")
 if [ $codex = yes ]; then
     printf '{"type":"thread.started","thread_id":"%s"}\n' "${resume:-thread-$$}"

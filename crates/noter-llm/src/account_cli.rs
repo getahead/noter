@@ -19,8 +19,12 @@ pub struct CliStatus {
     pub installed: bool,
     pub path: Option<String>,
     pub version: Option<String>,
-    /// The version is inside the tested range.
+    /// The version may run (the tested one or newer).
     pub supported: bool,
+    /// Newer than the tested range: it runs, with a warning (#1219).
+    pub untested: bool,
+    /// The version the adapter was tested with; None for Ollama.
+    pub tested: Option<String>,
     /// Who the CLI is signed in as; `None` when signed out (and for Ollama).
     pub identity: Option<AccountIdentity>,
     /// False when the auth probe failed or could not be interpreted.
@@ -36,8 +40,8 @@ impl CliStatus {
             path: self.path.clone(),
             version: self.version.clone(),
             supported: self.supported,
-            untested: false,
-            tested: None,
+            untested: self.untested,
+            tested: self.tested.clone(),
         }
     }
 
@@ -47,6 +51,8 @@ impl CliStatus {
             path: None,
             version: None,
             supported: false,
+            untested: false,
+            tested: None,
             identity: None,
             auth_known: false,
         }
@@ -224,6 +230,8 @@ impl ToolScript {
             path: self.path.clone(),
             version: self.version.clone(),
             supported: self.supported,
+            untested: false,
+            tested: None,
             identity: self.identity.clone(),
             auth_known: self.auth_known,
         }
