@@ -111,20 +111,31 @@ extension EngineLoop {
         // @cpt-begin:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
         let audio = source(nil)
-        do {
-            try audio?.start { chunk in
-                guard let events = state.feed(chunk) else { return }
-                events.forEach(writer.emit)
-                if let levels = state.levelsDue() { writer.emit(levels) }
-                if state.bothArrived { done.signal() }
+        // Opening the audio can wait on a permission request macOS never answers (#1211): it runs
+        // on its own queue, and the test ends with its window whether or not it returned.
+        let opening = DispatchQueue(label: "ai.noter.engine.self-test.open")
+        let opened = DispatchSemaphore(value: 0)
+        opening.async {
+            do {
+                try audio?.start { chunk in
+                    guard let events = state.feed(chunk) else { return }
+                    events.forEach(writer.emit)
+                    if let levels = state.levelsDue() { writer.emit(levels) }
+                    if state.bothArrived { done.signal() }
+                }
+            } catch {
+                FileHandle.standardError.write(Data("noter-engine: self-test audio: \(error)\n".utf8))
             }
-        } catch {
-            FileHandle.standardError.write(Data("noter-engine: self-test audio: \(error)\n".utf8))
+            opened.signal()
+        }
+        let openedInTime = opened.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow)) == .success
+        if !openedInTime {
+            FileHandle.standardError.write(Data("noter-engine: self-test audio did not open within the window\n".utf8))
         }
         // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-one-clock
         // @cpt-end:cpt-noter-flow-core-engine-foundation-self-test:p1:inst-open-taps
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
-        if playClip, audio != nil {
+        if playClip, audio != nil, openedInTime {
             state.clipStarted()
             play(Clip.samples())
             // The tap is listened to until the clip is over, however soon both channels arrive.
@@ -132,7 +143,8 @@ extension EngineLoop {
         }
         // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
         _ = done.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow))
-        audio?.stop()
+        // A source that opens late is stopped as soon as it does, on the queue that opens it.
+        if openedInTime { audio?.stop() } else { opening.async { audio?.stop() } }
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
         // The core waits for the result only a little past the window, and a cold model can take
         // longer to load: lines come from a model already loaded; otherwise it starts loading now.

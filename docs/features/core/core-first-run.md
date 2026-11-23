@@ -156,7 +156,7 @@ Decision D14 (the shared folder passed to the engine and to `models/`, with `not
 2. [x] - `p1` - **IF** the live model is missing **RETURN** `model_missing` - `inst-if-model-missing`
 3. [x] - `p1` - Under the first-run lock, refuse with `conflict` if a self-test or system-audio probe is active, then reserve the self-test - `inst-serialize-runs`
 4. [x] - `p1` - Register a one-off subscription with the stream hub and **RETURN** its `SubscriptionHandle` - `inst-register-stream`
-5. [x] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }`, then `ended` - `inst-map-events`
+5. [x] - `p1` - Run the engine self-test (`cpt-noter-flow-core-engine-foundation-self-test`) and map its events to `SelfTestMsg`: `stream_arrived`, `levels`, `line`, then `passed` or `failed { reason }` (`no_audio` when the engine reports `device_unavailable` and no channel delivered a buffer, #1211), then `ended`; every outcome writes one `noter.log` line (module `self_test`, `code` the result, `id` what the engine reported, `count` the channels that delivered sound) - `inst-map-events`
 6. [x] - `p1` - DB: store the `SelfTestState` (passed with its time, or failed with its reason) through the change-log write path - `inst-store-result`
 7. [x] - `p1` - Apply `cpt-noter-algo-core-first-run-detection-rule` and tell the engine `set_detection` - `inst-apply-detection`
 8. [x] - `p1` - Emit `setup:changed` - `inst-emit-setup`

@@ -407,6 +407,42 @@ async fn a_silent_microphone_does_not_mark_proven_system_audio_denied() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+// cpt-noter-seq-first-run-complete-setup — issue 1211: macOS gave the engine no sound on either channel; the result says so, and so does
+// noter.log, instead of 'didn't finish' and an empty log.
+async fn no_sound_on_either_channel_fails_as_no_audio_and_is_logged() {
+    let dir = tempfile::tempdir().unwrap();
+    let engine = ScriptedEngine::new();
+    engine.hold_next_self_test();
+    let r = open(dir.path(), engine, PermissionState::Granted, None);
+    let inject = r.engine.clone();
+    let emitter = tokio::spawn(async move {
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while !inject.inject(EngineEvent::SelfTestResult {
+                passed: false,
+                failure: Some(EngineErrorCode::DeviceUnavailable),
+                own_sounds_leak: false,
+            }) {
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        })
+        .await
+        .expect("the engine never started the held self-test");
+    });
+    let (_, events) = run_to_end(&r, false).await;
+    emitter.await.unwrap();
+    assert_eq!(failed(&events), Some(SelfTestFailure::NoAudio));
+    let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
+    let line = log
+        .lines()
+        .find(|l| l.contains("\"module\":\"self_test\""))
+        .expect("the failed self-test is logged");
+    let line: Value = serde_json::from_str(line).unwrap();
+    assert_eq!(line["code"], "no_audio");
+    assert_eq!(line["id"], "device_unavailable");
+    assert_eq!(line["count"], 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn an_engine_that_never_answers_times_out() {
     let dir = tempfile::tempdir().unwrap();
     let engine = ScriptedEngine::new().with_default(Behaviour {
