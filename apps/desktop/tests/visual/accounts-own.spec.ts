@@ -44,7 +44,7 @@ const progress = (page: Page, id: string, step: string, error: string | null = n
   page.evaluate(([i, st, er]) => (globalThis as unknown as { __noterFake: Fake }).__noterFake.emit("signin:progress", { session_id: i, provider: "chatgpt", step: st, identity: st === "waiting_for_browser" ? null : { email: "you@example.com", plan: "Plus" }, error: er }), [id, step, error] as const);
 const chatgptDialog = (page: Page) => page.getByRole("dialog", { name: /Sign in with your ChatGPT account/ });
 const codexReady = (w: World) => (W.idle(w), Object.assign(accountOf(w, "chatgpt").cli, { installed: true, path: "/opt/homebrew/bin/codex", version: "0.163.0", supported: true }));
-const states: { id: string; world: (w: World) => void; ready: (page: Page) => Promise<void>; target: (page: Page) => ReturnType<Page["locator"]> }[] = [
+const states: { id: string; world: (w: World) => void; ready: (page: Page) => Promise<void>; target: (page: Page) => ReturnType<Page["locator"]>; viewport?: { width: number; height: number } }[] = [
   {
     id: "signed-in",
     world: signedIn,
@@ -65,6 +65,17 @@ const states: { id: string; world: (w: World) => void; ready: (page: Page) => Pr
       await expect(page.getByRole("dialog", { name: /Sign in with your Claude account/ })).toContainText(/Use This Account|Continue in Browser/);
     },
     target: (page) => page.getByRole("dialog"),
+  },
+  // issue 1220: in the Settings window at its default size the sheet fits, its body scrolls and the buttons stay in view
+  {
+    id: "prepare-claude-820x620",
+    viewport: { width: 820, height: 620 },
+    world: (w) => W.idle(w),
+    ready: async (page) => {
+      await row(page, "Your Claude account").getByRole("button", { name: /Sign In/ }).click();
+      await expect(page.getByRole("dialog", { name: /Sign in with your Claude account/ })).toContainText(/Use This Account|Continue in Browser/);
+    },
+    target: (page) => page.locator("body"),
   },
   {
     id: "prepare-chatgpt-cli-missing",
@@ -133,6 +144,7 @@ const states: { id: string; world: (w: World) => void; ready: (page: Page) => Pr
 
 for (const s of states) {
   test(`renders ${s.id}`, async ({ page }) => {
+    if (s.viewport) await page.setViewportSize(s.viewport);
     await openWindow(page, "settings", { world: s.world });
     await page.getByRole("navigation", { name: "Settings panes" }).getByRole("option").filter({ hasText: "Models & Runtimes" }).click();
     await s.ready(page);

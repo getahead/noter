@@ -211,6 +211,13 @@ textarea.np-field__input { height: auto; padding: 6px 8px; resize: vertical; lin
 .np-sheet__body { padding: 10px 20px 14px; display: grid; gap: 12px; }
 .np-sheet__foot { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 12px 20px 16px; border-top: 1px solid var(--sep); }
 .np-sheet__foot .np-tb__spacer { flex: 1 1 auto; }
+/* issue 1220: a sheet never exceeds its window (macOS sheets): capped at the layer's height less its bottom margin,
+   a column whose title and buttons stay in view while the body scrolls; one wrapper element passes the column on */
+.np-sheet, .np-sheet > :only-child:not(.np-sheet__head, .np-sheet__body, .np-sheet__foot) { display: flex; flex-direction: column; min-height: 0; }
+.np-sheet { max-height: calc(100% - 24px); }
+.np-sheet > :only-child:not(.np-sheet__head, .np-sheet__body, .np-sheet__foot) { flex: 1 1 auto; }
+.np-sheet__head, .np-sheet__foot { flex: none; }
+.np-sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
 /* ---------------- Shared components ---------------- */
 .np-recdot { width: 9px; height: 9px; border-radius: 50%; background: var(--rec); display: inline-flex; align-items: center; justify-content: center; flex: none; color: var(--white); }
