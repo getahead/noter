@@ -254,6 +254,7 @@ final class EngineLoopTests: XCTestCase {
 
     /// cpt-noter-seq-first-run-complete-setup — issue 1211: opening the audio waits behind macOS's prompt; the engine says so, and the
     /// window starts once the user answers, so a slow answer is not a failure.
+    // cpt-noter-seq-first-run-complete-setup — #1211
     func testTheSelfTestWindowStartsOnceTheAudioOpensBehindAPrompt() throws {
         let lines = Lines()
         let mic = try wav("mic", seconds: 1, amplitude: 0.3)
@@ -270,6 +271,7 @@ final class EngineLoopTests: XCTestCase {
     }
 
     /// cpt-noter-seq-first-run-complete-setup — issue 1211: audio that never opens ends the test after the prompt wait, with nothing arrived.
+    // cpt-noter-seq-first-run-complete-setup — #1211
     func testTheSelfTestEndsWhenTheAudioNeverOpens() throws {
         let lines = Lines()
         let source = BlockedSource()
@@ -281,6 +283,19 @@ final class EngineLoopTests: XCTestCase {
         let result = try XCTUnwrap(lines.waitFor("self_test_result", timeout: 4))
         XCTAssertEqual(result["passed"] as? Bool, false)
         XCTAssertEqual(result["failure"] as? String, "device_unavailable")
+    }
+}
+
+final class SelfTestStateTests: XCTestCase {
+    /// #1212 review: once the window has closed, audio from a source that opened late is ignored,
+    /// so no stream or level follows a test that already gave up.
+    // cpt-noter-seq-first-run-complete-setup — #1211
+    func testAudioAfterTheWindowClosedIsIgnored() {
+        let state = SelfTestState()
+        let chunk = AudioChunk(channel: .mic, samples: [Float](repeating: 0.3, count: 160))
+        state.close()
+        XCTAssertNil(state.feed(chunk))
+        XCTAssertNil(state.levelsDue())
     }
 }
 

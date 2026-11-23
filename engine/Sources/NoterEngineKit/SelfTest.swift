@@ -149,6 +149,7 @@ extension EngineLoop {
         }
         // @cpt-end:cpt-noter-flow-core-engine-capture-self-test:p1:inst-play-clip
         _ = done.wait(timeout: .now() + max(0, deadline.timeIntervalSinceNow))
+        state.close()
         // A source that opens late is stopped as soon as it does, on the queue that opens it.
         if openedInTime { audio?.stop() } else { opening.async { audio?.stop() } }
         // @cpt-begin:cpt-noter-flow-core-engine-capture-self-test:p1:inst-self-test-lines
@@ -219,6 +220,9 @@ final class SelfTestState: @unchecked Sendable {
         defer { lock.unlock() }
         return monitor.bothArrived
     }
+
+    /// The window is over: audio from now on, say from a source that opened late, is ignored.
+    func close() { lock.withLock { finished = true } }
 
     func finish(modelsPresent: Bool) -> EngineEvent {
         lock.lock()
