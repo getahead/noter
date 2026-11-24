@@ -57,5 +57,6 @@ Rules: a new occurrence goes into the matching issue (failing job, commit, attem
 | [#410](https://github.com/getahead/noter/issues/410) | Blanket 4 s fake-command latency in screenshots | 5.5-6.6s per case | [#427](https://github.com/getahead/noter/pull/427) | closed |
 | [#408](https://github.com/getahead/noter/issues/408) | All-command probe, fresh real core per command | 53.6s | [#449](https://github.com/getahead/noter/pull/449) | closed |
 | [#409](https://github.com/getahead/noter/issues/409) | Archive fixture delays | 24-27s per file | [#441](https://github.com/getahead/noter/pull/441) | closed |
+| [#1232](https://github.com/getahead/noter/issues/1232) | Quit retry hangs (`DialogsTests` `failed_stop_stays_open_and_retry_saves`, native): Noter never exits. On Exit the main thread blocked on `Core::shutdown()` while every tokio worker waited in WebKit's `WKURLSchemeTask didFinish` for that main thread (spindump), so nothing drove tokio's timer or I/O | hung 1 run (#1207); 0 / 40 on main and 0 / 40 with the fix in a CI repeat run of only this test | [#1233](https://github.com/getahead/noter/pull/1233) | closed |
 
 Measured costs come from the audit (six successful main runs); a saving is a proposal until a run after the fix shows it, and parallel jobs' savings are never added up as one.
