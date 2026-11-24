@@ -21,6 +21,7 @@ pub mod webview_watch;
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::sync::{Arc, OnceLock};
 
@@ -272,16 +273,42 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("Noter could not build its windows");
-    app.run(move |app, event| {
-        if let RunEvent::Exit = event {
+    // The core shuts down while the event loop still runs: WebKit answers IPC from tokio's workers
+    // by waiting on the main thread, so a main thread blocked on the shutdown deadlocks them (#1232).
+    let shutting = AtomicBool::new(false);
+    let down = Arc::new(AtomicBool::new(false));
+    app.run(move |app, event| match event {
+        // A restart cannot be prevented: it shuts down on Exit below.
+        RunEvent::ExitRequested { code, api, .. }
+            if code != Some(tauri::RESTART_EXIT_CODE) && !down.load(Ordering::Acquire) =>
+        {
+            let Some(Ok(core)) = app.try_state::<Booted>().map(|b| b.0.clone()) else {
+                return;
+            };
+            api.prevent_exit();
+            if shutting.swap(true, Ordering::AcqRel) {
+                return;
+            }
+            let (app, down) = (app.clone(), down.clone());
+            tauri::async_runtime::spawn(async move {
+                core.shutdown().await;
+                down.store(true, Ordering::Release);
+                app.exit(code.unwrap_or(0));
+            });
+        }
+        RunEvent::Exit => {
             e2e_log::write_on_quit();
             if let Some(surfaces) = app.try_state::<Arc<surfaces::TauriSurfaces<tauri::Wry>>>() {
                 surfaces.save_frames();
+            }
+            if down.load(Ordering::Acquire) {
+                return;
             }
             if let Some(Ok(core)) = app.try_state::<Booted>().map(|b| b.0.clone()) {
                 tauri::async_runtime::block_on(core.shutdown());
             }
         }
+        _ => {}
     });
 }
 
