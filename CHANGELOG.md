@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.1](https://github.com/getahead/noter/compare/v0.26.0...v0.26.1) (2026-11-24)
+
+
+### Bug fixes
+
+* **test:** shut the core down before the event loop ends, so quit cannot deadlock ([#1233](https://github.com/getahead/noter/issues/1233)) ([c961392](https://github.com/getahead/noter/commit/c96139205a4169497f8f5154738b7e36c62a4e2d))
+
 ## [0.26.0](https://github.com/getahead/noter/compare/v0.25.1...v0.26.0) (2026-11-23)
 
 
