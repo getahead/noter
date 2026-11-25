@@ -9,6 +9,7 @@ mod ask;
 mod audio;
 mod audit;
 mod call_platform;
+mod call_type;
 mod capture;
 mod carry;
 mod chunks;

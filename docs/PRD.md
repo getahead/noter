@@ -3,6 +3,7 @@ Source of truth for Noter development.
 Living copy (edit, comment, review tab): https://claude.ai/code/artifact/8f34b45a-2903-468f-98d9-5de89e7163cc
 This file is regenerated from the living copy whenever the PRD, the design or the UI prototype changes.
 Last sync: 2026-10-18 (living copy rev 201; delivery decisions of 17–18 Oct: continuous delivery and releases, ad-hoc signing until a Developer ID, self-review by the delivering agent with the ponytail review, no API tokens, the Mac runner). Review findings: docs/REVIEW-2026-10-16.md. UI design: docs/DESIGN.md (v1.1; v1.0 accepted 2026-10-17). Diagrams: docs/diagrams/. UI prototype of record: docs/prototype/clickable/ (raw boards of 16 Oct kept as history in docs/prototype/raw-2026-10-16/).
+Pending living-copy backport (2026-11-25, #1257): local call-type detection at call end.
 -->
 
 # Noter — PRD & Technical Design
@@ -178,7 +179,8 @@ All outputs are editable; edits are kept when you regenerate, and the diff is sh
 **6. Integrations**
 
 - v1: export a call, a section or a selection as a folder of Markdown files, with the transcript as SRT and JSON and the audio while it is kept; the user chooses Summary and items, Transcript and Audio. Copy summary or action items to the clipboard formatted for Slack or Jira.
-- v1.x: Microsoft 365 calendar for attendee names, call type guessing and auto-start; Jira, Confluence and Slack through MCP servers; a pre-call brief delivered as a notification five minutes before a meeting.
+- v1 detects the call type locally at call end from the matched calendar title, call title and confirmed transcript. Ambiguous calls keep their current type.
+- v1.x: Microsoft 365 calendar for attendee names, Microsoft 365-based call type guessing and auto-start; Jira, Confluence and Slack through MCP servers; a pre-call brief delivered as a notification five minutes before a meeting.
 
 **7. Knowledge sources**
 
