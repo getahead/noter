@@ -1354,7 +1354,7 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `keychain_locked` | "Keychain locked" | key and account commands |
 | `cli_missing` | "Tool not installed" | `account_signin_*` |
 | `cli_version_unsupported` | "Tool not installed" with the version line (older than the tested version) | `account_signin_*`, runtime availability |
-| `cli_incompatible` | The run's error: the CLI rejected or ignored a lockdown flag; never retried without the flags (#1219) | LLM runs |
+| `cli_incompatible` | The run's error: the CLI rejected or ignored a lockdown flag, or refused the output schema; never retried without the flags (#1219). An account check the CLI refused answers it too (#1235) | LLM runs, account sign-in |
 | `sign_in_cancelled` | "Cancelled in the browser" | `signin:progress` |
 | `sign_in_timed_out` | "Sign-in timed out" | `signin:progress` |
 | `sign_in_no_page` | "Claude Code didn’t open a sign-in page": the CLI's login exited or went quiet before printing its page; `noter.log` names how (`exit_1`, `timed_out`), never the page, code or identity (#1235) | `account_signin_start` |

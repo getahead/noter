@@ -32,6 +32,9 @@ const ERROR_TEXT: Record<string, { title: MsgKey; text: MsgKey }> = {
   // issue 1235: a login that failed says how, never "Something went wrong"
   sign_in_no_page: { title: "signin.err.sign_in_no_page", text: "signin.err.sign_in_no_page_text" },
   sign_in_cli_failed: { title: "signin.err.sign_in_cli_failed", text: "signin.err.sign_in_cli_failed_text" },
+  // issue 1235: a test request the tool refused or failed says so, never "Something went wrong"
+  cli_incompatible: { title: "signin.err.cli_incompatible", text: "signin.err.cli_incompatible_text" },
+  runtime_unavailable: { title: "signin.err.runtime_unavailable", text: "signin.err.runtime_unavailable_text" },
   plan_not_eligible: { title: "signin.err.plan_not_eligible", text: "signin.err.plan_not_eligible_text" },
   offline: { title: "signin.err.offline", text: "signin.err.offline_text" },
   personal_use_not_confirmed: { title: "signin.err.personal_use_not_confirmed", text: "signin.err.personal_use_not_confirmed_text" },
@@ -367,11 +370,16 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
     const plan = known === "plan_not_eligible";
     // the account the plan check refused: the browser sign-in's identity, or the CLI's existing one
     const who = plan ? (s.identity ?? s.prepare?.existing ?? null) : null;
+    // a refused request names the version that refused it and the one Noter was tested with, when known
+    const cli = s.prepare?.cli;
+    const refused = known === "cli_incompatible";
+    const title = refused && cli?.version ? t("signin.err.cli_incompatible_version", { ...names, version: cli.version }) : t(ERROR_TEXT[known]!.title, names);
+    const text = refused && cli?.tested ? t("signin.err.cli_incompatible_tested_text", { ...names, tested: cli.tested }) : t(ERROR_TEXT[known]!.text, names);
     body = (
       <div className="np-sheet__body">
         <div className="st-banner" role="alert">
-          <strong>{who ? t("signin.err.plan_not_eligible_who", { ...names, email: who.email }) : t(ERROR_TEXT[known]!.title, names)}</strong>
-          <div>{who ? t("signin.err.plan_not_eligible_who_text", { ...names, plan: who.plan }) : t(ERROR_TEXT[known]!.text, names)}</div>
+          <strong>{who ? t("signin.err.plan_not_eligible_who", { ...names, email: who.email }) : title}</strong>
+          <div>{who ? t("signin.err.plan_not_eligible_who_text", { ...names, plan: who.plan }) : text}</div>
         </div>
       </div>
     );

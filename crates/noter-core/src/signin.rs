@@ -73,6 +73,11 @@ fn account_error(failure: Failure) -> CoreError {
                 CoreError::new(ErrorCode::PlanNotEligible, "the plan cannot be used")
             }
             "account_signed_out" => ended(),
+            // The tool refused the request itself: another try, or a key, runs into the same.
+            "cli_incompatible" => CoreError::new(
+                ErrorCode::CliIncompatible,
+                "the tool refused the account check",
+            ),
             other => CoreError::new(
                 ErrorCode::RuntimeUnavailable,
                 format!("the account runtime failed ({other})"),

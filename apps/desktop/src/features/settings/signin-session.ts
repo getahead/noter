@@ -145,7 +145,8 @@ export function stepIndex(s: SignIn): number {
     case "USE":
       return 3;
     case "SIGNIN_ERROR":
-      return s.code === "plan_not_eligible" ? 2 : 1;
+      // the plan check and the test request fail at Check, after the sign-in itself worked
+      return ["plan_not_eligible", "cli_incompatible", "runtime_unavailable"].includes(s.code ?? "") ? 2 : 1;
     default:
       return 0;
   }
