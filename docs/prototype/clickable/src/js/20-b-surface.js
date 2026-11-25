@@ -569,12 +569,13 @@
     }
     const tv = document.querySelector('[data-cw-transcript="cw-live"]');
     if (tv) {
-      if (!l.detached || l.jumpReq) { tv.scrollTop = tv.scrollHeight; l.jumpReq = false; }
+      // The prototype recreates the log on render. Position the new element before listening for user scrolls.
+      if (!l.detached || l.jumpReq) { tv.scrollTo({ top: tv.scrollHeight, behavior: 'instant' }); l.jumpReq = false; }
       if (!tv._cw) {
         tv._cw = true;
         tv.addEventListener('scroll', () => {
           const x = L();
-          const up = tv.scrollHeight - tv.scrollTop - tv.clientHeight > 40;
+          const up = tv.scrollHeight - tv.scrollTop - tv.clientHeight > 1;
           if (up !== x.detached) { x.detached = up; NP.render(); }
         });
       }

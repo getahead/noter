@@ -1064,7 +1064,7 @@ button.fr-step__btn:hover { background: var(--sel-unemph); }
 .fp-r4 { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; }
 .fp-ask { margin-bottom: 8px; display: grid; }
 .fp-r5 { flex: none; border-top: 1px solid var(--sep); padding: 4px 10px; }
-.fp-r5--full { flex: 1 1 auto; overflow: auto; border-top: 0; }
+.fp-r5--full { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border-top: 0; }
 .fp-r5--full .cw-seg { grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 8px; font: 400 12px/17px var(--font); }
 .fp-r5--full .cw-seg__end { grid-area: 1 / 3; }
 .fp-r5--full .cw-seg__text { grid-area: 2 / 1 / 3 / -1; }
@@ -5728,12 +5728,13 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
     }
     const tv = document.querySelector('[data-cw-transcript="cw-live"]');
     if (tv) {
-      if (!l.detached || l.jumpReq) { tv.scrollTop = tv.scrollHeight; l.jumpReq = false; }
+      // The prototype recreates the log on render. Position the new element before listening for user scrolls.
+      if (!l.detached || l.jumpReq) { tv.scrollTo({ top: tv.scrollHeight, behavior: 'instant' }); l.jumpReq = false; }
       if (!tv._cw) {
         tv._cw = true;
         tv.addEventListener('scroll', () => {
           const x = L();
-          const up = tv.scrollHeight - tv.scrollTop - tv.clientHeight > 40;
+          const up = tv.scrollHeight - tv.scrollTop - tv.clientHeight > 1;
           if (up !== x.detached) { x.detached = up; NP.render(); }
         });
       }

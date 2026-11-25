@@ -66,7 +66,7 @@
 .fp-r4 { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 10px; }
 .fp-ask { margin-bottom: 8px; display: grid; }
 .fp-r5 { flex: none; border-top: 1px solid var(--sep); padding: 4px 10px; }
-.fp-r5--full { flex: 1 1 auto; overflow: auto; border-top: 0; }
+.fp-r5--full { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border-top: 0; }
 .fp-r5--full .cw-seg { grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 8px; font: 400 12px/17px var(--font); }
 .fp-r5--full .cw-seg__end { grid-area: 1 / 3; }
 .fp-r5--full .cw-seg__text { grid-area: 2 / 1 / 3 / -1; }
