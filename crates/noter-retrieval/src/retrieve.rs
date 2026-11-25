@@ -279,6 +279,32 @@ impl Binds {
     }
 }
 
+/// Spoken languages in the displayed transcript for a selection of calls. The predicate
+/// selects call IDs on `s`; all user-supplied values are bound by the caller.
+// @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
+pub fn spoken_languages_sql(call_predicate: &str) -> String {
+    format!(
+        "WITH durations AS (
+            SELECT s.call_id, s.lang, min(s.t0_ms) AS first_at, sum(s.t1_ms - s.t0_ms) AS ms
+            FROM segments s WHERE {call_predicate} AND s.lang IS NOT NULL AND s.t1_ms > s.t0_ms
+              AND s.pass = CASE WHEN EXISTS (
+                SELECT 1 FROM segments a WHERE a.call_id = s.call_id AND a.pass = 'archive'
+              ) THEN 'archive' ELSE 'live' END
+            GROUP BY s.call_id, s.lang
+         ), shares AS (
+            SELECT *, sum(ms) OVER (PARTITION BY call_id) AS total,
+                row_number() OVER (PARTITION BY call_id ORDER BY ms DESC, first_at, lang) AS rank
+            FROM durations
+         )
+         SELECT call_id, lang, first_at FROM shares WHERE ms * 10 >= total OR rank = 1"
+    )
+}
+
+pub fn spoken_language_filter(marks: &str) -> String {
+    let languages = spoken_languages_sql("s.call_id = c.id");
+    format!("EXISTS (SELECT 1 FROM ({languages}) WHERE lang IN ({marks}))")
+}
+
 /// Which rows a predicate set is for: call evidence (segments, chunks) or items.
 #[derive(Clone, Copy, PartialEq)]
 enum Section {
@@ -318,9 +344,7 @@ impl Prepared {
         }
         if !f.languages.is_empty() {
             let marks = b.bind_all(f.languages.iter().map(lang_code));
-            out.push(format!(
-                "EXISTS (SELECT 1 FROM segments l WHERE l.call_id = c.id AND l.lang IN ({marks}))"
-            ));
+            out.push(spoken_language_filter(&marks));
         }
         if !f.people.is_empty() {
             let marks = b.bind_all(f.people.iter().map(|p| p.0.clone()));

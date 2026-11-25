@@ -1200,3 +1200,44 @@ async fn a_call_row_carries_the_audio_retention_days_and_no_deletion_time_while_
         assert_eq!(days().await.0, expected, "{word}");
     }
 }
+
+#[tokio::test]
+async fn cpt_noter_seq_library_filter_calls_keeps_only_the_top_language_when_all_are_below_ten_percent(
+) {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    // Eleven equally short archive utterances; first spoken wins the tie. The live pass has RU/EN.
+    for i in 0..11 {
+        let mut line = segment(
+            "call_a",
+            100 + i,
+            "spk_a_you",
+            &format!("x-{i}"),
+            i64::from(i) * 5000,
+        );
+        line.values
+            .iter_mut()
+            .find(|(key, _)| *key == "pass")
+            .unwrap()
+            .1 = json!("archive");
+        core.store().insert_batch(vec![line]).unwrap();
+    }
+    let filter = |lang| CallFilter {
+        languages: vec![lang],
+        ..Default::default()
+    };
+    assert!(ids(&core, filter(Lang::En), CallSort::Newest)
+        .await
+        .is_empty());
+    let winner = Lang::Other { code: "x-0".into() };
+    let page = core
+        .calls_list(
+            &main_window(),
+            list_args(filter(winner.clone()), CallSort::Newest, None, None),
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.rows[0].languages, vec![winner]);
+}
