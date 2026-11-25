@@ -4,7 +4,9 @@
 # failure code. Read-only: it never signs in or out and prints no identity; it spends one tiny
 # request of the signed-in plan. Run it after a Claude Code update to see that the flags and the
 # output schema Noter sends are still accepted (#1235).
-#   scripts/dev/claude-account-check.sh [path-to-claude]
+#   scripts/dev/claude-account-check.sh [path-to-claude] [schemas]
+# With `schemas` it sends one empty request per skill instead (six requests), to see that the
+# CLI accepts every generated output schema.
 set -eu
 cd "$(dirname "$0")/../.."
 claude=${1:-/opt/homebrew/bin/claude}
@@ -12,4 +14,4 @@ cargo build -q -p noter-llm --example account_check
 run=$(mktemp -d)
 trap 'rm -rf "$run"' EXIT
 env -i HOME="$HOME" USER="$USER" LOGNAME="$USER" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
-    TMPDIR="${TMPDIR:-/tmp}" target/debug/examples/account_check "$claude" "$run"
+    TMPDIR="${TMPDIR:-/tmp}" target/debug/examples/account_check "$claude" "$run" ${2:+"$2"}

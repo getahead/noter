@@ -2549,6 +2549,8 @@ The ChatGPT sheet is the same with **ChatGPT account**, **Codex**, **chatgpt.com
 | No connection | SH | **Couldn't reach claude.ai** · **Try Again** | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — No connection) |
 | Login printed no page | SH | **Claude Code didn’t open a sign-in page** with **Claude Code ended before it showed the page to sign in on. Try again. If it keeps happening, use the Anthropic API key instead.** · **Try Again** (Codex: the same with Codex); `noter.log` gets `sign_in_no_page` with how the login ended (`exit_1`, `timed_out`), never the page, code or account | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — The tool’s login failed) |
 | Login stopped early | SH | **Claude Code stopped before the sign-in finished** with **Nothing changed. Try again. If it keeps happening, use the Anthropic API key instead.** · **Try Again**; `noter.log` gets `sign_in_cli_failed` with the exit (`exit_1`) | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — The tool’s login failed) |
+| Test request refused by the tool | SH, at **Check** | **Claude Code 2.1.325 refused Noter’s request** with **This version of Claude Code doesn’t accept the request the way Noter sends it. Nothing changed. Update Noter, or use Claude Code 2.1.296.** · **Try Again** (Codex: the same with Codex). The first version is the installed one and the second the one Noter was tested with, both as the tool reports them; a version that is unknown is left out. No API key is offered: a key runs through the same tool and is refused the same way. `noter.log` gets `account_check_failed` with `cli_incompatible` and `account_check_cli` with the exit and a class (`exit_1.schema_rejected`), never the tool’s output or the account | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — The test request failed) |
+| Test request failed | SH, at **Check** | **Claude Code couldn’t run the test request** with **You’re signed in, but the short test request failed. Nothing changed. Try again. If it keeps happening, use the Anthropic API key instead.** · **Try Again** (Codex: the same with Codex and the Codex API key) | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Error — The test request failed) |
 | Sign out asked | AL | **Sign out of your Claude account in Noter?** with the agents that switch back, **Also sign out of Claude Code on this Mac** and **Sign Out**; afterwards the row reads **Signed out** | PM-58 | `cpt-noter-seq-settings-sign-in-account` (Other — Sign out) |
 | Regenerating with other settings | SH | **Regenerate Outputs** with the runtime, skill and sections; **Regenerate** busy, then the summary's **Regenerating…** | PM-59 | `cpt-noter-seq-call-page-review-outputs` (Other — Regenerate with a different model) |
 | Export log | SH | **Export Log** with **Period** and **Format**; **Exported log to Downloads/Noter log 16 Oct.md** | PM-59 | `cpt-noter-seq-call-page-review-outputs` (Other — Export the call's change log) |
@@ -9155,7 +9157,7 @@ SLA expectations, circuit breakers and rate limiting toward external systems are
 | `cpt-noter-seq-agents-add-agent` | Add an agent from a template | Agents | Error: Budget shares over 100 %; Error: Runtime unavailable; Other: New agent on your own account; Other: Fix with your signed-in account | No | stories-b |
 | `cpt-noter-seq-agents-tune-council` | Tune which agents run per call type | Agents | Error: Agent switched itself off; Error: Skill file missing; Other: During a live call | No | stories-b |
 | `cpt-noter-seq-settings-replace-api-key` | Replace a rejected API key | Settings window | Error: Key rejected; Error: Keychain locked; Error: Local model not ready; Other: Use your Claude account while the key is rejected | No | stories-b |
-| `cpt-noter-seq-settings-sign-in-account` | Sign in with your own Claude or ChatGPT account | Settings window | Other: Add the second account; Other: Choose the account for one agent; Other: Claude Code already signed in; Other: Sheet closed while the browser is open; Other: Sign out; Error: Codex not installed; Error: Cancelled in the browser; Error: Sign-in timed out; Error: No paid plan; Error: No connection; Error: The tool’s login failed; Error: Session ended by Claude | No | stories-b |
+| `cpt-noter-seq-settings-sign-in-account` | Sign in with your own Claude or ChatGPT account | Settings window | Other: Add the second account; Other: Choose the account for one agent; Other: Claude Code already signed in; Other: Sheet closed while the browser is open; Other: Sign out; Error: Codex not installed; Error: Cancelled in the browser; Error: Sign-in timed out; Error: No paid plan; Error: No connection; Error: The tool’s login failed; Error: The test request failed; Error: Session ended by Claude | No | stories-b |
 | `cpt-noter-seq-settings-check-privacy` | Check what left this Mac | Settings window | Empty: Nothing has left this Mac; Other: Screen share test; Error: Screen Recording not allowed; Error: Capture test failed; Error: Storage folder in iCloud Drive; Other: Install an update | No | stories-b |
 | `cpt-noter-seq-settings-add-knowledge-source` | Add a folder as a knowledge source | Settings window | Error: Sync failed; Error: Sign-in expired; Other: Remove the source | No | stories-b |
 | `cpt-noter-seq-settings-set-hotkeys` | Change a hotkey safely | Settings window | Error: Shortcut used by VoiceOver; Error: Card key used by another app; Error: Shortcut without a modifier; Empty: No setting matches the search | No | stories-b |
@@ -11977,6 +11979,15 @@ User:
 2. Sees **Claude Code didn’t open a sign-in page** with **Claude Code ended before it showed the page to sign in on. Try again. If it keeps happening, use the Anthropic API key instead.** (a login that stops after the page opened reads **Claude Code stopped before the sign-in finished**)
 3. Clicks **Try Again**
 4. Gets the sheet back at **Prepare** (or a fresh browser page), with the account row still **Not signed in**
+
+**Error path — The test request failed**
+
+User:
+
+1. Signs in, and at **Check** Claude Code refuses the short test request
+2. Sees **Claude Code 2.1.325 refused Noter’s request** with **This version of Claude Code doesn’t accept the request the way Noter sends it. Nothing changed. Update Noter, or use Claude Code 2.1.296.** (a test request that fails another way reads **Claude Code couldn’t run the test request**, with **If it keeps happening, use the Anthropic API key instead.**)
+3. Clicks **Try Again** after updating Noter
+4. Gets the sheet back at **Prepare**, with the account row still **Not signed in**
 
 **Error path — Session ended by Claude**
 

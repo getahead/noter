@@ -9,7 +9,7 @@ import { sentCommands } from "../../../tests/support/fake-core";
 import { find, rendered } from "../../ui/testing";
 import { loadAccounts } from "./accounts";
 import { AccountSignInSheet, sendSignInCode } from "./AccountSignInSheet";
-import { canContinue } from "./signin-session";
+import { canContinue, stepIndex } from "./signin-session";
 import { signInMachines } from "./signin-store";
 
 let bridge: Bridge;
@@ -144,6 +144,44 @@ describe("AccountSignInSheet", () => {
     body = html("claude");
     expect(body).toContain("Claude Code stopped before the sign-in finished");
     expect(body).toContain("Try Again");
+  });
+
+  // #1235: a test request the tool refused or failed says so at Check, never "Something went wrong"
+  it("names a refused or failed test request, with the versions when the tool reported them", async () => {
+    await ready();
+    await m().open("claude");
+    const cli = { ...m().state.claude.prepare!.cli, version: "2.1.325", tested: "2.1.296" };
+    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, cli } });
+    await m().proceed("claude");
+    const fail = () =>
+      m().dispatch("claude", { type: "progress", progress: { session_id: m().state.claude.sessionId!, provider: "claude", step: "sending_test_request", identity: null, error: "cli_incompatible" }, signedIn: false });
+    fail();
+    let body = html("claude");
+    expect(body).toContain("Claude Code 2.1.325 refused Noter’s request");
+    expect(body).toContain("Update Noter, or use Claude Code 2.1.296.");
+    // an API key runs through the same tool, so it is not offered for a refused request
+    expect(body).not.toContain("API key");
+    expect(body).toContain("Try Again");
+    expect(stepIndex(m().state.claude)).toBe(2);
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, cli: { ...cli, version: null, tested: null } } });
+    await m().proceed("claude");
+    fail();
+    body = html("claude");
+    expect(body).toContain("Claude Code refused Noter’s request");
+    expect(body).toContain("Nothing changed. Update Noter.");
+  });
+
+  it("names a test request that failed another way, with the key as the way out", async () => {
+    await ready();
+    await m().open("claude");
+    await m().proceed("claude");
+    const id = m().state.claude.sessionId!;
+    m().dispatch("claude", { type: "progress", progress: { session_id: id, provider: "claude", step: "sending_test_request", identity: null, error: "runtime_unavailable" }, signedIn: false });
+    const body = html("claude");
+    expect(body).toContain("Claude Code couldn’t run the test request");
+    expect(body).toContain("use the Anthropic API key instead");
+    expect(body).not.toContain("Something went wrong");
   });
 
   it("reuses an existing CLI account without a browser", async () => {
