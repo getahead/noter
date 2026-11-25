@@ -144,7 +144,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // A new WebView (first open, or after a crash) reads the snapshot (the bridge), then the window state, then the transcript.
   useEffect(() => void bridge.act("window_call_state", "window_call_state", () => bridge.core.windowCallState({}), { slice: "callWindow" }), [bridge]);
   const transcriptFor = cw && callId && live(cap) ? callId : null;
-  // one transcript Channel for the window: the live log and the tail share it, so a layout switch keeps it
+  // one transcript Channel for the window: both layouts share it, so a layout switch keeps it
   const tr = useTranscript(bridge, transcriptFor ?? "");
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-if-crash
@@ -607,9 +607,11 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                 {/* @cpt-end:cpt-noter-flow-ui-call-window-hide-for-presenting:p1:inst-if-warning */}
               </div>
             )}
+            {/* @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-floating-copilot-off */}
             <div className="fp-r5 fp-r5--full" data-region="FP-R5" aria-label={t("cw.transcript")}>
-              {replaying ? <TranscriptBar tr={tr} variant="tail" /> : <TranscriptLog tr={tr} variant="tail" tailLines={8} />}
+              {replaying ? <TranscriptBar tr={tr} variant="tail" /> : <TranscriptLog tr={tr} variant="live" onNamed={(text) => setFeedback({ text, variant: "notice" })} />}
             </div>
+            {/* @cpt-end:cpt-noter-algo-ui-call-window-layout-content:p1:inst-floating-copilot-off */}
           </>
         )}
         <footer className="fp-r6" data-region="FP-R6">
