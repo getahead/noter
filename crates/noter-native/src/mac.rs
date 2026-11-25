@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use block2::{DynBlock, RcBlock};
 use noter_protocol::model::{
-    CalendarEventRef, DisplayInfo, InputDeviceInfo, NativeEnvironment, NavTarget, NotificationAuth,
-    OutputDeviceInfo, OutputDeviceRow, OutputRoute,
+    CalendarAttendee, CalendarEvent, CalendarEventRef, DisplayInfo, InputDeviceInfo,
+    NativeEnvironment, NavTarget, NotificationAuth, OutputDeviceInfo, OutputDeviceRow, OutputRoute,
 };
 use noter_protocol::{CalendarEventId, DisplayId, PermissionKind, PermissionState, TimestampMs};
 use objc2::rc::Retained;
@@ -694,7 +694,7 @@ pub fn announce(text: &str, priority: isize) {
 
 // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-events
 /// The events overlapping `from_ms..to_ms` (epoch ms), from every calendar.
-pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEventRef> {
+pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEvent> {
     let store = unsafe { EKEventStore::new() };
     let start = NSDate::dateWithTimeIntervalSince1970(from_ms as f64 / 1000.0);
     let end = NSDate::dateWithTimeIntervalSince1970(to_ms as f64 / 1000.0);
@@ -704,11 +704,53 @@ pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEventRef> {
     unsafe { store.eventsMatchingPredicate(&predicate) }
         .iter()
         .filter_map(|e| {
-            Some(CalendarEventRef {
-                id: CalendarEventId(unsafe { e.eventIdentifier() }?.to_string()),
-                title: unsafe { e.title() }.to_string(),
-                starts_at: ms(unsafe { e.startDate() }),
-                ends_at: ms(unsafe { e.endDate() }),
+            let attendees = unsafe { e.attendees() }
+                .into_iter()
+                .flat_map(|list| {
+                    list.iter()
+                        .filter_map(|person| {
+                            use objc2_event_kit::EKParticipantType;
+                            if unsafe { person.isCurrentUser() }
+                                || matches!(
+                                    unsafe { person.participantType() },
+                                    EKParticipantType::Room
+                                        | EKParticipantType::Resource
+                                        | EKParticipantType::Group
+                                )
+                            {
+                                return None;
+                            }
+                            let url = unsafe { person.URL() };
+                            let email = url.absoluteString().and_then(|s| {
+                                s.to_string().strip_prefix("mailto:").map(str::to_owned)
+                            });
+                            let name = unsafe { person.name() }
+                                .map(|s| s.to_string())
+                                .filter(|s| !s.trim().is_empty())
+                                .or_else(|| email.clone())?;
+                            Some(CalendarAttendee { name, email })
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect();
+            let link = unsafe { e.URL() }
+                .and_then(|url| url.host())
+                .map(|s| s.to_string());
+            let location = unsafe { e.location() }.map(|s| s.to_string());
+            let platform = link
+                .as_deref()
+                .and_then(crate::meeting_service)
+                .or_else(|| location.as_deref().and_then(crate::meeting_service))
+                .map(str::to_owned);
+            Some(CalendarEvent {
+                attendees,
+                platform,
+                event: CalendarEventRef {
+                    id: CalendarEventId(unsafe { e.eventIdentifier() }?.to_string()),
+                    title: unsafe { e.title() }.to_string(),
+                    starts_at: ms(unsafe { e.startDate() }),
+                    ends_at: ms(unsafe { e.endDate() }),
+                },
             })
         })
         .collect()

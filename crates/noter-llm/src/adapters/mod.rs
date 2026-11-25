@@ -71,10 +71,15 @@ pub(crate) trait RuntimeAdapter: Send + Sync {
 /// The instructions every runtime gets with the packet. shortcut: one fixed text per skill; the
 /// user-editable `skills/<type>/SKILL.md` files replace it when post-call (2.17) brings them.
 pub(crate) fn instructions(skill: Skill) -> String {
+    let topic_title = if skill == Skill::PostCall {
+        " Include a short title naming the main topic in the summary language. Use null if there is no topic."
+    } else {
+        ""
+    };
     format!(
         "You run Noter's {} skill. The user message is a JSON packet whose `items` are the \
          evidence, each with an `id`. Answer only with JSON that matches the output schema, and \
-         cite only ids from `items`. A `repair` field says why the previous answer failed.",
+         cite only ids from `items`. A `repair` field says why the previous answer failed.{topic_title}",
         skill.id()
     )
 }

@@ -88,13 +88,13 @@ describe("cpt-noter-seq-record-prompt-start-recording", () => {
     const prompt = s.core("record-prompt");
     ok(await prompt.captureStart({ source: "record_prompt", sensitive: false, detection_id: detection.id }));
     const live = await phase("recording");
-    expect(live.title).toBe(TEAMS.app_name);
+    expect(live.title).toBe("Untitled call");
     expect(ok(await s.core("call-screen").appSnapshot({})).capture.call_id).toBe(live.call_id); // every window
     expect(states.all.map((c) => c.phase)).toEqual(expect.arrayContaining(["starting", "recording"]));
     expect(await s.surfaces()).toEqual(expect.arrayContaining(["close_record_prompt", "open_call_window_inactive"]));
     expect(ok(await prompt.appSnapshot({})).detection.detection).toBeNull(); // used up by the start
     const row = await callRow(live.call_id!);
-    if (row !== undefined) expect(row).toMatchObject({ title: TEAMS.app_name, status: "recording" });
+    if (row !== undefined) expect(row).toMatchObject({ title: "Untitled call", platform: TEAMS.app_name, status: "recording" });
 
     expect(ok(await s.core("call-screen").captureStop({ call_id: live.call_id! })).phase).toBe("stopped");
   });
@@ -109,7 +109,7 @@ describe("cpt-noter-seq-record-prompt-start-recording", () => {
     expect(refusal).toMatchObject({ code: "disk_full", detail: { type: "disk_space", free_mb: 420, needed_mb: 500 } });
     await s.setFreeDisk(90_000); // Delete Old Audio…
     ok(await s.core("main").captureStart({ source: "menu_bar", sensitive: false, detection_id: detection.id })); // Call Detected · Start Recording
-    expect((await phase("recording")).title).toBe(TEAMS.app_name);
+    expect((await phase("recording")).title).toBe("Untitled call");
   });
 
   it("other path — not a call: Don't Ask for Safari ignores it from then on", async () => {
@@ -140,9 +140,9 @@ describe("cpt-noter-seq-record-prompt-record-after-missed-prompt", () => {
 
     ok(await s.core("main").captureStart({ source: "menu_bar", sensitive: false, detection_id: detection.id }));
     const live = await phase("recording");
-    expect(live.title).toBe(TEAMS.app_name);
+    expect(live.title).toBe("Untitled call");
     const row = await callRow(live.call_id!);
-    if (row !== undefined) expect(row?.title).toBe(TEAMS.app_name);
+    if (row !== undefined) expect(row?.title).toBe("Untitled call");
   });
 
   it("error path — setup incomplete: no prompt, Start Recording still records (O1)", async () => {

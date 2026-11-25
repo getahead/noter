@@ -163,6 +163,7 @@ struct RowDetails {
     tags: Vec<String>,
     open_items: u32,
     participants: Vec<PersonChip>,
+    invited_ids: Vec<PersonId>,
     review_waiting: u32,
 }
 
@@ -205,15 +206,10 @@ fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDe
     )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
-    let participants = c
-        .prepare("SELECT person_id FROM call_participants WHERE call_id = ?1 ORDER BY person_id")?
-        .query_map([call_id], |r| {
-            crate::people::chip_of(c, &r.get::<_, String>(0)?)
-        })?
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
+    let mut people = RowDetails::default();
+    read_call_people(c, &[call_id.to_owned()], |_, chip, invited| {
+        people.add_person(chip, invited)
+    })?;
     let review_waiting: u32 = c.query_row(
         "SELECT count(*) FROM items WHERE call_id = ?1 AND review_state = 'suggested'",
         [call_id],
@@ -225,9 +221,52 @@ fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDe
         unnamed_speakers,
         tags,
         open_items,
-        participants,
         review_waiting,
+        ..people
     })
+}
+
+impl RowDetails {
+    fn add_person(&mut self, chip: PersonChip, invited: bool) {
+        if invited {
+            self.invited_ids.push(chip.id.clone());
+        }
+        self.participants.push(chip);
+    }
+}
+
+fn read_call_people(
+    c: &Connection,
+    ids: &[String],
+    mut add: impl FnMut(String, PersonChip, bool),
+) -> noter_db::rusqlite::Result<()> {
+    let marks = crate::util::marks(ids.len());
+    let query = format!(
+        "SELECT cp.call_id, p.id, p.display_name, p.short_name, p.is_you, cp.invited_only
+             FROM call_attendance cp JOIN people p ON p.id = cp.person_id
+             WHERE cp.call_id IN ({marks}) ORDER BY cp.call_id, cp.person_id"
+    );
+    for row in c
+        .prepare(&query)?
+        .query_map(params_from_iter(ids.iter()), |r| {
+            let display_name: String = r.get(2)?;
+            Ok((
+                r.get::<_, String>(0)?,
+                PersonChip {
+                    id: PersonId::new(r.get::<_, String>(1)?),
+                    display_name: display_name.clone(),
+                    short_name: r.get(3)?,
+                    initials: crate::people::initials_of(&display_name),
+                    is_you: r.get(4)?,
+                },
+                r.get::<_, bool>(5)?,
+            ))
+        })?
+    {
+        let (id, chip, invited) = row?;
+        add(id, chip, invited);
+    }
+    Ok(())
 }
 
 // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
@@ -310,30 +349,9 @@ fn details_for_calls(
             row.review_waiting = review_waiting;
         }
 
-        let query = format!(
-            "SELECT cp.call_id, p.id, p.display_name, p.short_name, p.is_you
-             FROM call_participants cp JOIN people p ON p.id = cp.person_id
-             WHERE cp.call_id IN ({marks}) ORDER BY cp.call_id, cp.person_id"
-        );
-        for row in c
-            .prepare(&query)?
-            .query_map(params_from_iter(ids.iter()), |r| {
-                let display_name: String = r.get(2)?;
-                Ok((
-                    r.get::<_, String>(0)?,
-                    PersonChip {
-                        id: PersonId::new(r.get::<_, String>(1)?),
-                        display_name: display_name.clone(),
-                        short_name: r.get(3)?,
-                        initials: crate::people::initials_of(&display_name),
-                        is_you: r.get(4)?,
-                    },
-                ))
-            })?
-        {
-            let (id, chip) = row?;
-            details.entry(id).or_default().participants.push(chip);
-        }
+        read_call_people(c, ids, |id, chip, invited| {
+            details.entry(id).or_default().add_person(chip, invited)
+        })?;
     }
 
     Ok(details)
@@ -360,7 +378,10 @@ fn assemble_with_details(
                 .unwrap_or(s.ended_at.unwrap_or(now) - s.started_at)
                 .clamp(0, u32::MAX.into()) as u32,
         ),
-        platform: s.platform,
+        platform: s
+            .platform
+            .map(|name| crate::call_platform::display_name("", &name)),
+        invited_ids: details.invited_ids,
         participants: details.participants,
         unnamed_speakers: details.unnamed_speakers,
         languages: details.languages,
@@ -648,10 +669,7 @@ impl Core {
         let (mut detail, calendar_event_id) = found
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
         detail.calendar_event = calendar_event_id.and_then(|id| {
-            self.deps
-                .native
-                .calendar_event_near(detail.call.started_at)
-                .filter(|event| event.id.0 == id)
+            self.start_event(None, Some(&CalendarEventId(id)), detail.call.started_at.0)
         });
         detail.call = self.live_length(detail.call);
         Ok(detail)
@@ -677,6 +695,7 @@ impl Core {
                 return Err(invalid("title", ValidationRule::Required));
             }
             values.push(("title", json!(title)));
+            values.push(("title_pending", json!(0)));
         }
         if let Some(kind) = &args.call_type {
             if !self

@@ -1917,7 +1917,8 @@ One row per captured call. Change from the PRD: adds `rev`, `outputs_status`, `a
 | id | TEXT | `call_` ULID |
 | rev | INTEGER | Row version for `conflict` checks |
 | started_at / ended_at | INTEGER | Epoch ms |
-| title | TEXT | From the calendar event or the meeting app |
+| title | TEXT | From the matched Calendar event, or **Untitled call** until the post-call summary supplies a topic title. A user rename takes precedence (#1256) |
+| title_pending | INTEGER | A topic title may still replace the automatic placeholder |
 | call_type | TEXT | Call type id (skill directory) |
 | platform | TEXT | Teams, Zoom, Meet, browser |
 | calendar_event_id | TEXT NULL | EventKit id |
@@ -2008,6 +2009,7 @@ Who was on which call. Change from the PRD: drops `speaker_label` and `channel`,
 |--------|------|-------------|
 | call_id | TEXT | FK calls |
 | person_id | TEXT | FK people |
+| from_invite | INTEGER | The Calendar invitation supplied this person. Show **Invited** until a speaker is named or voice-matched |
 | talk_time_ms | INTEGER NULL | Computed only when behaviour metrics are on, never back-computed |
 
 **PK**: (call_id, person_id)
