@@ -69,6 +69,14 @@ impl ClaudeCode {
         if api_key {
             let key = call.key.as_ref().ok_or("no_key")?;
             command.env("ANTHROPIC_API_KEY", key.expose()).arg("--bare");
+        } else {
+            // Claude Code finds its Keychain sign-in under the user's name; without it an
+            // own-account run is signed out though `claude auth status` says signed in (#1235).
+            for name in ["USER", "LOGNAME"] {
+                if let Some(value) = std::env::var_os(name) {
+                    command.env(name, value);
+                }
+            }
         }
         command
             .args(["--output-format", "json"])
