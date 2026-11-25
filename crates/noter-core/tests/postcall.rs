@@ -917,6 +917,8 @@ async fn check_local_regeneration_after_restart(local_available: bool) {
         Some(run.clone())
     );
     assert_eq!(scripted.received().len(), setup_packets);
+    // stop the core's background jobs first: under load one can still hold the core when it is dropped (issue 1285)
+    core.shutdown().await;
     let first = Arc::downgrade(&core);
     drop(core);
     assert!(first.upgrade().is_none());
