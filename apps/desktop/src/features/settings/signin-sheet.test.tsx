@@ -120,6 +120,32 @@ describe("AccountSignInSheet", () => {
     expect(body).toContain("Use Another Account");
   });
 
+  // #1235 (cpt-noter-flow-ui-accounts-sign-in): the existing sign-in names its plan, as DESIGN's Prepare row does
+  it("names the plan of the account the CLI is already signed in to", async () => {
+    await ready();
+    await m().open("claude");
+    m().dispatch("claude", { type: "prepared", prepare: { ...m().state.claude.prepare!, existing: { email: "ann@example.com", plan: "team" } } });
+    expect(html("claude")).toContain("Claude Code is already signed in to this Claude team account on this Mac. No browser needed.");
+  });
+
+  // #1235: a failed login names how it failed, with Try Again, never "Something went wrong"
+  it("names a login that printed no page and one that stopped early, each with Try Again", async () => {
+    await ready();
+    await m().open("chatgpt");
+    m().dispatch("chatgpt", { type: "prepareFailed", code: "sign_in_no_page" });
+    let body = html("chatgpt");
+    expect(body).toContain("Codex didn’t open a sign-in page");
+    expect(body).toContain("Try Again");
+    expect(body).not.toContain("Something went wrong");
+    await m().open("claude");
+    await m().proceed("claude");
+    const id = m().state.claude.sessionId!;
+    m().dispatch("claude", { type: "progress", progress: { session_id: id, provider: "claude", step: "waiting_for_browser", identity: null, error: "sign_in_cli_failed" }, signedIn: false });
+    body = html("claude");
+    expect(body).toContain("Claude Code stopped before the sign-in finished");
+    expect(body).toContain("Try Again");
+  });
+
   it("reuses an existing CLI account without a browser", async () => {
     const { seen } = await ready();
     await m().open("claude");

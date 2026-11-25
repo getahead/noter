@@ -1294,7 +1294,7 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `ask_start` | `AskMsg` | `started`, `delta`…, `citation`…, `done` or `failed` | `ended` |
 | `self_test_run` | `SelfTestMsg` | `stream_arrived` per channel, `levels`, `line`, then `passed` or `failed { reason }` | `ended` |
 
-**Error codes.** The closed list in `ErrorCode` (66 codes) maps to the named states of the UI design. A code not listed here is a contract break. Retryable by default, as the generated `DEFAULT_RETRYABLE` says: `internal`, `not_ready`, `offline`, `engine_unavailable`, `search_failed`, `source_sync_failed`, `keychain_locked`, `change_log_unreadable`, `calendar_unavailable`, `tracker_unreachable`.
+**Error codes.** The closed list in `ErrorCode` (68 codes) maps to the named states of the UI design. A code not listed here is a contract break. Retryable by default, as the generated `DEFAULT_RETRYABLE` says: `internal`, `not_ready`, `offline`, `engine_unavailable`, `search_failed`, `source_sync_failed`, `keychain_locked`, `change_log_unreadable`, `calendar_unavailable`, `tracker_unreachable`.
 
 | Code | UI state it shows (DESIGN.md States tables) | Raised by |
 | --- | --- | --- |
@@ -1357,6 +1357,8 @@ Every whole-state event payload has a `version`. `entity:changed`, `outputs:prog
 | `cli_incompatible` | The run's error: the CLI rejected or ignored a lockdown flag; never retried without the flags (#1219) | LLM runs |
 | `sign_in_cancelled` | "Cancelled in the browser" | `signin:progress` |
 | `sign_in_timed_out` | "Sign-in timed out" | `signin:progress` |
+| `sign_in_no_page` | "Claude Code didn’t open a sign-in page": the CLI's login exited or went quiet before printing its page; `noter.log` names how (`exit_1`, `timed_out`), never the page, code or identity (#1235) | `account_signin_start` |
+| `sign_in_cli_failed` | "Claude Code stopped before the sign-in finished": the login ended without a sign-in, e.g. a non-zero exit; `noter.log` names the exit (#1235) | `signin:progress` |
 | `plan_not_eligible` | "No paid plan" | `signin:progress` |
 | `account_signed_out` | "Session ended by the provider"; Agents "Account session ended" | runtime calls |
 | `personal_use_not_confirmed` | The Claude sheet stays on Prepare with the confirmation unchecked | `account_signin_start` |

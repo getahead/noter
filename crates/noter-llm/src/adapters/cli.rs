@@ -494,6 +494,11 @@ fn login_page(provider: AccountProvider, text: &str) -> Option<(String, Option<S
     Some((url, Some(code)))
 }
 
+/// A login's exit as a log id: `exit_1`, or `signal` when a signal ended it.
+fn exit_id(code: Option<i32>) -> String {
+    code.map_or_else(|| "signal".into(), |c| format!("exit_{c}"))
+}
+
 /// The identity `claude auth status` prints (JSON with `email` and `subscriptionType`).
 pub(crate) fn claude_identity(text: &str) -> Option<AccountIdentity> {
     let v: serde_json::Value = serde_json::from_str(text).ok()?;
@@ -592,9 +597,17 @@ impl AccountCli for CliAccounts {
                     }
                 }
             };
-            let Ok(Some((url, code))) = tokio::time::timeout(LOGIN_PAGE_TIMEOUT, read_page).await
-            else {
-                return Err(CliError::Failed("the login printed no page".into()));
+            let (url, code) = match tokio::time::timeout(LOGIN_PAGE_TIMEOUT, read_page).await {
+                Ok(Some(page)) => page,
+                Err(_) => return Err(CliError::NoPage("timed_out".into())),
+                // stdout closed first: the CLI ended, or is ending, without a page (#1235)
+                Ok(None) => {
+                    let exit = tokio::time::timeout(PROBE_TIMEOUT, child.wait()).await;
+                    return Err(CliError::NoPage(match exit {
+                        Ok(Ok(status)) => exit_id(status.code()),
+                        _ => "closed".into(),
+                    }));
+                }
             };
             let codex_home = self.codex_home.clone();
             // Claude's fallback page shows a code to paste into the login (issue 1136): the
@@ -625,11 +638,11 @@ impl AccountCli for CliAccounts {
                     Ok(exit) if exit.success() => {
                         match auth_state(tool, &program, &codex_home).await {
                             Some(Some(identity)) => LoginOutcome::SignedIn(identity),
-                            _ => LoginOutcome::Failed("not signed in after the login".into()),
+                            _ => LoginOutcome::Failed("not_signed_in".into()),
                         }
                     }
-                    Ok(exit) => LoginOutcome::Failed(format!("login exit {:?}", exit.code())),
-                    Err(_) => LoginOutcome::Failed("login wait".into()),
+                    Ok(exit) => LoginOutcome::Failed(exit_id(exit.code())),
+                    Err(_) => LoginOutcome::Failed("wait_failed".into()),
                 }
             });
             let paste = (provider == AccountProvider::Claude).then_some(paste);
@@ -861,6 +874,26 @@ mod account_tests {
             ),
             Some(("https://claude.com/a?b=c".into(), None))
         );
+    }
+
+    // #1235: a login that ends without printing its page says how it ended, never "failed".
+    #[tokio::test]
+    async fn a_login_that_exits_without_a_page_names_its_exit() {
+        let dir = tempfile::tempdir().unwrap();
+        let program = dir.path().join("claude");
+        crate::test_exec::write_executable(
+            &program,
+            "#!/bin/sh\necho 'Opening browser…'\nexit 3\n",
+        );
+        let cli = CliAccounts {
+            claude: program.clone(),
+            codex: program.clone(),
+            ollama: program,
+            codex_home: dir.path().join("codex-home"),
+        };
+        let started = cli.login(AccountProvider::Claude).await;
+        assert!(matches!(started, Err(CliError::NoPage(ref id)) if id == "exit_3"));
+        assert_eq!(exit_id(None), "signal");
     }
 
     #[tokio::test]

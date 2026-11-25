@@ -2262,7 +2262,7 @@
       ]
     }
   ],
-  "contract_version": "2.31",
+  "contract_version": "2.32",
   "default_retryable": [
     "not_ready",
     "internal",
@@ -2336,6 +2336,8 @@
     "cli_incompatible",
     "sign_in_cancelled",
     "sign_in_timed_out",
+    "sign_in_no_page",
+    "sign_in_cli_failed",
     "plan_not_eligible",
     "account_signed_out",
     "personal_use_not_confirmed",

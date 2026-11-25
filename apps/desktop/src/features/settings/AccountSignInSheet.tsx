@@ -29,6 +29,9 @@ const PROVIDER_TEXT: Record<AccountProvider, { account: MsgKey; site: MsgKey; pl
 const ERROR_TEXT: Record<string, { title: MsgKey; text: MsgKey }> = {
   sign_in_cancelled: { title: "signin.err.sign_in_cancelled", text: "signin.err.sign_in_cancelled_text" },
   sign_in_timed_out: { title: "signin.err.sign_in_timed_out", text: "signin.err.sign_in_timed_out_text" },
+  // issue 1235: a login that failed says how, never "Something went wrong"
+  sign_in_no_page: { title: "signin.err.sign_in_no_page", text: "signin.err.sign_in_no_page_text" },
+  sign_in_cli_failed: { title: "signin.err.sign_in_cli_failed", text: "signin.err.sign_in_cli_failed_text" },
   plan_not_eligible: { title: "signin.err.plan_not_eligible", text: "signin.err.plan_not_eligible_text" },
   offline: { title: "signin.err.offline", text: "signin.err.offline_text" },
   personal_use_not_confirmed: { title: "signin.err.personal_use_not_confirmed", text: "signin.err.personal_use_not_confirmed_text" },
@@ -216,7 +219,7 @@ export function AccountSignInSheet({ bridge, provider, view, onUseKey }: SheetHo
               label={t("signin.existing_label")}
               value={s.choice}
               options={[
-                { value: "existing", label: t("signin.use_existing", { email: existing.email }), note: t("signin.use_existing_note", names) },
+                { value: "existing", label: t("signin.use_existing", { email: existing.email }), note: existing.plan ? t("signin.use_existing_note_plan", { ...names, plan: existing.plan }) : t("signin.use_existing_note", names) },
                 { value: "other", label: t("signin.use_other"), note: t("signin.use_other_note") },
               ]}
               onAction={(v) => m.dispatch(provider, { type: "choose", choice: v as "existing" | "other" })}

@@ -66,6 +66,8 @@ pub enum CliError {
     Unsupported,
     Offline,
     Failed(String),
+    /// The login printed no sign-in page; the text is a short log id (`exit_1`, `timed_out`).
+    NoPage(String),
 }
 
 /// How a browser sign-in ended.
@@ -160,7 +162,8 @@ pub struct LoginScript {
     pub url: String,
     #[serde(default)]
     pub code: Option<String>,
-    /// `signed_in` (as `login_identity`), `cancel`, or any other text for a failure.
+    /// `signed_in` (as `login_identity`), `cancel`, `no_page` (the login prints no page and
+    /// exits 1), or any other text for a failure.
     #[serde(default = "signed_in")]
     pub outcome: String,
     #[serde(default)]
@@ -316,6 +319,9 @@ impl AccountCli for ScriptedAccountCli {
                 return Err(CliError::Unsupported);
             }
             lock(&self.state).log.push(format!("login:{provider:?}"));
+            if script.login.outcome == "no_page" {
+                return Err(CliError::NoPage("exit_1".into()));
+            }
             let this = self.clone();
             let outcome = script.login.clone();
             let identity = script.login_identity.clone();
