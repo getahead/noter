@@ -161,7 +161,10 @@ describe("windowState (cpt-noter-state-ui-call-window-window)", () => {
     expect(windowState(win({ visible: false }), false, cap())).toBe("HIDDEN_BY_USER");
     expect(windowState(win(), true, cap())).toBe("HIDDEN_FOR_PRESENTING");
     expect(windowState(win(), false, cap({ phase: "stopped" }))).toBe("CLOSING");
-    expect(windowState(win(), false, cap({ phase: "idle", call_id: null }))).toBe("CLOSED");
+    const idle = cap({ phase: "idle", call_id: null });
+    expect(windowState(win(), false, idle)).toBe("IDLE");
+    expect(windowState(win({ visible: false }), false, idle)).toBe("CLOSED");
+    expect(windowState(win(), true, idle)).toBe("CLOSED");
   });
 });
 

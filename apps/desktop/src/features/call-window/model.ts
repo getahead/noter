@@ -8,7 +8,7 @@ import { clock, t } from "../../i18n/format";
 export type CaptureView = "RECORDING" | "MIC_ONLY" | "NO_MIC" | "PAUSED" | "NOT_RECORDING" | "NOTICE_CALL_ENDED" | "NOTICE_NEW_MEETING" | "NOTICE_NOTHING_HEARD" | "STOPPED";
 export type IndicatorStatus = "recording" | "paused" | "mic-only" | "no-mic" | "not-recording" | "stopped";
 export type LayoutState = "DEDICATED" | "FLOATING" | "COLLAPSED";
-export type WindowView = "NOT_KEY" | "KEY" | "HIDDEN_BY_USER" | "HIDDEN_FOR_PRESENTING" | "CLOSING" | "CLOSED";
+export type WindowView = "IDLE" | "NOT_KEY" | "KEY" | "HIDDEN_BY_USER" | "HIDDEN_FOR_PRESENTING" | "CLOSING" | "CLOSED";
 
 const has = (degraded: readonly DegradedState[], callId: string | null, type: DegradedState["type"]) => degraded.some((d) => d.type === type && "call_id" in d && d.call_id === callId);
 export const stopped = (c: Pick<CaptureState, "phase">) => c.phase === "stopped" || c.phase === "stopping";
@@ -344,7 +344,9 @@ export function layoutState(w: CallWindowState, notice: boolean): LayoutState {
 /** The window's state: the core shows, hides, keys and closes the panel; the window reflects it. */
 export function windowState(w: CallWindowState, presenting: boolean, c: CaptureState): WindowView {
   // @cpt-begin:cpt-noter-state-ui-call-window-window:p1:inst-closing-closed
-  if (c.phase === "idle" || !c.call_id) return "CLOSED";
+  // @cpt-begin:cpt-noter-state-ui-call-window-window:p1:inst-open-idle
+  if (c.phase === "idle") return w.visible && !presenting ? "IDLE" : "CLOSED";
+  // @cpt-end:cpt-noter-state-ui-call-window-window:p1:inst-open-idle
   // @cpt-end:cpt-noter-state-ui-call-window-window:p1:inst-closing-closed
   // @cpt-begin:cpt-noter-state-ui-call-window-window:p1:inst-notkey-presenting
   if (presenting) return "HIDDEN_FOR_PRESENTING";
