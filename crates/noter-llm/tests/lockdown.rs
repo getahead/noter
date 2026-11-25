@@ -497,6 +497,11 @@ async fn claude_own_account_has_the_same_restrictions_without_bare() {
     // The sign-in lives in the user's home, so the run sees it; the flags keep the rest out.
     assert_eq!(Path::new(&env["HOME"]), world.home);
     assert_eq!(env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"], "1");
+    // #1235: Claude Code finds that sign-in in the Keychain under the user's name
+    for name in ["USER", "LOGNAME"] {
+        assert_eq!(env.get(name).cloned(), std::env::var(name).ok(), "{name}");
+    }
+    assert!(!env.contains_key("SHELL"));
     assert_nothing_hostile_loaded(&run);
     assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
 }

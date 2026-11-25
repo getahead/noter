@@ -292,6 +292,43 @@ async fn start_needs_confirmation_for_claude_only_and_a_usable_cli() {
     assert_eq!(err.code, ErrorCode::CliVersionUnsupported);
 }
 
+// #1235: a login that prints no page, or that stops before the sign-in ends, says so with its
+// own code, and noter.log names how it ended without the page, the code or the identity.
+#[tokio::test(start_paused = true)]
+async fn a_login_without_a_page_or_that_exits_early_names_why() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(dir.path(), None);
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296","login":{"outcome":"no_page"}}"#,
+    );
+    let err = w
+        .core
+        .account_signin_start(&settings(), start(CLAUDE, true))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::SignInNoPage);
+    assert_eq!(status(&view(&w).await, CLAUDE), AccountStatus::NotSignedIn);
+
+    bare(
+        &w,
+        r#"{"tool":"claude_code","installed":true,"version":"2.1.296",
+            "login_identity":{"email":"ann@example.com","plan":"Max"},"login":{"outcome":"exit_1"}}"#,
+    );
+    connect(&w, CLAUDE, true).await;
+    assert_eq!(
+        w.events.progress("claude").last().unwrap(),
+        "sign_in_cli_failed"
+    );
+    assert_eq!(status(&view(&w).await, CLAUDE), AccountStatus::NotSignedIn);
+
+    let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
+    assert!(log.contains(r#""code":"sign_in_no_page""#));
+    assert!(log.contains(r#""code":"sign_in_cli_failed""#));
+    assert!(log.contains(r#""id":"exit_1""#));
+    assert!(!log.contains("ann@example.com") && !log.contains("claude.ai/login"));
+}
+
 #[tokio::test(start_paused = true)]
 async fn both_providers_sign_in_independently_and_no_code_is_recorded() {
     let dir = tempfile::tempdir().unwrap();

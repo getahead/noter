@@ -153,7 +153,7 @@ The decomposition assigns no new table here: account metadata uses existing sett
 - A qualifying CLI-held sign-in passes account, plan and test checks without exposing a password or token.
 
 **Error Scenarios**:
-- `personal_use_not_confirmed`, `sign_in_cancelled`, `sign_in_timed_out`, `plan_not_eligible`, `offline` or a CLI failure leaves agents unchanged.
+- `personal_use_not_confirmed`, `sign_in_cancelled`, `sign_in_timed_out`, `sign_in_no_page`, `sign_in_cli_failed`, `plan_not_eligible`, `offline` or a CLI failure leaves agents unchanged.
 - Closing the sheet leaves the session running; explicit Cancel stops it.
 
 **Steps**:

@@ -250,6 +250,10 @@ pub enum ErrorCode {
     SignInCancelled,
     /// Sign-in timed out after 5 minutes.
     SignInTimedOut,
+    /// The CLI's login printed no sign-in page: it exited or went quiet first (#1235).
+    SignInNoPage,
+    /// The CLI's login stopped before the sign-in finished, e.g. a non-zero exit (#1235).
+    SignInCliFailed,
     /// The account's plan does not qualify.
     PlanNotEligible,
     /// The provider ended the account session.
@@ -354,6 +358,8 @@ impl ErrorCode {
         ErrorCode::CliIncompatible,
         ErrorCode::SignInCancelled,
         ErrorCode::SignInTimedOut,
+        ErrorCode::SignInNoPage,
+        ErrorCode::SignInCliFailed,
         ErrorCode::PlanNotEligible,
         ErrorCode::AccountSignedOut,
         ErrorCode::PersonalUseNotConfirmed,

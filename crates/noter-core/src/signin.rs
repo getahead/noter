@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use noter_db::ChangeMeta;
 use noter_jobs::BoxFuture;
-use noter_llm::{tool_of, CliStatus, Failure, LoginOutcome};
+use noter_llm::{tool_of, CliError, CliStatus, Failure, LoginOutcome};
 use noter_protocol::error::RuntimeUnavailableReason;
 use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
@@ -208,6 +208,14 @@ impl Core {
     // @cpt-end:cpt-noter-state-core-credentials-privacy-account:p1:inst-account-failed
     // @cpt-end:cpt-noter-flow-core-credentials-privacy-signin:p1:inst-signin-fail
 
+    /// One `noter.log` line naming how a login failed (`exit_1`, `timed_out`): never the page,
+    /// the code or the identity (#1235).
+    fn log_signin_failure(&self, code: &str, id: &str) {
+        let line =
+            serde_json::json!({"level": "warn", "module": "accounts", "code": code, "id": id});
+        self.log(crate::object(line));
+    }
+
     /// Stops the provider's pending sign-in, if any, as cancelled.
     fn cancel_pending(&self, provider: AccountProvider) {
         if let Some(session) = self.accounts.session(provider) {
@@ -247,12 +255,15 @@ impl Core {
         // @cpt-begin:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
         // The unmodified CLI runs the login and keeps the token: Noter gets a page, a code and,
         // at the end, an identity and a plan.
-        let login = self
-            .deps
-            .account_cli
-            .login(provider)
-            .await
-            .map_err(cli_code)?;
+        let login = match self.deps.account_cli.login(provider).await {
+            Ok(login) => login,
+            Err(e) => {
+                if let CliError::NoPage(id) = &e {
+                    self.log_signin_failure("sign_in_no_page", id);
+                }
+                return Err(cli_code(e));
+            }
+        };
         // @cpt-end:cpt-noter-algo-core-credentials-privacy-secret-boundary:p1:inst-secret-account
         let expires_at = TimestampMs(self.deps.clock.now().0 + DEADLINE.as_millis() as i64);
         let session = SignInSession {
@@ -316,13 +327,13 @@ impl Core {
                 self.fail_session(provider, &id, waiting, ErrorCode::SignInCancelled);
                 return;
             }
+            LoginOutcome::Failed(text) if text == "offline" => {
+                self.fail_session(provider, &id, waiting, ErrorCode::Offline);
+                return;
+            }
             LoginOutcome::Failed(text) => {
-                let code = if text == "offline" {
-                    ErrorCode::Offline
-                } else {
-                    ErrorCode::Internal
-                };
-                self.fail_session(provider, &id, waiting, code);
+                self.log_signin_failure("sign_in_cli_failed", &text);
+                self.fail_session(provider, &id, waiting, ErrorCode::SignInCliFailed);
                 return;
             }
         };

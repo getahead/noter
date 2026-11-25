@@ -20,6 +20,10 @@ pub(crate) fn cli_code(e: CliError) -> CoreError {
         ),
         CliError::Offline => CoreError::new(ErrorCode::Offline, "the install could not download"),
         CliError::Failed(text) => crate::internal(text),
+        CliError::NoPage(id) => CoreError::new(
+            ErrorCode::SignInNoPage,
+            format!("the login printed no page ({id})"),
+        ),
     }
 }
 

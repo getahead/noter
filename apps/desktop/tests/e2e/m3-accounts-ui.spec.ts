@@ -99,6 +99,7 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     await button(row(page, "Your Claude account"), /Sign In/).click();
     const dlg = sheet(page, /Sign in with your Claude account/);
     await expect(dlg).toContainText("Use ann@example.com");
+    await expect(dlg).toContainText("Claude Code is already signed in to this Claude Max account on this Mac. No browser needed."); // #1235: the plan, as DESIGN shows it
     await dlg.getByRole("checkbox").click({ force: true }); // the personal-use guard covers the existing account too
     await button(dlg, "Use This Account").click();
     // #1000: the ticked box goes with the request, and the core's answer moves the sheet on to Use
@@ -106,6 +107,26 @@ describeReal("cpt-noter-seq-settings-sign-in-account", () => {
     expect(await sent(page, "account_signin_start")).toHaveLength(0);
     await expect(dlg).toContainText("Connected to your Claude account");
     await expect(dlg).toContainText("ann@example.com");
+  });
+
+  // #1235: a login that failed names how, with Try Again, never "Something went wrong"
+  test("error path — the tool’s login failed: no page, then a login that stops early, each named with Try Again", async ({ page }) => {
+    const steer = await openWindow(page, "settings", { world: (w) => W.idle(w) });
+    await claudeCli(steer, { login: { outcome: "no_page" } });
+    await openModels(page);
+    await button(row(page, "Your Claude account"), /Sign In/).click();
+    const dlg = sheet(page, /Sign in with your Claude account/);
+    await dlg.getByRole("checkbox").click({ force: true });
+    await button(dlg, "Continue in Browser").click();
+    await expect(dlg).toContainText("Claude Code didn’t open a sign-in page");
+    await expect(dlg).not.toContainText("Something went wrong");
+    await claudeCli(steer, { login: { outcome: "exit_1", hold: true } });
+    await button(dlg, "Try Again").click(); // back at Prepare with the box still ticked
+    await button(dlg, "Continue in Browser").click();
+    await steer.invoke("harness.account_cli_release", { provider: "claude" });
+    await expect(dlg).toContainText("Claude Code stopped before the sign-in finished");
+    await expect(button(dlg, "Try Again")).toBeVisible();
+    await expect(row(page, "Your Claude account")).toContainText("Not signed in");
   });
 
   test("error path — Codex not installed: Install Codex keeps Continue in Browser disabled until the tool is found", async ({ page }) => {
