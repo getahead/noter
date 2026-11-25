@@ -442,9 +442,14 @@ impl Core {
         let checked = self.llm.verify_account(runtime, privacy).await;
         if let Err(Failure::Runtime { code }) = &checked {
             // Why the check failed, so the next failure is readable from noter.log (#1235).
-            self.log_signin_failure("account_check_failed", code);
+            // The tool is named: a Codex failure once read as a Claude one.
+            let tool = match provider {
+                AccountProvider::Claude => "claude",
+                AccountProvider::Chatgpt => "codex",
+            };
+            self.log_signin_failure("account_check_failed", &format!("{tool}.{code}"));
             if let Some(how) = self.llm.cli_failure(runtime) {
-                self.log_signin_failure("account_check_cli", &how);
+                self.log_signin_failure("account_check_cli", &format!("{tool}.{how}"));
             }
         }
         checked.map_err(account_error)?;

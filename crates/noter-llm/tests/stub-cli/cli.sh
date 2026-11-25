@@ -100,6 +100,13 @@ if [ "$mode" = fail ]; then
     echo "stub failure" >&2
     exit 1
 fi
+# The provider refused the request: Codex 0.171.0 says so in events on stdout, and little on
+# stderr (#1235).
+if [ "$mode" = api ]; then
+    echo '{"type":"turn.failed","error":{"message":"unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses"}}'
+    echo "ERROR codex_api::endpoint::responses_websocket: failed to connect" >&2
+    exit 1
+fi
 # A newer CLI that dropped or renamed a lockdown flag (#1219).
 if [ "$mode" = usage ]; then
     echo "error: unexpected argument '--strict-mcp-config' found" >&2

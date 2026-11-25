@@ -290,8 +290,12 @@ async fn output(
         .await
         .map_err(|_| "cli_failed".to_owned())?;
     if !out.status.success() {
-        let class = failure_class(&out.stderr);
-        *lock(failed) = Some(format!("{}.{class}", exit_id(out.status.code())));
+        // Codex reports an API error as events on stdout and Claude Code as a JSON result there;
+        // their stderr says little, so both are read for the class.
+        let said = [out.stderr.as_slice(), out.stdout.as_slice()].join(&b'\n');
+        let class = failure_class(&said);
+        let status = http_status(&said).map_or_else(String::new, |s| format!(".http_{s}"));
+        *lock(failed) = Some(format!("{}.{class}{status}", exit_id(out.status.code())));
         // A newer CLI that dropped or renamed a lockdown flag, or that refuses the output
         // schema, fails closed (#1219, #1235).
         let code = match class {
@@ -318,11 +322,13 @@ pub(crate) fn usage_error(stderr: &[u8]) -> bool {
     .any(|p| text.contains(p))
 }
 
-/// Why a CLI run exited with an error, as a word for the log; the stderr itself is never kept.
-// shortcut: only `schema_rejected` (Claude Code 2.1.325) and `unknown_flag` are matched against
-// real output; the other phrases are best guesses. Correct them when a real failure shows one.
-pub(crate) fn failure_class(stderr: &[u8]) -> &'static str {
-    let text = String::from_utf8_lossy(stderr).to_lowercase();
+/// Why a CLI run exited with an error, as a word for the log; what the CLI printed is never
+/// kept.
+// shortcut: `schema_rejected` (Claude Code 2.1.325), `unknown_flag` and `not_logged_in` (Codex
+// 0.171.0 without a sign-in) are matched against real output; the other phrases are best guesses.
+// Correct them when a real failure shows one.
+pub(crate) fn failure_class(said: &[u8]) -> &'static str {
+    let text = String::from_utf8_lossy(said).to_lowercase();
     let has = |phrases: &[&str]| phrases.iter().any(|p| text.contains(p));
     if has(&[
         "not a valid json schema",
@@ -330,22 +336,51 @@ pub(crate) fn failure_class(stderr: &[u8]) -> &'static str {
         "invalid_json_schema",
     ]) {
         "schema_rejected"
-    } else if usage_error(stderr) {
+    } else if usage_error(said) {
         "unknown_flag"
     } else if has(&[
         "not logged in",
         "/login",
         "authentication_error",
         "oauth token",
+        "401 unauthorized",
+        "missing bearer",
     ]) {
         "not_logged_in"
-    } else if has(&["rate limit", "rate_limit", "usage limit", "429"]) {
+    } else if has(&["rate limit", "rate_limit", "usage limit"]) {
         "rate_limit"
     } else if has(&["subscription", "your plan", "organization has disabled"]) {
         "plan"
+    } else if has(&[
+        "model_not_found",
+        "model is not supported",
+        "does not have access to model",
+    ]) {
+        "model"
+    } else if has(&[
+        "no such file",
+        "permission denied",
+        "operation not permitted",
+    ]) {
+        "file"
     } else {
         "other"
     }
+}
+
+/// The HTTP status the provider answered with, when the CLI names one (Codex: `unexpected status
+/// 401 Unauthorized`; Claude Code: `"api_error_status":401`): the last one it printed.
+pub(crate) fn http_status(said: &[u8]) -> Option<u16> {
+    let text = String::from_utf8_lossy(said);
+    let found = ["unexpected status ", "\"api_error_status\":"]
+        .iter()
+        .filter_map(|mark| {
+            let at = text.rfind(mark)? + mark.len();
+            let digits = text.get(at..at + 3)?;
+            Some((at, digits.parse::<u16>().ok()?))
+        })
+        .max_by_key(|(at, _)| *at)?;
+    (100..600).contains(&found.1).then_some(found.1)
 }
 
 pub(crate) fn effort(effort: Effort) -> &'static str {
@@ -938,6 +973,27 @@ mod account_tests {
         assert_eq!(failure_class(b"API Error: 429 rate limit"), "rate_limit");
         assert_eq!(failure_class(b"Your plan does not include this"), "plan");
         assert_eq!(failure_class(b"stub failure"), "other");
+        // Codex 0.171.0 without a sign-in, as it prints it on stdout.
+        let codex = br#"{"type":"turn.failed","error":{"message":"unexpected status 401 Unauthorized: Missing bearer or basic authentication in header, url: https://api.openai.com/v1/responses"}}"#;
+        assert_eq!(failure_class(codex), "not_logged_in");
+        assert_eq!(http_status(codex), Some(401));
+        assert_eq!(
+            http_status(br#"{"is_error":true,"api_error_status":429}"#),
+            Some(429)
+        );
+        assert_eq!(
+            http_status(b"unexpected status 400 Bad Request\nunexpected status 503"),
+            Some(503)
+        );
+        assert_eq!(http_status(b"stub failure"), None);
+        assert_eq!(
+            failure_class(b"The model is not supported with this account"),
+            "model"
+        );
+        assert_eq!(
+            failure_class(b"open schema.json: No such file or directory"),
+            "file"
+        );
     }
 
     // #1235: a login that ends without printing its page says how it ended, never "failed".
