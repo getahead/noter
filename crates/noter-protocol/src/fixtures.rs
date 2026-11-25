@@ -320,6 +320,7 @@ fn item(
 
 fn writer(rt: RuntimeChoice, model: &str) -> WriterInfo {
     WriterInfo {
+        cost_usd: None,
         runtime: rt,
         model: s(model),
         skill: s("planning"),
@@ -1209,6 +1210,7 @@ pub fn world() -> FakeWorld {
             duration_ms: DurationMs(23 * 60_000),
             platform: Some(s("Microsoft Teams")),
             invited_ids: vec![],
+            invited_guests: vec![],
             participants: vec![
                 chip("per_anna"),
                 chip("per_dmitri"),
@@ -1238,6 +1240,7 @@ pub fn world() -> FakeWorld {
             duration_ms: DurationMs(52 * 60_000),
             platform: Some(s("Zoom")),
             invited_ids: vec![],
+            invited_guests: vec![],
             participants: vec![chip("per_dmitri"), chip("per_oleg"), chip("per_you")],
             unnamed_speakers: 0,
             languages: vec![Lang::Ru, Lang::En],
@@ -1256,6 +1259,7 @@ pub fn world() -> FakeWorld {
     ];
 
     let backend_outputs = CallOutputs {
+        processing_run: None,
         waiting_for_power: None,
         call_id: CallId(s(BACKEND)),
         status: OutputsStatus::Ready,
@@ -1785,6 +1789,7 @@ pub fn world() -> FakeWorld {
                     trigger: s("Hourly while items are open, after each call"),
                     allow_on_battery: false,
                     last_run: Some(JobRunRow {
+                        call_id: None,
                         id: JobRunId(s("run_1")),
                         job_id: JobId(s("job_evidence")),
                         kind: JobKind::EvidenceCollection,

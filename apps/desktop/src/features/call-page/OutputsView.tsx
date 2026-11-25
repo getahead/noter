@@ -13,7 +13,7 @@ import { extrasOf } from "./cache";
 import { OutputSection } from "./OutputSection";
 import { announceSummaryOnce, loadOutputs, outputsKey, outputsRegenerateKey, regenerate } from "./outputs-actions";
 import { useOutputs } from "./outputs-cache";
-import { isWriting, mergeSection, orderSections, settledSince } from "./outputs-logic";
+import { isWriting, mergeSection, needsRegenerationSettings, orderSections, settledSince } from "./outputs-logic";
 import { RegenerationError, useRegenerate } from "./RegenerateSheet";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
@@ -26,23 +26,9 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   const progress = useWindow(bridge, (s) => s.outputs);
   const openRegenerate = useRegenerate(bridge, callId);
   const read = useWindow(bridge, (s) => s.commands[outputsKey(callId)]);
-  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
   const heldRun = outputs?.waiting_for_power;
-  const heldStatus = useWindow(bridge, (s) => heldRun && s.jobs[heldRun]?.status);
   const regen = useWindow(bridge, (s) => s.commands[outputsRegenerateKey(callId)]);
-  useEffect(() => {
-    if (heldStatus && heldStatus !== "queued") void loadOutputs(bridge, callId);
-  }, [bridge, callId, heldStatus]);
-  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
   const announce = useAnnounce(bridge);
-
-  // once per call and instance: a development remount must not ask the core twice
-  const asked = useRef<string | null>(null);
-  useEffect(() => {
-    if (asked.current === callId) return;
-    asked.current = callId;
-    void loadOutputs(bridge, callId);
-  }, [bridge, callId]);
   // A fast outputs_get may already show the new state when React renders the completion event.
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
   const previousProgress = useRef(progress);
@@ -65,6 +51,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   const sections = orderSections(outputs.sections.flatMap((r) => mergeSection(r, sent[`${callId}/${r.kind}`], progress[`${callId}/${r.kind}`]) ?? []));
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-sections
   const again = (kind: SectionKind, local: boolean) => void regenerate(bridge, { call_id: callId, sections: [kind], local });
+  const settingsLost = needsRegenerationSettings(outputs);
   const writing = isWriting(outputs);
   return (
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-return
@@ -72,6 +59,12 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
       {/* @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
       {naming}
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
+      {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-recover-settings */}
+      {settingsLost && <InlineBanner banner={{
+        id: "regen-settings", severity: "error", title: t("outputs.regen.missing_settings"), text: t("outputs.regen.choose_again"),
+        actions: [{ label: t("outputs.regen.again"), onAction: () => openRegenerate() }],
+      }} />}
+      {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-recover-settings */}
       {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold */}
       {heldRun && <>
         <InlineBanner banner={{
@@ -81,7 +74,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
         }} />
         {regen?.error?.code && <RegenerationError bridge={bridge} code={regen.error.code} />}
       </>}
-      {sections.filter((s) => !heldRun || s.state.type !== "pending").map((s: Section) => (
+      {sections.filter((s) => (!heldRun && !settingsLost) || s.state.type !== "pending").map((s: Section) => (
         <OutputSection key={s.kind} bridge={bridge} call={call} section={s} prefs={prefs} writing={writing} onRegenerate={(local) => (s.state.type === "failed" ? again(s.kind, local) : openRegenerate([s.kind]))} />
       ))}
       {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold */}

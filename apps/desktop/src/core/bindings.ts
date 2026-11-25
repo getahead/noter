@@ -657,6 +657,8 @@ export type CallMutation = {
 };
 
 export type CallOutputs = {
+	/**  The active output job for this call, or its most recent completed output job. */
+	processing_run?: JobRunRow | null,
 	/**  Queued regeneration for this call waiting for external power. Run Now names this exact run. */
 	waiting_for_power?: JobRunId | null,
 	call_id: CallId,
@@ -704,6 +706,8 @@ export type CallRow = {
 	participants: PersonChip[],
 	/**  Participants known only from the invitation, without an identified speaker in the call. */
 	invited_ids?: PersonId[],
+	/**  Display labels for unconfirmed invitees who have no linked Person. */
+	invited_guests?: string[],
 	unnamed_speakers: number,
 	languages: Lang[],
 	tags: string[],
@@ -2106,6 +2110,8 @@ export type JobRow = {
 export type JobRunId = string;
 
 export type JobRunRow = {
+	/**  The call whose post-call analysis or regeneration this row describes. */
+	call_id?: CallId | null,
 	id: JobRunId,
 	job_id: JobId,
 	kind: JobKind,
@@ -3849,6 +3855,8 @@ export type WindowLabel = "main" |
 "call-screen" | "record-prompt" | "settings" | "first-run";
 
 export type WriterInfo = {
+	/**  Recorded cost of this generation on an API key, when available. */
+	cost_usd?: number | null,
 	runtime: RuntimeChoice,
 	model: string,
 	skill: string,
@@ -3860,7 +3868,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.33";
+export const CONTRACT_VERSION = "2.35";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

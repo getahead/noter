@@ -65,11 +65,14 @@ export const whenLabel = (ms: number, now: number, prefs: UiPrefs, info = false)
   return t(info ? "callpage.info.when_day" : "callpage.when_day", { date, time });
 };
 
-const people = (c: CallRow): string => c.participants.map((p) => c.invited_ids?.includes(p.id) ? t("callpage.invited", { name: p.short_name }) : p.short_name).join(", ");
+const people = (c: CallRow): string => [
+  ...c.participants.map((p) => c.invited_ids?.includes(p.id) ? t("callpage.invited", { name: p.short_name }) : p.short_name),
+  ...(c.invited_guests ?? []).map((name) => t("callpage.invited", { name })),
+].join(", ");
 
 /** PC-R1's subtitle: **Today 10:00 · 48 min · Anna K., Pavel, Dmitri S., You**. */
 export const subtitleOf = (c: CallRow, now: number, prefs: UiPrefs): string =>
-  c.participants.length
+  c.participants.length || c.invited_guests?.length
     ? t("callpage.subtitle", { when: whenLabel(c.started_at, now, prefs), length: duration(c.duration_ms / 1000), people: people(c) })
     : t("callpage.subtitle_alone", { when: whenLabel(c.started_at, now, prefs), length: duration(c.duration_ms / 1000) });
 
@@ -79,16 +82,7 @@ export interface InfoModel {
   sensitive: boolean;
   audio: string;
   audioKept: boolean;
-  processing: string;
 }
-
-const STATUS: Record<CallRow["status"], MsgKey> = {
-  recording: "callpage.info.status.recording",
-  paused: "callpage.info.status.paused",
-  processing: "callpage.info.status.processing",
-  ready: "callpage.info.status.ready",
-  failed: "callpage.info.status.failed",
-};
 
 /** There is audio to delete: not deleted, stored, and with a retention date (issue 1050; Call info and the ⋯ menu). */
 export const audioKept = (c: Pick<CallRow, "audio_deleted" | "audio_kept_until">, audioNotStored: boolean): boolean =>
@@ -115,6 +109,5 @@ export function callInfo(c: CallRow, extra: { audio_not_stored: boolean }, now: 
     sensitive: c.privacy === "sensitive",
     audio,
     audioKept: kept,
-    processing: t(STATUS[c.status]),
   };
 }

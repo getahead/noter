@@ -94,7 +94,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 
 **Steps**:
 1. [x] - `p1` - Receive startup, after-call, hourly, nightly-window, source-change or on-demand trigger and resolve enabled job definitions - `inst-run-trigger`
-2. [x] - `p1` - DB: INSERT a queued `job_runs` row for due work or return the existing run for the same pending work generation - `inst-run-enqueue`
+2. [x] - `p1` - DB: INSERT a queued `job_runs` row for due work or return the existing run for the same pending work generation. Commit regeneration selections with the run before admission. Preserve them for recovery, and fail a legacy regeneration with missing selections so it can be explicitly requested again - `inst-run-enqueue`
 3. [x] - `p1` - Apply `cpt-noter-algo-core-jobs-scheduler-admit` before dispatch - `inst-run-admit`
 4. [x] - `p1` - Mark the admitted run running and publish `jobs:progress`; execute its pipeline handler with a cancellation signal - `inst-run-start`
 5. [x] - `p1` - Persist counts and progress after each completed stage or logged batch, then publish the updated run - `inst-run-progress`

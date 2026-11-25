@@ -52,6 +52,10 @@ pub struct CountEntry {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct JobRunRow {
+    /// The call whose post-call analysis or regeneration this row describes.
+    #[serde(default)]
+    #[specta(optional)]
+    pub call_id: Option<CallId>,
     pub id: JobRunId,
     pub job_id: JobId,
     pub kind: JobKind,

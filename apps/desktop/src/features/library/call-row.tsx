@@ -25,6 +25,7 @@ export function peopleOf(c: Call, max = 3): string {
       const name = p.short_name.replace(/ \p{Lu}\.$/u, "");
       return c.invited_ids?.includes(p.id) ? t("callpage.invited", { name }) : name;
     });
+  for (const name of c.invited_guests ?? []) names.push(t("callpage.invited", { name }));
   if (c.participants.some((p) => p.is_you)) names.push(t("library.you"));
   return names.length > max
     ? `${names.slice(0, max).join(", ")} +${names.length - max}`

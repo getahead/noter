@@ -147,6 +147,8 @@ export interface WindowState {
   /** The sections the core sent whole with `entity:changed`, keyed `call_id/kind`. */
   sections: Record<string, OutputSection>;
   jobs: Record<string, JobRunRow>;
+  /** Last output job to change status for each call (progress percentages need no reread). */
+  outputJobChanges: Record<string, JobRunRow>;
   signin: Record<string, SignInProgress>;
   /** The core's last navigation request (`nav:request`). */
   nav: NavTarget | null;
@@ -186,6 +188,7 @@ export function initialState(
     outputs: {},
     sections: {},
     jobs: {},
+    outputJobChanges: {},
     signin: {},
     nav: null,
     fixTerm: 0,
@@ -366,8 +369,16 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
         },
       };
     // @cpt-end:cpt-noter-algo-ui-call-page-outputs-project:p1:inst-progress
-    case "jobs:progress":
-      return { ...s, jobs: { ...s.jobs, [e.payload.run.id]: e.payload.run } };
+    // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-processing
+    case "jobs:progress": {
+      const run = e.payload.run;
+      const changed = s.jobs[run.id]?.status !== run.status;
+      return {
+        ...s, jobs: { ...s.jobs, [run.id]: run },
+        outputJobChanges: changed && run.call_id ? { ...s.outputJobChanges, [run.call_id]: run } : s.outputJobChanges,
+      };
+    }
+    // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-processing
     case "signin:progress":
       return {
         ...s,

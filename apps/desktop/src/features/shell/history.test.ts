@@ -12,12 +12,13 @@ describe("historyMove", () => {
     expect(INITIAL_HISTORY.index).toBe(0);
   });
 
-  it("opens a section at its root, then at the place the user last left it", () => {
+  it("opens a section at its root, also after a nested page was left there (issue 1270)", () => {
     let r = go(INITIAL_HISTORY, { type: "section", section: "library" });
     expect(r.route).toEqual({ section: "library", key: "root" });
     r = go(r.history, { type: "push", route: call("a") }, { type: "section", section: "today" }, { type: "section", section: "library" });
-    expect(r.route).toEqual(call("a"));
-    expect(r.history.entries.map((e) => e.key)).toEqual(["root", "root", "call:a", "root", "call:a"]);
+    expect(r.route).toEqual({ section: "library", key: "root" });
+    expect(r.history.entries.map((e) => e.key)).toEqual(["root", "root", "call:a", "root", "root"]);
+    expect(go(r.history, { type: "back" }).route).toEqual({ section: "today", key: "root" });
   });
 
   it("does not push a section that is already showing", () => {
@@ -45,7 +46,6 @@ describe("historyMove", () => {
     let r = go(INITIAL_HISTORY, { type: "push", route: searchRoute("zoom") }, { type: "push", route: call("a") });
     r = go(r.history, { type: "back" });
     expect(r.route).toEqual(searchRoute("zoom"));
-    expect(r.history.last.library).toEqual(searchRoute("zoom"));
     r = go(r.history, { type: "forward" });
     expect(r.route).toEqual(call("a"));
   });
@@ -54,13 +54,6 @@ describe("historyMove", () => {
     const r = go(INITIAL_HISTORY, { type: "push", route: call("a") }, { type: "replace", route: call("b") });
     expect(r.history.entries.map((e) => e.key)).toEqual(["root", "call:b"]);
     expect(r.history.index).toBe(1);
-  });
-
-  it("remembers every route as its section's last location, also after back", () => {
-    const r = go(INITIAL_HISTORY, { type: "push", route: call("a") }, { type: "back" }, { type: "section", section: "library" });
-    // back landed on Today's root, so Today remembers root; Calls still remembers a
-    expect(r.history.last.today).toEqual({ section: "today", key: "root" });
-    expect(r.route).toEqual(call("a"));
   });
 
   it("closes the inspector on every move unless it is kept for the same page", () => {
@@ -74,8 +67,7 @@ describe("historyMove", () => {
   });
 });
 
-// #1044, owner decision 21 Nov: choosing the section you are in returns to its root list as a new
-// entry (Back returns to the page); another section still opens where it was left (D17).
+// #1044 and #1270, owner rule: choosing any section opens its root page as a new entry (Back returns to the page).
 describe("re-choosing the current section", () => {
   const call: Route = { section: "library", key: "call:c1" };
   const run = (moves: HistoryMove[]) => moves.reduce((h, m) => historyMove(h, m).history, INITIAL_HISTORY as History);
@@ -85,8 +77,8 @@ describe("re-choosing the current section", () => {
     expect(at(h)).toEqual({ section: "library", key: "root" });
     expect(at(historyMove(h, { type: "back" }).history)).toEqual(call);
   });
-  it("leaves another section's remembered page as it was", () => {
+  it("opens another section at its root too, never the page left there before", () => {
     const h = run([{ type: "section", section: "library" }, { type: "push", route: call }, { type: "section", section: "today" }, { type: "section", section: "library" }]);
-    expect(at(h)).toEqual(call);
+    expect(at(h)).toEqual({ section: "library", key: "root" });
   });
 });

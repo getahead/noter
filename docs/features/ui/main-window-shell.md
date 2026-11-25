@@ -179,19 +179,18 @@ It implements `cpt-noter-component-shell-main-window`, the main-window row of `c
 
 - [x] `p1` - **ID**: `cpt-noter-algo-ui-main-window-shell-history`
 
-**Input**: the current history (list and index), each section's last location, and the requested move (section, push, back, forward, replace)
+**Input**: the current history (list and index) and the requested move (section, push, back, forward, replace)
 
 **Output**: the new history and the route to show
 
 **Steps**:
 1. [x] - `p1` - **MATCH** the move - `inst-match-move`
-   - [x] - `p1` - **CASE** section: route to that section's last location, or its root; push it - `inst-case-section`
+   - [x] - `p1` - **CASE** section: route to that section's root page, never a nested page left there before (owner, issues 1044 and 1270); push it unless it is showing - `inst-case-section`
    - [x] - `p1` - **CASE** push: drop the entries after the index, append the route - `inst-case-push`
    - [x] - `p1` - **CASE** back or forward: move the index by one when possible - `inst-case-back`
    - [x] - `p1` - **CASE** replace: replace the entry at the index - `inst-case-replace`
-2. [x] - `p1` - Remember the route as its section's last location - `inst-remember-section`
-3. [x] - `p1` - Close the inspector unless the move keeps it (an inspector opened for an item on the same page) - `inst-close-inspector`
-4. [x] - `p1` - **RETURN** the history and the route - `inst-return-history`
+2. [x] - `p1` - Close the inspector unless the move keeps it (an inspector opened for an item on the same page) - `inst-close-inspector`
+3. [x] - `p1` - **RETURN** the history and the route - `inst-return-history`
 
 ### Width class and collapse order
 
@@ -284,7 +283,7 @@ The system **MUST** render MW-R1 to MW-R5 as the prototype's `S.window`, `sideba
 
 - [x] `p1` - **ID**: `cpt-noter-dod-ui-main-window-shell-navigation`
 
-The system **MUST** keep one Back and Forward history across sections with per-section last locations, route ⌘1 to ⌘8, ⌘[, ⌘], ⌃⌘S, ⌥⌘I, ⌘F, ⌘, and ⌘W, let later features register their pages, and publish the app menu model (Noter, File, Edit, View, Call, Window, Help with their shortcuts) for the core to build natively.
+The system **MUST** keep one Back and Forward history across sections, open a section at its root page on every section switch, route ⌘1 to ⌘8, ⌘[, ⌘], ⌃⌘S, ⌥⌘I, ⌘F, ⌘, and ⌘W, let later features register their pages, and publish the app menu model (Noter, File, Edit, View, Call, Window, Help with their shortcuts) for the core to build natively.
 
 **Implements**:
 - `cpt-noter-flow-ui-main-window-shell-navigate`

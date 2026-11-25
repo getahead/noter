@@ -321,6 +321,29 @@ final class DiarizationTests: XCTestCase {
         XCTAssertEqual(Set(Diarization.assign(x, centroids: centroids, cannot: [(0, 1), (0, 2), (1, 2)])).count, 3)
     }
 
+    // cpt-noter-seq-call-page-name-speakers — #1273: the pinned WeSpeaker conversion gives unit vectors, while the
+    // x-vector transform centres them on `mean1` (length 1.42 in the pinned file) before it normalises; unit vectors
+    // minus that mean lost the voices and VBx kept one speaker for a whole call.
+    func testUnitLengthVectorsOfFiveVoicesStayFiveVoicesThroughAPLDAWithALongMean() {
+        let dims = Vectors.speakerDims
+        var mean1 = [Double](repeating: 0, count: dims)
+        mean1[100] = 1.42
+        let eye = { (rows: Int, cols: Int) in (0..<rows).map { i in (0..<cols).map { j in i == j ? 1.0 : 0 } } }
+        let plda = PLDA(
+            mean1: mean1, lda: eye(dims, 128), mean2: Array(repeating: 0, count: 128), mu: Array(repeating: 0, count: 128),
+            tr: eye(128, 128), psi: Array(repeating: 25, count: 128))
+        // Five voices, six turns each, every vector of length 1 as the CoreML model gives it; the pinned
+        // PLDA's heaviest direction weighs 25.9.
+        let vectors = (0..<30).map { i -> [Double] in
+            var v = [Double](repeating: 0, count: dims)
+            (v[i / 6], v[60 + i % 6]) = (1, 0.3)
+            return Diarization.scaled(v, to: 1)
+        }
+        let voices = Diarization.cluster(vectors, training: Array(repeating: true, count: 30), plda: plda, cannot: [])
+        XCTAssertEqual(Set(voices).count, 5, "one voice per speaker")
+        XCTAssertEqual(voices, (0..<30).map { voices[$0 / 6 * 6] }, "each speaker's turns stay together")
+    }
+
     func testThePinnedPLDAFilesAreReadWithTheirDirectionsByWeight() throws {
         let folder = container.appendingPathComponent("wespeaker")
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

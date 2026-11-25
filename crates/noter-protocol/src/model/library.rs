@@ -33,6 +33,9 @@ pub struct CallRow {
     /// Participants known only from the invitation, without an identified speaker in the call.
     #[serde(default)]
     pub invited_ids: Vec<PersonId>,
+    /// Display labels for unconfirmed invitees who have no linked Person.
+    #[serde(default)]
+    pub invited_guests: Vec<String>,
     pub unnamed_speakers: u32,
     pub languages: Vec<Lang>,
     pub tags: Vec<String>,

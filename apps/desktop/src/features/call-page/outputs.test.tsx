@@ -15,7 +15,7 @@ import { OutputSection } from "./OutputSection";
 import { OutputsView } from "./OutputsView";
 import { createAnnouncer } from "../../app/a11y/announce";
 import { announceSummaryOnce, commitDraft, loadOutputs, loadVersion, loadVersions, readVersion, regenerate, saveEdit } from "./outputs-actions";
-import { bodyOf, holdOutputs, resetOutputsCache } from "./outputs-cache";
+import { bodyOf, getOutputs, holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { RegenerateSheet, RegenerationError } from "./RegenerateSheet";
 import { VersionSwitcher } from "./VersionSwitcher";
 import { OutputItemRow } from "./OutputItemRow";
@@ -69,6 +69,16 @@ describe("OutputsView", () => {
     await open([sec("summary", { state: { type: "writing" } }), sec("decisions", { state: { type: "pending" } }), sec("action_items", { state: { type: "failed", code: "internal", local_fallback_available: true } as never }), sec("open_questions", { state: { type: "empty" } })], "writing");
     const html = view();
     for (const text of ["Writing summary…", "Waiting for the summary", "Couldn&#x27;t write the action items", "Try Again", "Use Local Model", "No open questions in this call"]) expect(html).toContain(text);
+  });
+
+  it("cpt-noter-seq-call-page-review-outputs — offers Regenerate again when a legacy run lost its settings", async () => {
+    await open([sec("summary", { state: { type: "pending" } })], "failed", {
+      processing_run: { id: "run_legacy", job_id: "job_regeneration", name: "Regeneration", started_at: 0, finished_at: 1, counts: [], progress: null, kind: "regeneration", status: "failed", error: "invalid_input" },
+    });
+    const html = view();
+    expect(html).toContain("Regeneration settings unavailable");
+    expect(html).toContain("Regenerate again");
+    expect(html).not.toContain("Waiting for the summary");
   });
 
   it("shows the power hold in place of pending sections and releases the named run", async () => {
@@ -251,6 +261,20 @@ describe("outputs commands", () => {
     const first = list.status === "ok" ? list.data.versions[0]! : null;
     expect((await loadVersion(bridge, s.summary_id!, first!.id)).status).toBe("ok");
     expect(bodyOf(s.summary_id!, first!.id)).toBeDefined();
+  });
+
+  it("cpt-noter-seq-call-page-review-outputs — a slow queued read cannot replace the finished run", async () => {
+    const { callId } = await withSummary();
+    const outputs = fake.world.outputs.find((o) => o.call_id === callId)!;
+    let release!: () => void;
+    vi.spyOn(bridge.core, "outputsGet").mockImplementationOnce(() => new Promise((resolve) => {
+      release = () => resolve({ status: "ok", data: { ...outputs, waiting_for_power: "old-run" } });
+    }));
+    const older = loadOutputs(bridge, callId);
+    await loadOutputs(bridge, callId);
+    release();
+    await older;
+    expect(getOutputs(callId)?.waiting_for_power).toBeNull();
   });
 
   it("a conflicting edit comes back as an error, and a missing version as not found", async () => {

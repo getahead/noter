@@ -322,7 +322,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.33",
+    "contract_version": "2.35",
     "copilot": {
       "agents": [
         {
@@ -727,6 +727,7 @@
         "call_type": "planning",
         "duration_ms": 1380000,
         "id": "call_live",
+        "invited_guests": [],
         "invited_ids": [],
         "languages": [
           "en",
@@ -918,6 +919,7 @@
         "call_type": "cross_team",
         "duration_ms": 3120000,
         "id": "call_backend",
+        "invited_guests": [],
         "invited_ids": [],
         "languages": [
           "ru",
@@ -1083,6 +1085,7 @@
       "call_type": "planning",
       "duration_ms": 1380000,
       "id": "call_live",
+      "invited_guests": [],
       "invited_ids": [],
       "languages": [
         "en",
@@ -1142,6 +1145,7 @@
       "call_type": "cross_team",
       "duration_ms": 3120000,
       "id": "call_backend",
+      "invited_guests": [],
       "invited_ids": [],
       "languages": [
         "ru",
@@ -1921,6 +1925,7 @@
         "id": "job_evidence",
         "kind": "evidence_collection",
         "last_run": {
+          "call_id": null,
           "counts": [
             {
               "label": "closed",
@@ -2147,6 +2152,7 @@
     {
       "archive": "done",
       "call_id": "call_backend",
+      "processing_run": null,
       "review_waiting": 0,
       "sections": [
         {
@@ -2165,6 +2171,7 @@
           "user_edited": false,
           "version_count": 2,
           "writer": {
+            "cost_usd": null,
             "from_pass": "live",
             "generated_at": 1792140600000,
             "model": "claude-sonnet",
@@ -2245,6 +2252,7 @@
           "user_edited": false,
           "version_count": 1,
           "writer": {
+            "cost_usd": null,
             "from_pass": "live",
             "generated_at": 1792140600000,
             "model": "claude-sonnet",
@@ -2702,6 +2710,7 @@
       "call_type": "planning",
       "duration_ms": 1380000,
       "id": "call_live",
+      "invited_guests": [],
       "invited_ids": [],
       "languages": [
         "en",

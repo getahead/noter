@@ -75,11 +75,37 @@ export function metaLine(s: OutputSection, call: Pick<CallRow, "started_at" | "d
   if (!w) return heading;
   // shortcut: the contract carries no language for a section, so the line names the interface language; use the writer's output language once it has one
   const language = t("outputs.language");
-  const after = Math.round(Math.max(0, w.generated_at - call.started_at - call.duration_ms) / 1000);
-  // past an hour, hours and days (an old call regenerated): never thousands of minutes (issue 1051)
-  const time = after < 60 ? t("outputs.s", { s: String(after) }) : after < 3600 ? t("outputs.min_s", { m: String(Math.floor(after / 60)), s: String(after % 60) }) : duration(after);
-  return [heading, language, runtimeLabel(w.runtime), t("outputs.after_call", { time })].filter(Boolean).join(" · ");
+  return [heading, language, runtimeLabel(w.runtime), afterCall(w.generated_at, call)].filter(Boolean).join(" · ");
 }
+
+function afterCall(generatedAt: number, call: Pick<CallRow, "started_at" | "duration_ms">): string {
+  const after = Math.round(Math.max(0, generatedAt - call.started_at - call.duration_ms) / 1000);
+  const time = after < 60 ? t("outputs.s", { s: String(after) }) : after < 3600 ? t("outputs.min_s", { m: String(Math.floor(after / 60)), s: String(after % 60) }) : duration(after);
+  return t("outputs.after_call", { time });
+}
+
+export function needsRegenerationSettings(outputs?: CallOutputs): boolean {
+  const run = outputs?.processing_run;
+  return run?.kind === "regeneration" && run.status === "failed" && run.error === "invalid_input";
+}
+
+// @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-processing
+export function processingText(call: Pick<CallRow, "status" | "started_at" | "duration_ms">, outputs?: CallOutputs): string {
+  if (call.status === "recording" || call.status === "paused") return t(`callpage.info.status.${call.status}`);
+  if (!outputs) return "";
+  if (outputs.waiting_for_power) return t("outputs.regen.power_title");
+  const run = outputs.processing_run;
+  if (needsRegenerationSettings(outputs)) return t("outputs.regen.missing_settings");
+  if (run && run.status !== "succeeded") {
+    return t(`callpage.processing.${run.kind === "regeneration" ? "regeneration" : "outputs"}.${run.status}`);
+  }
+  const writer = outputs.sections.find((s) => s.kind === "summary")?.writer;
+  if (!writer || (!run && outputs.status !== "ready")) return t(`callpage.processing.${outputs.status}`);
+  const line = t("callpage.processing.summary", { runtime: runtimeLabel(writer.runtime), after: afterCall(writer.generated_at, call) });
+  if (!writer.cost_usd || (writer.runtime !== "claude_api_key" && writer.runtime !== "codex_api_key")) return line;
+  return t("callpage.processing.cost", { line, cost: writer.cost_usd.toFixed(2) });
+}
+// @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-processing
 
 /** A version's short name: **v1**, **Your Edit**. */
 export const versionName = (v: VersionMeta): string => (v.kind === "user_edit" ? t("outputs.your_edit_short") : `v${v.n}`);

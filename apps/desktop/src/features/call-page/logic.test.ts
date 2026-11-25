@@ -72,6 +72,9 @@ describe("subtitle", () => {
   it("cpt-noter-seq-call-page-check-evidence marks an invited person in the subtitle", () => {
     expect(subtitleOf(row({ invited_ids: ["p1"] }), NOW, PREFS)).toBe("Today 10:00 · 52 min · Dmitri S. (Invited), You");
   });
+  it("shows invitation-only calls in the subtitle", () => {
+    expect(subtitleOf(row({ participants: [], invited_guests: ["Guest"] }), NOW, PREFS)).toBe("Today 10:00 · 52 min · Guest (Invited)");
+  });
   it("has no trailing separator for a call with no participants yet", () => {
     expect(subtitleOf(row({ participants: [] }), NOW, PREFS)).toBe("Today 10:00 · 52 min");
   });

@@ -63,6 +63,7 @@ impl Core {
             .collect();
         let writing = sections.iter().any(|s| s.state == SectionState::Writing);
         Ok(CallOutputs {
+            processing_run: self.jobs.output_run(call)?.map(Box::new),
             waiting_for_power: self.jobs.waiting_for_power(call)?,
             call_id: call.clone(),
             status: if writing {
@@ -186,7 +187,7 @@ impl Core {
         let rows = self.store().read(move |c| {
             let mut stmt = c.prepare(
                 "SELECT v.id, v.n, v.kind, v.body_md, l.runtime_choice, l.model, k.call_type,
-                        v.skill_version, v.created_at, v.from_pass
+                        v.skill_version, v.created_at, v.from_pass, l.cost_usd
                  FROM summary_versions v
                  JOIN summaries s ON s.id = v.summary_id
                  JOIN calls k ON k.id = s.call_id
@@ -284,9 +285,7 @@ impl Core {
                 job_run_id: run.clone(),
             });
         }
-        let req = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &args.call_id);
-        self.postcall.request(args);
-        let run = self.in_runtime(|| self.jobs.trigger(req))?;
+        let run = self.in_runtime(|| self.jobs.regenerate(args))?;
         let job_run_id = run.ok_or_else(blocked)?;
         if matches!(self.jobs.waiting_for_power(&args.call_id), Ok(Some(id)) if id == job_run_id) {
             self.log(object(json!({ "level": "info", "module": "postcall", "command": "outputs_regenerate", "code": "waiting_for_power", "id": job_run_id })));

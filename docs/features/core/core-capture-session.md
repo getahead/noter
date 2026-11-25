@@ -145,7 +145,7 @@ Capture is the release-blocking function, and its rules must live in one machine
 1. [x] - `p1` - API: `capture_start { source, sensitive, detection_id?, calendar_event_id? }` - `inst-start-call`
 2. [x] - `p1` - Run `cpt-noter-algo-core-capture-session-start-guard`; **RETURN** its error if any - `inst-start-guard`
 3. [x] - `p1` - **IF** the phase is `stopped`, close that call's Continue window (it goes to `idle` for it) - `inst-close-continue`
-4. [x] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, matched Calendar event ID and title, friendly platform, `started_at`) through the change-log write path. Show **Untitled call** for an unmatched call. Import attendees from a matched event as **Invited** until a speaker is identified (#1256) - `inst-insert-call`
+4. [x] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, matched Calendar event ID and title, friendly platform, `started_at`) through the change-log write path. Show **Untitled call** for an unmatched call. Import attendees from a matched event as **Invited** until a speaker is identified. Link existing People and keep unknown invitees on the call at every invitation size. Use **Guest** when Calendar supplies only an address (#1256, #1267) - `inst-insert-call`
 5. [x] - `p1` - Phase `starting`; emit `capture:state` - `inst-phase-starting`
 6. [x] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary - `inst-start-engine`
 7. [x] - `p1` - On `session_started`, phase `recording`; ask the native layer to open the call window on the call display without focus - `inst-phase-recording`

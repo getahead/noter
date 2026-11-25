@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use noter_db::{ChangeMeta, Mutation, Store};
-use noter_protocol::model::{CountEntry, JobKind, JobRunRow, JobRunStatus};
+use noter_protocol::model::{CountEntry, JobKind, JobRunRow, JobRunStatus, RegenerateArgs};
 use noter_protocol::{CallId, CoreError, ErrorCode, JobRunId, TimestampMs};
 use serde_json::json;
 use tokio::sync::watch;
@@ -244,6 +244,20 @@ impl Scheduler {
     /// Queues the work a trigger asks for and returns its run (the existing run for the same
     /// pending work). `None`: the definition is disabled or the trigger is not its own.
     pub fn trigger(&self, req: Request) -> Result<Option<JobRunId>, CoreError> {
+        self.trigger_with_request(req, None)
+    }
+
+    /// Queue the user's choices with the run, or replace them on the same still-queued run.
+    pub fn regenerate(&self, args: &RegenerateArgs) -> Result<Option<JobRunId>, CoreError> {
+        let req = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &args.call_id);
+        self.trigger_with_request(req, Some(json!(args).to_string()))
+    }
+
+    fn trigger_with_request(
+        &self,
+        req: Request,
+        selections: Option<String>,
+    ) -> Result<Option<JobRunId>, CoreError> {
         // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-trigger
         let now = self.0.deps.clock.now().0;
         let def = self.0.define(req.kind)?;
@@ -253,7 +267,9 @@ impl Scheduler {
             return Ok(None);
         }
         // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-trigger
-        let id = self.0.enqueue(&def, req.subject, req.trigger)?;
+        let id = self
+            .0
+            .enqueue(&def, req.subject, req.trigger, selections.as_deref(), true)?;
         self.0.apply();
         // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-return
         Ok(Some(id))
@@ -320,9 +336,16 @@ impl Scheduler {
         self.0.tick();
     }
 
+    /// The run whose state belongs in this call's Processing inspector.
+    pub fn output_run(&self, call: &CallId) -> Result<Option<JobRunRow>, CoreError> {
+        Ok(rows::runs(&self.0.deps.store, Some(call))?
+            .pop()
+            .map(|r| r.row))
+    }
+
     /// Every run, oldest first.
     pub fn runs(&self) -> Result<Vec<JobRunRow>, CoreError> {
-        Ok(rows::runs(&self.0.deps.store)?
+        Ok(rows::runs(&self.0.deps.store, None)?
             .into_iter()
             .map(|s| s.row)
             .collect())
@@ -344,6 +367,7 @@ impl Inner {
         let (trigger, battery) = rows::default_def(kind);
         let id = rows::job_id(kind);
         let row = JobRunRow {
+            call_id: None,
             id: JobRunId::new(""),
             job_id: id.clone(),
             kind,
@@ -389,7 +413,26 @@ impl Inner {
         let now = self.deps.clock.now();
         let defs = rows::defs(&self.deps.store)?;
         let mut retries = vec![];
-        for Stored { mut row, subject } in rows::runs(&self.deps.store)? {
+        for Stored { mut row, subject } in rows::runs(&self.deps.store, None)? {
+            let active = matches!(
+                row.status,
+                JobRunStatus::Queued | JobRunStatus::Running | JobRunStatus::Paused
+            );
+            let request = if row.kind == JobKind::Regeneration && subject.is_some() && active {
+                let request = rows::regeneration_request(&self.deps.store, &row.id)?;
+                if request.is_none() {
+                    // Older builds never persisted local-only intent. A fresh user request is required.
+                    row.status = JobRunStatus::Failed;
+                    row.finished_at = Some(now);
+                    row.error = Some(ErrorCode::InvalidInput);
+                    rows::save(&self.deps.store, &row, &subject)?;
+                    self.deps.sink.publish(&row);
+                    continue;
+                }
+                request
+            } else {
+                None
+            };
             match row.status {
                 JobRunStatus::Queued => {
                     lock(&self.open).insert(
@@ -409,15 +452,15 @@ impl Inner {
                     row.error = Some(ErrorCode::Internal);
                     rows::save(&self.deps.store, &row, &subject)?;
                     self.deps.sink.publish(&row);
-                    retries.push((row.kind, subject));
+                    retries.push((row.kind, subject, request));
                     // @cpt-end:cpt-noter-state-core-jobs-scheduler-run:p1:inst-st-failed
                 }
                 _ => {}
             }
         }
-        for (kind, subject) in retries {
+        for (kind, subject, request) in retries {
             if let Some(def) = defs.iter().find(|d| d.kind == kind && d.enabled) {
-                self.enqueue(def, subject, def.trigger)?;
+                self.enqueue(def, subject, def.trigger, request.as_deref(), false)?;
             }
         }
         Ok(())
@@ -438,7 +481,7 @@ impl Inner {
                 _ => 0,
             };
             if def.last_run_at.map_or(true, |last| now - last >= gap) {
-                self.enqueue(&def, None, def.trigger)?;
+                self.enqueue(&def, None, def.trigger, None, false)?;
             }
         }
         Ok(())
@@ -455,6 +498,8 @@ impl Inner {
         def: &Def,
         subject: Option<String>,
         trigger: Trigger,
+        selections: Option<&str>,
+        replace_pending: bool,
     ) -> Result<JobRunId, CoreError> {
         let now = self.deps.clock.now();
         let row = {
@@ -468,9 +513,19 @@ impl Inner {
                         || def.kind != JobKind::Regeneration)
             });
             if let Some(e) = same {
+                if let Some(request) = selections.filter(|_| replace_pending) {
+                    let mut mutation = rows::run_mutation(&e.row, &subject);
+                    mutation
+                        .values
+                        .push(("regeneration_request", json!(request)));
+                    self.deps
+                        .store
+                        .write(mutation, rows::meta(&e.row, "updated regeneration request"))?;
+                }
                 return Ok(e.row.id.clone());
             }
             let row = JobRunRow {
+                call_id: rows::output_call(def.kind, subject.as_deref()),
                 id: JobRunId::new(format!("run_{}", ulid::Ulid::generate())),
                 job_id: def.id.clone(),
                 kind: def.kind,
@@ -482,6 +537,35 @@ impl Inner {
                 error: None,
                 progress: None,
             };
+            let mut run = rows::run_mutation(&row, &subject);
+            if def.kind == JobKind::Regeneration {
+                if let Some(call) = &subject {
+                    let request = selections.map(str::to_owned).unwrap_or_else(|| {
+                        json!(RegenerateArgs {
+                            call_id: CallId::new(call),
+                            sections: vec![],
+                            local: false,
+                            skill: None,
+                            runtime: None,
+                            model: None,
+                            run_now_on_battery: None,
+                        })
+                        .to_string()
+                    });
+                    run.values.push(("regeneration_request", json!(request)));
+                }
+            }
+            let job = Mutation {
+                entity_type: "job",
+                table: "jobs",
+                id: def.id.0.clone(),
+                base_rev: None,
+                bump_rev: false,
+                values: vec![("last_run_at", json!(now.0))],
+            };
+            self.deps
+                .store
+                .write_batch(vec![run, job], rows::meta(&row, "queued"))?;
             open.insert(
                 row.id.clone(),
                 Entry {
@@ -493,22 +577,7 @@ impl Inner {
             );
             row
         };
-        if let Err(e) = rows::save(&self.deps.store, &row, &subject) {
-            lock(&self.open).remove(&row.id);
-            return Err(e);
-        }
         self.deps.sink.publish(&row);
-        self.deps.store.write(
-            Mutation {
-                entity_type: "job",
-                table: "jobs",
-                id: def.id.0.clone(),
-                base_rev: None,
-                bump_rev: false,
-                values: vec![("last_run_at", json!(now.0))],
-            },
-            rows::meta(&row, "queued"),
-        )?;
         Ok(row.id)
     }
     // @cpt-end:cpt-noter-flow-core-jobs-scheduler-run:p1:inst-run-enqueue
@@ -708,6 +777,22 @@ pub struct RunCtx {
 }
 
 impl RunCtx {
+    // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-restore
+    /// The durable settings for this exact run, including after a restart.
+    pub fn regeneration_request(&self) -> Result<RegenerateArgs, CoreError> {
+        rows::regeneration_request(&self.inner.deps.store, &self.id)?
+            .and_then(|text| serde_json::from_str::<RegenerateArgs>(&text).ok())
+            .filter(|args| Some(args.call_id.as_str()) == self.subject())
+            .ok_or_else(|| {
+                CoreError::new(
+                    ErrorCode::InvalidInput,
+                    "Regenerate again to choose new settings",
+                )
+            })
+    }
+
+    // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-restore
+
     pub fn run_id(&self) -> &JobRunId {
         &self.id
     }
