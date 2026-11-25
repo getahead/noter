@@ -211,7 +211,7 @@
       mi('Mute Copilot', { sub: true, action: 'mb.muteMenu' }),
     ]);
     const r5 = group('MB-R5', [
-      mode === 'idle' ? '' : mi('Open Call Screen', { kbd: '⌃⌥⌘N', action: 'mb.openCall', noKey }),
+      mi('Open Call Screen', { kbd: '⌃⌥⌘N', action: 'mb.openCall', noKey }),
       mode === 'idle' ? '' : mi('Use Floating Panel', { checked: state.rec.layout === 'floating', action: 'mb.floating' }),
       mi('Open Last Summary — Design review · 09:30', { action: 'mb.lastSummary' }),
       hidden ? mi('Show Noter', { kbd: '⌃⌥⌘0', action: 'mb.hide', noKey }) : mi('Hide for Presenting', { kbd: '⌃⌥⌘0', action: 'mb.hide', noKey }),
@@ -236,7 +236,8 @@
       L.muted = id === 'muted' ? 'call' : null;
       if (id === 'audio-not-granted') state.setup.sysGranted = false;
       if (id === 'idle' || id === 'call-detected') { state.setup.micGranted = true; state.setup.sysGranted = true; }
-      if (id === 'engine-stopped' && isRec()) state.rec.status = 'idle';
+      const { mode } = mbModel({ demo: id, local: L });
+      if (mode !== state.rec.status) NP.actions['proto.rec']({ status: mode });
     },
     render: (ctx) => {
       const m = mbModel(ctx);
@@ -278,7 +279,7 @@
     'mb.muteMenu': () => { const L = NP.local('menubar'); L.muteOpen = !L.muteOpen; },
     'mb.mute': (a) => { const L = NP.local('menubar'); L.muted = a.v; L.muteOpen = false; },
     'mb.unmute': () => { const L = NP.local('menubar'); L.muted = null; L.muteOpen = false; if (state.demo.menubar === 'muted') state.demo.menubar = 'recording'; },
-    'mb.openCall': () => { state.rec.layout = state.rec.layout === 'collapsed' ? 'floating' : state.rec.layout; NP.local('menubar').hidden = false; state.surface = 'call'; },
+    'mb.openCall': () => { if (state.rec.layout === 'collapsed') state.rec.layout = 'floating'; NP.local('menubar').hidden = false; return NP.actions['call.show'](); },
     'mb.floating': () => { state.rec.layout = state.rec.layout === 'floating' ? 'dedicated' : 'floating'; state.surface = 'call'; },
     'mb.lastSummary': () => { NP.go('call-page', { callId: 'c-design', view: 'summary' }); return false; },
     'mb.hide': () => { const L = NP.local('menubar'); const d = state.demo.menubar; if (d === 'hidden' || d === 'hidden-ended') { state.demo.menubar = 'default'; L.hidden = false; } else L.hidden = !L.hidden; },

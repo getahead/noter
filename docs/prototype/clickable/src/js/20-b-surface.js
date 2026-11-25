@@ -33,7 +33,7 @@
   });
   const L = () => NP.local('cw', init);
 
-  const layout = () => state.rec.layout || 'dedicated';
+  const layout = () => state.rec.status === 'idle' && state.rec.layout === 'collapsed' ? 'floating' : state.rec.layout || 'dedicated';
   const segments = () => {
     const l = L();
     if (l.newCall) return [];
@@ -178,6 +178,19 @@
       ${region('FP-R6', { cls: 'fp-r6', tag: 'footer' }, C.callStatusStrip({ variant: off ? 'copilot-off' : 'compact' }))}`);
   };
 
+  // @cpt-component:cpt-noter-component-shell-call-window:p1
+  const idleStates = [
+    { id: 'idle', label: 'Not recording' },
+    { id: 'idle-model', label: 'Not recording · speech model missing', reason: 'Record is off until the speech model is downloaded.', link: 'Models & Runtimes', pane: 'models' },
+    { id: 'idle-disk', label: 'Not recording · less than 500 MB free', reason: 'Record is off: less than 500 MB of disk space is free.', link: 'Maintenance', pane: 'maintenance' },
+  ];
+  const idleState = () => idleStates.find((s) => s.id === NP.demo('call')) || idleStates[0];
+  const idleView = () => {
+    const { reason, link, pane } = idleState();
+    return html`${C.emptyState({ variant: 'large', icon: 'record', heading: true, title: 'Not recording', body: reason, linkLabel: link, linkAction: ['settings.open', { pane }] })}
+      <div class="cw-idle__actions">${P.button('Close', { action: ['cw.hide', { how: 'hide' }] })}${P.button('Start Recording', { variant: 'primary', disabled: !!reason, help: reason, action: ['cw.start'] })}</div>`;
+  };
+
   /* ---------------- closing state (whole window) ---------------- */
   const closingView = (fl) => {
     const l = L();
@@ -194,10 +207,10 @@
     const btn = (label, on, action, args) => html`<button type="button" class="cw-proto__btn${on ? ' is-on' : ''}" aria-pressed="${String(!!on)}" ${act(action, args)}>${label}</button>`;
     return html`<div class="cw-proto" data-proto-chrome>
       <span class="cw-proto__lbl">Layout</span>
-      ${btn('Call screen · display 2', lay === 'dedicated', 'cw.layout', { layout: 'dedicated' })}${btn('Floating panel', lay === 'floating', 'cw.layout', { layout: 'floating' })}${btn('Collapsed strip', lay === 'collapsed', 'cw.layout', { layout: 'collapsed' })}
+      ${btn('Call screen · display 2', lay === 'dedicated', 'cw.layout', { layout: 'dedicated' })}${btn('Floating panel', lay === 'floating', 'cw.layout', { layout: 'floating' })}${state.rec.status !== 'idle' ? btn('Collapsed strip', lay === 'collapsed', 'cw.layout', { layout: 'collapsed' }) : ''}
       ${lay === 'floating' ? html`<span class="cw-proto__lbl">Panel height</span>${btn('360', l.fpHeight === 360, 'cw.fpHeight', { h: 360 })}${btn('560', l.fpHeight === 560, 'cw.fpHeight', { h: 560 })}${btn('720', l.fpHeight === 720, 'cw.fpHeight', { h: 720 })}` : ''}
-      <span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}${btn('Not identified', l.route === 'unknown', 'cw.route', { route: 'unknown' })}
-      <span class="cw-proto__lbl">Simulate</span>${btn('New card', false, 'cw.simCard')}${btn('Card keys ⌃⌥⌘1–3', false, 'cw.simKey')}${btn('Panel becomes key', l.panelKey, 'cw.panelKey')}
+      ${state.rec.status !== 'idle' ? html`<span class="cw-proto__lbl">Output</span>${btn('Headphones', l.route === 'headphones', 'cw.route', { route: 'headphones' })}${btn('Speakers', l.route === 'speakers', 'cw.route', { route: 'speakers' })}${btn('Not identified', l.route === 'unknown', 'cw.route', { route: 'unknown' })}
+      <span class="cw-proto__lbl">Simulate</span>${btn('New card', false, 'cw.simCard')}${btn('Card keys ⌃⌥⌘1–3', false, 'cw.simKey')}${btn('Panel becomes key', l.panelKey, 'cw.panelKey')}` : ''}
     </div>`;
   };
 
@@ -207,7 +220,7 @@
     return html`<div class="cw-hidden" data-proto-chrome>
       ${icon(pres ? 'eyeSlash' : 'menubar', { size: 28 })}
       <div class="t-headline">${pres ? 'Noter is hidden for presenting' : 'The panel is hidden to the menu bar'}</div>
-      <div class="np-muted">${pres ? 'Every Noter surface is hidden. Capture, transcript and copilot keep running; the card keys are released.' : 'Capture continues. The menu bar keeps the recording state.'}</div>
+      ${state.rec.status !== 'idle' ? html`<div class="np-muted">${pres ? 'Every Noter surface is hidden. Capture, transcript and copilot keep running; the card keys are released.' : 'Capture continues. The menu bar keeps the recording state.'}</div>` : ''}
       <div class="cw-hidden__btns">${P.button(pres ? 'Show Noter Again (⌃⌥⌘0)' : 'Open Call Screen (⌃⌥⌘N)', { variant: 'primary', action: ['cw.unhide'] })}${P.button('Menu Bar', { action: ['surface.show', { surface: 'menubar' }] })}</div>
     </div>`;
   };
@@ -219,10 +232,35 @@
     <div class="cw-hidden__btns">${P.button('Open Main Window', { variant: 'primary', action: ['cw.closedGo'] })}${P.button('Start a New Recording', { action: ['cw.restart'] })}</div>
   </div>`;
 
+  const visibleWindow = (l, lay) => {
+    const idle = state.rec.status === 'idle';
+    const dedicated = lay === 'dedicated';
+    const collapsed = lay === 'collapsed' && !idle && !l.notice;
+    let contents;
+    if (idle) contents = idleView();
+    else if (l.closing) contents = dedicated ? html`<div class="cs cs--closing">${closingView(false)}</div>` : closingView(true);
+    else if (dedicated) contents = callScreen();
+    else contents = collapsed ? C.collapsedCallStrip() : floatingPanel();
+    const panel = NP.shell.window({
+      component: 'cpt-noter-component-shell-call-window', titlebar: false,
+      cls: 'cw-win ' + (dedicated ? 'cw-win--dedicated' : 'cw-win--floating') + (idle ? ' cw-idle' : '') + (collapsed ? ' is-collapsed' : ''),
+      variant: dedicated ? 'dedicated' : collapsed ? 'collapsed' : 'floating',
+      state: idle ? 'idle' : l.closing ? 'closing' : l.panelKey ? 'key' : 'not-key',
+      h: idle && !dedicated ? l.fpHeight : undefined, body: contents,
+    });
+    if (dedicated) return html`<div class="cw-frame cw-frame--dedicated">${panel}</div>`;
+    return html`<div class="cw-desktop">
+      <div class="cw-callapp" data-proto-chrome aria-hidden="true"><div class="cw-callapp__bar">Microsoft Teams · keeps focus</div><div class="cw-callapp__grid"><span>Anna K.</span><span>Pavel</span><span>Dmitri S.</span><span>Speaker 3</span></div></div>
+      <div class="cw-floatwrap${collapsed ? ' is-collapsed' : ''}">${panel}</div>
+    </div>`;
+  };
+
   NP.surface('call', {
     label: 'Call window',
+    selectedState: () => state.rec.status === 'idle' ? idleState().id : NP.demo('call'),
     states: [
       { id: 'default', label: 'Recording, three cards' },
+      ...idleStates,
       { id: 'listening', label: 'No card yet (listening)' },
       { id: 'held', label: 'Cards held (1 new card)' },
       { id: 'carry', label: 'Carry-forward card' },
@@ -257,6 +295,12 @@
       const keepLayout = state.rec.layout;
       state.local.cw = init();
       const l = L();
+      if (idleStates.some((s) => s.id === id)) {
+        state.rec.status = 'idle';
+        if (keepLayout === 'collapsed') state.rec.layout = 'floating';
+        delete state.demo.menubar;
+        return;
+      }
       if (state.rec.status === 'idle' || state.rec.status === 'closing') NP.startRecording();
       if (state.rec.status === 'paused') { state.rec.startedAt += Date.now() - state.rec.pausedAt; state.rec.status = 'recording'; }
       state.rec.mode = 'Cloud, redacted';
@@ -294,24 +338,11 @@
         default: break;
       }
     },
-    render: (ctx) => {
-      if (state.rec.status === 'idle' && !L().closed) { NP.startRecording(); }
+    render: () => {
       const l = L();
       const lay = layout();
       const note = NP.flashed('cw-proto');
-      let body;
-      if (l.closed) body = closedView();
-      else if (l.hidden) body = hiddenView();
-      else if (lay === 'dedicated') {
-        body = html`<div class="cw-frame cw-frame--dedicated">${NP.shell.window({ component: 'cpt-noter-component-shell-call-window', variant: 'dedicated', state: l.closing ? 'closing' : l.panelKey ? 'key' : 'not-key', titlebar: false, cls: 'cw-win cw-win--dedicated', body: l.closing ? html`<div class="cs cs--closing">${closingView(false)}</div>` : callScreen() })}</div>`;
-      } else {
-        const collapsed = lay === 'collapsed' && !l.notice;
-        const panel = NP.shell.window({ component: 'cpt-noter-component-shell-call-window', variant: collapsed ? 'collapsed' : 'floating', state: l.closing ? 'closing' : l.panelKey ? 'key' : 'not-key', titlebar: false, cls: 'cw-win cw-win--floating' + (collapsed ? ' is-collapsed' : ''), body: l.closing ? closingView(true) : collapsed ? C.collapsedCallStrip() : floatingPanel() });
-        body = html`<div class="cw-desktop">
-          <div class="cw-callapp" data-proto-chrome aria-hidden="true"><div class="cw-callapp__bar">Microsoft Teams · keeps focus</div><div class="cw-callapp__grid"><span>Anna K.</span><span>Pavel</span><span>Dmitri S.</span><span>Speaker 3</span></div></div>
-          <div class="cw-floatwrap${collapsed ? ' is-collapsed' : ''}">${panel}</div>
-        </div>`;
-      }
+      const body = l.closed ? closedView() : l.hidden ? hiddenView() : visibleWindow(l, lay);
       const cap = lay === 'dedicated' ? ' · borderless, fills the visible frame of display 2 (shown scaled), non-activating panel' : lay === 'collapsed' ? ' · collapsed strip, 56 pt high' : ` · floating layout, 420 × ${l.fpHeight} pt, non-activating panel`;
       return html`${NP.shell.caption('Call window', cap)}${protoBar()}${note ? html`<div class="cw-proto-note" data-proto-chrome>${icon('info', { size: 13 })} ${note}</div>` : ''}${body}`;
     },
@@ -330,6 +361,17 @@
   };
 
   NP.onMany({
+    // @cpt-begin:cpt-noter-state-ui-call-window-window:p1:inst-start-idle
+    'cw.start': () => {
+      if (state.rec.status !== 'idle' || idleState().reason) return;
+      const { fpHeight } = L();
+      state.local.cw = { ...init(), fpHeight };
+      delete state.demo.call;
+      delete state.demo.menubar;
+      NP.local('menubar').closing = false;
+      NP.startRecording({ offsetMs: 0, layout: layout() });
+    },
+    // @cpt-end:cpt-noter-state-ui-call-window-window:p1:inst-start-idle
     'cw.layout': (a) => { state.rec.layout = a.layout; if (a.layout !== 'floating') L().showAllCards = false; },
     'cw.fpHeight': (a) => { L().fpHeight = a.h; },
     'cw.route': (a) => { const l = L(); l.route = a.route; if (a.route === 'speakers' && l.playback) { l.playback.stopped = true; setTimeout(() => { L().playback = null; NP.render(); }, 3000); } },
@@ -589,6 +631,12 @@
     const k = ev.code;
     const l = L();
     const run = (n, a) => { ev.preventDefault(); NP.actions[n](a || {}); NP.render(); };
+    if (k === 'KeyN') return run(l.hidden || l.closed ? 'call.show' : 'cw.panelKey');
+    if (k === 'Digit0') return run(l.hidden ? 'cw.unhide' : 'cw.hide', { how: 'presenting' });
+    if (state.rec.status === 'idle') {
+      if (k === 'KeyR') run('cw.start');
+      return;
+    }
     if (/^Digit[123]$/.test(k)) {
       const num = +k.slice(-1); const c = l.cards.find((x) => x.num === num);
       if (ev.shiftKey) { if (c) run('cw.cardDismiss', { id: c.id }); else { NP.flash('call-status', 'No card ' + num, 2000); NP.render(); } }
@@ -600,7 +648,5 @@
     else if (k === 'KeyR') run('cw.stop', { how: 'manual' });
     else if (k === 'KeyA') run('cw.ask');
     else if (k === 'KeyK') run('cw.mute');
-    else if (k === 'Digit0') run(l.hidden ? 'cw.unhide' : 'cw.hide', { how: 'presenting' });
-    else if (k === 'KeyN') run(l.hidden ? 'cw.unhide' : 'cw.panelKey');
   });
 })();
