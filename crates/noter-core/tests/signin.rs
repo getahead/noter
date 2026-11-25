@@ -485,7 +485,7 @@ async fn a_failed_account_check_names_why_in_the_log() {
     );
     assert_eq!(status(&view(&w).await, CLAUDE), AccountStatus::NotSignedIn);
     let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
-    assert!(log.contains(r#""code":"account_check_failed","id":"cli_incompatible""#));
+    assert!(log.contains(r#""code":"account_check_failed","id":"claude.cli_incompatible""#));
     assert!(!log.contains("ann@example.com"));
 }
 

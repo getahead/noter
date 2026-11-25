@@ -345,6 +345,7 @@ fn output() -> Value {
     };
     serde_json::to_value(PostCallOutput {
         lang: Lang::En,
+        title: None,
         summary_md: "Importer ships Friday.".into(),
         decisions: vec![item.clone()],
         action_items: vec![item],
@@ -913,6 +914,18 @@ async fn a_failed_run_leaves_nothing_behind() {
         stub.set("mode", "shape");
         llm.run_once(world.request(runtime)).await.unwrap_err();
         assert_eq!(llm.cli_failure(runtime), None);
+        // What the provider answered is read from stdout too, where Codex reports it (#1235).
+        stub.set("mode", "api");
+        let llm = if claude {
+            world.claude_only(&stub, Some("sk-test"), false)
+        } else {
+            world.codex_only(&stub, Some("sk-test"), false)
+        };
+        llm.run_once(world.request(runtime)).await.unwrap_err();
+        assert_eq!(
+            llm.cli_failure(runtime).as_deref(),
+            Some("exit_1.not_logged_in.http_401")
+        );
         assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
     }
 }

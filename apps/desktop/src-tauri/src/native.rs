@@ -239,12 +239,7 @@ impl NativeServices for Mac {
             .map(|events| {
                 events
                     .into_iter()
-                    .filter(|e| (from.0..to.0).contains(&e.starts_at.0))
-                    .map(|event| CalendarEvent {
-                        event,
-                        platform: None,
-                        attendees: vec![],
-                    })
+                    .filter(|e| (from.0..to.0).contains(&e.event.starts_at.0))
                     .collect()
             })
             .map_err(|_| CoreError::new(ErrorCode::CalendarUnavailable, "the calendar read failed"))

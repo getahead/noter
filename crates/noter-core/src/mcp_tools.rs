@@ -223,7 +223,7 @@ fn person_of(
     let recent_calls: Vec<CallId> = c
         .prepare(&format!(
             "SELECT c.id FROM calls c WHERE c.id IN
-               (SELECT call_id FROM call_participants WHERE person_id = ?1
+               (SELECT call_id FROM call_attendance WHERE NOT invited_only AND person_id = ?1
                 UNION SELECT call_id FROM speakers WHERE person_id = ?1) {sensitive}
              ORDER BY c.started_at DESC LIMIT {MAX_RECENT_CALLS}"
         ))?

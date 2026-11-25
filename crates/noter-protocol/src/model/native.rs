@@ -5,6 +5,20 @@ use super::{
     OutputDeviceInfo, OutputDeviceRow, OutputRoute,
 };
 
+/// A calendar event Today shows, as EventKit reports it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalendarEvent {
+    pub event: super::CalendarEventRef,
+    pub platform: Option<String>,
+    pub attendees: Vec<CalendarAttendee>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CalendarAttendee {
+    pub name: String,
+    pub email: Option<String>,
+}
+
 /// The native environment fields shared by the host and core.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EnvironmentReading {

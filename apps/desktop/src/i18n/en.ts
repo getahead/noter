@@ -1552,6 +1552,7 @@ export const en = {
   "callpage.delete_error": "Couldn’t delete this call.",
   "callpage.loading": "Loading the call",
   "callpage.info": "Call info",
+  "callpage.invited": "{name} (Invited)",
   "callpage.info.participants": "Participants",
   "callpage.info.call": "Call",
   "callpage.info.privacy": "Privacy",

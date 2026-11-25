@@ -25,7 +25,8 @@ const MAX_NAME: usize = 200;
 const OPEN: &str = "i.status IN ('open', 'carried') AND i.review_state != 'rejected'";
 
 /// The calls a person was on, by participation or by a speaker named as them (`?1`).
-const THEIR_CALLS: &str = "SELECT call_id FROM call_participants WHERE person_id = ?1
+const THEIR_CALLS: &str =
+    "SELECT call_id FROM call_attendance WHERE NOT invited_only AND person_id = ?1
      UNION SELECT call_id FROM speakers WHERE person_id = ?1";
 
 /// Lookup form shared with transcript and document keyword search.
@@ -242,7 +243,7 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
     let mut last: HashMap<String, i64> = c
         .prepare(&format!(
             "SELECT p.person_id, max(c.started_at) FROM
-               (SELECT person_id, call_id FROM call_participants
+               (SELECT person_id, call_id FROM call_attendance WHERE NOT invited_only
                 UNION SELECT person_id, call_id FROM speakers WHERE person_id IS NOT NULL) p
              JOIN calls c ON c.id = p.call_id {person_filter} GROUP BY p.person_id",
         ))?
@@ -266,7 +267,7 @@ fn rows_of(c: &Connection, only: Option<&str>) -> Db<Vec<PersonRow>> {
     let mut owed: HashMap<String, u32> = c
         .prepare(&format!(
             "SELECT p.person_id, count(DISTINCT i.id) FROM
-               (SELECT person_id, call_id FROM call_participants
+               (SELECT person_id, call_id FROM call_attendance WHERE NOT invited_only
                 UNION SELECT person_id, call_id FROM speakers WHERE person_id IS NOT NULL) p
              JOIN items i ON i.call_id = p.call_id
              WHERE i.owner_person_id = (SELECT id FROM people WHERE is_you = 1)
@@ -386,7 +387,7 @@ fn talk_share(c: &Connection, person_id: &str) -> Db<Option<f32>> {
         "SELECT sum(CASE WHEN person_id = ?1 THEN talk_time_ms END), sum(talk_time_ms)
          FROM call_participants
          WHERE talk_time_ms IS NOT NULL AND call_id IN
-           (SELECT call_id FROM call_participants WHERE person_id = ?1 AND talk_time_ms IS NOT NULL)",
+           (SELECT call_id FROM call_attendance WHERE NOT invited_only AND person_id = ?1 AND talk_time_ms IS NOT NULL)",
         [person_id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
@@ -428,10 +429,10 @@ fn languages_of(c: &Connection, person_id: &str) -> Db<Vec<LanguageShare>> {
 /// took part (1 is a 1:1).
 fn meetings_of(c: &Connection, person_id: &str) -> Db<Vec<(i64, u32)>> {
     c.prepare(
-        "SELECT c.started_at, (SELECT count(*) FROM call_participants o WHERE o.call_id = c.id
+        "SELECT c.started_at, (SELECT count(*) FROM call_attendance o WHERE NOT o.invited_only AND o.call_id = c.id
                  AND o.person_id NOT IN (SELECT id FROM people WHERE is_you = 1))
          FROM calls c
-         WHERE c.id IN (SELECT call_id FROM call_participants WHERE person_id = ?1)
+         WHERE c.id IN (SELECT call_id FROM call_attendance WHERE NOT invited_only AND person_id = ?1)
          ORDER BY c.started_at",
     )?
     .query_map([person_id], |r| Ok((r.get(0)?, r.get(1)?)))?
@@ -1083,7 +1084,7 @@ fn merge_tx(
         ));
     }
     let participation =
-        "SELECT id, call_id, talk_time_ms FROM call_participants WHERE person_id = ?1";
+        "SELECT id, call_id, talk_time_ms, from_invite FROM call_participants WHERE person_id = ?1";
     for row in rows(tx, participation, source)? {
         let (id, call) = (text(&row[0]), text(&row[1]));
         let twin: bool = db(tx.query_row(
@@ -1100,6 +1101,7 @@ fn merge_tx(
                     ("call_id", json!(call), Value::Null),
                     ("person_id", json!(source), Value::Null),
                     ("talk_time_ms", row[2].clone(), Value::Null),
+                    ("from_invite", row[3].clone(), Value::Null),
                 ],
             ));
         } else {

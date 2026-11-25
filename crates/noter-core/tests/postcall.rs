@@ -1040,3 +1040,49 @@ async fn speaker_naming_substitutes_labels_preserving_edits_and_publishes_the_se
             .names_updated
     );
 }
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_names_only_automatically_untitled_calls() {
+    let script = json!({"on": "post-call", "after_ms": 1000, "output": {
+        "title": "Release timing", "lang": "en", "summary_md": "Next week's release.",
+        "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": []
+    }});
+    for manual in [false, true] {
+        let (core, _, dir) = open(&script.to_string()).await;
+        seed_call(&core, CALL, 2);
+        let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+        db.execute(
+            "UPDATE calls SET title = 'Untitled call', title_pending = 1",
+            [],
+        )
+        .unwrap();
+        let run = post_call(&core, CALL);
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if manual {
+            core.call_update(
+                &main_window(),
+                noter_protocol::model::CallUpdateArgs {
+                    call_id: CallId::new(CALL),
+                    rev: Rev(1),
+                    title: Some("Untitled call".into()),
+                    call_type: None,
+                },
+            )
+            .await
+            .unwrap();
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+        let title: String = db
+            .query_row("SELECT title FROM calls", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            title,
+            if manual {
+                "Untitled call"
+            } else {
+                "Release timing"
+            }
+        );
+    }
+}

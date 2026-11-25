@@ -12,8 +12,8 @@ use noter_db::rusqlite::params;
 use noter_db::{Logged, Store};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
-pub use noter_protocol::model::EnvironmentReading;
 use noter_protocol::model::*;
+pub use noter_protocol::model::{CalendarAttendee, CalendarEvent, EnvironmentReading};
 use noter_protocol::*;
 use serde::{Deserialize, Serialize};
 
@@ -22,20 +22,6 @@ use crate::{internal, lock, settings, Core};
 
 /// A boxed future, so the seams stay object-safe.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
-/// A calendar event Today shows, as EventKit reports it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CalendarEvent {
-    pub event: CalendarEventRef,
-    pub platform: Option<String>,
-    pub attendees: Vec<CalendarAttendee>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CalendarAttendee {
-    pub name: String,
-    pub email: Option<String>,
-}
 
 /// macOS services (`noter-native` in the app, a scripted Mac in the harness).
 pub trait NativeServices: Send + Sync {
