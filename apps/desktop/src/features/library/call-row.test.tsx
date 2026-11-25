@@ -63,7 +63,7 @@ describe("call row (cpt-noter-component-ui-call-row)", () => {
   });
 
   it("cpt-noter-seq-library-filter-calls marks an invited person in the Calls list", () => {
-    expect(peopleOf(call({ participants: [person("Anna"), person("Boris")], invited_ids: ["Anna"] }))).toBe("Anna (Invited), Boris");
+    expect(peopleOf(call({ participants: [person("Anna"), person("Boris")], invited_ids: ["Anna"], invited_guests: ["Guest"] }))).toBe("Anna (Invited), Boris, Guest (Invited)");
   });
 
   it("drops a trailing initial in any script: Anna K. and Борис К. read Anna, Борис", () => {

@@ -59,10 +59,19 @@ fn texts(values: &[String]) -> Vec<Sql> {
 }
 
 /// The person a calendar attendee names.
-fn known_person(c: &Connection, name: &str) -> Db<Option<PersonChip>> {
-    crate::people::by_name(c, name, None)?
-        .map(|id| owner_chip(c, &id))
-        .transpose()
+fn known_person(c: &Connection, name: &str, email: Option<&str>) -> Db<Option<PersonChip>> {
+    let Some(id) = crate::people::by_name(c, name, email)? else {
+        return Ok(None);
+    };
+    let mut chip = owner_chip(c, &id)?;
+    if chip.display_name.contains('@') {
+        chip.display_name = "Guest".into();
+        chip.initials = "G".into();
+    }
+    if chip.short_name.contains('@') {
+        chip.short_name = "Guest".into();
+    }
+    Ok(Some(chip))
 }
 
 #[derive(Default)]
@@ -167,10 +176,15 @@ fn card_of(
         .attendees
         .iter()
         .map(|a| {
+            let name = crate::people::invitee_name(a);
+            let person = known_person(c, name.unwrap_or_default(), a.email.as_deref())?;
             Ok(AttendeeChip {
-                person: known_person(c, &a.name)?,
-                name: a.name.clone(),
-                email: a.email.clone(),
+                name: name
+                    .or_else(|| person.as_ref().map(|p| p.display_name.as_str()))
+                    .unwrap_or("Guest")
+                    .into(),
+                person,
+                email: None,
             })
         })
         .collect::<Db<Vec<_>>>()?;

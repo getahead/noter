@@ -108,9 +108,11 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
 
   test("cpt-noter-seq-call-page-check-evidence — Call info identifies invitees until a speaker is named", async ({ page }) => {
     await openWindow(page, "main", {
-      world: quiet(false, (w) => patchCall(w, W.PAST_CALL, (c) => Object.assign(c, { invited_ids: ["per_oleg"] }))),
+      world: quiet(false, (w) => patchCall(w, W.PAST_CALL, (c) => Object.assign(c, { invited_ids: ["per_oleg"], invited_guests: ["Guest"] }))),
     });
     await openCall(page);
+    await expect(info(page)).toContainText("Guest (Invited)");
+    await expect(toolbar(page)).toContainText("Guest (Invited)");
     await expect(info(page).locator(".pc-chip").filter({ hasText: "Oleg M." })).toContainText("Invited");
     await expect(info(page).locator(".pc-chip").filter({ hasText: "Dmitri S." })).not.toContainText("Invited");
   });

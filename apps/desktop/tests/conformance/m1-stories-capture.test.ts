@@ -77,6 +77,22 @@ async function recording(): Promise<CallId | null> {
 }
 
 describe("cpt-noter-seq-record-prompt-start-recording", () => {
+  it("keeps an address-only invitee on the call with a private display label", async () => {
+    await s.change((w) => {
+      const now = Date.now();
+      w.today.calendar = "granted";
+      w.today.today = [{
+        event_id: "evt_guests", title: "Invitation", starts_at: now, ends_at: now + 60_000,
+        platform: null, attendees: [{ name: "private@example.test", email: "private@example.test", person: null }],
+        sensitive: false, call_id: null, last_time: null, items: [], questions: [], handed_off: [], open_count: 0,
+      }];
+    });
+    const started = ok(await s.core("main").captureStart({ source: "today", sensitive: false, calendar_event_id: "evt_guests" }));
+    const row = await callRow(started.call_id!);
+    expect(row).toMatchObject({ title: "Invitation", participants: [], invited_guests: ["Guest"] });
+    expect(JSON.stringify(row)).not.toContain("private@example.test");
+  });
+
   it("happy path: a detected call shows the prompt, Record starts it, every window sees it recording, the call window opens without focus", async () => {
     const detected = await s.events("capture:detected");
     const states = await s.events("capture:state");

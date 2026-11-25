@@ -376,6 +376,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "automatic call titles and calendar invitations",
         sql: include_str!("../migrations/0012_call_metadata.sql"),
     },
+    Migration {
+        owner: "noter-core",
+        version: 13,
+        name: "call-local calendar guests",
+        sql: include_str!("../migrations/0013_call_guests.sql"),
+    },
 ];
 
 impl Core {

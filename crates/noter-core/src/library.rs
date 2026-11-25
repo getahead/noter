@@ -164,6 +164,7 @@ struct RowDetails {
     open_items: u32,
     participants: Vec<PersonChip>,
     invited_ids: Vec<PersonId>,
+    invited_guests: Vec<String>,
     review_waiting: u32,
 }
 
@@ -210,6 +211,9 @@ fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDe
     read_call_people(c, &[call_id.to_owned()], |_, chip, invited| {
         people.add_person(chip, invited)
     })?;
+    read_guests(c, &[call_id.to_owned()], |_, name| {
+        people.invited_guests.push(name)
+    })?;
     let review_waiting: u32 = c.query_row(
         "SELECT count(*) FROM items WHERE call_id = ?1 AND review_state = 'suggested'",
         [call_id],
@@ -235,6 +239,26 @@ impl RowDetails {
     }
 }
 
+fn read_guests(
+    c: &Connection,
+    ids: &[String],
+    mut add: impl FnMut(String, String),
+) -> noter_db::rusqlite::Result<()> {
+    let query = format!(
+        "SELECT call_id, display_name FROM unconfirmed_guests
+         WHERE call_id IN ({}) ORDER BY call_id, display_name, id",
+        crate::util::marks(ids.len())
+    );
+    for row in c
+        .prepare(&query)?
+        .query_map(params_from_iter(ids.iter()), |r| Ok((r.get(0)?, r.get(1)?)))?
+    {
+        let (call, name) = row?;
+        add(call, name);
+    }
+    Ok(())
+}
+
 fn read_call_people(
     c: &Connection,
     ids: &[String],
@@ -242,9 +266,8 @@ fn read_call_people(
 ) -> noter_db::rusqlite::Result<()> {
     let marks = crate::util::marks(ids.len());
     let query = format!(
-        "SELECT cp.call_id, p.id, p.display_name, p.short_name, p.is_you, cp.invited_only
-             FROM call_attendance cp JOIN people p ON p.id = cp.person_id
-             WHERE cp.call_id IN ({marks}) ORDER BY cp.call_id, cp.person_id"
+        "SELECT call_id, id, display_name, short_name, is_you, invited_only
+             FROM call_people_labels WHERE call_id IN ({marks}) ORDER BY call_id, id"
     );
     for row in c
         .prepare(&query)?
@@ -349,6 +372,9 @@ fn details_for_calls(
             row.review_waiting = review_waiting;
         }
 
+        read_guests(c, ids, |id, name| {
+            details.entry(id).or_default().invited_guests.push(name)
+        })?;
         read_call_people(c, ids, |id, chip, invited| {
             details.entry(id).or_default().add_person(chip, invited)
         })?;
@@ -382,6 +408,7 @@ fn assemble_with_details(
             .platform
             .map(|name| crate::call_platform::display_name("", &name)),
         invited_ids: details.invited_ids,
+        invited_guests: details.invited_guests,
         participants: details.participants,
         unnamed_speakers: details.unnamed_speakers,
         languages: details.languages,

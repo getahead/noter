@@ -386,7 +386,7 @@ export function setCapture(fake: FakeCore, next: Partial<CaptureState>): Capture
 export function createCaptureCall(world: World, id: string, title: string, started_at: number, sensitive: boolean): CallRow {
   const template = world.calls[0];
   const row: CallRow = template
-    ? { ...template, id, rev: 1, title, started_at, duration_ms: 0, platform: null, invited_ids: [], participants: [], unnamed_speakers: 0, languages: [], tags: [], privacy: sensitive ? "sensitive" : "normal", status: "recording", outputs: "not_started", archive: "not_started", audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 }
+    ? { ...template, id, rev: 1, title, started_at, duration_ms: 0, platform: null, invited_ids: [], invited_guests: [], participants: [], unnamed_speakers: 0, languages: [], tags: [], privacy: sensitive ? "sensitive" : "normal", status: "recording", outputs: "not_started", archive: "not_started", audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 }
     : { id, rev: 1, title, call_type: "one_on_one", started_at, duration_ms: 0, platform: null, participants: [], unnamed_speakers: 0, languages: [], tags: [], privacy: sensitive ? "sensitive" : "normal", status: "recording", outputs: "not_started", archive: "not_started", audio_kept_until: null, audio_deleted: false, audio_deleted_at: null, audio_retention_days: 30, open_items: 0, review_waiting: 0 };
   world.calls.unshift(row);
   world.transcripts.push({ subscription_id: null, call_id: id, live: true, pass: "live", archive: "not_started", segments: [], hypotheses: [], marks: [], gaps: [], speakers: [], last_seq: 0, audio_available: true });

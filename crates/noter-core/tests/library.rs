@@ -1241,3 +1241,44 @@ fn cpt_noter_seq_record_prompt_start_recording_migrates_only_legacy_automatic_ti
     assert_eq!(title("automatic"), ("Untitled call".into(), true));
     assert_eq!(title("renamed"), (helper.into(), false));
 }
+
+#[test]
+fn cpt_noter_seq_library_filter_calls_repairs_imported_email_labels_on_upgrade() {
+    use noter_db::rusqlite::{params, Connection};
+    let db = Connection::open_in_memory().unwrap();
+    for migration in noter_db::MIGRATIONS
+        .iter()
+        .chain(noter_core::MIGRATIONS.iter().filter(|m| m.version < 13))
+    {
+        db.execute_batch(migration.sql).unwrap();
+    }
+    for (id, display) in [
+        ("imported", "guest@example.test"),
+        ("renamed", "My colleague"),
+    ] {
+        db.execute(
+            "INSERT INTO people(id, rev, display_name, short_name, email) VALUES (?1, 1, ?2, ?2, 'guest@example.test')",
+            params![id, display],
+        ).unwrap();
+        let delta =
+            serde_json::to_vec(&json!({"display_name": [null, "guest@example.test"]})).unwrap();
+        db.execute("INSERT INTO changes (id, ts, actor, entity_type, entity_id, delta, summary, reason, status)
+                    VALUES (?1, 0, 'you', 'person', ?1, ?2, 'Imported call invitation', 'calendar_attendees', 'applied')",
+                   params![id, delta]).unwrap();
+    }
+    db.execute_batch(include_str!("../migrations/0013_call_guests.sql"))
+        .unwrap();
+    let label = |id| {
+        db.query_row(
+            "SELECT display_name, short_name FROM people WHERE id = ?1",
+            [id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .unwrap()
+    };
+    assert_eq!(label("imported"), ("Guest".into(), "Guest".into()));
+    assert_eq!(
+        label("renamed"),
+        ("My colleague".into(), "My colleague".into())
+    );
+}
