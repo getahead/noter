@@ -693,6 +693,15 @@ async fn exported_markdown_opens_with_the_call_title_date_and_participants() {
                 ],
             ),
             row(
+                "call_guests",
+                &[
+                    ("id", json!("guest_1")),
+                    ("call_id", json!("call_a")),
+                    ("display_name", json!("Guest")),
+                    ("email", json!("private@example.test")),
+                ],
+            ),
+            row(
                 "call_participants",
                 &[
                     ("id", json!("cp_1")),
@@ -706,9 +715,13 @@ async fn exported_markdown_opens_with_the_call_title_date_and_participants() {
         .await
         .unwrap();
     let text = std::fs::read_to_string(out.join("summary.md")).unwrap();
+    let metadata = std::fs::read_to_string(out.join("call.json")).unwrap();
+    assert!(!metadata.contains("private@example.test"));
+    assert!(metadata.contains("Guest"));
+    assert!(!text.contains("private@example.test"));
     // a pasted export says which call it is (issue 1053)
     assert!(
-        text.starts_with("# Call call\\_a\n\n2026-10-14 · Dana Ito\n\n"),
+        text.starts_with("# Call call\\_a\n\n2026-10-14 · Dana Ito · Guest (Invited)\n\n"),
         "{text}"
     );
 }

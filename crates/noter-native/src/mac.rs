@@ -726,8 +726,7 @@ pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEvent> {
                             });
                             let name = unsafe { person.name() }
                                 .map(|s| s.to_string())
-                                .filter(|s| !s.trim().is_empty())
-                                .or_else(|| email.clone())?;
+                                .unwrap_or_default();
                             Some(CalendarAttendee { name, email })
                         })
                         .collect::<Vec<_>>()

@@ -960,3 +960,17 @@ async fn a_call_still_recording_is_not_offered_for_review() {
     assert_eq!(view.review_waiting, 1);
     assert_eq!(view.review_calls[0].id.as_str(), "new");
 }
+
+// cpt-noter-seq-today-review-before-call: an address-only attendee is private on Today.
+#[tokio::test]
+async fn today_renders_an_email_only_guest_without_the_address() {
+    let mut meeting = event("private", "Meeting", NOW + HOUR, &["hidden@example.test"]);
+    meeting.attendees[0].email = Some("hidden@example.test".into());
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open_with(dir.path(), Some(granted(vec![meeting])));
+    let card = today(&core).await.unwrap().today.remove(0);
+    assert_eq!(card.attendees[0].name, "Guest");
+    assert!(!serde_json::to_string(&card)
+        .unwrap()
+        .contains("hidden@example.test"));
+}

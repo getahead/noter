@@ -570,9 +570,9 @@ fn markdown_header(
     )?;
     let mut line = vec![local.date(started_at)];
     let mut people = c.prepare(
-        "SELECT p.display_name || CASE WHEN cp.invited_only THEN ' (Invited)' ELSE '' END \
-         FROM call_attendance cp JOIN people p ON p.id = cp.person_id \
-         WHERE cp.call_id = ?1 ORDER BY p.display_name",
+        "SELECT display_name || CASE WHEN invited_only THEN ' (Invited)' ELSE '' END \
+         FROM call_people_labels WHERE call_id = ?1 UNION ALL \
+         SELECT display_name || ' (Invited)' FROM unconfirmed_guests WHERE call_id = ?1 ORDER BY 1",
     )?;
     for name in people.query_map([id], |r| r.get::<_, String>(0))? {
         line.push(name?);
