@@ -64,10 +64,13 @@ describe.skipIf(isFake)("credentials slice 1 on the real core (2.25)", () => {
 
   it("audit_export writes metadata only, a cancelled panel writes nothing and the rows stay", async () => {
     await control("llm_run", { skill: "post-call", items: [{ id: "seg_1", text: PAYLOAD }] });
+    await control("set_utc_offset", { minutes: -210 });
     const before = await call<Page<AuditEntry>>("settings", "audit_list", { page: {} });
     const json = await call<ExportResult>("settings", "audit_export", { format: "json" });
     const text = readFileSync(json.path, "utf8");
-    expect(JSON.parse(text)).toEqual(before.rows);
+    expect(JSON.parse(text)).toEqual(before.rows.map((row) => ({
+      ...row, at_iso: new Date(row.at - 210 * 60_000).toISOString().replace("Z", "-03:30"),
+    })));
     expect(text).not.toContain(PAYLOAD);
     const md = await call<ExportResult>("settings", "audit_export", { format: "markdown" });
     expect(readFileSync(md.path, "utf8")).not.toContain(PAYLOAD);
