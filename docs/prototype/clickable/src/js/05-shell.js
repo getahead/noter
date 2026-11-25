@@ -213,12 +213,12 @@
   const statesFor = () => {
     if (state.surface === 'main') { const d = NP.screens[state.route.screen]; return d ? { key: d.key, label: (typeof d.title === 'function' ? d.title(ctxFor(d.key)) : d.title) || d.key, states: d.states || [] } : null; }
     const s = NP.surfaces[state.surface];
-    return s ? { key: s.key, label: s.label, states: s.states || [] } : null;
+    return s ? { key: s.key, label: s.label, states: s.states || [], selectedState: s.selectedState } : null;
   };
 
   S.harness = () => {
     const sf = statesFor();
-    const cur = sf ? NP.demo(sf.key) : 'default';
+    const cur = sf?.selectedState?.() ?? NP.demo(sf?.key);
     const statesItems = sf && sf.states.length ? sf.states.map((s) => ({ label: s.label, checked: s.id === cur, action: ['proto.setDemo', { key: sf.key, id: s.id }] })) : [{ label: 'No extra states for this view', disabled: true }];
     NP._menus['h-states'] = statesItems;
     const dialogItems = (NP.galleries.dialogs || []).map((d) => ({ label: d.label, action: ['proto.openDialog', { id: d.id }] }));
@@ -284,6 +284,11 @@
   NP.on('proto.inspect', () => { state.inspect = !state.inspect; if (!state.inspect) S.hideTip(); });
   NP.on('proto.panel', () => { state.handoffPanel = !state.handoffPanel; });
   NP.on('proto.rec', (a) => {
+    if (a.status !== state.rec.status && (a.status === 'idle' || state.rec.status === 'idle')) {
+      delete state.demo.call;
+      delete state.local.cw;
+      if (state.rec.layout === 'collapsed') state.rec.layout = 'floating';
+    }
     if (a.status === 'idle') state.rec.status = 'idle';
     else if (a.status === 'recording') { if (state.rec.status === 'paused') { state.rec.startedAt += Date.now() - state.rec.pausedAt; state.rec.status = 'recording'; } else NP.startRecording(); }
     else if (a.status === 'paused') { if (state.rec.status === 'idle') NP.startRecording(); state.rec.status = 'paused'; state.rec.pausedAt = Date.now(); }

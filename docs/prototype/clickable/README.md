@@ -8,7 +8,7 @@
 ## What it covers
 
 - **Surfaces:** the main window with all its pages, the call window in both layouts plus the collapsed strip, the record prompt, the menu bar extra, the first-run wizard, the Settings window (11 panes, using DESIGN's pane list) and notifications. 33 dialogs (sheets, alerts and popovers) open from **Dialogs ▾**.
-- **Screens and states:** all 16 DESIGN screens. Every row of each screen's **States** table that looks different is selectable from **State ▾**, plus seven account states. That makes 343 screen and state combinations, all checked for errors.
+- **Screens and states:** all 16 DESIGN screens. Every row of each screen's **States** table that looks different is selectable from **State ▾**, plus seven account states.
 - **Components:** all 75 component IDs from DESIGN 3.2 (shells, screens and complex components) and 25 of the 26 primitives appear somewhere. Help tags (tooltips) are carried as `title`/`data-help-tag` instead of `data-primitive`.
 - **Clickable paths:** the main user paths of DESIGN 3.6 work end to end. For example: Record → call window → pin and dismiss cards → Stop Recording → closing state → Open in Noter → Call page → review the suggested items → hand off to Claude Code. Others: search → results → Call page at the span; Ask with citations; Person page; Activity proposals with Undo and Redo; Settings › replace a rejected API key.
 
@@ -25,6 +25,8 @@
 | **Components** | Lists every component kind on the current view with counts, variants and states. Click a row to highlight it |
 
 The call window adds its own prototype bar: layout, output route (headphones, speakers, not identified), a simulated new card, card keys, and making the panel key.
+
+With capture idle, choose **Menu bar → Open Call Screen**. Both layouts show **Not recording**. **Close** hides the panel and **Start Recording** starts capture in the same layout. The call window's **State** menu also lets you try a missing speech model or less than 500 MB free. Each disables **Start Recording** and links to its Settings pane.
 
 ## Owner decisions of 17 October (DESIGN v1.1)
 
