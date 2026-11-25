@@ -276,6 +276,8 @@ async fn output(
     stdin: &[u8],
     failed: &Mutex<Option<String>>,
 ) -> Result<Vec<u8>, String> {
+    // A run that fails some other way (a timeout, an answer it cannot read) names no old exit.
+    *lock(failed) = None;
     let mut child = command.spawn().map_err(|_| "cli_missing".to_owned())?;
     if let Some(mut input) = child.stdin.take() {
         input
@@ -934,6 +936,7 @@ mod account_tests {
         );
         assert_eq!(failure_class(b"Not logged in. Run /login"), "not_logged_in");
         assert_eq!(failure_class(b"API Error: 429 rate limit"), "rate_limit");
+        assert_eq!(failure_class(b"Your plan does not include this"), "plan");
         assert_eq!(failure_class(b"stub failure"), "other");
     }
 

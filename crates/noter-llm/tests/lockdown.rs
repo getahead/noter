@@ -909,6 +909,10 @@ async fn a_failed_run_leaves_nothing_behind() {
         let failed = llm.run_once(world.request(runtime)).await.unwrap_err();
         assert!(matches!(failed, Failure::Runtime { .. }), "{failed:?}");
         assert_eq!(llm.cli_failure(runtime).as_deref(), Some("exit_1.other"));
+        // The next run starts clean: an old exit is never reported for a later failure.
+        stub.set("mode", "shape");
+        llm.run_once(world.request(runtime)).await.unwrap_err();
+        assert_eq!(llm.cli_failure(runtime), None);
         assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
     }
 }
