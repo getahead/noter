@@ -23,6 +23,23 @@
   height: 56px;
 }
 
+/* The native panel also opens before a call starts. */
+.np-win.cw-idle {
+  align-items: center;
+  justify-content: safe center;
+  overflow-y: auto;
+  padding: 12px;
+}
+.cw-idle .np-empty {
+  padding: 0 0 12px;
+}
+.cw-idle__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 /* ---------------- Call screen (dedicated) ---------------- */
 .cs {
   display: flex;

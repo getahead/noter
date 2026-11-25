@@ -78,7 +78,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 - **Design**: [DESIGN.md](../../DESIGN.md) › 3.2 Shell — Call window; Screen — Call screen; Screen — Floating panel; Component — Capture notice; Recording indicator; Call status strip; Collapsed call strip; Person chip; 3.8 Deployment Topology
 - **Design elements**: `cpt-noter-component-shell-call-window`, `cpt-noter-component-screen-call-screen`, `cpt-noter-component-screen-floating-panel`, `cpt-noter-component-ui-capture-notice`, `cpt-noter-component-ui-recording-indicator`, `cpt-noter-component-ui-call-status-strip`, `cpt-noter-component-ui-collapsed-call-strip`, `cpt-noter-component-ui-person-chip`, `cpt-noter-topology-ui-windows`
 - **Stories** (M1): `cpt-noter-seq-call-screen-recover-capture`, `cpt-noter-seq-call-screen-stop-at-call-end`, `cpt-noter-seq-call-screen-hide-for-presenting`, `cpt-noter-seq-floating-panel-display-unplugged`, `cpt-noter-seq-floating-panel-collapse-strip`, `cpt-noter-seq-floating-panel-hide-and-reopen`
-- **Frozen commands it calls**: `capture_stop`, `capture_set_paused`, `capture_mark_moment`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `capture_continue`, `capture_keep_recording`, `capture_discard`, `capture_set_sensitive`, `capture_exclude_source`, `capture_keep_source`, `capture_resume_interrupted`, `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `open_external`
+- **Frozen commands it calls**: `capture_start`, `capture_stop`, `capture_set_paused`, `capture_mark_moment`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `capture_continue`, `capture_keep_recording`, `capture_discard`, `capture_set_sensitive`, `capture_exclude_source`, `capture_keep_source`, `capture_resume_interrupted`, `window_show_call`, `window_hide_call`, `window_call_state`, `window_set_call_layout`, `window_set_collapsed`, `app_set_hidden_for_presenting`, `window_navigate`, `window_announce`, `open_external`
 - **Events**: `capture:state`, `degraded:changed`, `window:call`, `app:presenting`, `privacy:changed`, `env:changed`, `hotkeys:changed`
 - **Prototype modules**: `src/js/20-b-surface.js` (`surface('call')`, both layouts, the closing state, the state list), `src/js/20-b-components.js` (`C.captureNotice`, `C.callStatusStrip`, `C.collapsedCallStrip`), `src/js/04-shared.js` (`C.recordingIndicator`, `NP.captureHealth`, `NP.liveStatus`, `C.personChip`, `call.makeSensitive`), `src/css/20-b.css` (`.cw-*`, `.cs-*`, `.fp-*`)
 - **Dependencies**: `cpt-noter-feature-ui-core-bridge`, `cpt-noter-feature-ui-primitives`, `cpt-noter-feature-ui-accessibility-l10n`, `cpt-noter-feature-ui-live-transcript`
@@ -225,6 +225,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 **Success Scenarios**:
 - Happy path of `cpt-noter-seq-floating-panel-hide-and-reopen`: **Hide** (×, help tag **Hide to the menu bar**) hides the panel while recording goes on; ⌃⌥⌘N or **Open Call Screen** brings it back without taking focus
+- Opened before recording: **Not recording**, **Start Recording** and **Close**. Start follows PM-60. A missing speech model links to Models & Runtimes, and less than 500 MB free links to Maintenance. Close hides the idle panel.
 
 **Error Scenarios**:
 - Error — Capture problem while hidden: NT-3 (`cpt-noter-feature-ui-notifications`); its click shows the window with the banner
@@ -336,7 +337,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 - [x] `p1` - **ID**: `cpt-noter-state-ui-call-window-window`
 
-**States**: NOT_KEY, KEY, HIDDEN_BY_USER, HIDDEN_FOR_PRESENTING, CLOSING, CLOSED
+**States**: NOT_KEY, KEY, HIDDEN_BY_USER, HIDDEN_FOR_PRESENTING, CLOSING, CLOSED, IDLE
 
 **Initial State**: NOT_KEY
 
@@ -350,6 +351,9 @@ Success criteria: no click or key on the call window ever moves focus from the c
 7. [x] - `p1` - **FROM** NOT_KEY **TO** CLOSING **WHEN** capture stops (manual or automatic) - `inst-notkey-closing`
 8. [x] - `p1` - **FROM** CLOSING **TO** NOT_KEY **WHEN** the user chooses **Continue Recording** - `inst-closing-notkey`
 9. [x] - `p1` - **FROM** CLOSING **TO** CLOSED **WHEN** 10 s pass, or the user chooses **Close** or **Open in Noter**, or the user discards the recording - `inst-closing-closed`
+10. [x] - `p1` - **FROM** CLOSED **TO** IDLE **WHEN** the user opens the window while no call is being recorded - `inst-open-idle`
+11. [x] - `p1` - **FROM** IDLE **TO** CLOSED **WHEN** the user closes the panel - `inst-close-idle`
+12. [x] - `p1` - **FROM** IDLE **TO** NOT_KEY **WHEN** capture starts in the non-activating panel - `inst-start-idle`
 
 ### Layout
 

@@ -3,6 +3,7 @@
 // the Copilot flag off state (M1). One tree and one store for both layouts: the core places, shows, hides and
 // keys the panel and sends `window:call`; the window renders the layout it names and sends wanted state.
 import "./call-window.css";
+import { IdleCallWindow } from "./idle-call-window";
 import { foldOrder, useHeaderFold } from "./header-fold";
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -59,6 +60,12 @@ export function subscribeWhile<K extends "levels_subscribe">(bridge: Bridge, on:
   if (!on) return undefined;
   void bridge.subscribe(cmd, args);
   return () => void bridge.unsubscribe(cmd);
+}
+
+function readWindowState(bridge: Bridge) {
+  if (bridge.store.getState().commands.window_call_state?.state !== "WAITING") {
+    void bridge.act("window_call_state", "window_call_state", () => bridge.core.windowCallState({}), { slice: "callWindow" });
+  }
 }
 
 // @cpt-component:cpt-noter-component-shell-call-window:p1
@@ -142,7 +149,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   // @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-if-crash
   // @cpt-begin:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // A new WebView (first open, or after a crash) reads the snapshot (the bridge), then the window state, then the transcript.
-  useEffect(() => void bridge.act("window_call_state", "window_call_state", () => bridge.core.windowCallState({}), { slice: "callWindow" }), [bridge]);
+  useEffect(() => readWindowState(bridge), [bridge]);
   const transcriptFor = cw && callId && live(cap) ? callId : null;
   // one transcript Channel for the window: both layouts share it, so a layout switch keeps it
   const tr = useTranscript(bridge, transcriptFor ?? "");
@@ -189,11 +196,18 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const fpFold = useHeaderFold(fpTitle, fpOrder.length, [cw?.text_size_pct, displays, cw?.layout, cw?.collapsed, cap?.phase]); // re-measured when the panel appears
   const fpFolded = new Set(fpOrder.slice(0, fpFold));
 
-  if (!cap || !cw || !callId) return null;
+  if (!cw || !cap) {
+    const read = commands.window_call_state;
+    return read?.state === "ERROR"
+      ? <InlineBanner banner={{ id: "call-window-error", severity: "error", text: t("window.error"), actions: [{ label: t("action.try_again"), onAction: () => readWindowState(bridge) }] }} />
+      : <p role="status">{t("callpage.loading")}</p>;
+  }
   const view = windowState(cw, presenting, cap);
   // @cpt-begin:cpt-noter-algo-ui-call-window-closing-state:p1:inst-auto-close
   if (view === "CLOSED") return null;
   // @cpt-end:cpt-noter-algo-ui-call-window-closing-state:p1:inst-auto-close
+  if (view === "IDLE") return <IdleCallWindow bridge={bridge} layout={cw.layout} />;
+  if (!callId) return <InlineBanner banner={{ id: "capture-error", severity: "error", text: t("window.error"), actions: [{ label: t("action.try_again"), onAction: () => void bridge.open() }] }} />;
 
   /** A command of this window: WAITING until the core answers; a capture command's failure shows in the strip. */
   async function run<T>(cmd: CommandName, call: () => Promise<Result<T>>, opts: ActOptions = {}, strip = true): Promise<Result<T>> {

@@ -198,10 +198,11 @@ impl Core {
 
     pub(crate) fn hide_call(&self) -> CallWindowState {
         let mut w = lock(&self.windows);
-        if !w.call.visible {
+        if !w.call.visible && !w.was_visible {
             return w.call.clone();
         }
         // @cpt-begin:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-hide
+        w.was_visible = false;
         w.call.visible = false;
         w.call.key = false;
         // @cpt-end:cpt-noter-state-core-native-surfaces-call-window:p1:inst-st-hide

@@ -41,6 +41,8 @@ import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { IconButton } from "../../ui/primitives/icon-button";
 import type { MenuItem } from "../../ui/primitives/menu";
 import { find, rendered } from "../../ui/testing";
+import { EmptyState } from "../../ui/feedback/empty-state";
+import { IdleCallWindow } from "./idle-call-window";
 import { TranscriptLog, type TranscriptLogProps } from "../transcript/hosts";
 import { CallWindow, loadParticipants } from "./call-window";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
@@ -125,14 +127,50 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(page).toContain('data-state="not-key"');
   });
 
-  it("renders nothing before the window state is read, or once the call closed", async () => {
+  it("shows loading until the window state arrives and draws nothing for a closed idle panel", async () => {
     fake = new FakeCore({ window: "call-screen" });
     bridge = createBridge("call-screen", fake);
     await bridge.open();
-    expect(html()).toBe("");
+    expect(html()).toContain("Loading the call");
     await bridge.close();
-    await open({ phase: "idle", call_id: null });
+    await open({ phase: "idle", call_id: null }, { visible: false });
     expect(html()).toBe("");
+  });
+
+  it("starts capture in the explicitly opened idle panel and reports a refusal", async () => {
+    await open({ phase: "idle", call_id: null }, { visible: true });
+    expect(html()).toContain("Not recording");
+    const idle = rendered(IdleCallWindow, { bridge: bridge!, layout: "floating" });
+    const start = find(idle, (p) => p.label === "Start Recording").props.onAction as () => Promise<void>;
+    fake.failNext("capture_start", "disk_full");
+    await start();
+    expect(stateWrites).toContain("disk_full");
+    await start();
+    expect(bridge!.store.getState().whole.capture?.phase).toBe("recording");
+    expect(args("capture_start")).toEqual(Array(2).fill({ source: "call_window", sensitive: false }));
+  });
+
+  it("links an idle recording blocker to Settings and closes the panel", async () => {
+    await open({ phase: "idle", call_id: null }, { visible: true });
+    await bridge!.core.windowShowCall({});
+    bridge!.store.setState((s) => ({ whole: { ...s.whole, environment: { ...s.whole.environment!, disk_free_mb: 400 } } }));
+    const idle = rendered(IdleCallWindow, { bridge: bridge!, layout: "floating" });
+    const empty = find(idle, (_p, type) => type === EmptyState);
+    expect(empty.props.linkLabel).toBe("Maintenance");
+    expect(find(idle, (p) => p.label === "Start Recording").props.disabled).toBe(true);
+    await (empty.props.onLink as () => Promise<void>)();
+    expect(args("window_navigate")).toEqual([{ target: { type: "settings", pane: "maintenance" } }]);
+    await (find(idle, (p) => p.label === "Close").props.onAction as () => Promise<void>)();
+    expect(bridge!.store.getState().whole.callWindow?.visible).toBe(false);
+  });
+
+  it("offers to reload the snapshot if a live capture lacks its call identity", async () => {
+    await open({ phase: "recording", call_id: null });
+    expect(html()).toContain("Try Again");
+    const banner = find(tree(), (_p, type) => type === InlineBanner).props.banner as { actions: { onAction: () => void }[] };
+    banner.actions[0].onAction();
+    await settle();
+    expect(args("app_snapshot")).toHaveLength(2);
   });
 
   it("sends mode and call-ended announcements through the call-screen bridge", async () => {

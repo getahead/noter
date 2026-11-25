@@ -8,7 +8,7 @@ import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
 import { freeze, NOW, settled } from "./freeze";
 
-type Win = Partial<{ layout: "dedicated" | "floating"; collapsed: boolean; show_share_warning: boolean }>;
+type Win = Partial<{ visible: boolean; layout: "dedicated" | "floating"; collapsed: boolean; show_share_warning: boolean }>;
 const DEDICATED = { width: 1280, height: 800 };
 const FLOATING = { width: 420, height: 560 };
 
@@ -44,6 +44,7 @@ const stoppedAt = (w: World, auto: boolean) =>
   Object.assign(w.app.capture, { phase: "stopped", continue_until: NOW + 5 * W.MIN, notice: auto ? { type: "stopped_automatically", call_id: live } : null });
 
 test.describe("cpt-noter-dod-ui-call-window-shell call window layouts", () => {
+  test("idle: open the floating panel before recording", async ({ page }) => shot(page, "idle-floating", W.idle, { visible: true, layout: "floating" }));
   test("copilot-off: the dedicated layout with the header chips", async ({ page }) => shot(page, "copilot-off"));
   test("unplugged: the floating layout", async ({ page }) => shot(page, "unplugged", W.laptopOnly, { layout: "floating" }));
   test("floating, first open: the share warning", async ({ page }) => shot(page, "share-warning", () => {}, { layout: "floating", show_share_warning: true }));
