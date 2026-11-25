@@ -529,3 +529,56 @@ test.describe("cpt-noter-seq-call-page-check-evidence", () => {
     expect(await sent(page, "share_copy")).toEqual([expect.objectContaining({ scope: expect.objectContaining({ item_ids: ["itm_a3"] }) })]);
   });
 });
+
+// #1271: the Call page's item rows as the prototype draws them (.it-row--full): the topic and Suggested chips, the
+// hh:mm:ss time and the Accept / Edit / Reject, share and ⓘ controls never clip or overlap, at the narrowest window
+// (tauri.conf.json minWidth) and a wide one, with long titles and a long topic name.
+const LONG = "Move every websocket notification for the drawer, the inbox and the activity feed behind one per-account flag before the release branch is cut";
+const longRows = (w: World) => {
+  suggest("itm_d1", "itm_a0", "itm_q1")(w);
+  const t = w.topics[0]!;
+  t.name = "Fleet and cluster provisioning for the regional rollout of drawer notifications";
+  for (const i of O.outputsOf(w).sections.flatMap((s) => s.items)) {
+    if (["itm_d1", "itm_a0", "itm_q1"].includes(i.id)) i.text = `${LONG} (${i.id})`;
+    i.topic = { id: t.id, name: t.name };
+    i.spans = [{ call_id: W.PAST_CALL, channel: null, t0_ms: 3_723_000, t1_ms: 3_730_000 }]; // 01:02:03
+  }
+  w.items = [...w.items.filter((i) => i.call.id !== W.PAST_CALL), ...O.outputsOf(w).sections.flatMap((s) => s.items)];
+};
+test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
+  for (const px of [900, 1920])
+    test(`UI — design — item rows at ${px} px: chips, the time and the controls neither clip nor overlap (#1271)`, async ({ page }) => {
+      await page.setViewportSize({ width: px, height: 900 });
+      await openCall(page, longRows);
+      const question = byId(page, "itm_q1");
+      await expect(question.getByRole("button", { name: "Accept" })).toBeVisible();
+      for (const id of ["itm_d1", "itm_q1", "itm_a0", "itm_d2", "itm_q2"]) {
+        const row = byId(page, id);
+        await row.scrollIntoViewIfNeeded();
+        const box = (await row.boundingBox())!;
+        const parts = await row.locator(".np-badge, .np-topic, .np-prov, button").evaluateAll((els) =>
+          els
+            .filter((e) => (e as HTMLElement).offsetParent && !els.some((o) => o !== e && o.contains(e)))
+            .map((e) => {
+              const r = e.getBoundingClientRect();
+              const name = e.querySelector(".np-topic__name") ?? e;
+              // a topic longer than its line may ellipsize its name; every other chip, the time and the controls show whole
+              const clipped = !e.classList.contains("np-topic") && (e.scrollWidth > e.clientWidth + 1 || name.scrollWidth > name.clientWidth + 1);
+              return { label: (e.getAttribute("aria-label") ?? e.textContent ?? "").trim(), x: r.x, y: r.y, w: r.width, h: r.height, clipped };
+            }),
+        );
+        expect(parts.length, id).toBeGreaterThan(1);
+        for (const p of parts) {
+          expect(p.clipped, `${id}: ${p.label} is cut`).toBe(false);
+          expect(p.x + p.w, `${id}: ${p.label} runs past the row`).toBeLessThanOrEqual(box.x + box.width + 1);
+          expect(p.x, `${id}: ${p.label} starts before the row`).toBeGreaterThanOrEqual(box.x - 1);
+        }
+        for (const [i, a] of parts.entries())
+          for (const b of parts.slice(i + 1)) {
+            const overlap = a.x < b.x + b.w - 1 && b.x < a.x + a.w - 1 && a.y < b.y + b.h - 1 && b.y < a.y + a.h - 1;
+            expect(overlap, `${id}: ${a.label} overlaps ${b.label}`).toBe(false);
+          }
+      }
+      await expect(question).toContainText("01:02:03");
+    });
+});

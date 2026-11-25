@@ -10,6 +10,7 @@ import { t } from "../../i18n/format";
 import { Badge } from "../../ui/primitives/badge";
 import { Link } from "../../ui/primitives/link";
 import { Icon } from "../../ui/icons";
+import { TopicChip } from "../../ui/primitives/topic-chip";
 import { CallLink } from "../items/CallLink";
 import { KIND_ICON, KIND_KEY } from "../items/kind";
 import { slots } from "./slots";
@@ -25,7 +26,7 @@ export function OutputItemRow({ bridge, item: listed, compact = false }: { bridg
   const span = item.spans[0];
   const lang = typeof item.lang === "string" ? item.lang : item.lang.code;
   const topic = item.topic && <Badge kind="kind" text={item.topic.name} />;
-  const suggested = item.review === "suggested" && <Badge kind="status" tone="accent" text={t("outputs.suggested")} />;
+  const suggested = item.review === "suggested" && <Badge kind="status" tone="neutral" text={t("outputs.suggested")} />;
   const evidence = span && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, span, "main-window-shell")} />;
   if (compact)
     return (
@@ -38,14 +39,27 @@ export function OutputItemRow({ bridge, item: listed, compact = false }: { bridg
         {Tail ? <Tail bridge={bridge} item={item} afterTime={<>{topic}{suggested}</>} /> : <>{evidence}{topic}{suggested}</>}
       </li>
     );
+  // the prototype's full row (.it-row--full): glyph · text over a wrapping meta line · the controls, which never clip (issue 1271)
   return (
-    <li className="pc-item" data-component="cpt-noter-component-ui-output-item-row" data-call-id={item.call?.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} aria-label={item.text} tabIndex={-1} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
-      <span className="pc-item__text" title={item.text} lang={typeof item.lang === "string" ? item.lang : item.lang.code}>{item.text}</span>
-      {item.owner && <span className="np-dim">{item.owner.short_name}</span>}
-      {item.topic && <Badge kind="kind" text={item.topic.name} />}
-      {item.review === "suggested" && <Badge kind="status" tone="accent" text={t("outputs.suggested")} />}
-      {/* the evidence opens the transcript at the span (`window_navigate`, as a notification does) */}
-      {Tail ? <Tail bridge={bridge} item={item} /> : span && <Link label={t("outputs.evidence")} onAction={() => void openSpan(bridge, span, "main-window-shell")} />}
+    <li className="it-row it-row--full" data-component="cpt-noter-component-ui-output-item-row" data-call-id={item.call?.id} data-review={item.review} data-item-id={item.id} id={`row-${item.id}`} aria-label={item.text} tabIndex={-1} onKeyDown={(e) => slots.itemKeys?.(bridge, item, e)}>
+      <span className="it-row__check it-row__glyph">
+        <Icon name={KIND_ICON[item.kind]} size={14} label={t(KIND_KEY[item.kind])} />
+      </span>
+      <div className="it-row__main">
+        <span className="it-row__text" lang={lang}>{item.text}</span>
+        <div className="it-row__line2">
+          {item.owner && <span className="np-dim">{item.owner.short_name}</span>}
+          {/* the evidence opens the transcript at the span (`window_navigate`, as a notification does) */}
+          {Tail ? <Tail bridge={bridge} item={item} part="meta" /> : evidence}
+          {suggested}
+          {item.topic && <TopicChip name={item.topic.name} />}
+        </div>
+      </div>
+      {Tail && (
+        <div className="it-row__actions">
+          <Tail bridge={bridge} item={item} part="actions" />
+        </div>
+      )}
     </li>
   );
 }

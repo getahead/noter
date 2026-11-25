@@ -15,10 +15,13 @@
 .pc-md p, .pc-md ul { margin: 0 0 8px; }
 .pc-md ul { padding-left: 20px; }
 .pc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-/* one line: the text wraps inside its column and a long topic tag truncates, so share and ⓘ stay on the row */
+/* the one-line rows (thread, compact): a long topic tag truncates, so share and ⓘ stay on the row */
 .pc-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pc-item > .np-badge { flex: 0 1 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pc-item__text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* the full row's meta line wraps whole parts: chips and the time never shrink; only a topic longer than the line truncates its name (issue 1271) */
+.it-row--full .it-row__main { grid-template-columns: minmax(0, 1fr); }
+.it-row--full .it-row__line2 > * { flex: none; max-width: 100%; white-space: nowrap; }
 .pc-regen { display: grid; gap: 12px; }
 .pc-regen__row { display: grid; gap: 4px; border: 0; padding: 0; margin: 0; }
 

@@ -15,14 +15,21 @@ import { patchLocal, useLocal } from "./local";
 import { ProvenanceChip } from "./ProvenanceChip";
 import { slots } from "./slots";
 
-export function ItemTail({ bridge, item, afterTime }: { bridge: Bridge; item: ItemView; afterTime?: ReactNode }) {
+/** `part` splits the tail for the full row's grid (prototype .it-row--full): the time on the meta line, the controls in the actions column. */
+export function ItemTail({ bridge, item, afterTime, part }: { bridge: Bridge; item: ItemView; afterTime?: ReactNode; part?: "meta" | "actions" }) {
   const it = useItem(bridge, item);
   const local = useLocal(it.id);
   const inspect = slots.inspect ? () => slots.inspect!(bridge, it.id) : null;
-  return (
+  const meta = (
     <>
       {it.spans[0] && <ProvenanceChip bridge={bridge} span={it.spans[0]} />}
       {afterTime}
+    </>
+  );
+  if (part === "meta") return meta;
+  return (
+    <>
+      {part !== "actions" && meta}
       {local.outcome && (
         <InlineStatus variant="row-outcome" text={local.outcome.text} ms={local.outcome.ms} actionLabel={local.outcome.target ? t("items.undo") : undefined} actionAriaLabel={local.outcome.target ? `${t("items.undo")}: ${it.text}` : undefined} onAction={() => void undoRow(bridge, it.id, local.outcome!.target!)} onExpire={() => patchLocal(it.id, { outcome: undefined })} />
       )}
