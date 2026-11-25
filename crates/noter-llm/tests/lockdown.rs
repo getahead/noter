@@ -346,6 +346,7 @@ fn output() -> Value {
     serde_json::to_value(PostCallOutput {
         lang: Lang::En,
         title: None,
+        call_type: None,
         summary_md: "Importer ships Friday.".into(),
         decisions: vec![item.clone()],
         action_items: vec![item],

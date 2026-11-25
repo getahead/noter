@@ -85,6 +85,20 @@ pub struct ParticipantNotes {
     pub evidence_segment_ids: Vec<SegmentId>,
 }
 
+/// A built-in call type the post-call skill may suggest for an unclassified call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SuggestedCallType {
+    OneOnOne,
+    Standup,
+    Planning,
+    Retro,
+    CrossTeam,
+    Vendor,
+    Interview,
+    Incident,
+}
+
 /// Post-call analysis for one call type skill.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct PostCallOutput {
@@ -93,6 +107,8 @@ pub struct PostCallOutput {
     pub summary_md: String,
     /// A short, single-line title naming the main topic in the summary language. Null if there is no topic.
     pub title: Option<String>,
+    /// The built-in type this call clearly is. Null when unsure or when several fit.
+    pub call_type: Option<SuggestedCallType>,
     pub decisions: Vec<ExtractedItem>,
     pub action_items: Vec<ExtractedItem>,
     pub open_questions: Vec<ExtractedItem>,
