@@ -657,6 +657,8 @@ export type CallMutation = {
 };
 
 export type CallOutputs = {
+	/**  Queued regeneration for this call waiting for external power. Run Now names this exact run. */
+	waiting_for_power?: JobRunId | null,
 	call_id: CallId,
 	status: OutputsStatus,
 	sections: OutputSection[],
@@ -2810,6 +2812,8 @@ export type RedoArgs = {
 };
 
 export type RegenerateArgs = {
+	/**  Release only this queued regeneration on battery, retaining its original selections. */
+	run_now_on_battery?: JobRunId | null,
 	call_id: CallId,
 	/**  Summary; decisions, action items and open questions; role reviews. */
 	sections: SectionKind[],
@@ -3854,7 +3858,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.32";
+export const CONTRACT_VERSION = "2.33";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

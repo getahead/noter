@@ -2249,6 +2249,7 @@ The Call page is where the user confirms and shares what came out of a call with
 | A section failed with no assistant | PC-R3, that section | While the mode is **No assistant**: **Couldn't write the action items (no assistant is set up)** · **Add an Assistant…**, which opens Settings › Models & Runtimes; no tool is named, and there is no **Try Again** or **Use Local Model** (#1170) | `cpt-noter-principle-degrade-visibly` | `cpt-noter-seq-call-page-review-outputs` (Error — A section failed) |
 | Written by the local model | PC-R2 | Degraded banner **Summary written by the local model** · **Regenerate with Claude Code…** | PRD › Product principles › 6 | `cpt-noter-seq-call-page-review-outputs` (Error — Written by the local model) |
 | Empty section | PC-R3 | **No decisions in this call**, **No action items in this call**, **No open questions in this call**; an empty **Action items** offers **Add Action Item** and its inline field; **Risks** is left out when there are none | PRD › Feature specification › 4. Post-call outputs | `cpt-noter-seq-call-page-review-outputs` (Empty — Nothing in a section) |
+| Regeneration queued on battery | PC-R3 | **Regeneration queued · waiting for power** · **Connect power to regenerate the selected outputs, or run it now on battery.** · **Run Now**. Show this on every submission, including a repeat for the same queued run, and when reopening the call. It replaces the waiting placeholders and keeps written sections readable. **Run Now** allows only that run on battery. The **Battery Settings…** link is deferred until M5 delivers Maintenance › **Allow on battery**. | #1251 | `cpt-noter-seq-call-page-review-outputs` (Other — Regenerate with a different model) |
 | Regenerated with edits | Section meta line | **Regenerated · your 2 edits kept · Show Diff** | D41 | `cpt-noter-seq-call-page-review-outputs` (Error — Written by the local model) |
 | Suggested items waiting | PC-R2; section headers | **7 suggested items to review before sharing** · **Start Review** · **Accept All**; **Action items · 4 · 3 to review** | D73, PM-20 | `cpt-noter-seq-call-page-review-suggested-items` (Happy path) |
 | Rejected by mistake | The row | **Rejected · Undo** for 10 s, then **Rejected (1)** with **Restore** | D73 | `cpt-noter-seq-call-page-review-suggested-items` (Error — Rejected by mistake) |
@@ -10527,7 +10528,7 @@ User:
 
 1. Selects **Regenerate Outputs…** from ⋯ (or **With a Different Model…** under **Regenerate ▾**) and sees **Regenerate Outputs**
 2. Picks **Claude Code · Opus** in **Runtime and model**, keeps the **Skill**, and ticks **Role reviews** under **Sections**
-3. Clicks **Regenerate**, sees the button busy, then **Regenerating…** in the summary's meta line
+3. Clicks **Regenerate**, sees the button busy, then **Regenerating…** in the summary's meta line. If no assistant is set up, the sheet explains why and offers **Add an Assistant…** for Settings › Models & Runtimes. On battery, a power-held run waits in the call page with **Run Now**. Connecting power resumes the run automatically. **Run Now** preserves its selections and all other guards
 4. Gets the outputs rewritten, with **Regenerated · your 2 edits kept** and **Show Diff**; suggested items it drops are counted in **1 item not suggested again because you rejected it**
 
 **Other path — Compare versions**

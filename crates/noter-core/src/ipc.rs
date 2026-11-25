@@ -325,7 +325,7 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: RegenerateArgs,
     ) -> Result<JobAccepted, CoreError> {
-        self.queue_regeneration(&args)
+        self.queue_regeneration(&args).await
     }
 
     async fn output_versions(

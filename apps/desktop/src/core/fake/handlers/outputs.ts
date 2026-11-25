@@ -4,6 +4,7 @@ import { coreError } from "../fake-core";
 import * as shared from "./shared";
 
 export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
+  const heldRequests = new Map<string, Bindings.RegenerateArgs>();
   const newId = (prefix: string) => shared.nextId(fake, prefix);
   return {
   // ── Outputs and sharing ──────────────────────────────────────────────
@@ -35,9 +36,19 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
   outputs_regenerate: (a, { world, fake, emit }) => {
     shared.call(world, a.call_id);
     if (shared.live(world.app.capture)) throw coreError("job_blocked", "regeneration waits for the live call to end");
-    const run = newId("run");
+    if (world.app.degraded.states.some((s) => s.type === "no_assistant")) throw coreError("runtime_unavailable", "no assistant is set up");
+    const out = world.outputs.find((o) => o.call_id === a.call_id);
+    if (a.run_now_on_battery && a.run_now_on_battery !== out?.waiting_for_power) throw coreError("not_found");
+    const run = out?.waiting_for_power ?? newId("run");
+    if (out?.waiting_for_power && !a.run_now_on_battery) {
+      heldRequests.set(run, a);
+      return { job_run_id: run };
+    }
+    const request = heldRequests.get(run) ?? a;
+    heldRequests.delete(run);
+    if (out) out.waiting_for_power = null;
     // No sections means all of them, as in the real core.
-    const sections = a.sections.length ? a.sections : (world.outputs.find((o) => o.call_id === a.call_id)?.sections.map((x) => x.kind) ?? []);
+    const sections = request.sections.length ? request.sections : (out?.sections.map((x) => x.kind) ?? []);
     sections.forEach((kind, i) => {
       fake.later(300 * (i + 1), () => emit("outputs:progress", { call_id: a.call_id, status: "writing", section: kind, state: { type: "writing" } }));
       fake.later(300 * (i + 2), () => {
@@ -45,7 +56,7 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
         if (section) {
           section.names_updated = false;
           // Use Local Model: the local runtime writes the section, as in the real core.
-          if (a.local && section.writer) {
+          if (request.local && section.writer) {
             section.writer = { ...section.writer, runtime: "local", model: "local", generated_at: shared.now() };
             world.outputs.find((o) => o.call_id === a.call_id)!.written_locally = true;
           }

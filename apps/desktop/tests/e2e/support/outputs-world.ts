@@ -64,6 +64,15 @@ export function writing(w: World): void {
   }
 }
 
+/** A past call with no stored sections after the app reopened. */
+export function unwritten(w: World): void {
+  writing(w);
+  setState(w, "summary", { type: "pending" });
+  outputsOf(w).status = "failed";
+  const call = w.calls.find((c) => c.id === W.PAST_CALL)!;
+  Object.assign(call, { status: "failed", outputs: "failed" });
+}
+
 /** Local writing has provenance in a stored empty draft, not only the fake world's aggregate flag. */
 export function writingLocally(w: World): void {
   writing(w);

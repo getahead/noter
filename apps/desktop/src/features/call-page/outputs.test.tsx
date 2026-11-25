@@ -16,7 +16,7 @@ import { OutputsView } from "./OutputsView";
 import { createAnnouncer } from "../../app/a11y/announce";
 import { announceSummaryOnce, commitDraft, loadOutputs, loadVersion, loadVersions, readVersion, regenerate, saveEdit } from "./outputs-actions";
 import { bodyOf, holdOutputs, resetOutputsCache } from "./outputs-cache";
-import { RegenerateSheet } from "./RegenerateSheet";
+import { RegenerateSheet, RegenerationError } from "./RegenerateSheet";
 import { VersionSwitcher } from "./VersionSwitcher";
 import { OutputItemRow } from "./OutputItemRow";
 import { CallToolbar, moreItems } from "./CallToolbar";
@@ -69,6 +69,22 @@ describe("OutputsView", () => {
     await open([sec("summary", { state: { type: "writing" } }), sec("decisions", { state: { type: "pending" } }), sec("action_items", { state: { type: "failed", code: "internal", local_fallback_available: true } as never }), sec("open_questions", { state: { type: "empty" } })], "writing");
     const html = view();
     for (const text of ["Writing summary…", "Waiting for the summary", "Couldn&#x27;t write the action items", "Try Again", "Use Local Model", "No open questions in this call"]) expect(html).toContain(text);
+  });
+
+  it("shows the power hold in place of pending sections and releases the named run", async () => {
+    const ready = sec("summary", { body_md: "Previous summary" });
+    await open([ready, sec("decisions", { state: { type: "pending" } })], "partially_failed", { waiting_for_power: "run_held" });
+    const html = view();
+    expect(html).toContain("Regeneration queued · waiting for power");
+    expect(html).toContain("Run Now");
+    expect(html).toContain("Previous summary");
+    expect(html).not.toContain("Waiting for the summary");
+    const seen = sent();
+    const tree = rendered(OutputsView, { bridge, callId: id });
+    const banner = find(tree, (p) => (p.banner as { id?: string })?.id === "regen-power").props.banner as { actions: { onAction(): void }[] };
+    banner.actions[0]!.onAction();
+    await settle();
+    expect(seen).toContainEqual(["outputs_regenerate", { call_id: id, run_now_on_battery: "run_held", sections: [], local: false }]);
   });
 
   it("shows nothing until the outputs are read", async () => {
@@ -243,6 +259,22 @@ describe("outputs commands", () => {
     expect((await loadVersion(bridge, s.summary_id!, "ver_none")).status).toBe("error");
   });
 
+  it("a repeated submission retains the fake core's selected sections and local runtime for Run Now", async () => {
+    const { callId } = await withSummary();
+    fake.world.app.capture = { ...fake.world.app.capture, phase: "idle" };
+    const out = fake.world.outputs.find((o) => o.call_id === callId)!;
+    out.waiting_for_power = "run_held";
+    const request = { call_id: callId, sections: ["summary"] as SectionKind[], local: true };
+    expect(await regenerate(bridge, request)).toEqual({ status: "ok", data: { job_run_id: "run_held" } });
+    const stale = await regenerate(bridge, { ...request, run_now_on_battery: "previous_run" });
+    expect(stale.status === "error" && stale.error.code).toBe("not_found");
+    expect(out.waiting_for_power).toBe("run_held");
+    const released = await regenerate(bridge, { call_id: callId, sections: [], local: false, run_now_on_battery: "run_held" });
+    expect(released).toEqual({ status: "ok", data: { job_run_id: "run_held" } });
+    expect(out.waiting_for_power).toBeNull();
+    await vi.waitFor(() => expect(out.sections.find((s) => s.kind === "summary")?.writer?.runtime).toBe("local"), { timeout: 2000 });
+  });
+
   it("outputs_regenerate is accepted as a job, and refused with job_blocked while a call is live", async () => {
     const { callId } = await withSummary();
     const live = await regenerate(bridge, { call_id: callId, sections: ["summary"], local: false });
@@ -253,6 +285,19 @@ describe("outputs commands", () => {
 });
 
 describe("RegenerateSheet", () => {
+  it("maps regeneration refusals and opens assistant settings from the no-runtime error", async () => {
+    await open([]);
+    for (const [code, text] of [["job_blocked", "Regeneration waits for the call to end"], ["internal", "start regenerating"], ["runtime_unavailable", "Add an Assistant…"]] as const) {
+      expect(renderToString(<RegenerationError bridge={bridge} code={code} />)).toContain(text);
+    }
+    const seen = sent();
+    const close = vi.fn();
+    const tree = rendered(RegenerationError, { bridge, code: "runtime_unavailable", onOpenSettings: close });
+    (tree.props.banner as { actions: { onAction(): void }[] }).actions[0]!.onAction();
+    expect(close).toHaveBeenCalledOnce();
+    expect(seen).toContainEqual(["window_navigate", { target: { type: "settings", pane: "models_and_runtimes" } }]);
+  });
+
   it("runs the default action on Return from a checkbox", async () => {
     await open([]);
     fake.world.app.capture = { ...fake.world.app.capture, phase: "idle" } as never;

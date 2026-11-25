@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import type { MsgKey } from "../../i18n/en";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { RuntimeChoice, SectionKind } from "../../core/bindings";
+import type { ErrorCode, RuntimeChoice, SectionKind } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { useSheetIfAny } from "../../ui/dialogs/host";
@@ -15,7 +15,7 @@ import { PushButton } from "../../ui/primitives/push-button";
 import { Sheet, SheetFooter } from "../../ui/primitives/sheet";
 import { useTypes } from "./cache";
 import { regenerate } from "./outputs-actions";
-import { loadOutputs } from "./outputs-actions";
+import { getOutputs } from "./outputs-cache";
 
 // DESIGN: Summary, "Decisions, action items and open questions" (both on) and Role reviews (off)
 const GROUPS: ReadonlyArray<{ id: string; label: MsgKey; kinds: SectionKind[] }> = [
@@ -38,7 +38,7 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
   const [skill, setSkill] = useState("");
   const [picked, setPicked] = useState<Set<string>>(new Set(GROUPS.filter((g) => g.id !== "role_reviews" && g.kinds.some((k) => sections.includes(k) || g.id === "items")).map((g) => g.id)));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ErrorCode | null>(null);
 
   const submit = async () => {
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
@@ -48,9 +48,11 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
     const r = await regenerate(bridge, { call_id: callId, sections: GROUPS.filter((g) => picked.has(g.id)).flatMap((g) => g.kinds), runtime: chosen?.runtime ?? null, model: chosen?.model ?? null, skill: skill || null, local: runtime === "local" });
     setBusy(false);
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
-    if (r.status === "error") return setError(r.error.code === "job_blocked" ? t("outputs.regen.blocked") : t("outputs.regen.failed"));
+    if (r.status === "error") return setError(r.error.code);
     close();
-    void loadOutputs(bridge, callId);
+    if (getOutputs(callId)?.waiting_for_power === r.data.job_run_id) {
+      void bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } });
+    }
   };
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-sheet
@@ -58,7 +60,7 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
     <Sheet title={t("outputs.regen.title")} width={520} busy={busy} onCancel={close} onDefault={() => void submit()}>
       <div className="np-sheet__head"><div className="np-sheet__title">{t("outputs.regen.title")}</div></div>
       <div className="np-sheet__body pc-regen">
-        {error && <InlineBanner banner={{ id: "regen-error", severity: "error", text: error }} />}
+        {error && <RegenerationError bridge={bridge} code={error} onOpenSettings={close} />}
         <label className="pc-regen__row">{t("outputs.regen.runtime")}
           <PopupButton label={t("outputs.regen.runtime")} value={runtime} onAction={setRuntime} options={[{ value: "current", label: t("outputs.regen.current") }, ...RUNTIMES.map((r) => ({ value: r.value, label: t(r.label) }))]} />
         </label>
@@ -77,6 +79,22 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
   );
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-sheet
 }
+
+// @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error
+export function RegenerationError({ bridge, code, onOpenSettings }: { bridge: Bridge; code: ErrorCode; onOpenSettings?: () => void }) {
+  const openSettings = () => {
+    onOpenSettings?.();
+    void bridge.core.windowNavigate({ target: { type: "settings", pane: "models_and_runtimes" } });
+  };
+  const noAssistant = code === "runtime_unavailable";
+  return <InlineBanner banner={{
+    id: "regen-error",
+    severity: "error",
+    text: t(noAssistant ? "mode.text.no_assistant" : code === "job_blocked" ? "outputs.regen.blocked" : "outputs.regen.failed"),
+    actions: noAssistant ? [{ label: t("outputs.add_assistant"), onAction: openSettings }] : [],
+  }} />;
+}
+// @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error
 
 /** Opens the sheet for a call; registers it with the host the first time a page asks. */
 export function useRegenerate(bridge: Bridge, callId: string) {

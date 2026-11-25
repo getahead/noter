@@ -11,10 +11,10 @@ import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { SummaryNamingPanel } from "../transcript/hosts";
 import { extrasOf } from "./cache";
 import { OutputSection } from "./OutputSection";
-import { announceSummaryOnce, loadOutputs, outputsKey, regenerate } from "./outputs-actions";
+import { announceSummaryOnce, loadOutputs, outputsKey, outputsRegenerateKey, regenerate } from "./outputs-actions";
 import { useOutputs } from "./outputs-cache";
 import { isWriting, mergeSection, orderSections } from "./outputs-logic";
-import { useRegenerate } from "./RegenerateSheet";
+import { RegenerationError, useRegenerate } from "./RegenerateSheet";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
 // @cpt-dod:cpt-noter-dod-ui-call-page-outputs-content:p1
@@ -26,6 +26,12 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   const progress = useWindow(bridge, (s) => s.outputs);
   const openRegenerate = useRegenerate(bridge, callId);
   const read = useWindow(bridge, (s) => s.commands[outputsKey(callId)]);
+  const heldRun = outputs?.waiting_for_power;
+  const heldStatus = useWindow(bridge, (s) => heldRun && s.jobs[heldRun]?.status);
+  const regen = useWindow(bridge, (s) => s.commands[outputsRegenerateKey(callId)]);
+  useEffect(() => {
+    if (heldStatus && heldStatus !== "queued") void loadOutputs(bridge, callId);
+  }, [bridge, callId, heldStatus]);
   const announce = useAnnounce(bridge);
 
   // once per call and instance: a development remount must not ask the core twice
@@ -65,7 +71,15 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
       {/* @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
       {naming}
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
-      {sections.map((s: Section) => (
+      {heldRun && <>
+        <InlineBanner banner={{
+          id: "regen-power", severity: "warning", title: t("outputs.regen.power_title"), text: t("outputs.regen.power_help"),
+          actions: [{ label: t("outputs.regen.run_now"), loading: regen?.state === "WAITING",
+            onAction: () => void regenerate(bridge, { call_id: callId, sections: [], local: false, run_now_on_battery: heldRun }) }],
+        }} />
+        {regen?.error?.code && <RegenerationError bridge={bridge} code={regen.error.code} />}
+      </>}
+      {sections.filter((s) => !heldRun || s.state.type !== "pending").map((s: Section) => (
         <OutputSection key={s.kind} bridge={bridge} call={call} section={s} prefs={prefs} writing={writing} onRegenerate={(local) => (s.state.type === "failed" ? again(s.kind, local) : openRegenerate([s.kind]))} />
       ))}
     </div>

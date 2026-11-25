@@ -115,6 +115,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - **Regenerated · your 2 edits kept · Show Diff**; Compare toggles **v1 → Your Edit** without replacing the saved edit.
 
 **Error Scenarios**:
+- On battery, show the core’s power-held run on the call page, including after a repeat submission or reopening the call. **Run Now** releases that run once. Without an assistant, show **Add an Assistant…** when reading unwritten sections of a past call and when regeneration is refused.
 - `job_blocked` during capture: explain regeneration waits for the call to end; no timer retry.
 - If requesting regeneration is refused, keep the failed section visible and show the command's error beside it; preserve **Try Again** and **Use Local Model** where available.
 - A failed runtime leaves old output and offers explicit retry/local fallback.
@@ -268,7 +269,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 **Touches**:
 - Commands: `outputs_get`, `output_edit`, `outputs_regenerate`, `output_versions`, `output_version_get`
-- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison with adjacent replacement text separated
+- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, a battery-held regeneration with Run Now, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison with adjacent replacement text separated
 
 ### Sharing, tags, audio and notification routing
 
