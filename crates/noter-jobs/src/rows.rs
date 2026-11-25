@@ -155,6 +155,19 @@ pub(crate) fn defs(store: &Store) -> Result<Vec<Def>, CoreError> {
         .collect())
 }
 
+pub(crate) fn regeneration_request(
+    store: &Store,
+    run: &JobRunId,
+) -> Result<Option<String>, CoreError> {
+    store.read(|c| {
+        c.query_row(
+            "SELECT regeneration_request FROM job_runs WHERE id = ?1",
+            [run.as_str()],
+            |r| r.get(0),
+        )
+    })
+}
+
 pub(crate) fn runs(store: &Store) -> Result<Vec<Stored>, CoreError> {
     let raw = store.read(|c| {
         let mut st = c.prepare(

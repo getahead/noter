@@ -716,6 +716,44 @@ async fn a_failed_batch_rolls_back_and_progress_stays_truthful() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_legacy_regeneration_never_runs_on_restart() {
+    let r = rig().await;
+    r.power.0.store(true, Ordering::SeqCst);
+    let call = CallId::new("call_legacy");
+    let run = r.go(Request::for_call(
+        JobKind::Regeneration,
+        Trigger::OnDemand,
+        &call,
+    ));
+    let db = noter_db::rusqlite::Connection::open(r.dir.path().join("noter.db")).unwrap();
+    db.execute(
+        "UPDATE job_runs SET regeneration_request = NULL WHERE id = ?1",
+        [run.as_str()],
+    )
+    .unwrap();
+    drop(db);
+    let restored = rig_on(r.dir, r.store, 9_000);
+    restored.sched.start().unwrap();
+    settle().await;
+    let row = restored.run(&run);
+    assert_eq!(
+        (row.status, row.error),
+        (JobRunStatus::Failed, Some(ErrorCode::InvalidInput))
+    );
+    assert!(restored.sched.waiting_for_power(&call).unwrap().is_none());
+    assert_eq!(
+        restored
+            .sched
+            .runs()
+            .unwrap()
+            .iter()
+            .filter(|r| r.kind == JobKind::Regeneration)
+            .count(),
+        1
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn restart_fails_unfinished_runs_and_queues_a_retry() {
     let dir = tempfile::tempdir().unwrap();
     let store = open_store(&dir);

@@ -284,9 +284,7 @@ impl Core {
                 job_run_id: run.clone(),
             });
         }
-        let req = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &args.call_id);
-        self.postcall.request(args);
-        let run = self.in_runtime(|| self.jobs.trigger(req))?;
+        let run = self.in_runtime(|| self.jobs.regenerate(args))?;
         let job_run_id = run.ok_or_else(blocked)?;
         if matches!(self.jobs.waiting_for_power(&args.call_id), Ok(Some(id)) if id == job_run_id) {
             self.log(object(json!({ "level": "info", "module": "postcall", "command": "outputs_regenerate", "code": "waiting_for_power", "id": job_run_id })));

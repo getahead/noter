@@ -149,7 +149,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - User regeneration during capture: `job_blocked`; an unavailable chosen runtime: typed runtime failure; failed archive leaves the live transcript usable as archive pending.
 
 **Steps**:
-1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration - `inst-regen-request`
+1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration. Store the selected sections, runtime, model, skill and local-only choice with that run, including when updating a queued request. Keep the choices through restart and retry. When a local-only request finds no usable local runtime, fail it without sending a cloud request - `inst-regen-request`
 2. [x] - `p1` - For ArchivePass, wait until no call is live, then request `offline_pass` with the latest user constraints - `inst-regen-archive`
 3. [x] - `p1` - **IF** audio is absent or archive fails, retain the live transcript, expose archive pending or failed state and use the scheduled retry path when audio remains available - `inst-regen-archive-fail`
 4. [x] - `p1` - On archive success, re-read the latest live speakers and segments after the offline pass and its final checkpoint; map clusters by time overlap, retain user speaker and term corrections made while the pass ran, install archive segments and keep the live copy for seven days - `inst-regen-install`
@@ -157,6 +157,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 6. [x] - `p1` - Generate only the requested sections and run `cpt-noter-algo-core-postcall-merge` with current edits re-read at commit time - `inst-regen-merge`
 7. [x] - `p1` - Publish committed changes, including archive speaker relabelling information and section progress, then refresh per-call files - `inst-regen-publish`
 8. [x] - `p1` - **RETURN** the job's result; cancellation or a superseded generation cannot install late output, and install uses the current live correction snapshot - `inst-regen-return`
+9. [x] - `p1` - Recover the choices attached to this run before selecting a runtime or building its packet. Fail safely when a legacy run has no saved request - `inst-regen-restore`
 
 ## 3. Processes / Business Logic (CDSL)
 

@@ -794,6 +794,132 @@ async fn an_edit_is_in_the_history_of_everything_and_of_its_call_with_the_items(
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_restores_the_selected_local_run_after_restart() {
+    check_local_regeneration_after_restart(true).await;
+    check_local_regeneration_after_restart(false).await;
+}
+
+async fn check_local_regeneration_after_restart(local_available: bool) {
+    use noter_protocol::model::{ApiKeySetArgs, KeyProvider};
+
+    struct Power(bool);
+    impl noter_core::PowerSource for Power {
+        fn on_battery(&self) -> bool {
+            self.0
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let scripted = Scripted::new();
+    let cli = noter_core::ScriptedAccountCli::default();
+    scripted.follow(&cli);
+    let secrets = Arc::new(noter_core::MemorySecrets::default());
+    let open_core = |battery| {
+        let deps = CoreDeps {
+            power: Arc::new(Power(battery)),
+            llm: Adapters::scripted(&scripted),
+            secrets: secrets.clone(),
+            ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(Events::default()))
+        };
+        let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+        core.start_first_run();
+        core
+    };
+    let core = open_core(true);
+    core.accounts_read_at_launch().await;
+    core.api_key_set(
+        &CommandCtx {
+            caller: Caller::Window {
+                label: WindowLabel::Settings,
+            },
+        },
+        ApiKeySetArgs {
+            provider: KeyProvider::Anthropic,
+            key: "test-stand-in-value-0001".into(),
+        },
+    )
+    .await
+    .unwrap();
+    seed_call(&core, CALL, 3);
+    let args = RegenerateArgs {
+        call_id: CallId::new(CALL),
+        sections: vec![SectionKind::Decisions],
+        local: true,
+        runtime: None,
+        model: Some("selected-local-model".into()),
+        skill: Some(noter_protocol::CallTypeId("one_on_one".into())),
+        run_now_on_battery: None,
+    };
+    let setup_packets = scripted.received().len();
+    let initial = RegenerateArgs {
+        sections: vec![SectionKind::Summary],
+        local: false,
+        ..args.clone()
+    };
+    let run = core
+        .outputs_regenerate(&main_window(), initial)
+        .await
+        .unwrap()
+        .job_run_id;
+    let updated = core
+        .outputs_regenerate(&main_window(), args)
+        .await
+        .unwrap()
+        .job_run_id;
+    assert_eq!(updated, run);
+    // The archive's automatic default regeneration must not overwrite the user's pending choices.
+    let archive = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &CallId::new(CALL));
+    assert_eq!(
+        core.scheduler().trigger(archive).unwrap(),
+        Some(run.clone())
+    );
+    assert_eq!(
+        outputs(&core, CALL).await.waiting_for_power,
+        Some(run.clone())
+    );
+    assert_eq!(scripted.received().len(), setup_packets);
+    let first = Arc::downgrade(&core);
+    drop(core);
+    assert!(first.upgrade().is_none());
+
+    if !local_available {
+        cli.set(serde_json::from_value(json!({"tool":"ollama", "installed":false})).unwrap());
+    }
+    let restored = open_core(false);
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    let received = &scripted.received()[setup_packets..];
+    if !local_available {
+        assert!(
+            received.is_empty(),
+            "local-only regeneration fell back to cloud"
+        );
+        assert_eq!(
+            run_status(&restored, &run),
+            (JobRunStatus::Failed, Some(ErrorCode::RuntimeUnavailable))
+        );
+        return;
+    }
+    assert_eq!(run_status(&restored, &run).0, JobRunStatus::Succeeded);
+    assert!(!received.is_empty());
+    assert!(
+        received.iter().all(|r| r.runtime == RuntimeChoice::Local),
+        "restored run sent a cloud request"
+    );
+    assert!(received.iter().all(|r| r.model == "selected-local-model"));
+    assert!(received
+        .iter()
+        .all(|r| String::from_utf8_lossy(&r.bytes).contains("one_on_one")));
+    let out = outputs(&restored, CALL).await;
+    assert_eq!(
+        out.sections
+            .iter()
+            .filter(|s| s.writer.is_some())
+            .map(|s| s.kind)
+            .collect::<Vec<_>>(),
+        [SectionKind::Decisions]
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_power_held_regeneration_checks_the_assistant_again_before_running_on_battery() {
     struct Battery;
     impl noter_core::PowerSource for Battery {
