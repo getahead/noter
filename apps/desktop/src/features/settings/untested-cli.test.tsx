@@ -12,15 +12,16 @@ import { AccountSignInSheet } from "./AccountSignInSheet";
 import { AccountRow } from "./CredentialRow";
 import { signInMachines } from "./signin-store";
 
-const WARNING = "Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, use your API key or Codex 0.163.";
+const WARNING = "Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, update Noter, or use Codex 0.163.";
 const codex = (over: Partial<CliInfo> = {}): CliInfo => ({ tool: "codex", installed: true, path: "/bin/codex", version: "0.171.0", supported: true, untested: true, tested: "0.163.0", ...over });
 
 let bridge: Bridge;
 afterEach(() => bridge?.close());
 
 describe("an untested newer CLI (issue 1219)", () => {
-  it("names the version, says it should work and points to the tested one", () => {
+  it("cpt-noter-seq-settings-sign-in-account: names the version and points to a Noter update or the tested version, never to the API key (issue 1247: a key runs through the same tool)", () => {
     expect(untestedText("chatgpt", codex())).toBe(WARNING);
+    expect(untestedText("claude", codex({ version: "2.4.1", tested: "2.1.296" }))).not.toContain("API key");
     expect(untestedText("chatgpt", codex({ untested: false }))).toBeNull();
     expect(untestedText("chatgpt", codex({ tested: null }))).toBeNull();
   });

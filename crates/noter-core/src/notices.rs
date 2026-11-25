@@ -132,6 +132,27 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-notices:p1:inst-raise-notice
     }
 
+    fn next_meeting_event(
+        &self,
+        current: Option<&CalendarEventId>,
+        now: i64,
+    ) -> Option<CalendarEventRef> {
+        let near = self.start_event(None, None, now)?;
+        if Some(&near.id) != current {
+            return Some(near);
+        }
+        // The running event wins the usual start lookup even when the next
+        // invitation begins inside its ten-minute lookahead.
+        self.deps
+            .native
+            .calendar_events(TimestampMs(now), TimestampMs(now + 600_001))
+            .ok()?
+            .into_iter()
+            .map(|entry| entry.event)
+            .filter(|e| Some(&e.id) != current && (now..=now + 600_000).contains(&e.starts_at.0))
+            .min_by_key(|e| e.starts_at.0)
+    }
+
     /// The engine reported a meeting app holding audio.
     // @cpt-flow:cpt-noter-flow-core-capture-session-record-detected:p1
     // @cpt-dod:cpt-noter-dod-core-capture-session-detection:p1
@@ -148,9 +169,7 @@ impl Core {
             if !same_app && !asked {
                 // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
                 let notice = CaptureNotice::NewMeeting {
-                    event: self
-                        .start_event(None, None, now)
-                        .filter(|e| session.event_id.as_ref() != Some(&e.id)),
+                    event: self.next_meeting_event(session.event_id.as_ref(), now),
                     app_name: Some(app_name.clone()),
                     detected_at: TimestampMs(now),
                     expires_at: TimestampMs(now + NEW_MEETING_MS),

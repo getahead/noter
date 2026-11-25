@@ -124,6 +124,19 @@ describe("fake core stream and record parity", () => {
     expect(current.state).toEqual({ type: "ready" });
   });
 
+  it("cpt-noter-seq-call-screen-stop-at-call-end imports only the next invitation when splitting", async () => {
+    const fake = core();
+    const event = fake.world.today.today[0]!;
+    event.attendees = [{ name: "hidden@example.test", person: null, email: "hidden@example.test" }];
+    const current = fake.world.app.capture;
+    current.notice = {
+      type: "new_meeting", event: { id: event.event_id, title: event.title, starts_at: event.starts_at, ends_at: event.ends_at },
+      app_name: "Zoom", detected_at: fake.world.now, expires_at: fake.world.now + 60_000, default_choice: "start_as_new_call",
+    };
+    const next = await fake.invoke("capture_answer_new_meeting", { call_id: current.call_id, choice: "start_as_new_call" }) as CaptureState;
+    expect(fake.world.calls.find((c) => c.id === next.call_id)).toMatchObject({ participants: [], invited_guests: ["Guest"], title: event.title });
+  });
+
   it("creates a call row and live transcript on capture start, then stops the row and transcript", async () => {
     const fake = core();
     const other = new FakeCore({ window: "main", world: fake.world });

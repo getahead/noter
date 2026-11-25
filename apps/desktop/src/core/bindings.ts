@@ -704,6 +704,8 @@ export type CallRow = {
 	participants: PersonChip[],
 	/**  Participants known only from the invitation, without an identified speaker in the call. */
 	invited_ids?: PersonId[],
+	/**  Display labels for unconfirmed invitees who have no linked Person. */
+	invited_guests?: string[],
 	unnamed_speakers: number,
 	languages: Lang[],
 	tags: string[],

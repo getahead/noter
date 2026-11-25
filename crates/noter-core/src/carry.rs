@@ -100,6 +100,7 @@ impl Core {
     }
 
     /// Resolve and persist the matched invitation before the first segment (even for a silent call).
+    // @cpt-dbtable:cpt-noter-dbtable-call-participants:p1
     pub(crate) fn seed_invitees(
         &self,
         call: &CallId,
@@ -115,34 +116,35 @@ impl Core {
         self.store().write_with(meta, move |tx| {
             let mut log = Vec::new();
             for attendee in attendees {
-                let name = attendee.name.trim();
-                if name.is_empty() {
-                    continue;
-                }
-                let person = match db(crate::people::by_name(tx, name, attendee.email.as_deref()))?
+                let name = crate::people::invitee_name(&attendee);
+                let email = attendee
+                    .email
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|e| !e.is_empty());
+                if let Some(person) =
+                    db(crate::people::by_name(tx, name.unwrap_or_default(), email))?
                 {
-                    Some(id) => id,
-                    None => {
-                        let id = new_id("per");
-                        let short = crate::people::short_of(name);
-                        db(tx.execute(
-                            "INSERT INTO people (id, rev, display_name, short_name, email)
-                             VALUES (?1, 1, ?2, ?3, ?4)",
-                            params![id, name, short, attendee.email],
-                        ))?;
+                    add_participant(tx, &call, &person, true, &mut log)?;
+                } else {
+                    let id = new_id("guest");
+                    let label = name.unwrap_or("Guest");
+                    if db(tx.execute(
+                        "INSERT INTO call_guests (id, call_id, display_name, email)
+                         VALUES (?1, ?2, ?3, ?4) ON CONFLICT DO NOTHING",
+                        params![id, call, label, email],
+                    ))? != 0
+                    {
                         log.push(logged(
-                            "person",
+                            "call_guest",
                             &id,
                             vec![
-                                ("display_name", json!(null), json!(name)),
-                                ("short_name", json!(null), json!(short)),
-                                ("email", json!(null), json!(attendee.email)),
+                                ("call_id", json!(null), json!(call)),
+                                ("display_name", json!(null), json!(label)),
                             ],
                         ));
-                        id
                     }
-                };
-                add_participant(tx, &call, &person, true, &mut log)?;
+                }
             }
             Ok(((), log))
         })?;

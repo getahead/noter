@@ -2017,7 +2017,7 @@ Who was on which call. Change from the PRD: drops `speaker_label` and `channel`,
 
 **Constraints**: FK cascade on call delete; person delete unlinks
 
-**Additional info**: Filled from calendar attendees and named speakers
+**Additional info**: Link existing People from Calendar invitations at any size. Keep unknown invitees in `call_guests` for that call until explicitly named or confirmed as speakers. An invitation alone never creates a Person. Lists and exports show their display name or **Guest** with **Invited**. The importer uses addresses privately for matching and omits addresses from the change log. A new meeting split uses its own matched event and invitees, or starts without an invitation (PM-39).
 
 **Example**:
 

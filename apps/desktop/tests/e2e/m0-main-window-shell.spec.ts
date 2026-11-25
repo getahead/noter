@@ -59,6 +59,41 @@ test.describe("cpt-noter-flow-ui-main-window-shell-navigate", () => {
     await expect(calls).toBeVisible();
   });
 
+  // #1270, owner rule 25 Nov (extends #1044): every section switch opens the section's root page, never a nested page left
+  // there before; Back and Forward keep their history
+  test("UI — other path: Calls → a call, Today, then Calls in the sidebar opens the Calls list, and Back returns to Today", async ({ page }) => {
+    await openWindow(page, "main", { world: () => {} });
+    const calls = page.getByRole("heading", { name: "Calls", level: 1 });
+    const callPage = page.locator('[data-region="PC-R1"]');
+    const row = page.locator('[data-component="cpt-noter-component-ui-call-row"][data-variant="table-row"]').filter({ hasText: "Backend sync" }).first();
+    await expect(async () => {
+      await section(page, "Calls").click();
+      await expect(calls).toBeVisible({ timeout: 1000 });
+    }).toPass();
+    await row.dblclick();
+    await expect(callPage).toContainText("Backend sync");
+
+    await section(page, "Today").click();
+    await expect(section(page, "Today")).toHaveAttribute("aria-current", "page");
+    await section(page, "Calls").click();
+    await expect(calls).toBeVisible();
+    await expect(callPage).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Back" }).first().click();
+    await expect(section(page, "Today")).toHaveAttribute("aria-current", "page");
+
+    // the section shortcut (and the View menu item that runs it) opens the root too
+    await page.keyboard.press("Meta+BracketRight");
+    await expect(calls).toBeVisible();
+    await row.dblclick();
+    await expect(callPage).toContainText("Backend sync");
+    await page.keyboard.press("Meta+Digit1");
+    await expect(section(page, "Today")).toHaveAttribute("aria-current", "page");
+    await page.keyboard.press("Meta+Digit3");
+    await expect(calls).toBeVisible();
+    await expect(callPage).toHaveCount(0);
+  });
+
   test("UI — keyboard only: ⌘3 opens Calls with focus on its heading, ⌘[ goes back, Back is disabled at the start", async ({ page }) => {
     await openWindow(page, "main");
     await expect(page.locator('[data-region="window"]')).toHaveAttribute("data-state", "ready");

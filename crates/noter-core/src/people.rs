@@ -59,8 +59,12 @@ pub(crate) fn db<T>(r: Db<T>) -> Result<T, CoreError> {
     r.map_err(internal)
 }
 
-/// A named speaker's or item owner's chip from the person row, so a rename needs no transcript
-/// rewrite; `None` when the person is gone.
+/// An EventKit name may contain the address even when the display name was omitted.
+pub(crate) fn invitee_name(attendee: &crate::CalendarAttendee) -> Option<&str> {
+    let name = attendee.name.trim();
+    (!name.is_empty() && !name.contains('@')).then_some(name)
+}
+
 /// Resolve a person by email first, then by display name or normalized alias.
 pub(crate) fn by_name(c: &Connection, name: &str, email: Option<&str>) -> Db<Option<String>> {
     if let Some(email) = email.filter(|email| !email.trim().is_empty()) {
@@ -125,6 +129,8 @@ pub(crate) fn chip_for(c: &Connection, person_id: &str, fallback_name: &str) -> 
     Ok(chip_of(c, person_id)?.unwrap_or_else(|| chip_from_name(person_id, fallback_name)))
 }
 
+/// A named speaker's or item owner's chip from the person row, so a rename needs no transcript
+/// rewrite; `None` when the person is gone.
 pub(crate) fn chip_of(c: &Connection, person_id: &str) -> Db<Option<PersonChip>> {
     c.query_row(
         "SELECT display_name, short_name, is_you FROM people WHERE id = ?1",

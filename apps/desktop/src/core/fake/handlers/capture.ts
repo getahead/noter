@@ -1,7 +1,15 @@
+import type { CallRow, UpcomingCall } from "../../bindings";
 import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
 import * as shared from "./shared";
 import { hideCallWindow } from "./windows";
+
+function importInvitation(row: CallRow, invitation: UpcomingCall | undefined) {
+  const attendees = invitation?.attendees ?? [];
+  row.participants = attendees.flatMap((a) => a.person && !a.person.is_you ? [a.person] : []);
+  row.invited_ids = row.participants.map((p) => p.id);
+  row.invited_guests = attendees.filter((a) => !a.person).map((a) => a.name.trim() && !a.name.includes("@") ? a.name.trim() : "Guest");
+}
 
 export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
@@ -42,8 +50,7 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     const started_at = shared.now();
     const row = shared.createCaptureCall(world, id, title, started_at, a.sensitive);
     row.platform = invitation?.platform ?? detection?.app_name ?? null;
-    row.participants = invitation?.attendees.flatMap((a) => a.person && !a.person.is_you ? [a.person] : []) ?? [];
-    row.invited_ids = row.participants.map((p) => p.id);
+    importInvitation(row, invitation);
     const audioNotStored = world.settings.audio.retention === "never_store";
     return shared.setCapture(fake, {
       phase: "recording",
@@ -135,7 +142,11 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     const id = newId("call");
     const started_at = cap.notice.detected_at;
     // Like the real core, a new call has its row and empty live transcript at once (D-37).
-    shared.createCaptureCall(world, id, title, started_at, cap.sensitive);
+    const row = shared.createCaptureCall(world, id, title, started_at, cap.sensitive);
+    const eventId = cap.notice.event?.id;
+    const invitation = [...world.today.today, ...world.today.this_week].find((e) => e.event_id === eventId);
+    row.platform = invitation?.platform ?? cap.notice.app_name;
+    importInvitation(row, invitation);
     return shared.setCapture(fake, { call_id: id, title, started_at, recorded_ms: 0, notice: null });
   },
   capture_keep_recording: (a, { world, fake }) => {
