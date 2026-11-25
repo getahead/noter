@@ -11,6 +11,7 @@ import { Badge } from "../../ui/primitives/badge";
 import { Link } from "../../ui/primitives/link";
 import { Icon } from "../../ui/icons";
 import { TopicChip } from "../../ui/primitives/topic-chip";
+import { Owner } from "../items/ActionItemRow";
 import { CallLink } from "../items/CallLink";
 import { KIND_ICON, KIND_KEY } from "../items/kind";
 import { slots } from "./slots";
@@ -48,7 +49,7 @@ export function OutputItemRow({ bridge, item: listed, compact = false, showCall 
       <div className="it-row__main">
         <span className="it-row__text" lang={lang}>{item.text}</span>
         <div className="it-row__line2">
-          {item.owner && <span className="np-dim">{item.owner.short_name}</span>}
+          {item.owner && <Owner person={item.owner} />}
           {/* the evidence opens the transcript at the span (`window_navigate`, as a notification does) */}
           {Tail ? <Tail bridge={bridge} item={item} part="meta" /> : evidence}
           {suggested}
