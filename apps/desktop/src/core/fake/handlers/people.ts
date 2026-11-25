@@ -3,6 +3,36 @@ import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
 import * as shared from "./shared";
 
+function shortName(name: string): string {
+  const words = name.trim().split(/\s+/);
+  return words.length < 2 ? name : `${words[0]} ${Array.from(words.at(-1)!)[0]}.`;
+}
+
+// The real core joins these chips to the person when it reads them. The fixture embeds copies.
+function refreshChips(world: Core.World, person: Bindings.PersonRow) {
+  const chip = shared.personRef(person);
+  const refresh = (held: Bindings.PersonChip | null) => {
+    if (held?.id === person.id) Object.assign(held, chip);
+  };
+  const refreshLabel = (label: Bindings.SpeakerLabel) => {
+    if (label.type === "person") refresh(label.person);
+  };
+  for (const call of [...world.calls, ...world.call_details.map((detail) => detail.call)]) call.participants.forEach(refresh);
+  for (const snapshot of [...world.transcripts, ...world.call_details]) {
+    for (const speaker of snapshot.speakers) {
+      refreshLabel(speaker.label);
+      refresh(speaker.suggestion);
+    }
+  }
+  for (const transcript of world.transcripts) {
+    for (const segment of [...transcript.segments, ...transcript.hypotheses]) {
+      refreshLabel(segment.speaker.label);
+      segment.crosstalk_with.forEach((ref) => refreshLabel(ref.label));
+    }
+  }
+  for (const item of world.items) refresh(item.owner);
+}
+
 export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
   /** What the user owes a person: their own open actions from calls the person was on (the page's list, the row's count). */
@@ -26,7 +56,8 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
   },
   person_get: (a, { world }) => {
     const p = shared.person(world, a.person_id);
-    const calls = world.calls.filter((c) => c.participants.some((x) => x.id === p.id));
+    const spoken = new Set(world.transcripts.filter((tr) => tr.speakers.some((s) => s.label.type === "person" && s.label.person.id === p.id)).map((tr) => tr.call_id));
+    const calls = world.calls.filter((c) => spoken.has(c.id) || c.participants.some((x) => x.id === p.id));
     const callIds = new Set(calls.map((call) => call.id));
     const topicIds = new Set(world.items.flatMap((item) => callIds.has(item.call.id) && item.topic ? [item.topic.id] : []));
     return {
@@ -54,7 +85,11 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     shared.checkRev(p.rev, a.rev);
     const patch = a.patch;
     if (patch.display_name != null && !patch.display_name.trim()) throw coreError("invalid_input", "name", { type: "validation", field: "display_name", rule: "required" });
-    if (patch.display_name != null) p.display_name = patch.display_name;
+    if (patch.display_name != null) {
+      if (p.short_name === shortName(p.display_name)) p.short_name = shortName(patch.display_name);
+      p.display_name = patch.display_name;
+      p.initials = patch.display_name.trim().split(/\s+/).slice(0, 2).map((word) => Array.from(word)[0]).join("").toUpperCase();
+    }
     if (patch.short_name != null) p.short_name = patch.short_name;
     if (patch.email !== undefined) p.email = patch.email;
     if (patch.role !== undefined) p.role = patch.role;
@@ -62,6 +97,7 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     if (patch.aliases != null) p.aliases = patch.aliases;
     if (patch.notes !== undefined) p.notes = patch.notes;
     p.rev += 1;
+    if (patch.display_name != null || patch.short_name != null) refreshChips(world, p);
     emit("entity:changed", { type: "person", person: p });
     return { person: p, change_id: shared.logChange(fake, world, { entity: { kind: "person", id: p.id, label: p.display_name }, summary: `Edited ${p.display_name}` }) };
   },

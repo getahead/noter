@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "../../ui/primitives/link";
 import { Popover } from "../../ui/primitives/popover";
 import { useBridge } from "../../app/bridge/context";
-import { useWindow } from "../../app/use-window";
+import { useIdentityRevision, useWindow } from "../../app/use-window";
 import { useAnnounce, type AnnounceEvent } from "../../app/a11y/announce";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallFilter, Lang, PlaybackState, SearchResults } from "../../core/bindings";
@@ -210,7 +210,8 @@ export function SearchPage({ query }: { query: string }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [fstate, setFstate] = useState(heldFilter);
   const filter = fstate.filter;
-  const lists = useLists(bridge);
+  const identity = useIdentityRevision(bridge);
+  const lists = useLists(bridge, identity);
   const playback = useWindow(bridge, (s) => s.whole.playback);
   // the bar changes the held filter; a changed filter reads the search again
   const onFilter = (a: FilterAction) => {
@@ -223,16 +224,17 @@ export function SearchPage({ query }: { query: string }) {
   };
   usePublishHead(null, read.status === "OK" ? t("search.count", { count: resultCount(read.results) }) : null);
   const reads = useRef(once());
+  // A background rename keeps the current results mounted, including keyboard focus.
+  useEffect(() => setRead({ status: "LOADING" }), [query, again]);
   useEffect(() => {
-    const mine = reads.current.start(again, query);
+    const mine = reads.current.start(again, query, identity);
     if (mine === null) return;
-    setRead({ status: "LOADING" });
     // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
     void bridge.act("search", "search", () => bridge.core.search({ query, filter, limit: null }), { screen: "library-search" }).then((r) => {
       if (reads.current.current(mine)) setRead(r.status === "ok" ? { status: "OK", results: r.data } : { status: "READ_ERROR" });
     });
     // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
-  }, [bridge, query, again]);
+  }, [bridge, query, again, identity]);
   // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-return-search
   return (
     <SearchView

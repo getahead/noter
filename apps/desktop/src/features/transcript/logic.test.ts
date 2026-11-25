@@ -243,7 +243,7 @@ describe("host effects", () => {
   it("holds one Channel through StrictMode's second run and ends it a tick after unmount", () => {
     vi.useFakeTimers();
     const bridge = { subscribe: vi.fn(async () => {}), unsubscribe: vi.fn(async () => {}) };
-    const held = { current: null as string | null };
+    const held = { current: null };
     const ending = { current: null as ReturnType<typeof setTimeout> | null };
     const cleanup = holdChannel(bridge, "transcript_subscribe", "c1", held, ending);
     cleanup(); // StrictMode: cleanup, then the effect again
@@ -251,6 +251,11 @@ describe("host effects", () => {
     vi.runAllTimers();
     expect(bridge.subscribe).toHaveBeenCalledOnce();
     expect(bridge.unsubscribe).toHaveBeenCalledOnce();
+    holdChannel(bridge, "transcript_subscribe", "c1", held, ending);
+    holdChannel(bridge, "transcript_subscribe", "c1", held, ending, 1);
+    holdChannel(bridge, "transcript_subscribe", "c1", held, ending, 1);
+    expect(bridge.subscribe).toHaveBeenCalledTimes(3); // a rename supersedes the snapshot once
+
     holdChannel(bridge, "levels_subscribe", "c1", held, ending);
     holdChannel(bridge, "levels_subscribe", null, held, ending); // speech arrived: no more meters
     expect(bridge.unsubscribe).toHaveBeenLastCalledWith("levels_subscribe");

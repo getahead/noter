@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 
 import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
-import { useWindow } from "../../app/use-window";
+import { useIdentityRevision, useWindow } from "../../app/use-window";
 import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, PersonChip as PersonChipView, Result, SegmentId, SpeakerView } from "../../core/bindings";
 import { callTime, clock as timeOf, quote, t } from "../../i18n/format";
 import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
@@ -135,7 +135,8 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     const b = hotkeys?.find((h) => h.action === action);
     return b ? capsOf(b.shortcut) : (DEFAULT_KEYS[action] ?? "");
   };
-  useEffect(() => loadParticipants(bridge, callId, setParticipants), [bridge, callId]);
+  const identity = useIdentityRevision(bridge, callId);
+  useEffect(() => loadParticipants(bridge, callId, setParticipants), [bridge, callId, identity]);
   const notice = cap && !stopped(cap) && cap.notice?.type !== "stopped_automatically" ? cap.notice : null;
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-if-hidden
   // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-return-hidden

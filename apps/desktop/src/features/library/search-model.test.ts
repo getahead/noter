@@ -43,5 +43,9 @@ describe("once (one search read per words, even when the page effect runs twice)
     expect(b).not.toBeNull();
     expect(o.current(a!)).toBe(false);
     expect(o.current(b!)).toBe(true);
+    const renamed = o.start(1, "drawer", 1);
+    expect(renamed).not.toBeNull();
+    expect(o.current(b!)).toBe(false);
+    expect(o.start(1, "drawer", 1)).toBeNull();
   });
 });

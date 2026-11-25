@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { CallDetail, SegmentView, SpeakerView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { Bridge } from "../../app/bridge/bridge";
-import { useWindow } from "../../app/use-window";
+import { useIdentityRevision, useWindow } from "../../app/use-window";
 import { duration, shortDay, t } from "../../i18n/format";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Menu } from "../../ui/primitives/menu";
@@ -41,10 +41,10 @@ export interface TranscriptOptions {
  * Holds a Channel of the call while mounted (`null`: none). The end waits a tick, so StrictMode's second effect run
  * keeps the first subscription instead of opening another; a new call id replaces the Channel. Returns a resubscribe.
  */
-export function useChannel(bridge: Bridge, cmd: ChannelCmd, callId: string | null): () => void {
-  const held = useRef<string | null>(null);
+export function useChannel(bridge: Bridge, cmd: ChannelCmd, callId: string | null, revision = 0): () => void {
+  const held = useRef<{ callId: string; revision: number } | null>(null);
   const ending = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => holdChannel(bridge, cmd, callId, held, ending), [bridge, cmd, callId]);
+  useEffect(() => holdChannel(bridge, cmd, callId, held, ending, revision), [bridge, cmd, callId, revision]);
   return () => void (callId && bridge.subscribe(cmd, { call_id: callId }));
 }
 
@@ -52,10 +52,15 @@ type ChannelCmd = "transcript_subscribe" | "levels_subscribe";
 type Box<T> = { current: T };
 
 /** The effect of `useChannel`: open the call's Channel unless it is already held; the cleanup ends it a tick later. */
-export function holdChannel(bridge: Pick<Bridge, "subscribe" | "unsubscribe">, cmd: ChannelCmd, callId: string | null, held: Box<string | null>, ending: Box<ReturnType<typeof setTimeout> | null>) {
+export function holdChannel(bridge: Pick<Bridge, "subscribe" | "unsubscribe">, cmd: ChannelCmd, callId: string | null, held: Box<{ callId: string; revision: number } | null>, ending: Box<ReturnType<typeof setTimeout> | null>, revision = 0) {
   if (ending.current) clearTimeout(ending.current);
-  if (held.current !== callId) void (callId ? bridge.subscribe(cmd, { call_id: callId }) : bridge.unsubscribe(cmd));
-  held.current = callId;
+  if (callId && (held.current?.callId !== callId || held.current.revision !== revision)) {
+    void bridge.subscribe(cmd, { call_id: callId });
+    held.current = { callId, revision };
+  } else if (!callId && held.current) {
+    void bridge.unsubscribe(cmd);
+    held.current = null;
+  }
   return () => {
     ending.current = setTimeout(() => {
       if (held.current) void bridge.unsubscribe(cmd);
@@ -125,7 +130,10 @@ export function useTranscript(bridge: Bridge, callId: string, o: TranscriptOptio
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-follow:p1:inst-api-subscribe
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-mount-stored
   // @cpt-begin:cpt-noter-flow-ui-live-transcript-stored:p1:inst-api-stored
-  const subscribe = useChannel(bridge, "transcript_subscribe", callId);
+  // Stored calls have no Channel for segments_updated. Read their new assignments after a rename.
+  // A live Channel delivers those assignments itself, but person edits arrive through entity:changed.
+  const identity = useIdentityRevision(bridge, data?.live && !stream?.ended ? null : callId);
+  const subscribe = useChannel(bridge, "transcript_subscribe", callId, identity);
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-api-stored
   // @cpt-end:cpt-noter-flow-ui-live-transcript-stored:p1:inst-mount-stored
   // @cpt-end:cpt-noter-flow-ui-live-transcript-follow:p1:inst-api-subscribe
@@ -408,7 +416,7 @@ export async function readNaming(bridge: Bridge, callId: string): Promise<{ spea
 /** PC-R9 above the Summary: one read of the speakers and lines, no Channel (the Transcript tab owns the one Channel slot); a naming re-reads. */
 export function SummaryNamingPanel({ bridge, callId, detail }: { bridge: Bridge; callId: string; detail: AudioFacts }) {
   const [read, setRead] = useState<{ callId: string; data: Awaited<ReturnType<typeof readNaming>> } | null>(null);
-  const named = useWindow(bridge, (s) => s.entities.speaker);
+  const named = useIdentityRevision(bridge, callId);
   // Ignore a previous call's read when navigation changes before it completes.
   useEffect(() => {
     let current = true;

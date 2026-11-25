@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 import type { Bridge } from "../../app/bridge/bridge";
 import { useBridge } from "../../app/bridge/context";
-import { useWindow } from "../../app/use-window";
+import { useIdentityRevision, useWindow } from "../../app/use-window";
 import type { CoreError, PersonPage as Page, PersonRow, UiPrefs } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
@@ -33,15 +33,16 @@ const reading = new WeakMap<Bridge, Map<string, Promise<PersonState>>>();
 
 /** One `person_get`; a person who no longer exists reads as the error until Delete Person returns to People.
  *  StrictMode mounts a page twice in development: a read in flight is shared, never sent twice. */
-export function readPerson(bridge: Bridge, id: string): Promise<PersonState> {
+export function readPerson(bridge: Bridge, id: string, revision = 0): Promise<PersonState> {
   const mine = reading.get(bridge) ?? reading.set(bridge, new Map()).get(bridge)!;
-  const held = mine.get(id);
+  const key = JSON.stringify([id, revision]);
+  const held = mine.get(key);
   if (held) return held;
   const read = bridge
     .act("person:get", "person_get", () => bridge.core.personGet({ person_id: id }), { screen: "person" })
     .then((res): PersonState => (res.status === "ok" ? { status: "OK", page: res.data, error: null } : { status: "ERROR", page: null, error: res.error }))
-    .finally(() => void mine.delete(id));
-  mine.set(id, read);
+    .finally(() => void mine.delete(key));
+  mine.set(key, read);
   return read;
 }
 
@@ -58,7 +59,7 @@ export function PersonPage({ id }: { id: string }) {
   const bridge = useBridge();
   const tab = usePersonTab(id);
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
-  const known = useWindow(bridge, (s) => s.entities.person[id]);
+  const identity = useIdentityRevision(bridge);
   const [state, setState] = useState<PersonState>({ status: "LOADING", page: null, error: null });
   const [slow, setSlow] = useState(false);
   const [reads, setReads] = useState(0);
@@ -75,9 +76,9 @@ export function PersonPage({ id }: { id: string }) {
   useEffect(() => {
     let current = true;
     // a failed re-read keeps the page that is on screen
-    void readPerson(bridge, id).then((next) => current && setState((s) => (next.status === "ERROR" ? { ...next, page: s.page } : next)));
+    void readPerson(bridge, id, identity).then((next) => current && setState((s) => (next.status === "ERROR" ? { ...next, page: s.page } : next)));
     return () => void (current = false);
-  }, [bridge, id, known?.rev, reads, reread]);
+  }, [bridge, id, identity, reads, reread]);
   // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-get
   useEffect(() => {
     holdPerson(state.page);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type MouseEvent } from "react";
 
 import { useBridge } from "../../app/bridge/context";
-import { useWindow } from "../../app/use-window";
+import { useIdentityRevision, useWindow } from "../../app/use-window";
 import type { PersonRow, UiPrefs, UnnamedSpeaker } from "../../core/bindings";
 import { shortDay, t } from "../../i18n/format";
 import { Icon } from "../../ui/icons";
@@ -43,7 +43,7 @@ export function PeoplePage() {
   const state = usePeopleListState(list);
   const query = usePeopleQuery();
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
-  const known = useWindow(bridge, (s) => s.entities.person);
+  const identity = useIdentityRevision(bridge);
   const [selection, setSelection] = useState<Selection>(NONE);
   const [slow, setSlow] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number; ids: string[] } | null>(null);
@@ -53,15 +53,8 @@ export function PeoplePage() {
   // the named row is gone once the list is read again: focus goes to the next Name…, else the Add Person button
   useEffect(() => void (named.current = settleNaming(document, named.current, state.status)), [state]);
   const sheets = usePeopleSheets();
-  const seen = useRef(known);
-  const reread = usePersonReread(); // Undo of a naming: the core emits no person change, so the strip's refresh bumps this
-  useEffect(() => void (reread && list.load()), [reread, list]);
-  useEffect(() => void list.load(), [list]);
-  // the core changed a person (naming, merge, edit): read the list again, keeping it on screen meanwhile
-  useEffect(() => {
-    if (seen.current !== known) list.load();
-    seen.current = known;
-  }, [known, list]);
+  const reread = usePersonReread();
+  useEffect(() => void list.load(identity + reread), [identity, reread, list]);
   useEffect(() => {
     if (state.status !== "LOADING") return setSlow(false);
     const timer = setTimeout(() => setSlow(true), SLOW_MS);
