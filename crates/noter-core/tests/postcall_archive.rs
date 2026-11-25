@@ -459,6 +459,7 @@ async fn regeneration_merges_new_text_into_the_users_edit_and_keeps_the_candidat
         .outputs_regenerate(
             &main_window(),
             RegenerateArgs {
+                run_now_on_battery: None,
                 call_id: CallId::new(CALL),
                 sections: vec![SectionKind::Summary, SectionKind::CallTypeExtras],
                 runtime: None,

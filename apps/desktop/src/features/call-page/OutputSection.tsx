@@ -118,11 +118,10 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
   const shown = showing && section.summary_id ? bodyOf(section.summary_id, showing) : undefined;
 
   const body = () => {
-    if (state === "pending") return <p className="np-dim">{t("outputs.waiting")}</p>;
-    if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading })}</p>;
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
     // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
-    if (state === "failed" && noAssistant && !regenerateError)
+    const pastCall = call.status !== "recording" && call.status !== "paused";
+    if (noAssistant && (state === "failed" || (pastCall && state === "pending")))
       return (
         <InlineBanner
           banner={{
@@ -146,6 +145,8 @@ export function OutputSection({ bridge, call, section, prefs, writing, onRegener
       );
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-section
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-failed
+    if (state === "pending") return <p className="np-dim">{t("outputs.waiting")}</p>;
+    if (state === "writing" && !section.body_md && !section.items.length) return <p className="np-dim">{prose ? t("outputs.writing_summary") : t("outputs.writing_items", { section: heading })}</p>;
     if (state === "empty")
       return (
         <>

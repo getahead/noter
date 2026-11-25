@@ -142,6 +142,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Archive upgrade reconciles labels, re-chunks and regenerates; manual regeneration can choose runtime, model, skill and sections or request a local rewrite of a failed section.
 
 **Error Scenarios**:
+- Without an assistant, refuse regeneration with `runtime_unavailable` and log the code. A battery-held regeneration remains queued and visible through `outputs_get`. A user can release that run on battery without changing the job definition or bypassing the remaining guards.
 - User regeneration during capture: `job_blocked`; an unavailable chosen runtime: typed runtime failure; failed archive leaves the live transcript usable as archive pending.
 
 **Steps**:

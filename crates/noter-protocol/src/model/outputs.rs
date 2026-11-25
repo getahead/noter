@@ -90,6 +90,10 @@ pub enum OutputsStatus {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallOutputs {
+    /// Queued regeneration for this call waiting for external power. Run Now names this exact run.
+    #[serde(default)]
+    #[specta(optional)]
+    pub waiting_for_power: Option<JobRunId>,
     pub call_id: CallId,
     pub status: OutputsStatus,
     pub sections: Vec<OutputSection>,
@@ -116,6 +120,10 @@ pub struct OutputMutation {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct RegenerateArgs {
+    /// Release only this queued regeneration on battery, retaining its original selections.
+    #[serde(default)]
+    #[specta(optional)]
+    pub run_now_on_battery: Option<JobRunId>,
     pub call_id: CallId,
     /// Summary; decisions, action items and open questions; role reviews.
     pub sections: Vec<SectionKind>,

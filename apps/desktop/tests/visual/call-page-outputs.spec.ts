@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { coreReady, openWindow } from "../e2e/support/app";
 import type { World } from "../support/scenario";
 import * as W from "../support/world-presets";
-import { actionItemsFailed, outputsOf, sectionOf, writing, writingLocally, written } from "../e2e/support/outputs-world";
+import { actionItemsFailed, outputsOf, sectionOf, unwritten, writing, writingLocally, written } from "../e2e/support/outputs-world";
 import { freeze } from "./freeze";
 
 type Fake = { invoke: (cmd: string, args: unknown) => Promise<unknown> };
@@ -74,6 +74,15 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
 });
 
 test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
+  test("battery-held regeneration offers Run Now for the queued call", async ({ page }) => {
+    await open(page, (w) => {
+      unwritten(w);
+      outputsOf(w).waiting_for_power = "run_regeneration";
+    });
+    await expect(outputBody(page).getByRole("button", { name: "Run Now" })).toBeInViewport();
+    await shot(page, "outputs-regeneration-waiting-for-power");
+  });
+
   test("writing: sections remain visible while outputs are being written", async ({ page }) => {
     await openWindow(page, "main", { world: writing });
     await coreReady(page);

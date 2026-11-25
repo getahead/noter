@@ -52,7 +52,7 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
     list.push({ id: "audio-delete-error", severity: "error", text: t("audio.failed"), actions: audioDeleteError.tryAgain ? [{ label: t("action.try_again"), onAction: () => void bridge.retry(deleteKey) }] : [] });
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete-error
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-writing
-  if (tab === "summary" && outputs?.status === "writing")
+  if (tab === "summary" && !outputs?.waiting_for_power && outputs?.status === "writing")
     list.push({
       id: "writing",
       severity: "info",

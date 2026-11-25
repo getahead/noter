@@ -1256,6 +1256,7 @@ pub fn world() -> FakeWorld {
     ];
 
     let backend_outputs = CallOutputs {
+        waiting_for_power: None,
         call_id: CallId(s(BACKEND)),
         status: OutputsStatus::Ready,
         sections: vec![
