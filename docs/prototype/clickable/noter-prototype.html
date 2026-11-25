@@ -9576,7 +9576,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
       <div class="e-cred__main">
         <div class="e-cred__head"><span class="e-cred__name">Your ${p.account}</span>${statusTag}${flash ? C.inlineStatus(flash, { variant: 'trailing' }) : ''}</div>
         ${detail}
-        ${pid === 'chatgpt' && NP.demo('settings') === 'cli-untested' ? html`<span class="st-warnline">${icon('warning', { size: 12 })} Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, use your API key or Codex 0.163.</span>` : ''}
+        ${pid === 'chatgpt' && NP.demo('settings') === 'cli-untested' ? html`<span class="st-warnline">${icon('warning', { size: 12 })} Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, update Noter, or use Codex 0.163.</span>` : ''}
       </div>
       <div class="e-cred__actions">${actions}</div>`);
   };
@@ -9606,7 +9606,7 @@ const NOTER_APP_ICON = 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIj8+Cj
         ? html`<div class="f-check is-warn">${icon('warning', { size: 14 })}<div><div><strong>${p.tool} isn’t installed</strong></div><div class="np-dim">Noter signs in through ${p.tool}. Installing it takes about a minute.</div></div>${P.button('Install ' + p.tool, { size: 'small', variant: 'primary', action: ['auth.installCli', { p: pid }] })}</div>`
         : f.cli === 'installing'
           ? html`<div class="f-check">${P.progress({ variant: 'spinner' })}<div><div><strong>Installing ${p.tool}…</strong></div><div class="np-dim">${P.progress({ value: 62, label: 'Installing' })}</div></div></div>`
-          : html`<div class="f-check is-ok">${icon('checkCircle', { size: 14 })}<div><div><strong>${p.tool} found</strong></div><div class="np-dim np-mono">${p.path}</div></div></div>${pid === 'chatgpt' && NP.demo('settings') === 'cli-untested' ? html`<div class="f-check is-warn">${icon('warning', { size: 14 })}<div class="np-dim">Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, use your API key or Codex 0.163.</div></div>` : ''}`;
+          : html`<div class="f-check is-ok">${icon('checkCircle', { size: 14 })}<div><div><strong>${p.tool} found</strong></div><div class="np-dim np-mono">${p.path}</div></div></div>${pid === 'chatgpt' && NP.demo('settings') === 'cli-untested' ? html`<div class="f-check is-warn">${icon('warning', { size: 14 })}<div class="np-dim">Codex 0.171.0 hasn’t been tested with Noter yet. It should work; if something fails, update Noter, or use Codex 0.163.</div></div>` : ''}`;
       const existing = f.existing && f.cli === 'found'
         ? html`<div class="f-existing">${P.radioGroup('auth-existing-' + pid, [
             { value: 'existing', label: `Use ${p.email}`, note: `${p.tool} is already signed in to this ${p.name} ${p.plan} account on this Mac. No browser needed.` },
