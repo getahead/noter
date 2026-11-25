@@ -1,3 +1,4 @@
+import { createWindowStore } from "../../app/store/window-store";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -97,7 +98,7 @@ describe("PeoplePage", () => {
   it("starts in LOADING under the bridge: the heading is there, no rows yet", async () => {
     const { BridgeProvider } = await import("../../app/bridge/context");
     const { PeoplePage } = await import("./PeoplePage");
-    const bridge = { label: "main", store: { getState: () => ({ entities: { person: {} }, app: null, commands: {} }), subscribe: () => () => {} }, act: () => new Promise(() => {}), core: {} } as never;
+    const bridge = { label: "main", store: createWindowStore("main"), act: () => new Promise(() => {}), core: {} } as never;
     const h = renderToString(<BridgeProvider value={bridge}><DialogsProvider><PeoplePage /></DialogsProvider></BridgeProvider>);
     expect(h).toContain('data-state="loading"');
     expect(h).not.toContain("pe-row");

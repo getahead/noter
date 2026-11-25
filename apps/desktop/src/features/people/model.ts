@@ -23,7 +23,14 @@ export function createPeopleList(bridge: Bridge) {
   // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-list
   // StrictMode mounts a page twice in development: a read in flight is shared, never sent twice
   let reading: Promise<void> | null = null;
-  const load = (): Promise<void> => (reading ??= read().finally(() => void (reading = null)));
+  let revision = 0;
+  const load = (next = revision): Promise<void> => {
+    if (reading && revision === next) return reading;
+    revision = next;
+    const pending = read().finally(() => { if (reading === pending) reading = null; });
+    reading = pending;
+    return pending;
+  };
   const read = async (): Promise<void> => {
     const mine = ++request;
     if (!state.read) set({ status: "LOADING", read: null, error: null });

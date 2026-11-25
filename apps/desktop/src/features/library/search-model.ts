@@ -68,14 +68,17 @@ export const askRoute = (words: string): Route => ({ section: "ask", key: ["new"
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-ask
 
 // @cpt-begin:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search
-/** One read per (try, words): the same pair again (a replayed effect) starts nothing, and only the newest read's answer may show. */
-export function once(): { start(tries: number, words: string): number | null; current(n: number): boolean } {
-  let tries: number | null = null;
-  let words = "";
+/** Share a replayed effect. A new query, retry, or identity change supersedes the previous answer. */
+export function once() {
+  let last: { tries: number; words: string; revision: number } | null = null;
   let n = 0;
   return {
-    start: (t, w) => (t === tries && w === words ? null : ((tries = t), (words = w), ++n)),
-    current: (m) => m === n,
+    start(tries: number, words: string, revision = 0) {
+      if (last?.tries === tries && last.words === words && last.revision === revision) return null;
+      last = { tries, words, revision };
+      return ++n;
+    },
+    current: (m: number) => m === n,
   };
 }
 // @cpt-end:cpt-noter-flow-ui-library-search-topics-search:p1:inst-search

@@ -1,3 +1,4 @@
+import { createWindowStore } from "../../app/store/window-store";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -118,7 +119,7 @@ describe("PersonPage", () => {
     expect(await readPerson({ act: async () => err, core: {} } as never, "per_a")).toEqual({ status: "ERROR", page: null, error: { code: "not_found" } });
   });
   it("starts LOADING under the bridge and dialogs providers", () => {
-    const b = { label: "main", store: { getState: () => ({ entities: { person: {} }, app: null, commands: {} }), subscribe: () => () => {} }, act: () => new Promise(() => {}), core: {} } as never;
+    const b = { label: "main", store: createWindowStore("main"), act: () => new Promise(() => {}), core: {} } as never;
     const h = renderToString(<BridgeProvider value={b}><DialogsProvider><PersonPage id="per_a" /></DialogsProvider></BridgeProvider>);
     expect(h).toContain('data-state="loading"');
   });

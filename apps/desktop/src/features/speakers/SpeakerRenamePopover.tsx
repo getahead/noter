@@ -63,7 +63,7 @@ export function SpeakerRenamePopover({
   const label = speakerName(speaker.label);
 
   // @cpt-begin:cpt-noter-flow-ui-speakers-live-name:p1:inst-rename
-  const rename = async (ref: PersonRef, isNew: boolean) => {
+  const rename = async (ref: PersonRef, pickedName: string, isNew: boolean) => {
     if (busy) return;
     setBusy(true);
     setError(null);
@@ -90,11 +90,14 @@ export function SpeakerRenamePopover({
       return setError(t("speakers.err", { name: label }));
     // @cpt-end:cpt-noter-flow-ui-speakers-live-name:p1:inst-error
     // @cpt-begin:cpt-noter-flow-ui-speakers-live-name:p1:inst-result
-    const named = res.data.speakers.find((s) => s.id === speaker.id);
+    // A split leaves the old speaker in the result. The selected line now belongs to the target.
+    const named = scope === "whole_call" ? res.data.speakers.find((s) => s.id === speaker.id)
+      : res.data.speakers.find(({ label }) => label.type === "person" && (ref.type === "existing"
+        ? label.person.id === ref.person_id : label.person.display_name === ref.display_name));
     const to =
       named?.label.type === "person"
         ? named.label.person.short_name
-        : (chosen?.name ?? label);
+        : pickedName;
     const count =
       scope === "one_segment"
         ? 1
@@ -139,7 +142,7 @@ export function SpeakerRenamePopover({
           )}
           onConfirm={(ref, name, isNew) => (
             setChosen({ ref, name }),
-            void rename(ref, isNew)
+            void rename(ref, name, isNew)
           )}
           onClose={onClose}
         />
@@ -159,7 +162,7 @@ export function SpeakerRenamePopover({
             variant="primary"
             disabled={!chosen || busy}
             loading={busy}
-            onAction={() => chosen && void rename(chosen.ref, false)}
+            onAction={() => chosen && void rename(chosen.ref, chosen.name, false)}
           />
         </div>
       </div>

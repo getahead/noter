@@ -30,15 +30,16 @@ export function CallPage({ bridge, callId, span, tab = "transcript" }: { bridge:
   const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const extras = useExtras(callId);
   const deleteError = useDeleteError(callId);
-  const asked = useRef<string | null>(null);
+  const people = useWindow(bridge, (s) => s.identity.people);
+  const asked = useRef<{ callId: string; people: number } | null>(null);
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
   // once per call and instance: a development remount must not ask the core twice
   useEffect(() => {
-    if (asked.current === callId) return;
-    asked.current = callId;
-    void openCallPage(bridge, callId);
-  }, [bridge, callId]);
+    if (asked.current?.callId !== callId) void openCallPage(bridge, callId);
+    else if (asked.current.people !== people) void readCall(bridge, callId);
+    asked.current = { callId, people };
+  }, [bridge, callId, people]);
   // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-open-route
   // the core sends no notification for the call this window shows; null once the page closes
   useEffect(() => {

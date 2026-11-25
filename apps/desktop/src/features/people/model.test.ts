@@ -28,6 +28,18 @@ describe("cpt-noter-state-ui-people-view", () => {
     await again;
     expect(list.get()).toMatchObject({ read: { people: [1] } });
   });
+  it("a speaker event supersedes a People read already in flight", async () => {
+    let finishOlder!: (value: unknown) => void;
+    const older = new Promise((resolve) => { finishOlder = resolve; });
+    const act = vi.fn().mockReturnValueOnce(older).mockResolvedValueOnce({ status: "ok", data: read });
+    const list = createPeopleList(bridge(act));
+    const stale = list.load();
+    await list.load(1);
+    finishOlder({ status: "ok", data: { people: [], unnamed: [{ speaker_id: "old" }] } });
+    await stale;
+    expect(list.get().read).toEqual(read);
+  });
+
   it("a read in flight is shared: StrictMode's second mount sends nothing more", async () => {
     const act = vi.fn(async () => ({ status: "ok", data: read }));
     const list = createPeopleList(bridge(act));

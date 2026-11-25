@@ -1,7 +1,7 @@
 // One action item, wherever it is listed: the Call page's output section (full), compact lists, Today's Done list
 // and read-only views. Review, tick, edit and handoff answer all go through `actions.ts`; the row only draws what the
 // core and `local.ts` say. Registers itself in the outputs section's seam (`register.tsx`).
-import { useEffect, useId, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useState, type KeyboardEvent } from "react";
 
 import { useWindow } from "../../app/use-window";
 import { elementId } from "../../app/element-id";
@@ -37,7 +37,14 @@ const dueText = (due: string) => zoned(new Date(`${due}T00:00`).getTime(), { wee
 /** The live item: the store's record unless the section handed over a newer one. */
 export function useItem(bridge: Bridge, item: ItemView): ItemView {
   const held = useWindow(bridge, (s) => s.entities.item[item.id]);
-  return held && held.rev >= item.rev ? held : item;
+  const current = held && held.rev >= item.rev ? held : item;
+  // A person edit changes the owner chip without bumping the item's revision.
+  const owner = useWindow(bridge, (s) => current.owner && s.entities.person[current.owner.id]);
+  return useMemo(() => {
+    if (!owner || !current.owner) return current;
+    const { display_name, short_name, initials } = owner;
+    return { ...current, owner: { ...current.owner, display_name, short_name, initials } };
+  }, [current, owner]);
 }
 
 /** Focus the next suggested row after `id`, in the order the rows are on the page; false when none remain. */

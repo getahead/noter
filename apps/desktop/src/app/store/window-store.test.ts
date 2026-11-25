@@ -111,6 +111,19 @@ describe("window store", () => {
     expect(applyEvent(s, { event: "entity:changed", payload: { type: "future" } as never })).toBe(s);
   });
 
+  it("invalidates derived reads on speaker and person events without invalidating other calls on a speaker assignment", () => {
+    let s = initialState("main");
+    const change = (payload: EventPayloads["entity:changed"]) => {
+      s = applyEvent(s, { event: "entity:changed", payload });
+      return s.identity;
+    };
+    expect(change({ type: "speakers", call_id: "first", speakers: [] })).toEqual({ revision: 1, people: 0, calls: { first: 1 } });
+    expect(change({ type: "speakers", call_id: "second", speakers: [] }).calls).toEqual({ first: 1, second: 2 });
+    expect(change({ type: "person", person: world.people[1]! }).people).toBe(3);
+    expect(change({ type: "removed", kind: "person", id: world.people[1]!.id }).people).toBe(4);
+    expect(change({ type: "call", call: world.calls[0]! }).revision).toBe(4);
+  });
+
   it("keys entities by identity and removes them", () => {
     const call = { id: "call_1", rev: 1, title: "A" };
     let s = applyEvent(initialState("main"), {

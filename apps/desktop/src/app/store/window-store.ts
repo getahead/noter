@@ -140,6 +140,8 @@ export interface WindowState {
   > | null;
   whole: Partial<WholeSlices>;
   entities: Entities;
+  /** Revisions of reads that embed person names or depend on speaker assignments. */
+  identity: { revision: number; people: number; calls: Record<string, number> };
   /** `outputs:progress`, keyed `call_id/section`. */
   outputs: Record<string, OutputsProgress>;
   /** The sections the core sent whole with `entity:changed`, keyed `call_id/kind`. */
@@ -170,6 +172,7 @@ export function initialState(
     error: null,
     app: null,
     whole: {},
+    identity: { revision: 0, people: 0, calls: {} },
     entities: {
       call: {},
       item: {},
@@ -290,6 +293,15 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
   switch (e.event) {
     case "entity:changed": {
       const c = e.payload;
+      // @cpt-flow:cpt-noter-flow-ui-speakers-live-name:p1
+      // These events also invalidate snapshots that embed a name, a segment assignment or participation.
+      if (c.type === "person" || c.type === "speakers" || (c.type === "removed" && c.kind === "person")) {
+        const revision = s.identity.revision + 1;
+        const identity = c.type === "speakers"
+          ? { ...s.identity, revision, calls: { ...s.identity.calls, [c.call_id]: revision } }
+          : { ...s.identity, revision, people: revision };
+        s = { ...s, identity };
+      }
       switch (c.type) {
         case "call":
           return setEntity(s, "call", c.call.id, c.call);

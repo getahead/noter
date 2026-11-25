@@ -1,3 +1,4 @@
+import { createWindowStore } from "../../app/store/window-store";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { BridgeProvider } from "../../app/bridge/context";
@@ -16,7 +17,7 @@ describe("SearchPage (cpt-noter-flow-ui-library-search-topics-search)", () => {
     let out: never = null as never;
     const Probe = () => ((out = SearchPage({ query: "websocket" }) as never), null);
     renderToString(
-      <BridgeProvider value={{ act, core: {}, store: { getState: () => ({ whole: {} }), subscribe: () => () => {} } } as never}>
+      <BridgeProvider value={{ act, core: {}, store: createWindowStore("main") } as never}>
         <Probe />
       </BridgeProvider>,
     );
