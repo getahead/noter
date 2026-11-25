@@ -62,6 +62,10 @@ pub(crate) trait RuntimeAdapter: Send + Sync {
     /// Opens a warm session, or resumes a recorded one.
     fn open_session(&self, runtime: RuntimeChoice, resume: Option<&str>) -> Result<String, String>;
     fn close_session(&self, runtime: RuntimeChoice, session: &str);
+    /// How the runtime's last failed CLI run ended (`exit_1.schema_rejected`); never its output.
+    fn last_failure(&self) -> Option<String> {
+        None
+    }
 }
 
 /// The instructions every runtime gets with the packet. shortcut: one fixed text per skill; the

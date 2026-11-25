@@ -315,7 +315,7 @@ export function layoutRegions(o: { layout: LayoutState; notice: boolean; banners
   // @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-else-floating
   // @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-floating-regions
   // @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-floating-copilot-off
-  // The notice takes the place of the banners; no FP-R2 mode line or FP-R4 cards; the tail fills the panel.
+  // The notice takes the place of the banners; no FP-R2 mode line or FP-R4 cards; the live log fills the panel.
   // @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-return-regions
   return ["FP-R1", o.notice ? "FP-R0" : o.banners && "FP-R3", "FP-R5", "FP-R6"].filter((r): r is string => !!r);
   // @cpt-end:cpt-noter-algo-ui-call-window-layout-content:p1:inst-return-regions

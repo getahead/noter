@@ -327,7 +327,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
    2. [x] - `p1` - **IF** the copilot flag is off: no CS-R4 column; the transcript fills the width; CS-R5 has no budget, **Pinned** or **Catch Me Up** - `inst-dedicated-copilot-off`
 2. [x] - `p1` - **ELSE** (floating) - `inst-else-floating`
    1. [x] - `p1` - Render FP-R0 (notice, in place of FP-R2 and FP-R3), FP-R1, FP-R3, FP-R6 - `inst-floating-regions`
-   2. [x] - `p1` - **IF** the copilot flag is off: no FP-R2 mode line or FP-R4 cards; the transcript tail fills the panel with the last 8 lines - `inst-floating-copilot-off`
+   2. [x] - `p1` - **IF** the copilot flag is off: no FP-R2 mode line or FP-R4 cards; the wrapping live transcript fills the remaining height, follows new speech and lets the user scroll back through the call or choose **Jump to Live** - `inst-floating-copilot-off`
    With the copilot flag on (M4), the card capacity by panel height is `cpt-noter-algo-ui-copilot-card-stream` step `inst-capacity` in `docs/features/ui/copilot.md` (owner decision A, 28 Oct 2026).
 3. [x] - `p1` - **RETURN** the regions - `inst-return-regions`
 

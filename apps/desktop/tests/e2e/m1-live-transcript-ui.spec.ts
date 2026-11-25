@@ -293,6 +293,61 @@ test.describe("cpt-noter-flow-ui-live-transcript-follow", () => {
 });
 
 test.describe("cpt-noter-seq-call-screen-replay-line", () => {
+  test("long utterances wrap at floating panel widths and on the dedicated display", async ({ page }) => {
+    const speech = "We need to preserve the discussion when a meeting runs long so that anyone reading the transcript can follow the entire decision. ".repeat(3).trim();
+    const steer = await openWindow(page, "call-screen", { world: liveWith([line(60, { text: speech })], false) });
+    const text = log(page).getByText(speech, { exact: true });
+    for (const [width, height, colorScheme] of [[1280, 800, "light"], [340, 420, "dark"], [600, 720, "light"]] as const) {
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ colorScheme });
+      if (width === 340) await steer.invoke("window_set_call_layout", { preference: "floating" }, "call-screen");
+      await expect(page.locator(width === 1280 ? '[data-region="CS-R2"]' : '[data-region="FP-R5"]')).toContainText(speech);
+      const lines = await text.evaluate((el) => el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight));
+      expect(lines, `wrapped lines at ${width}px`).toBeGreaterThan(1);
+      expect(await text.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("the floating transcript uses the remaining window height as the panel grows", async ({ page }) => {
+    const steer = await openWindow(page, "call-screen", { world: liveWith([], false) });
+    await steer.invoke("window_set_call_layout", { preference: "floating" }, "call-screen");
+    await steer.invoke("window_share_warning_seen", {}, "call-screen");
+    const header = page.locator('[data-region="FP-R1"]');
+    const footer = page.locator('[data-region="FP-R6"]');
+    await expect(page.locator('[data-region="FP-R3"]')).toHaveCount(0);
+    await expect(log(page).getByText(ANNA_LINE, { exact: false })).toBeAttached();
+    for (const height of [460, 860]) {
+      await page.setViewportSize({ width: 420, height });
+      const area = (await log(page).locator(".cw-tv__scroll").boundingBox())!;
+      const head = (await header.boundingBox())!;
+      const foot = (await footer.boundingBox())!;
+      expect(Math.abs(foot.y + foot.height - height)).toBeLessThanOrEqual(2);
+      expect(Math.abs(area.y - (head.y + head.height))).toBeLessThanOrEqual(5);
+      expect(Math.abs(foot.y - (area.y + area.height))).toBeLessThanOrEqual(5);
+    }
+  });
+
+  test("the floating transcript keeps history and follows new speech until the reader scrolls up", async ({ page }) => {
+    await page.setViewportSize({ width: 420, height: 500 });
+    await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+    const steer = await openWindow(page, "call-screen", { world: liveWith(many(45), false) });
+    await steer.invoke("window_set_call_layout", { preference: "floating" }, "call-screen");
+    await expect(page.locator('[data-region="FP-R5"]')).toBeVisible();
+    await steer.push("transcript_subscribe", confirmed(line(45)));
+    await expect(rowWith(page, "Test line number 45")).toBeInViewport();
+    const scroller = log(page).locator(".cw-tv__scroll");
+    await scroller.evaluate((el) => el.scrollTo({ top: 0, behavior: "instant" }));
+    await expect(rowWith(page, ANNA_LINE)).toBeInViewport();
+    await expect(log(page)).toHaveAttribute("data-state", "detached");
+    await steer.push("transcript_subscribe", confirmed(line(46)));
+    const resume = jump(page, "Jump to Live · 1 new line");
+    await expect(resume).toBeInViewport();
+    await expect(rowWith(page, ANNA_LINE)).toBeInViewport();
+    await resume.click();
+    await expect(rowWith(page, "Test line number 46")).toBeInViewport();
+    await expect(log(page)).toHaveAttribute("data-state", "following");
+  });
+
   test("UI — happy path: scroll up, Jump to Live counts new lines, play Anna K.'s line on headphones, back to live", async ({ page }) => {
     const steer = await openWindow(page, "call-screen", {
       world: liveWith(many(60), false),

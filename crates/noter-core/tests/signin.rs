@@ -468,6 +468,26 @@ async fn cancel_ends_only_the_matching_active_session() {
     assert!(is_signed_in(&view(&w).await, CHATGPT));
 }
 
+// #1235: a failed test request leaves its runtime code in noter.log, never the identity.
+#[tokio::test(start_paused = true)]
+async fn a_failed_account_check_names_why_in_the_log() {
+    let dir = tempfile::tempdir().unwrap();
+    let w = open(
+        dir.path(),
+        Some(r#"{"on": "ask-answer", "fail": "cli_incompatible"}"#),
+    );
+    claude(&w, "Max", 0);
+    connect(&w, CLAUDE, true).await;
+    assert_eq!(
+        w.events.progress("claude").last().unwrap(),
+        "runtime_unavailable"
+    );
+    assert_eq!(status(&view(&w).await, CLAUDE), AccountStatus::NotSignedIn);
+    let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap_or_default();
+    assert!(log.contains(r#""code":"account_check_failed","id":"cli_incompatible""#));
+    assert!(!log.contains("ann@example.com"));
+}
+
 #[tokio::test(start_paused = true)]
 async fn offline_and_ineligible_plans_leave_everything_unchanged() {
     let dir = tempfile::tempdir().unwrap();

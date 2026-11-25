@@ -1807,10 +1807,10 @@ The floating panel is the compact layout of the call window beside the call app,
 - `cpt-noter-component-ui-recording-indicator` — uses (FP-R1, FP-C1)
 - `cpt-noter-component-ui-mode-indicator` — uses (FP-R2, FP-C1)
 - `cpt-noter-component-ui-call-status-strip` — uses (FP-R6, compact variant)
-- `cpt-noter-component-ui-transcript-view` — uses (FP-R5, tail variant)
+- `cpt-noter-component-ui-transcript-view` — uses (FP-R5, live with the copilot off, tail with it on)
 - `cpt-noter-component-ui-transcript-segment-row` — uses (FP-R5)
-- `cpt-noter-component-ui-speaker-label` — uses (FP-R5 tail rows)
-- `cpt-noter-component-ui-language-tag` — uses (FP-R5 tail rows)
+- `cpt-noter-component-ui-speaker-label` — uses (FP-R5 transcript rows)
+- `cpt-noter-component-ui-language-tag` — uses (FP-R5 transcript rows)
 - `cpt-noter-component-ui-playback-bar` — uses (FP-R5, while replaying on headphones)
 - `cpt-noter-component-ui-copilot-card-stack` — uses (FP-R4, compact variant)
 - `cpt-noter-component-ui-copilot-card` — uses (FP-R4; peek variant in FP-C2)
@@ -1836,7 +1836,7 @@ The floating panel is the compact layout of the call window beside the call app,
 | FP-R2 Mode line | 28 high | **Council** and `cpt-noter-component-ui-mode-indicator`; key legend; **Mute** pull-down (icon), whose menu also holds **Show Transcript** | D70 |
 | FP-R3 Banner | Optional, under FP-R2 | `cpt-noter-component-ui-inline-banner`, compact, with the messages of CS-R3 and CS-R4d; the first time the floating layout opens, the info line **Hidden from window shares only. Before sharing your whole screen, press** ⌃⌥⌘0. · **Got It** | PRD › Live copilot loop › Degraded states; PM-49 |
 | FP-R4 Cards | Fills the middle | The ask field **Ask about this call…** on top while it is open; `cpt-noter-component-ui-copilot-card-stack` with compact cards (13/19) and number badges; **1 more** when more cards exist than fit | D82, PM-59 |
-| FP-R5 Transcript tail | 2 to 4 lines (12/17), at heights of 680 and up or with **Show Transcript** | `cpt-noter-component-ui-transcript-view`, tail variant: time, `cpt-noter-component-ui-speaker-label`, text and `cpt-noter-component-ui-language-tag`; the playback bar takes its place while replaying on headphones | D82, D85, D92 |
+| FP-R5 Transcript | With the copilot off, a wrapping live log with history and **Jump to Live** fills the space between the header or banners and FP-R6. With it on, a tail of 2 to 4 lines (12/17) appears at heights of 680 and up or with **Show Transcript** | `cpt-noter-component-ui-transcript-view` with `cpt-noter-component-ui-speaker-label` and `cpt-noter-component-ui-language-tag`. The playback bar takes its place during headphone replay. | D82, D85, D92 |
 | FP-R6 Footer | 44 high | **Mark Moment**, **Catch Me Up**, ⋯ (**Pause** or **Resume**, **Stop Recording**, **Ask…**), budget text; card-key feedback | D72 |
 | FP-C1 State | Collapsed strip, leading | Recording dot and clock (`cpt-noter-component-ui-recording-indicator`), mode glyph | D83 |
 | FP-C2 Newest card | Collapsed strip, middle | The newest card's number badge, type label and first line, tail-truncated; **Pin** and **Dismiss** icon buttons on hover or focus; the listening line when there is no card | D83, PM-59 |
@@ -1925,7 +1925,7 @@ Collapsed strip, 56 high:
 | Catch-up or solicited answer while collapsed | Whole panel | The panel expands for the card and collapses again after **Dismiss** | D83 | `cpt-noter-seq-floating-panel-collapse-strip` (Happy path) |
 | Copilot muted | FP-C2; FP-R3 | **Copilot muted** in place of the card line; expanded, **Copilot muted for 10 min** · **Unmute** | D11, D83 | `cpt-noter-seq-floating-panel-collapse-strip` (Empty — Copilot muted while collapsed) |
 | Paused | FP-C1; FP-R6 | The strip clock reads **Paused 3 min**; ⋯ offers **Resume** | D83 | `cpt-noter-seq-menu-bar-control-recording` (Happy path) |
-| Copilot flag off | FP-R2; FP-R4; FP-C2 | No mode line or cards; the transcript tail fills the panel, and the strip has no card area | D9 | `cpt-noter-seq-floating-panel-collapse-strip` (Happy path) |
+| Copilot flag off | FP-R2; FP-R4; FP-C2 | The expanded panel omits the mode line and cards so the live transcript fills the space between its header or banners and footer. The collapsed strip omits the card area | D9 | `cpt-noter-seq-floating-panel-collapse-strip` (Happy path) |
 | Degraded | FP-R3 | Compact copies of the CS-R3 and CS-R4d banners, such as **System audio silent** · **Open System Settings…**, **Microphone off** · **Open System Settings…** or **Not recording · engine stopped** · **Try Again** | PRD › Live copilot loop › Degraded states | `cpt-noter-seq-floating-panel-hide-and-reopen` (Error — Capture problem while hidden) |
 | Share warning, first open | FP-R3; FP-R1 | **Hidden from window shares only. Before sharing your whole screen, press** ⌃⌥⌘0. · **Got It**; the share-protection glyph and its help tag stay in FP-R1 | PM-49 | `cpt-noter-seq-call-screen-hide-for-presenting` (Other — Share warning in the floating panel) |
 | New meeting | FP-R0 | **A new meeting may have started: 1:1 with Anna K.** with **Start as New Call** and **Keep in This Call**, stacked | PM-39 | `cpt-noter-seq-call-screen-stop-at-call-end` (Error — Next meeting starts straight away) |
@@ -4654,14 +4654,14 @@ The transcript view shows a call's transcript as a virtualised log: during the c
 
 | Variant | Used where | Difference |
 | --- | --- | --- |
-| Live | CS-R2 | Follows output; Call transcript style 15 on 22 pt |
-| Tail | FP-R5 | Last 3 transcript lines (mark and gap rows left out) in 12 on 17 pt, no timestamps, no scrolling; shown at panel heights of 680 pt and up or with **Show Transcript**; when the copilot is off it fills the panel with the last 8 lines (PM-59) |
+| Live | CS-R2, FP-R5 with the copilot off | Follows new speech until the user scrolls up. **Jump to Live** resumes following. In CS-R2 the text is 15 on 22 pt. In FP-R5 the utterance wraps across the row beneath its time, speaker and language at 12 on 17 pt. |
+| Tail | FP-R5 with the copilot on | Shows the last 3 transcript lines at 12 on 17 pt at panel heights of 680 pt and up or with **Show Transcript**. The tail omits mark rows, gaps and timestamps and stays fixed (PM-59). |
 | Stored | PC-R5 | At most 960 pt wide; find bar, archive changes, play controls on any output |
 
 **States.**
 
 - Following: new rows appear at the end and the view stays at the end.
-- Detached: the user scrolled up more than one row; the pill shows the number of new lines.
+- Detached: scrolling up releases the live log on the first upward frame. The pill counts new lines as they arrive.
 - Waiting for speech: two level meters and **Waiting for speech…**; also shown right after **Start as New Call** until the new call's first speech (PM-59).
 - Loading (stored): skeleton rows after 300 ms.
 - Find active: matches in the Match highlight colour, the current match with a focus ring.
@@ -4751,7 +4751,7 @@ One row shows one segment: who spoke, when, what was said and in which language,
 | You | Microphone channel | Speaker **You**, not renamable; another voice on the microphone reads **Guest (your side)** |
 | Crosstalk | Overlapping speech marked by the offline pass (PRD › Diarization and speaker identity) | **Crosstalk** tag after the speaker label; the speaker column shows both candidate speakers, **Anna K. / Speaker 3** |
 | Low confidence | Words below the confidence bar | Dotted underline, help tag **Low confidence** |
-| Tail | FP-R5 | Speaker label, text and language tag in 12 on 17 pt, no play control; the label opens the rename popover while the panel is key (D92) |
+| Tail | FP-R5 with the copilot on | Speaker label, text and language tag in 12 on 17 pt, no play control; the label opens the rename popover while the panel is key (D92) |
 
 **States.**
 
@@ -4825,7 +4825,7 @@ The speaker label shows who spoke and lets the user fix a wrong label in one cli
 **Used in**:
 
 - `cpt-noter-component-screen-call-screen` — used by (CS-R2 rows, CS-R1 chips)
-- `cpt-noter-component-screen-floating-panel` — used by (FP-R5 tail rows)
+- `cpt-noter-component-screen-floating-panel` — used by (FP-R5 transcript rows)
 - `cpt-noter-component-screen-call-page` — used by (PC-R5, PC-R4 participants)
 - `cpt-noter-component-screen-people` — used by (PL-R3 **Unnamed speakers**)
 
@@ -4904,7 +4904,7 @@ Calls mix English, Russian and German, often in one call. The language tag shows
 **Used in**:
 
 - `cpt-noter-component-screen-call-screen` — used by (CS-R1, CS-R2)
-- `cpt-noter-component-screen-floating-panel` — used by (FP-R5 tail rows)
+- `cpt-noter-component-screen-floating-panel` — used by (FP-R5 transcript rows)
 - `cpt-noter-component-screen-call-page` — used by
 - `cpt-noter-component-screen-library` — used by
 - `cpt-noter-component-screen-ask` — used by
