@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.26.3](https://github.com/getahead/noter/compare/v0.26.2...v0.26.3) (2026-11-25)
+
+
+### Bug fixes
+
+* **accounts:** the Claude sign-in passes its check on Claude Code 2.1.325, and a failed check says why in the log ([#1243](https://github.com/getahead/noter/issues/1243)) ([266fabe](https://github.com/getahead/noter/commit/266fabe7a226ef413661524696b6bc368d14953f))
+* **accounts:** the sign-in sheet names a test request the tool refused or failed ([#1248](https://github.com/getahead/noter/issues/1248)) ([2a5724f](https://github.com/getahead/noter/commit/2a5724f9162f09d4d1af3fd393a3205d7ea775b2))
+* **ui:** show the Call Screen when opened before recording ([#1245](https://github.com/getahead/noter/issues/1245)) ([2aff8f1](https://github.com/getahead/noter/commit/2aff8f1267ba84d552f1f0634315542d42325116))
+* **ui:** wrap the live transcript and fill the floating call window ([#1244](https://github.com/getahead/noter/issues/1244)) ([51cb680](https://github.com/getahead/noter/commit/51cb6802e5b805304db55ac2a36f397bd3eee836))
+
 ## [0.26.2](https://github.com/getahead/noter/compare/v0.26.1...v0.26.2) (2026-11-25)
 
 
