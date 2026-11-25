@@ -160,8 +160,8 @@ fn nullable(schema: &Value) -> bool {
             .is_some_and(|b| b.iter().any(|b| b["type"] == null))
 }
 
-/// Back to the app schema's shape: an optional field the model answered with `null` under the
-/// strict schema is absent again.
+/// Back to the app schema's shape: an optional field that takes no `null` there, answered with
+/// `null` under the strict schema, is absent again.
 fn denull(value: &mut Value, schema: &Value, root: &Value) {
     let schema = match schema["$ref"].as_str().and_then(|r| r.strip_prefix('#')) {
         Some(pointer) => root.pointer(pointer).unwrap_or(&Value::Null),
@@ -177,10 +177,11 @@ fn denull(value: &mut Value, schema: &Value, root: &Value) {
             .for_each(|v| denull(v, &schema["items"], root)),
         Value::Object(map) => {
             let required = schema["required"].as_array();
+            // only the fields `close` made nullable; a null the app schema takes stays
             map.retain(|k, v| {
-                let optional = schema["properties"].get(k).is_some()
+                let made_nullable = schema["properties"].get(k).is_some_and(|p| !nullable(p))
                     && !required.is_some_and(|r| r.contains(&json!(k)));
-                !(optional && v.is_null())
+                !(made_nullable && v.is_null())
             });
             for (k, v) in map.iter_mut() {
                 denull(v, &schema["properties"][k.as_str()], root);
@@ -345,8 +346,9 @@ mod tests {
         };
         let mut answer = json!({ "cards": [card(json!("en")), card(json!({ "code": "fr" }))] });
         denull(&mut answer, &schema, &schema);
-        assert!(answer["cards"][0].get("body").is_none());
-        assert!(answer["cards"][1].get("jira_key").is_none());
+        // `body` and `jira_key` take null in the app schema too, so they stay as answered
+        assert_eq!(answer["cards"][0]["body"], Value::Null);
+        assert_eq!(answer["cards"][1]["jira_key"], Value::Null);
         assert_eq!(answer["cards"][1]["lang"], json!({ "code": "fr" }));
         Skill::CouncilTick.conforms(&answer).unwrap();
     }
