@@ -103,7 +103,7 @@ export function UpcomingCallCard({ bridge, card, expanded, next = false, onToggl
       )}
       {rows && rows.rows.length > 0 && (
         <div className="td-card__rows">
-          {rows.rows.map((it) => (it.kind !== "action_item" ? <ul key={it.id} className="td-card__q"><OutputItemRow bridge={bridge} item={it} /></ul> : <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />))}
+          {rows.rows.map((it) => (it.kind !== "action_item" ? <ul key={it.id} className="td-card__q"><OutputItemRow bridge={bridge} item={it} compact /></ul> : <ActionItemRow key={it.id} bridge={bridge} item={it} variant="compact" />))}
           {rows.more > 0 && <PushButton label={t("today.show_more", { count: rows.more })} variant="quiet" size="small" onAction={() => {
 // @cpt-begin:cpt-noter-state-ui-today-card:p1:inst-more
 positionOf(bridge).all.add(id); setAll(true);

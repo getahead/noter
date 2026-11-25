@@ -16,8 +16,8 @@ import { KIND_ICON, KIND_KEY } from "../items/kind";
 import { slots } from "./slots";
 
 // @cpt-component:cpt-noter-component-ui-output-item-row:p1
-/** `compact` is the one-line row of a list across calls (Library search): kind glyph · text · call · time · topic · actions, no owner. */
-export function OutputItemRow({ bridge, item: listed, compact = false }: { bridge: Bridge; item: ItemView; compact?: boolean }) {
+/** `compact` is the one-line row (Library search, a Today card): kind glyph · text · call (with `showCall`) · time · topic · actions, no owner. */
+export function OutputItemRow({ bridge, item: listed, compact = false, showCall = false }: { bridge: Bridge; item: ItemView; compact?: boolean; showCall?: boolean }) {
   // a review or edit since the section was read: the store holds the newer record
   const held = useWindow(bridge, (s) => s.entities.item[listed.id]);
   const item = held && held.rev >= listed.rev ? held : listed;
@@ -35,7 +35,7 @@ export function OutputItemRow({ bridge, item: listed, compact = false }: { bridg
           <Icon name={KIND_ICON[item.kind]} size={13} label={t(KIND_KEY[item.kind])} />
         </span>
         <span className="pc-item__text" lang={lang}>{item.text}</span>
-        <CallLink bridge={bridge} call={item.call} />
+        {showCall && <CallLink bridge={bridge} call={item.call} />}
         {Tail ? <Tail bridge={bridge} item={item} afterTime={<>{topic}{suggested}</>} /> : <>{evidence}{topic}{suggested}</>}
       </li>
     );

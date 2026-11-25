@@ -14,7 +14,7 @@
 .pc-md { line-height: 1.5; }
 .pc-md p, .pc-md ul { margin: 0 0 8px; }
 .pc-md ul { padding-left: 20px; }
-.pc-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.pc-items { list-style: none; margin: 0; padding: 0; display: grid; } /* rows part by their own hairline, as the prototype's .pc-rows */
 /* the one-line rows (thread, compact): a long topic tag truncates, so share and ⓘ stay on the row */
 .pc-item { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .pc-item > .np-badge { flex: 0 1 auto; min-width: 2em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
