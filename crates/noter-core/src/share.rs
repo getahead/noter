@@ -569,7 +569,8 @@ fn markdown_header(
     )?;
     let mut line = vec![crate::history::date_of(started_at)];
     let mut people = c.prepare(
-        "SELECT p.display_name FROM call_participants cp JOIN people p ON p.id = cp.person_id \
+        "SELECT p.display_name || CASE WHEN cp.invited_only THEN ' (Invited)' ELSE '' END \
+         FROM call_attendance cp JOIN people p ON p.id = cp.person_id \
          WHERE cp.call_id = ?1 ORDER BY p.display_name",
     )?;
     for name in people.query_map([id], |r| r.get::<_, String>(0))? {

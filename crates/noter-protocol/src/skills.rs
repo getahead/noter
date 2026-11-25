@@ -91,6 +91,8 @@ pub struct PostCallOutput {
     pub lang: Lang,
     /// 5–10 sentences for someone who was not there.
     pub summary_md: String,
+    /// A short, single-line title naming the main topic in the summary language. Null if there is no topic.
+    pub title: Option<String>,
     pub decisions: Vec<ExtractedItem>,
     pub action_items: Vec<ExtractedItem>,
     pub open_questions: Vec<ExtractedItem>,

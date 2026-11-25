@@ -1208,6 +1208,7 @@ pub fn world() -> FakeWorld {
             started_at: ts(NOW),
             duration_ms: DurationMs(23 * 60_000),
             platform: Some(s("Microsoft Teams")),
+            invited_ids: vec![],
             participants: vec![
                 chip("per_anna"),
                 chip("per_dmitri"),
@@ -1236,6 +1237,7 @@ pub fn world() -> FakeWorld {
             started_at: backend.started_at,
             duration_ms: DurationMs(52 * 60_000),
             platform: Some(s("Zoom")),
+            invited_ids: vec![],
             participants: vec![chip("per_dmitri"), chip("per_oleg"), chip("per_you")],
             unnamed_speakers: 0,
             languages: vec![Lang::Ru, Lang::En],

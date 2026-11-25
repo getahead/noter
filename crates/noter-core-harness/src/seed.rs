@@ -293,6 +293,12 @@ impl Harness {
                         ),
                         ("call_id", id.clone()),
                         ("person_id", participant["id"].clone()),
+                        (
+                            "from_invite",
+                            json!(call["invited_ids"]
+                                .as_array()
+                                .is_some_and(|ids| ids.contains(&participant["id"]))),
+                        ),
                     ],
                 ));
             }

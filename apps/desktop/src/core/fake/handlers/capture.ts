@@ -28,17 +28,27 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
       world.app.banners.banners = banners.filter((b) => b.type !== "recording_interrupted_by_quit");
       publish("banners:changed");
     }
+    const detection = world.app.detection.detection;
+    const event = world.today.calendar === "granted" ? detection?.matched_event : null;
+    const eventId = a.calendar_event_id ?? event?.id;
+    const invitation = world.today.calendar === "granted" && eventId
+      ? [...world.today.today, ...world.today.this_week].find((e) => e.event_id === eventId)
+      : undefined;
+    const title = invitation?.title ?? (eventId === event?.id ? event?.title : null) ?? "Untitled call";
     if (world.app.detection.detection) {
       world.app.detection.detection = null;
       publish("capture:detected");
     }
     const started_at = shared.now();
-    shared.createCaptureCall(world, id, "New call", started_at, a.sensitive);
+    const row = shared.createCaptureCall(world, id, title, started_at, a.sensitive);
+    row.platform = invitation?.platform ?? detection?.app_name ?? null;
+    row.participants = invitation?.attendees.flatMap((a) => a.person && !a.person.is_you ? [a.person] : []) ?? [];
+    row.invited_ids = row.participants.map((p) => p.id);
     const audioNotStored = world.settings.audio.retention === "never_store";
     return shared.setCapture(fake, {
       phase: "recording",
       call_id: id,
-      title: "New call",
+      title,
       started_at,
       recorded_ms: 0,
       sensitive: a.sensitive,
@@ -121,7 +131,7 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     const cap = world.app.capture;
     if (cap.call_id !== a.call_id || !cap.notice || cap.notice.type !== "new_meeting") throw coreError("notice_expired");
     if (a.choice === "keep_in_this_call") return shared.setCapture(fake, { notice: null });
-    const title = cap.notice.event?.title ?? "New call";
+    const title = cap.notice.event?.title ?? "Untitled call";
     const id = newId("call");
     const started_at = cap.notice.detected_at;
     // Like the real core, a new call has its row and empty live transcript at once (D-37).

@@ -30,7 +30,7 @@ use crate::speakers::speaker_name;
 use crate::{lock, object, to_json, Core};
 
 /// The post-call skill's contract version, as `summary_versions.skill_version` records it.
-const SKILL_VERSION: &str = "1.0.0";
+const SKILL_VERSION: &str = "1.1.0";
 
 /// The call types whose skill writes extras (standup blockers, planning Jira-ready items,
 /// interview scorecard, incident timeline).
@@ -517,6 +517,7 @@ pub(crate) fn switches_off(per_call: &[(u32, u32)]) -> bool {
 
 /// One section's generated text and items, as the job commits them.
 struct Generated {
+    title: Option<String>,
     body_md: String,
     lang: Lang,
     llm_run_id: Option<String>,
@@ -739,6 +740,7 @@ impl Core {
         if packet.items.is_empty() {
             // Nothing was said: every section is validly empty, and nothing goes to a model.
             return Ok(Generated {
+                title: None,
                 body_md: String::new(),
                 lang: Lang::En,
                 llm_run_id: None,
@@ -782,6 +784,11 @@ impl Core {
         Ok(Generated {
             body_md: body_of(kind, &out),
             items: items_of(kind, &out),
+            title: out.title.and_then(|title| {
+                let short = title.split_whitespace().collect::<Vec<_>>().join(" ");
+                (kind == SectionKind::Summary && !short.is_empty())
+                    .then(|| short.chars().take(120).collect())
+            }),
             lang: out.lang,
             llm_run_id: Some(done.provenance.llm_run_id.as_str().to_owned()),
         })
@@ -931,15 +938,27 @@ impl Core {
         loop {
             attempts += 1;
             let existing = self.stored_section(call, kind)?;
-            let Some(mut rows) = self.section_rows(call, kind, existing.as_ref(), g, from_pass)?
-            else {
-                // Nothing new for an edited section; the call's own rows still commit.
-                if !extra.is_empty() {
-                    ctx.commit_batch(extra.clone(), vec![], progress).await?;
+            let mut rows = self
+                .section_rows(call, kind, existing.as_ref(), g, from_pass)?
+                .unwrap_or_default();
+            if let Some(title) = &g.title {
+                let rev: Option<u32> = self.store().read(|c| c.query_row(
+                    "SELECT rev FROM calls WHERE id = ?1 AND title_pending = 1 AND calendar_event_id IS NULL",
+                    [call.as_str()], |r| r.get(0),
+                ).optional())?;
+                if let Some(rev) = rev {
+                    let mut rename = call_mutation(
+                        call,
+                        vec![("title", json!(title)), ("title_pending", json!(0))],
+                    );
+                    rename.base_rev = Some(Rev(rev));
+                    rows.push(rename);
                 }
-                break;
-            };
+            }
             rows.extend(extra.iter().cloned());
+            if rows.is_empty() {
+                break;
+            }
             // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-commit
             match ctx.commit_batch(rows, vec![], progress).await {
                 Err(Stop::Failed(e)) if e.code == ErrorCode::Conflict && attempts < 3 => continue,
@@ -949,6 +968,9 @@ impl Core {
             break;
         }
         // @cpt-end:cpt-noter-algo-core-postcall-merge:p1:inst-merge-race
+        if g.title.is_some() {
+            self.publish_call_row(call);
+        }
         self.store_items(ctx, call, kind, &g.items).await?;
         // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-return
         let state = section(self.stored_section(call, kind)?.as_ref(), kind, None).state;
@@ -1523,6 +1545,7 @@ mod tests {
         };
         let out = PostCallOutput {
             lang: Lang::En,
+            title: None,
             summary_md: " S. ".into(),
             decisions: vec![item.clone()],
             action_items: vec![],

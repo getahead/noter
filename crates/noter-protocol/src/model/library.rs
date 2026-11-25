@@ -30,6 +30,9 @@ pub struct CallRow {
     pub duration_ms: DurationMs,
     pub platform: Option<String>,
     pub participants: Vec<PersonChip>,
+    /// Participants known only from the invitation, without an identified speaker in the call.
+    #[serde(default)]
+    pub invited_ids: Vec<PersonId>,
     pub unnamed_speakers: u32,
     pub languages: Vec<Lang>,
     pub tags: Vec<String>,
