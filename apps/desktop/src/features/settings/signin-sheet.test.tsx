@@ -170,6 +170,9 @@ describe("AccountSignInSheet", () => {
     body = html("claude");
     expect(body).toContain("Claude Code refused Noter’s request");
     expect(body).toContain("Nothing changed. Update Noter.");
+    // Try Again goes back to Prepare, not through the browser a second time
+    await m().retry("claude");
+    expect(m().state.claude.phase).toBe("PREPARE");
   });
 
   it("names a test request that failed another way, with the key as the way out", async () => {

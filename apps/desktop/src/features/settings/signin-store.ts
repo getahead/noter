@@ -93,7 +93,10 @@ class Machines {
   // @cpt-flow:cpt-noter-flow-ui-accounts-sign-in:p1
   async retry(p: AccountProvider) {
     const m = this.state[p];
-    if (!m.sessionId || m.code === "personal_use_not_confirmed") {
+    // a failed test request came after a sign-in that worked: back to Prepare, where the tool's
+    // account is offered, never through the browser again
+    const checked = m.code === "cli_incompatible" || m.code === "runtime_unavailable";
+    if (!m.sessionId || checked || m.code === "personal_use_not_confirmed") {
       if (m.code === "personal_use_not_confirmed") this.dispatch(p, { type: "confirm", on: false });
       await this.open(p);
       return;
