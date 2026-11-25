@@ -131,6 +131,9 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, keep adjacent replacement words visibly separated without losing the before/after text or its marks, fold long unchanged stretches - `inst-diff`
 9. [x] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
 10. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
+11. [x] - `p1` - If regeneration is refused, explain the error at the action. For `runtime_unavailable`, offer **Add an Assistant…** to open Models & Runtimes - `inst-regen-refusal`
+12. [x] - `p1` - Show the queued run in Summary when submitted or reopened. Replace pending sections with the power notice, keep written sections readable, and let **Run Now** release only the named run - `inst-power-hold`
+13. [x] - `p1` - When the held run leaves the queue, refresh the outputs to clear the notice and show its progress - `inst-power-refresh`
 
 ### Copy or export a visible scope
 

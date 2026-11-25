@@ -26,12 +26,14 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
   const progress = useWindow(bridge, (s) => s.outputs);
   const openRegenerate = useRegenerate(bridge, callId);
   const read = useWindow(bridge, (s) => s.commands[outputsKey(callId)]);
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
   const heldRun = outputs?.waiting_for_power;
   const heldStatus = useWindow(bridge, (s) => heldRun && s.jobs[heldRun]?.status);
   const regen = useWindow(bridge, (s) => s.commands[outputsRegenerateKey(callId)]);
   useEffect(() => {
     if (heldStatus && heldStatus !== "queued") void loadOutputs(bridge, callId);
   }, [bridge, callId, heldStatus]);
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
   const announce = useAnnounce(bridge);
 
   // once per call and instance: a development remount must not ask the core twice
@@ -71,6 +73,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
       {/* @cpt-begin:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
       {naming}
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
+      {/* @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold */}
       {heldRun && <>
         <InlineBanner banner={{
           id: "regen-power", severity: "info", dismissible: false, title: t("outputs.regen.power_title"), text: t("outputs.regen.power_help"),
@@ -82,6 +85,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
       {sections.filter((s) => !heldRun || s.state.type !== "pending").map((s: Section) => (
         <OutputSection key={s.kind} bridge={bridge} call={call} section={s} prefs={prefs} writing={writing} onRegenerate={(local) => (s.state.type === "failed" ? again(s.kind, local) : openRegenerate([s.kind]))} />
       ))}
+      {/* @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold */}
     </div>
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-return
   );

@@ -265,6 +265,7 @@ impl Scheduler {
         self.0.define(kind).map(|_| ())
     }
 
+    // @cpt-begin:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-regen-power
     /// The queued regeneration the user can release on this call, including a run restored at startup.
     pub fn waiting_for_power(&self, call: &CallId) -> Result<Option<JobRunId>, CoreError> {
         let run = lock(&self.0.open)
@@ -302,6 +303,7 @@ impl Scheduler {
         self.0.apply();
         Ok(())
     }
+    // @cpt-end:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-regen-power
 
     /// Cancels a queued, running or paused run; a running one stops at its next boundary.
     // @cpt-flow:cpt-noter-flow-core-jobs-scheduler-interrupt:p1

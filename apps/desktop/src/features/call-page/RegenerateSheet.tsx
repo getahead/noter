@@ -50,9 +50,11 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
     // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
     if (r.status === "error") return setError(r.error.code);
     close();
+    // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold
     if (getOutputs(callId)?.waiting_for_power === r.data.job_run_id) {
       void bridge.core.windowNavigate({ target: { type: "call_page", call_id: callId, tab: "summary" } });
     }
+    // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-hold
   };
 
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-sheet
@@ -80,7 +82,7 @@ export function RegenerateSheet({ close, bridge, callId, sections }: SheetProps 
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-sheet
 }
 
-// @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error
+// @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-regen-refusal
 export function RegenerationError({ bridge, code, onOpenSettings }: { bridge: Bridge; code: ErrorCode; onOpenSettings?: () => void }) {
   const openSettings = () => {
     onOpenSettings?.();
@@ -94,7 +96,7 @@ export function RegenerationError({ bridge, code, onOpenSettings }: { bridge: Br
     actions: noAssistant ? [{ label: t("outputs.add_assistant"), onAction: openSettings }] : [],
   }} />;
 }
-// @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-error
+// @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-regen-refusal
 
 /** Opens the sheet for a call; registers it with the host the first time a page asks. */
 export function useRegenerate(bridge: Bridge, callId: string) {
