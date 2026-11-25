@@ -40,6 +40,8 @@ pub(crate) struct LiveLine {
     pub t1: i64,
     pub text: String,
     pub corrections: Vec<TermCorrection>,
+    /// The user moved this line to its speaker (it opens a cannot-link of the call).
+    pub moved: bool,
 }
 
 /// Where an archive segment goes: onto a live speaker's archive row, or a new speaker for a
@@ -78,9 +80,10 @@ fn span(s: &EngineSegment) -> (i64, i64) {
     (s.t0_ms.0.into(), s.t1_ms.0.into())
 }
 
-/// The target of every archive segment and of every cluster. A segment goes to the live speaker
-/// its own span overlaps most, so a line the user moved to another speaker stays there; one that
-/// overlaps no live line goes where its cluster's speech overlaps most, else to a new speaker.
+/// The target of every archive segment and of every cluster. Each live speaker goes to the one
+/// cluster that overlaps its speech most, so its name stays with that voice; every other cluster
+/// is a new speaker (#1273: live labels the system channel as one speaker, and all voices went
+/// onto it). A segment over a line the user moved goes where the user moved it.
 pub(crate) fn map_speakers(
     archive: &[EngineSegment],
     live: &[LiveLine],
@@ -96,19 +99,43 @@ pub(crate) fn map_speakers(
             *all.entry(id).or_default() += o;
         }
     }
-    let of_cluster: HashMap<(AudioChannel, String), Target> = clusters
-        .into_iter()
-        .map(|(key, votes)| {
-            let target =
-                most(votes).map_or_else(|| Target::New(key.0, key.1.clone()), Target::Live);
-            (key, target)
-        })
+    // The largest overlaps pair first; ties by label and id, so the mapping is deterministic.
+    let mut pairs: Vec<(i64, &(AudioChannel, String), &String)> = clusters
+        .iter()
+        .flat_map(|(key, votes)| votes.iter().map(move |(id, o)| (*o, key, id)))
         .collect();
+    pairs.sort_by(|a, b| {
+        (
+            std::cmp::Reverse(a.0),
+            &a.1 .1,
+            a.1 .0 == AudioChannel::Mic,
+            a.2,
+        )
+            .cmp(&(
+                std::cmp::Reverse(b.0),
+                &b.1 .1,
+                b.1 .0 == AudioChannel::Mic,
+                b.2,
+            ))
+    });
+    let mut of_cluster: HashMap<(AudioChannel, String), Target> = HashMap::new();
+    let mut taken = std::collections::HashSet::new();
+    for (_, key, id) in pairs {
+        if !of_cluster.contains_key(key) && taken.insert(id) {
+            of_cluster.insert(key.clone(), Target::Live(id.clone()));
+        }
+    }
+    for key in clusters.keys() {
+        of_cluster
+            .entry(key.clone())
+            .or_insert_with(|| Target::New(key.0, key.1.clone()));
+    }
+    let moved: Vec<LiveLine> = live.iter().filter(|l| l.moved).cloned().collect();
     let targets = archive
         .iter()
         .map(|s| {
             let (t0, t1) = span(s);
-            most(votes(live, s.channel, t0, t1))
+            most(votes(&moved, s.channel, t0, t1))
                 .map(Target::Live)
                 .unwrap_or_else(|| of_cluster[&(s.channel, s.speaker_label.clone())].clone())
         })
@@ -275,7 +302,11 @@ fn live_of(
         })?
         .collect::<Result<Vec<_>, _>>()?;
     let mut stmt = c.prepare(
-        "SELECT speaker_id, channel, t0_ms, t1_ms, text, corrections FROM segments
+        // A moved line opens a cannot-link whose first span is the line (speakers.rs, inst-correct-split).
+        "SELECT speaker_id, channel, t0_ms, t1_ms, text, corrections,
+                EXISTS (SELECT 1 FROM speaker_constraints k WHERE k.call_id = s.call_id
+                          AND k.kind = 'cannot_link' AND k.a_t0_ms = s.t0_ms AND k.a_t1_ms = s.t1_ms)
+         FROM segments s
          WHERE call_id = ?1 AND pass = 'live' AND speaker_id IS NOT NULL ORDER BY t0_ms",
     )?;
     let lines = stmt
@@ -287,6 +318,7 @@ fn live_of(
                 t1: r.get(3)?,
                 text: r.get(4)?,
                 corrections: serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or_default(),
+                moved: r.get(6)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -324,6 +356,25 @@ fn speaker_values(
             ]
         }
     }
+}
+
+/// The system channel's clustering in counts only (#1273): the voices the engine heard and the
+/// speakers they were installed as.
+fn diarization_counts(result: &ArchiveResult, rows: &[Insert]) -> (usize, usize) {
+    let voices = result
+        .segments
+        .iter()
+        .filter(|s| s.channel == AudioChannel::Sys && !s.speaker_label.is_empty())
+        .map(|s| s.speaker_label.as_str())
+        .collect::<std::collections::HashSet<_>>()
+        .len();
+    let speakers = rows
+        .iter()
+        .filter(|r| {
+            r.table == "speakers" && r.values.contains(&("channel", json!(AudioChannel::Sys)))
+        })
+        .count();
+    (voices, speakers)
 }
 
 /// The `speakers` and `segments` rows of pass `archive` that install `result`.
@@ -539,8 +590,17 @@ impl Core {
         let id = call.as_str().to_owned();
         let (speakers, live) = self.store().read(move |c| live_of(c, &id))?;
         // Capture data (TL-1): one transaction, no change rows; the live rows stay.
-        self.store()
-            .insert_batch(install_rows(call, &result, &speakers, &live))?;
+        let rows = install_rows(call, &result, &speakers, &live);
+        let (voices, installed) = diarization_counts(&result, &rows);
+        for (code, count) in [
+            ("diarization_clustered", voices),
+            ("diarization_speakers", installed),
+        ] {
+            self.log(object(json!({
+                "level": "info", "module": "postcall", "code": code, "count": count
+            })));
+        }
+        self.store().insert_batch(rows)?;
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-install
         self.set_archive(ctx, call, "done")?;
         // Voices that match an opted-in profile are named before the transcript file and the
@@ -613,7 +673,35 @@ mod tests {
             t1,
             text: text.into(),
             corrections: vec![],
+            moved: false,
         }
+    }
+
+    /// cpt-noter-seq-call-page-name-speakers — #1273: the live pass labels the whole system
+    /// channel as one speaker, so every archive voice overlapped it most and all of them were
+    /// installed onto it: a call of many speakers read as one.
+    #[test]
+    fn each_archive_voice_stays_its_own_speaker_when_live_heard_one() {
+        let live = vec![line("spk", 0, 60_000, "all of it")];
+        let archive = vec![
+            seg(AudioChannel::Sys, "c1", 0, 9_000, "x"),
+            seg(AudioChannel::Sys, "c2", 10_000, 12_000, "y"),
+            seg(AudioChannel::Sys, "c1", 12_000, 29_000, "x"),
+            seg(AudioChannel::Sys, "c3", 30_000, 40_000, "z"),
+        ];
+        let (targets, clusters) = map_speakers(&archive, &live);
+        let new = |l: &str| Target::New(AudioChannel::Sys, l.into());
+        assert_eq!(
+            targets,
+            vec![
+                Target::Live("spk".into()),
+                new("c2"),
+                Target::Live("spk".into()),
+                new("c3")
+            ],
+            "the voice that spoke most keeps the live speaker; the others are new speakers"
+        );
+        assert_eq!(clusters[&(AudioChannel::Sys, "c3".into())], new("c3"));
     }
 
     #[test]
@@ -621,7 +709,10 @@ mod tests {
         let live = vec![
             line("anna", 0, 10_000, "a"),
             // The user moved this one line to Ben (cannot-link with Anna's voice).
-            line("ben", 10_000, 12_000, "b"),
+            LiveLine {
+                moved: true,
+                ..line("ben", 10_000, 12_000, "b")
+            },
             line("anna", 12_000, 30_000, "a"),
             line("ben", 30_000, 40_000, "b"),
         ];
@@ -782,9 +873,27 @@ mod tests {
                         ("pass", json!("live")),
                     ],
                 ),
+                // The user moved Ben's line out of Anna's voice.
+                row(
+                    "speaker_constraints",
+                    vec![
+                        ("id", json!("spc_c_cannot_link_10000_0")),
+                        ("call_id", json!("c")),
+                        ("kind", json!("cannot_link")),
+                        ("a_t0_ms", json!(10_000)),
+                        ("a_t1_ms", json!(20_000)),
+                        ("b_t0_ms", json!(0)),
+                        ("b_t1_ms", json!(10_000)),
+                    ],
+                ),
             ])
             .unwrap();
         let (speakers, live) = core.store().read(|c| live_of(c, "c")).unwrap();
+        assert_eq!(
+            live.iter().map(|l| l.moved).collect::<Vec<_>>(),
+            [false, true],
+            "the line a cannot-link starts at is the moved one"
+        );
         let mut both = seg(AudioChannel::Sys, "c2", 10_000, 20_000, "Both at once.");
         both.crosstalk_labels = vec!["c1".into(), "c2".into()];
         let result = ArchiveResult {
@@ -795,9 +904,13 @@ mod tests {
                 both,
             ],
         };
-        core.store()
-            .insert_batch(install_rows(&call, &result, &speakers, &live))
-            .unwrap();
+        let rows = install_rows(&call, &result, &speakers, &live);
+        assert_eq!(
+            diarization_counts(&result, &rows),
+            (2, 2),
+            "two voices, installed as Anna and Ben"
+        );
+        core.store().insert_batch(rows).unwrap();
         let read = core
             .store()
             .read(|c| crate::transcript::segments_of(c, &call, None))
