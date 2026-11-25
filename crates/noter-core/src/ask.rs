@@ -158,11 +158,10 @@ impl Core {
         self.store()
             .read(|c| Ok(noter_retrieval::check_start(c, &args)))??;
         let privacy = noter_retrieval::Privacy::Cloud;
-        noter_retrieval::prepare(noter_retrieval::ask_query(
-            &args.question,
-            &args.scope,
-            privacy,
-        ))?;
+        noter_retrieval::prepare(
+            noter_retrieval::ask_query(&args.question, &args.scope, privacy),
+            |d| self.local_time().start(d),
+        )?;
         let new_thread = args.thread_id.is_none();
         let thread = args
             .thread_id
@@ -249,7 +248,7 @@ impl Core {
             noter_retrieval::Privacy::Cloud
         };
         let query = noter_retrieval::ask_query(&job.question, &job.scope, privacy);
-        let request = noter_retrieval::prepare(query)?;
+        let request = noter_retrieval::prepare(query, |d| self.local_time().start(d))?;
         let (vector, mode) = self.query_vector(request.text()).await;
         let request = request.with_vector(vector);
         let found = self

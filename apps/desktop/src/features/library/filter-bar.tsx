@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallTypeInfo, PersonRow, TagCount } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import type { CallTypeInfo, PersonRow, TagCount, UiPrefs } from "../../core/bindings";
+import { dayOf, t } from "../../i18n/format";
 import { Checkbox } from "../../ui/primitives/checkbox";
 import { Popover } from "../../ui/primitives/popover";
 import { PushButton } from "../../ui/primitives/push-button";
@@ -50,7 +50,7 @@ const LANGS = ["en", "ru", "de"];
 
 // @cpt-component:cpt-noter-component-ui-filter-bar:p1
 /** The filter bar: pop-ups and tokens over one filter state; Clear keeps the typed words. */
-export function FilterBar({ state, lists, onAction }: { state: FilterState; lists: Lists; onAction: (a: FilterAction) => void }) {
+export function FilterBar({ state, lists, onAction, prefs }: { prefs?: UiPrefs; state: FilterState; lists: Lists; onAction: (a: FilterAction) => void }) {
   const [open, setOpen] = useState<Menu>(null);
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const toks = tokens(state, lookups(lists));
@@ -73,7 +73,7 @@ export function FilterBar({ state, lists, onAction }: { state: FilterState; list
     items.map((i) => <Checkbox key={i.value} label={i.label} checked={((f[g] ?? []) as string[]).includes(i.value)} onAction={() => onAction({ type: "toggle", group: g, value: i.value })} />);
   const people = <PeopleList lists={lists} held={(f.people ?? []) as string[]} onAction={onAction} />;
   // @cpt-end:cpt-noter-flow-ui-library-search-topics-filter-tag:p1:inst-choose
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dayOf(Date.now(), prefs);
   const preset = datePreset(f);
   return (
     <div data-region="LC-R2" className="lb-filterbar" role="search" aria-label={t("filters.label")}>

@@ -18,22 +18,28 @@ const SNIPPET_CHARS: usize = 400;
 // @cpt-flow:cpt-noter-flow-core-retrieval-ask-search:p1
 /// The checked request: `invalid_input` for a limit outside 1–100 or a bad date. Every section
 /// and every source; the caller adds the query's vector when the indexes are ready.
-pub fn search_request(args: &SearchArgs) -> Result<Prepared, CoreError> {
+pub fn search_request(
+    args: &SearchArgs,
+    start_of_day: impl Fn(i64) -> i64,
+) -> Result<Prepared, CoreError> {
     // @cpt-begin:cpt-noter-flow-core-retrieval-ask-search:p1:inst-search-request
     let limit = args.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {
         return Err(invalid("limit", ValidationRule::OutOfRange));
     }
-    prepare(Query {
-        text: args.query.clone(),
-        filter: args.filter.clone(),
-        scope: Scope {
-            include_documents: true,
-            ..Scope::default()
+    prepare(
+        Query {
+            text: args.query.clone(),
+            filter: args.filter.clone(),
+            scope: Scope {
+                include_documents: true,
+                ..Scope::default()
+            },
+            wanted: limit as usize,
+            ..Query::default()
         },
-        wanted: limit as usize,
-        ..Query::default()
-    })
+        start_of_day,
+    )
     // @cpt-end:cpt-noter-flow-core-retrieval-ask-search:p1:inst-search-request
 }
 

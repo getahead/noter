@@ -18,7 +18,7 @@ use crate::settings::invalid;
 use crate::{internal, lock, Core};
 
 const MAX_TAG: usize = 32;
-const DAY_MS: i64 = 86_400_000;
+
 const WEEK_DAYS: i64 = 7;
 /// Calls of the same people that Today carries work from.
 pub(crate) const CARRY_CALLS: usize = 2;
@@ -301,12 +301,15 @@ struct Sections {
 struct Window {
     ranking: TodayRanking,
     week: bool,
+    date: String,
     day_start: i64,
+    day_end: i64,
+    week_end: i64,
 }
 
 fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections> {
-    let day_end = w.day_start + DAY_MS;
-    let week_end = w.day_start + (WEEK_DAYS + 1) * DAY_MS;
+    let day_end = w.day_end;
+    let week_end = w.week_end;
     let (mut today, mut this_week, mut shown) = (vec![], vec![], BTreeSet::new());
     let mut ordered: Vec<&CalendarEvent> = events.iter().collect();
     ordered.sort_by_key(|e| e.event.starts_at.0);
@@ -324,7 +327,7 @@ fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections
             this_week.push(card);
         }
     }
-    let date = crate::history::date_of(w.day_start);
+    let date = w.date.clone();
     let mut due_without_call = items_where(
         c,
         "i.status IN ('open', 'carried') AND i.review_state = 'accepted'
@@ -550,10 +553,16 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-request
         let now = self.deps.clock.now().0;
         let settings = lock(&self.settings).today.clone();
+        let local = self.local_time();
+        let today = local.day(now);
+        let date = local.date(now);
         let window = Window {
             ranking: settings.ranking,
             week: settings.horizon == DashboardHorizon::ThisWeek,
-            day_start: now.div_euclid(DAY_MS) * DAY_MS,
+            date: date.clone(),
+            day_start: local.start(today),
+            day_end: local.start(today + 1),
+            week_end: local.start(today + WEEK_DAYS + 1),
         };
         let access = self.deps.native.permission(PermissionKind::Calendar);
         // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-request
@@ -561,7 +570,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-calendar
         let (calendar, events) = match access {
             PermissionState::Granted => {
-                let to = TimestampMs(window.day_start + (WEEK_DAYS + 1) * DAY_MS);
+                let to = TimestampMs(window.week_end);
                 let events = self
                     .deps
                     .native
@@ -610,7 +619,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-banners
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-return
         Ok(TodayView {
-            date: LocalDate(crate::history::date_of(now)),
+            date: LocalDate(date),
             ranking: settings.ranking,
             calendar,
             live_call,

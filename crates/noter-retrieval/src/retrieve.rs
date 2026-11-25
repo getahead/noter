@@ -20,7 +20,6 @@ pub const OVER_FETCH: usize = 4;
 // shortcut: one fixed floor until the golden set (owner, TL-35) tunes it; bge-m3 puts unrelated
 // text near 0.4–0.6 and paraphrases above 0.8.
 pub const MIN_SIMILARITY: f64 = 0.8;
-const DAY_MS: i64 = 86_400_000;
 
 /// Who will read the evidence: a cloud runtime never gets sensitive calls or sources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -194,7 +193,7 @@ pub struct Prepared {
 }
 
 /// Checks the filter's dates (`invalid_input` on a malformed date or `from` after `to`).
-pub fn prepare(query: Query) -> Result<Prepared, CoreError> {
+pub fn prepare(query: Query, start_of_day: impl Fn(i64) -> i64) -> Result<Prepared, CoreError> {
     let day = |d: &Option<LocalDate>, field: &str| match d {
         None => Ok(None),
         Some(d) => day_number(d)
@@ -206,12 +205,11 @@ pub fn prepare(query: Query) -> Result<Prepared, CoreError> {
     if from.zip(to).is_some_and(|(from, to)| from > to) {
         return Err(invalid("filter.to", ValidationRule::OutOfRange));
     }
-    // shortcut: a day is a UTC day, as `calls_list` counts it; use the user's time zone when
-    // settings carry one.
+    // Bounds are independent local midnights, including when the UTC offset changes.
     Ok(Prepared {
         query,
-        from_ms: from.map(|d| d * DAY_MS),
-        to_ms: to.map(|d| (d + 1) * DAY_MS),
+        from_ms: from.map(&start_of_day),
+        to_ms: to.map(|d| start_of_day(d + 1)),
     })
 }
 

@@ -55,6 +55,10 @@ pub trait NativeServices: Send + Sync {
         let _ = at;
         None
     }
+    /// The host's named time zone for the WebView's calendar and clock formatters.
+    fn time_zone(&self) -> String {
+        "UTC".into()
+    }
     /// The Mac's local offset from UTC at `at`, in minutes (the menu shows local times).
     fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
         let _ = at;

@@ -887,7 +887,8 @@ impl Core {
             wanted,
             vector,
         };
-        let prepared = noter_retrieval::prepare(query).map_err(|_| PARAMS)?;
+        let prepared =
+            noter_retrieval::prepare(query, |d| self.local_time().start(d)).map_err(|_| PARAMS)?;
         let found = self
             .store
             .read(|c| {
@@ -905,7 +906,7 @@ impl Core {
                 }
                 let mut hits = vec![];
                 for hit in r.calls.iter().take(wanted) {
-                    hits.extend(call_hit(c, hit)?);
+                    hits.extend(call_hit(c, hit, self.local_time())?);
                 }
                 Ok(to_json(&SearchCallsOutput {
                     hits,
@@ -1129,6 +1130,7 @@ fn typed<T: serde::de::DeserializeOwned>(params: Value) -> Result<T, Rpc> {
 fn call_hit(
     c: &Connection,
     hit: &noter_retrieval::Hit,
+    local: crate::local_time::LocalTime,
 ) -> noter_db::rusqlite::Result<Option<CallHit>> {
     let (Some(call), HitTarget::Segment { span }) = (&hit.call, &hit.target) else {
         return Ok(None);
@@ -1151,7 +1153,7 @@ fn call_hit(
     Ok(Some(CallHit {
         call_id: call.id.clone(),
         call_title: call.title.clone(),
-        call_date: LocalDate(crate::history::date_of(call.started_at.0)),
+        call_date: LocalDate(local.date(call.started_at.0)),
         t0_ms: span.t0_ms,
         t1_ms: span.t1_ms,
         segment_ids,

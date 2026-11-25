@@ -5,24 +5,8 @@ use noter_db::rusqlite::{params, Connection};
 use noter_protocol::model::*;
 use noter_protocol::*;
 
-const DAY_MS: i64 = 86_400_000;
 /// People and topics offered, the most frequent or recent first.
 const EACH: i64 = 5;
-
-/// `YYYY-MM-DD` of an epoch-ms instant (UTC, as the filters count days).
-fn date_of(ms: i64) -> LocalDate {
-    // Civil from days (Howard Hinnant).
-    let z = ms.div_euclid(DAY_MS) + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    let y = yoe + era * 400 + i64::from(m <= 2);
-    LocalDate(format!("{y:04}-{m:02}-{d:02}"))
-}
 
 fn preset(id: String, label: String, scope: AskScope) -> ScopePreset {
     ScopePreset {
@@ -35,14 +19,14 @@ fn preset(id: String, label: String, scope: AskScope) -> ScopePreset {
     }
 }
 
-/// The presets for `now`, with call-type labels from `call_types`.
+/// The presets for the local last-30-days cutoff, with call-type labels from `call_types`.
 pub fn scope_presets(
     conn: &Connection,
-    now: TimestampMs,
+    since: TimestampMs,
+    since_date: LocalDate,
     call_types: &[CallTypeInfo],
 ) -> noter_db::rusqlite::Result<ScopePresetList> {
-    let since = now.0 - 30 * DAY_MS;
-    let month = Some(date_of(since));
+    let month = Some(since_date);
     let mut presets = vec![
         preset(
             "all".into(),
@@ -71,7 +55,7 @@ pub fn scope_presets(
          GROUP BY call_type ORDER BY count(*) DESC, call_type",
     )?;
     let used: Vec<String> = stmt
-        .query_map(params![since], |r| r.get(0))?
+        .query_map(params![since.0], |r| r.get(0))?
         .collect::<Result<_, _>>()?;
     for id in &used {
         let Some(t) = call_types.iter().find(|t| &t.id.0 == id) else {
@@ -139,19 +123,4 @@ pub fn scope_presets(
         ));
     }
     Ok(ScopePresetList { presets })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn dates_are_utc_calendar_days() {
-        assert_eq!(date_of(0).0, "1970-01-01");
-        assert_eq!(date_of(1_709_164_800_000).0, "2024-02-29");
-        assert_eq!(date_of(1_709_251_199_999).0, "2024-02-29");
-        assert_eq!(date_of(-1).0, "1969-12-31");
-        let back = crate::retrieve::day_number(&date_of(1_789_000_000_000)).unwrap();
-        assert_eq!(back, 1_789_000_000_000 / DAY_MS);
-    }
 }

@@ -13,6 +13,10 @@ use crate::retrieve::fuse;
 use crate::*;
 
 const DAY: i64 = 86_400_000;
+fn utc_midnight(day: i64) -> i64 {
+    day * DAY
+}
+
 /// 2026-10-01T00:00:00Z.
 const OCT_1: i64 = 1_790_812_800_000;
 
@@ -243,7 +247,7 @@ impl Library {
     }
 
     fn find(&self, q: Query) -> Retrieved {
-        retrieve(&self.db, &prepare(q).unwrap(), &NoDocuments).unwrap()
+        retrieve(&self.db, &prepare(q, utc_midnight).unwrap(), &NoDocuments).unwrap()
     }
 
     fn path(&self) -> std::path::PathBuf {
@@ -528,14 +532,17 @@ fn filters_narrow_every_section_in_sql() {
 #[test]
 fn bad_dates_are_invalid_input_before_any_read() {
     let bad = |from: &str, to: &str| {
-        prepare(Query {
-            filter: CallFilter {
-                from: Some(LocalDate(from.into())),
-                to: Some(LocalDate(to.into())),
-                ..CallFilter::default()
+        prepare(
+            Query {
+                filter: CallFilter {
+                    from: Some(LocalDate(from.into())),
+                    to: Some(LocalDate(to.into())),
+                    ..CallFilter::default()
+                },
+                ..query("x")
             },
-            ..query("x")
-        })
+            utc_midnight,
+        )
         .unwrap_err()
     };
     let e = bad("2026-02-30", "2026-03-01");
@@ -549,7 +556,7 @@ fn bad_dates_are_invalid_input_before_any_read() {
         Some(ErrorDetail::Validation { ref field, rule: error::ValidationRule::OutOfRange })
             if field == "filter.to"
     ));
-    assert!(prepare(query("x")).is_ok());
+    assert!(prepare(query("x"), utc_midnight).is_ok());
 }
 
 #[test]
@@ -632,13 +639,16 @@ fn calls_only_scope_leaves_documents_out() {
     }
     let lib = library();
     let run = |include_documents| {
-        let p = prepare(Query {
-            scope: Scope {
-                include_documents,
-                ..Scope::default()
+        let p = prepare(
+            Query {
+                scope: Scope {
+                    include_documents,
+                    ..Scope::default()
+                },
+                ..query("websockets")
             },
-            ..query("websockets")
-        })
+            utc_midnight,
+        )
         .unwrap();
         retrieve(&lib.db, &p, &OneDoc).unwrap()
     };
@@ -966,10 +976,10 @@ fn run_search(lib: &Library, p: &Prepared, mode: SearchMode) -> SearchResults {
 fn search_sections_explain_strength_and_validate_limits() {
     let lib = library();
     for limit in [0, MAX_LIMIT + 1] {
-        let e = search_request(&args("x", Some(limit))).unwrap_err();
+        let e = search_request(&args("x", Some(limit)), utc_midnight).unwrap_err();
         assert_eq!(e.code, ErrorCode::InvalidInput);
     }
-    let p = search_request(&args("WebSockets", None)).unwrap();
+    let p = search_request(&args("WebSockets", None), utc_midnight).unwrap();
     assert_eq!(p.wanted(), DEFAULT_LIMIT as usize);
     let r = run_search(&lib, &p, SearchMode::Hybrid);
     assert_eq!(r.query, "WebSockets");
@@ -993,13 +1003,13 @@ fn search_sections_explain_strength_and_validate_limits() {
     // No hits: empty sections, not weak.
     let none = run_search(
         &lib,
-        &search_request(&args("zzz", None)).unwrap(),
+        &search_request(&args("zzz", None), utc_midnight).unwrap(),
         SearchMode::Hybrid,
     );
     assert!(none.calls.is_empty() && none.items.is_empty() && none.topics.is_empty());
     assert!(!none.only_weak);
     // Only weak hits: said so, and the semantic hit in Russian is a cross-language match.
-    let p = search_request(&args("zzz", Some(5)))
+    let p = search_request(&args("zzz", Some(5)), utc_midnight)
         .unwrap()
         .with_vector(Some(vector(2)));
     let weak = run_search(&lib, &p, SearchMode::Hybrid);
@@ -1013,7 +1023,7 @@ fn search_sections_explain_strength_and_validate_limits() {
     };
     let r = run_search(
         &lib,
-        &search_request(&args("x", None)).unwrap(),
+        &search_request(&args("x", None), utc_midnight).unwrap(),
         mode.clone(),
     );
     assert_eq!(r.mode, mode);
@@ -1028,7 +1038,7 @@ fn search_sections_explain_strength_and_validate_limits() {
         .unwrap();
     let r = run_search(
         &lib,
-        &search_request(&args("вебсокет", None)).unwrap(),
+        &search_request(&args("вебсокет", None), utc_midnight).unwrap(),
         SearchMode::Hybrid,
     );
     assert_eq!(r.topics.len(), 1);
@@ -1058,8 +1068,13 @@ fn presets_come_from_the_library() {
                VALUES ('top_ws', 1, 'Drawer', 0, 5)",
         )
         .unwrap();
-    let now = TimestampMs(OCT_1 + 30 * DAY);
-    let list = scope_presets(&lib.db, now, &types).unwrap();
+    let list = scope_presets(
+        &lib.db,
+        TimestampMs(OCT_1),
+        LocalDate("2026-10-01".into()),
+        &types,
+    )
+    .unwrap();
     let ids: Vec<&str> = list.presets.iter().map(|p| p.id.as_str()).collect();
     assert_eq!(
         ids,
@@ -1731,7 +1746,10 @@ fn ask_start_checks_the_question_thread_and_scope() {
         },
         Privacy::Cloud,
     );
-    assert_eq!(prepare(q).unwrap_err().code, ErrorCode::InvalidInput);
+    assert_eq!(
+        prepare(q, utc_midnight).unwrap_err().code,
+        ErrorCode::InvalidInput
+    );
     assert!(only_weak([MatchStrength::Weak, MatchStrength::Weak]));
     assert!(!only_weak([MatchStrength::Weak, MatchStrength::Strong]));
     assert!(!only_weak([]));

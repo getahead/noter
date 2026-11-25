@@ -47,7 +47,6 @@ const UNCLASSIFIED: &str = "unclassified";
 
 const DEFAULT_PAGE: u32 = 100;
 const MAX_PAGE: u32 = 500;
-const DAY_MS: i64 = 86_400_000;
 
 /// Call folders whose files could not be removed after their rows went; retried at the next start.
 const PENDING_FILE: &str = "audio/.pending-delete";
@@ -498,7 +497,7 @@ impl Core {
                 "EXISTS (SELECT 1 FROM speakers p WHERE p.call_id = c.id AND p.person_id IN ({marks}))"
             ));
         }
-        // shortcut: a day is a UTC day; use the user's time zone when settings carry one.
+        // The two local midnight boundaries can have different UTC offsets.
         let day = |d: &Option<LocalDate>, field: &str| match d {
             None => Ok(None),
             Some(d) => day_number(d)
@@ -510,11 +509,11 @@ impl Core {
             return Err(invalid("filter.to", ValidationRule::OutOfRange));
         }
         if let Some(from) = from {
-            let mark = w.bind(from * DAY_MS);
+            let mark = w.bind(self.local_time().start(from));
             clauses.push(format!("c.started_at >= {mark}"));
         }
         if let Some(to) = to {
-            let mark = w.bind((to + 1) * DAY_MS);
+            let mark = w.bind(self.local_time().start(to + 1));
             clauses.push(format!("c.started_at < {mark}"));
         }
         if let Some(open) = f.has_open_items {
