@@ -73,7 +73,7 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
       {/* @cpt-end:cpt-noter-flow-ui-speakers-post-call:p1:inst-panel */}
       {heldRun && <>
         <InlineBanner banner={{
-          id: "regen-power", severity: "warning", title: t("outputs.regen.power_title"), text: t("outputs.regen.power_help"),
+          id: "regen-power", severity: "info", dismissible: false, title: t("outputs.regen.power_title"), text: t("outputs.regen.power_help"),
           actions: [{ label: t("outputs.regen.run_now"), loading: regen?.state === "WAITING",
             onAction: () => void regenerate(bridge, { call_id: callId, sections: [], local: false, run_now_on_battery: heldRun }) }],
         }} />

@@ -82,6 +82,7 @@ describe("OutputsView", () => {
     const seen = sent();
     const tree = rendered(OutputsView, { bridge, callId: id });
     const banner = find(tree, (p) => (p.banner as { id?: string })?.id === "regen-power").props.banner as { actions: { onAction(): void }[] };
+    expect(banner).toMatchObject({ severity: "info", dismissible: false });
     banner.actions[0]!.onAction();
     await settle();
     expect(seen).toContainEqual(["outputs_regenerate", { call_id: id, run_now_on_battery: "run_held", sections: [], local: false }]);
