@@ -94,7 +94,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 **Success Scenarios**:
 - The transcript remains readable while Summary, Decisions, Action items, Open questions and Per participant appear; risks and call-type extras follow where applicable, and role reviews run last.
 - Before queuing PostCall, normal and interrupted stops classify an unclassified call locally. A matched calendar title or call title takes precedence over confirmed transcript cues. A unique match selects one of the eight built-ins. A tie or insufficient evidence leaves the call unclassified. A user-selected type survives detection.
-- At launch, a one-time background pass applies the same rule to previously stopped, unclassified calls. Detection works on battery without a model. Each assignment has an automatic, undoable History entry. An undone choice is respected on retry or relaunch.
+- At launch, a one-time background pass applies the same rule to previously stopped, unclassified calls. Detection works on battery without a model. The backfill updates only the type. Existing outputs can be regenerated explicitly. Each assignment has an automatic, undoable History entry. An undone choice is respected on retry or relaunch.
 - Another live call keeps PostCall running at low priority; local results identify their writer and role reviews follow in the background.
 
 **Error Scenarios**:

@@ -33,7 +33,7 @@ fn builtins_match_a_title_or_a_distinctive_spoken_agenda() {
             "standup",
             "Команда · Дейли",
             "Вчера я закончил задачу.",
-            "Сегодня я начинаю следующую.",
+            "Сегодня я начинаю следующую. Блокеров нет.",
         ),
         (
             "planning",
@@ -78,6 +78,60 @@ fn builtins_match_a_title_or_a_distinctive_spoken_agenda() {
             Some(kind),
             "{first}"
         );
+    }
+}
+
+// cpt-noter-seq-core-call-end-outputs
+#[test]
+fn generic_weekly_updates_do_not_identify_an_agenda() {
+    for (earlier, later) in [
+        (
+            "Yesterday we sent the customer the design.",
+            "Today we need a decision.",
+        ),
+        (
+            "Я вчера отправил дизайн.",
+            "Я сегодня уточню оценки по эпикам.",
+        ),
+        (
+            "We showed the epics to the customer.",
+            "Their estimates include support.",
+        ),
+        (
+            "Вчера мы обсуждали эпики и оценки.",
+            "Сегодня мы разберём замечания.",
+        ),
+    ] {
+        assert_eq!(
+            transcript_matches("Weekly sync", &[("live", earlier), ("live", later)]),
+            None,
+            "{earlier}"
+        );
+    }
+}
+
+#[test]
+fn titles_distinguish_hiring_interviews_and_daily_scrums_from_other_meetings() {
+    for title in [
+        "Customer interview",
+        "User interview",
+        "Research interview",
+        "Daily ops review",
+        "Jour fixe",
+    ] {
+        assert_eq!(transcript_matches(title, &[]), None, "{title}");
+    }
+    for (title, kind) in [
+        ("Technical interview", "interview"),
+        ("Интервью", "interview"),
+        ("Стенд-ап", "standup"),
+        ("Daily", "standup"),
+        ("Планёрка спринта", "planning"),
+        ("Teamübergreifender Jour fixe", "cross_team"),
+        ("Vorfall", "incident"),
+        ("Produktionsausfall", "incident"),
+    ] {
+        assert_eq!(transcript_matches(title, &[]), Some(kind), "{title}");
     }
 }
 

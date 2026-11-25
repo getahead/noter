@@ -60,6 +60,13 @@ fn detect(
             .replace("1:1", "one on one")
             .replace("1-1", "one on one"),
     );
+    // These shorthand labels identify a type on their own. In longer titles their
+    // qualifiers matter ("daily scrum", "daily ops review", "customer interview").
+    match title.trim() {
+        "daily" => return Ok(Some("standup")),
+        "interview" | "интервью" => return Ok(Some("interview")),
+        _ => {}
+    }
     let mut labels = RULES
         .iter()
         .filter(|rule| mentions(&title, rule.titles))
