@@ -133,6 +133,16 @@ struct Entry {
     row: JobRunRow,
     subject: Option<String>,
     cancel: bool,
+    run_on_battery: bool,
+}
+
+impl Entry {
+    fn queued_regeneration(&self, call: &CallId) -> bool {
+        self.row.kind == JobKind::Regeneration
+            && self.subject.as_deref() == Some(call.as_str())
+            && self.row.status == JobRunStatus::Queued
+            && !self.cancel
+    }
 }
 
 struct Inner {
@@ -255,6 +265,46 @@ impl Scheduler {
         self.0.define(kind).map(|_| ())
     }
 
+    // @cpt-begin:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-regen-power
+    /// The queued regeneration the user can release on this call, including a run restored at startup.
+    pub fn waiting_for_power(&self, call: &CallId) -> Result<Option<JobRunId>, CoreError> {
+        let run = lock(&self.0.open)
+            .values()
+            .find(|e| e.queued_regeneration(call) && !e.run_on_battery)
+            .map(|e| e.row.id.clone());
+        if run.is_none() || !self.0.deps.power.on_battery() {
+            return Ok(None);
+        }
+        let held = rows::defs(&self.0.deps.store)?
+            .iter()
+            .any(|d| d.kind == JobKind::Regeneration && d.enabled && !d.allow_on_battery);
+        Ok(run.filter(|_| held))
+    }
+
+    /// Release a particular queued run. The job definition and the capture guard still apply.
+    pub fn run_regeneration_on_battery(
+        &self,
+        call: &CallId,
+        id: &JobRunId,
+    ) -> Result<(), CoreError> {
+        {
+            let mut open = lock(&self.0.open);
+            let entry = open
+                .get_mut(id)
+                .filter(|e| e.queued_regeneration(call))
+                .ok_or_else(|| {
+                    CoreError::new(
+                        ErrorCode::NotFound,
+                        "regeneration is no longer queued for this call",
+                    )
+                })?;
+            entry.run_on_battery = true;
+        }
+        self.0.apply();
+        Ok(())
+    }
+    // @cpt-end:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-regen-power
+
     /// Cancels a queued, running or paused run; a running one stops at its next boundary.
     // @cpt-flow:cpt-noter-flow-core-jobs-scheduler-interrupt:p1
     pub fn cancel(&self, id: &JobRunId) -> Result<(), CoreError> {
@@ -348,6 +398,7 @@ impl Inner {
                             row,
                             subject,
                             cancel: false,
+                            run_on_battery: false,
                         },
                     );
                 }
@@ -437,6 +488,7 @@ impl Inner {
                     row: row.clone(),
                     subject: subject.clone(),
                     cancel: false,
+                    run_on_battery: false,
                 },
             );
             row
@@ -544,7 +596,7 @@ impl Inner {
                 .filter(|e| {
                     defs.iter()
                         .find(|d| d.kind == e.row.kind)
-                        .is_some_and(|d| !held(d, &e.subject, battery, &guard))
+                        .is_some_and(|d| !held(d, &e.subject, battery && !e.run_on_battery, &guard))
                 })
                 .collect();
             ready.sort_by_key(|e| {
@@ -747,10 +799,8 @@ impl Inner {
             .into_iter()
             .find(|d| d.kind == kind);
         let guard = self.deps.guard.borrow().clone();
-        let hold = def.map_or(true, |d| {
-            held(&d, subject, self.deps.power.on_battery(), &guard)
-        });
-        let changed = {
+        let battery = self.deps.power.on_battery();
+        let (hold, changed) = {
             let mut open = lock(&self.open);
             let Some(entry) = open.get_mut(id) else {
                 return Err(Stop::Cancelled);
@@ -758,10 +808,13 @@ impl Inner {
             if entry.cancel {
                 return Err(Stop::Cancelled);
             }
+            let hold = def.map_or(true, |d| {
+                held(&d, subject, battery && !entry.run_on_battery, &guard)
+            });
             // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-pause
             // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-postcall
             // @cpt-begin:cpt-noter-state-core-jobs-scheduler-run:p1:inst-st-pause
-            if hold && entry.row.status == JobRunStatus::Running {
+            let changed = if hold && entry.row.status == JobRunStatus::Running {
                 entry.row.status = JobRunStatus::Paused;
                 Some(entry.row.clone())
             // @cpt-end:cpt-noter-state-core-jobs-scheduler-run:p1:inst-st-pause
@@ -776,7 +829,8 @@ impl Inner {
             // @cpt-end:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-resume
             } else {
                 None
-            }
+            };
+            (hold, changed)
         };
         if let Some(row) = changed {
             // @cpt-begin:cpt-noter-flow-core-jobs-scheduler-interrupt:p1:inst-interrupt-return

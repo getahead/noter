@@ -27,6 +27,7 @@ export interface CorePlan {
   latencyFor?: CommandName;
   /** Page Date and the real core use the fixture's clock; browser timers still run. */
   fixedClock?: boolean;
+  power?: "battery" | "ac";
   /** The real core's scripted host refuses this initially bound chord. */
   hotkeyConflict?: { action: HotkeyAction; shortcut: string; owner: string };
   /** The story's starting state (tests/support/world-presets.ts), applied before the window's first command. */
@@ -175,6 +176,7 @@ async function connectRealCore(page: Page, label: string, plan: CorePlan): Promi
   if (!command) throw new Error("NOTER_CORE=stdio needs NOTER_CORE_CMD (path to noter-core-harness and its flags)");
   const args = [
     ...(plan.fixedClock ? ["--clock", "fixed"] : []),
+    ...(plan.power ? ["--power", plan.power] : []),
     ...(plan.hotkeyConflict ? ["--hotkey-conflict", `${plan.hotkeyConflict.shortcut}=${plan.hotkeyConflict.owner}`] : []),
   ];
   const core = new StdioCore({ command, args });

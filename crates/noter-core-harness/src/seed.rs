@@ -293,6 +293,30 @@ impl Harness {
                         ),
                         ("call_id", id.clone()),
                         ("person_id", participant["id"].clone()),
+                        (
+                            "from_invite",
+                            json!(call["invited_ids"]
+                                .as_array()
+                                .is_some_and(|ids| ids.contains(&participant["id"]))),
+                        ),
+                    ],
+                ));
+            }
+            for (index, guest) in call["invited_guests"]
+                .as_array()
+                .unwrap_or(&empty)
+                .iter()
+                .enumerate()
+            {
+                rows.push(ins(
+                    "call_guests",
+                    vec![
+                        (
+                            "id",
+                            json!(format!("guest_{}_{index}", id.as_str().unwrap_or_default())),
+                        ),
+                        ("call_id", id.clone()),
+                        ("display_name", guest.clone()),
                     ],
                 ));
             }

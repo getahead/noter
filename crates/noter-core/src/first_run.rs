@@ -12,8 +12,8 @@ use noter_db::rusqlite::params;
 use noter_db::{Logged, Store};
 use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
-pub use noter_protocol::model::EnvironmentReading;
 use noter_protocol::model::*;
+pub use noter_protocol::model::{CalendarAttendee, CalendarEvent, EnvironmentReading};
 use noter_protocol::*;
 use serde::{Deserialize, Serialize};
 
@@ -22,20 +22,6 @@ use crate::{internal, lock, settings, Core};
 
 /// A boxed future, so the seams stay object-safe.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
-
-/// A calendar event Today shows, as EventKit reports it.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CalendarEvent {
-    pub event: CalendarEventRef,
-    pub platform: Option<String>,
-    pub attendees: Vec<CalendarAttendee>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CalendarAttendee {
-    pub name: String,
-    pub email: Option<String>,
-}
 
 /// macOS services (`noter-native` in the app, a scripted Mac in the harness).
 pub trait NativeServices: Send + Sync {
@@ -54,6 +40,10 @@ pub trait NativeServices: Send + Sync {
     fn calendar_event_near(&self, at: TimestampMs) -> Option<CalendarEventRef> {
         let _ = at;
         None
+    }
+    /// The host's named time zone for the WebView's calendar and clock formatters.
+    fn time_zone(&self) -> String {
+        "UTC".into()
     }
     /// The Mac's local offset from UTC at `at`, in minutes (the menu shows local times).
     fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
@@ -370,6 +360,16 @@ impl Core {
         self.start_playback();
         self.start_transcript();
         self.start_jobs();
+        if let Some(runtime) = self.runtime.get() {
+            let core = self.clone();
+            runtime.spawn_blocking(move || {
+                if let Err(e) = core.backfill_call_types() {
+                    core.log(crate::object(serde_json::json!({
+                        "level": "error", "module": "call_type", "code": e.code
+                    })));
+                }
+            });
+        }
         // Recovery finalizes older interrupted calls through the same scheduler and transcript
         // path as a normal stop, so it must run after both services are ready.
         if let Err(e) = self.find_interrupted() {

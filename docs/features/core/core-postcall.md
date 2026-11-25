@@ -93,6 +93,8 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 **Success Scenarios**:
 - The transcript remains readable while Summary, Decisions, Action items, Open questions and Per participant appear; risks and call-type extras follow where applicable, and role reviews run last.
+- Before queuing PostCall, normal and interrupted stops classify an unclassified call locally. A matched calendar title or call title takes precedence over confirmed transcript cues. A unique match selects one of the eight built-ins. A tie or insufficient evidence leaves the call unclassified. A user-selected type survives detection.
+- At launch, a one-time background pass applies the same rule to previously stopped, unclassified calls. Detection works on battery without a model. The backfill updates only the type. Existing outputs can be regenerated explicitly. Each assignment has an automatic, undoable History entry. An undone choice is respected on retry or relaunch.
 - Another live call keeps PostCall running at low priority; local results identify their writer and role reviews follow in the background.
 
 **Error Scenarios**:
@@ -100,17 +102,18 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Continue Recording cancels this generation; a later stop queues a new one with edits retained.
 
 **Steps**:
-1. [x] - `p1` - Load the stopped call's current transcript, metadata, participants, glossary, configured summary language and call-type skill - `inst-write-load`
-2. [x] - `p1` - Run `cpt-noter-algo-core-postcall-chunks` for live segments and build a packet with known evidence ids - `inst-write-packet`
-3. [x] - `p1` - Run the call-type `PostCallOutput` through the router with cancellation and the scheduler's current run generation - `inst-write-model`
-4. [x] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
+1. [x] - `p1` - Detect an eligible stopped call’s type before scheduling analysis and backfill eligible existing calls once at launch - `inst-write-classify`
+2. [x] - `p1` - Load the stopped call's current transcript, metadata, participants, glossary, configured summary language and call-type skill - `inst-write-load`
+3. [x] - `p1` - Run `cpt-noter-algo-core-postcall-chunks` for live segments and build a packet with known evidence ids - `inst-write-packet`
+4. [x] - `p1` - Run the call-type `PostCallOutput` through the router with cancellation and the scheduler's current run generation - `inst-write-model`
+5. [x] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
    1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
    2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
    3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
-5. Role reviews run last: delivered by `core-agents` (M4), which owns the `agents` table; `inst-write-reviews` is there.
-6. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
-7. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
-8. [x] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
+6. Role reviews run last: delivered by `core-agents` (M4), which owns the `agents` table; `inst-write-reviews` is there.
+7. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
+8. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`
+9. [x] - `p1` - **RETURN** committed output state to the job; queue archive processing if audio is available - `inst-write-return`
 
 ### Read, edit and compare versions
 
@@ -142,6 +145,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Archive upgrade reconciles labels, re-chunks and regenerates; manual regeneration can choose runtime, model, skill and sections or request a local rewrite of a failed section.
 
 **Error Scenarios**:
+- Without an assistant, refuse regeneration with `runtime_unavailable` and log the code. A battery-held regeneration remains queued and visible through `outputs_get`. A user can release that run on battery without changing the job definition or bypassing the remaining guards.
 - User regeneration during capture: `job_blocked`; an unavailable chosen runtime: typed runtime failure; failed archive leaves the live transcript usable as archive pending.
 
 **Steps**:
@@ -172,6 +176,8 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 5. [x] - `p1` - Write extracted items as suggested, keep pins accepted and attach supported topics; never turn an unreviewed suggestion into accepted output - `inst-store-items`
 6. [x] - `p1` - Commit primary records, changes and derived indexes through the writer in batches of at most 200 rows; mark a section ready only after its complete committed state exists - `inst-store-commit`
 7. [x] - `p1` - **RETURN** section state ready, empty or failed; an empty valid section is not an error - `inst-store-return`
+
+The summary output may include a short title describing the call’s main topic (#1256). Commit it only while the title is still automatic and pending. Calendar titles and user edits take precedence, including on regeneration.
 
 ### Chunk and embed the active transcript
 

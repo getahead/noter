@@ -27,10 +27,12 @@ export function saveEdit(bridge: Bridge, callId: string, summaryId: string, rev:
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-regenerate:p1
 /** `outputs_regenerate`: the answer is the scheduled job, not the result; `outputs:progress` brings the text. */
-export function regenerate(bridge: Bridge, args: RegenerateArgs) {
+export async function regenerate(bridge: Bridge, args: RegenerateArgs) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-job
-  return bridge.act(outputsRegenerateKey(args.call_id), "outputs_regenerate", () => bridge.core.outputsRegenerate(args));
+  const result = await bridge.act(outputsRegenerateKey(args.call_id), "outputs_regenerate", () => bridge.core.outputsRegenerate(args));
+  if (result.status === "ok" || args.run_now_on_battery) await loadOutputs(bridge, args.call_id);
+  return result;
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-job
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-call
 }

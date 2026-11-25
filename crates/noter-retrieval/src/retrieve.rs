@@ -20,7 +20,6 @@ pub const OVER_FETCH: usize = 4;
 // shortcut: one fixed floor until the golden set (owner, TL-35) tunes it; bge-m3 puts unrelated
 // text near 0.4–0.6 and paraphrases above 0.8.
 pub const MIN_SIMILARITY: f64 = 0.8;
-const DAY_MS: i64 = 86_400_000;
 
 /// Who will read the evidence: a cloud runtime never gets sensitive calls or sources.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -194,7 +193,7 @@ pub struct Prepared {
 }
 
 /// Checks the filter's dates (`invalid_input` on a malformed date or `from` after `to`).
-pub fn prepare(query: Query) -> Result<Prepared, CoreError> {
+pub fn prepare(query: Query, start_of_day: impl Fn(i64) -> i64) -> Result<Prepared, CoreError> {
     let day = |d: &Option<LocalDate>, field: &str| match d {
         None => Ok(None),
         Some(d) => day_number(d)
@@ -206,12 +205,11 @@ pub fn prepare(query: Query) -> Result<Prepared, CoreError> {
     if from.zip(to).is_some_and(|(from, to)| from > to) {
         return Err(invalid("filter.to", ValidationRule::OutOfRange));
     }
-    // shortcut: a day is a UTC day, as `calls_list` counts it; use the user's time zone when
-    // settings carry one.
+    // Bounds are independent local midnights, including when the UTC offset changes.
     Ok(Prepared {
         query,
-        from_ms: from.map(|d| d * DAY_MS),
-        to_ms: to.map(|d| (d + 1) * DAY_MS),
+        from_ms: from.map(&start_of_day),
+        to_ms: to.map(|d| start_of_day(d + 1)),
     })
 }
 
@@ -279,6 +277,32 @@ impl Binds {
     }
 }
 
+/// Spoken languages in the displayed transcript for a selection of calls. The predicate
+/// selects call IDs on `s`; all user-supplied values are bound by the caller.
+// @cpt-algo:cpt-noter-algo-core-library-calls-row:p1
+pub fn spoken_languages_sql(call_predicate: &str) -> String {
+    format!(
+        "WITH durations AS (
+            SELECT s.call_id, s.lang, min(s.t0_ms) AS first_at, sum(s.t1_ms - s.t0_ms) AS ms
+            FROM segments s WHERE {call_predicate} AND s.lang IS NOT NULL AND s.t1_ms > s.t0_ms
+              AND s.pass = CASE WHEN EXISTS (
+                SELECT 1 FROM segments a WHERE a.call_id = s.call_id AND a.pass = 'archive'
+              ) THEN 'archive' ELSE 'live' END
+            GROUP BY s.call_id, s.lang
+         ), shares AS (
+            SELECT *, sum(ms) OVER (PARTITION BY call_id) AS total,
+                row_number() OVER (PARTITION BY call_id ORDER BY ms DESC, first_at, lang) AS rank
+            FROM durations
+         )
+         SELECT call_id, lang, first_at FROM shares WHERE ms * 10 >= total OR rank = 1"
+    )
+}
+
+pub fn spoken_language_filter(marks: &str) -> String {
+    let languages = spoken_languages_sql("s.call_id = c.id");
+    format!("EXISTS (SELECT 1 FROM ({languages}) WHERE lang IN ({marks}))")
+}
+
 /// Which rows a predicate set is for: call evidence (segments, chunks) or items.
 #[derive(Clone, Copy, PartialEq)]
 enum Section {
@@ -318,9 +342,7 @@ impl Prepared {
         }
         if !f.languages.is_empty() {
             let marks = b.bind_all(f.languages.iter().map(lang_code));
-            out.push(format!(
-                "EXISTS (SELECT 1 FROM segments l WHERE l.call_id = c.id AND l.lang IN ({marks}))"
-            ));
+            out.push(spoken_language_filter(&marks));
         }
         if !f.people.is_empty() {
             let marks = b.bind_all(f.people.iter().map(|p| p.0.clone()));

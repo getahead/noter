@@ -106,6 +106,17 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await expect.poll(async () => (await sent(page, "window_report_view")).at(-1)).toEqual({ call_id: null });
   });
 
+  test("cpt-noter-seq-call-page-check-evidence — Call info identifies invitees until a speaker is named", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: quiet(false, (w) => patchCall(w, W.PAST_CALL, (c) => Object.assign(c, { invited_ids: ["per_oleg"], invited_guests: ["Guest"] }))),
+    });
+    await openCall(page);
+    await expect(info(page)).toContainText("Guest (Invited)");
+    await expect(toolbar(page)).toContainText("Guest (Invited)");
+    await expect(info(page).locator(".pc-chip").filter({ hasText: "Oleg M." })).toContainText("Invited");
+    await expect(info(page).locator(".pc-chip").filter({ hasText: "Dmitri S." })).not.toContainText("Invited");
+  });
+
   test("UI — other path: Call info docks without taking focus (a nav:request moves none); ⌥⌘I takes it and hiding returns it", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);
@@ -445,4 +456,28 @@ test.describe("cpt-noter-seq-today-review-before-call", () => {
     await page.locator('[data-region="MW-R4"]').getByRole("button", { name: "Close Inspector" }).click({ timeout: 3000 });
     await expect(info(page)).toHaveCount(0);
   });
+});
+
+test("cpt-noter-seq-call-page-check-evidence — a late UTC call shows its local date and time", async ({ page }) => {
+  const at = Date.parse("2026-11-24T23:14:39Z");
+  await page.clock.setFixedTime(new Date("2026-11-25T12:00:00Z"));
+  const steer = await openWindow(page, "main", {
+    world(w) {
+      const call = w.calls.find((c) => c.id === "call_backend")!;
+      call.started_at = at;
+      w.call_details.find((d) => d.call.id === call.id)!.call.started_at = at;
+    },
+  });
+  if (process.env.NOTER_CORE === "stdio") {
+    await steer.invoke("harness.set_utc_offset", { minutes: 60 });
+    await page.reload();
+  }
+  await expect(async () => {
+    await page.keyboard.press("Meta+Digit3");
+    await expect(page.locator('[data-lib-row="call_backend"]')).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  const row = page.locator('[data-lib-row="call_backend"]');
+  await expect(row).toContainText("Today 00:14");
+  await row.getByRole("button", { name: /^Open / }).click();
+  await expect(page.locator('[data-region="PC-R1"]')).toContainText("Today 00:14");
 });

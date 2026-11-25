@@ -115,6 +115,7 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 - **Regenerated · your 2 edits kept · Show Diff**; Compare toggles **v1 → Your Edit** without replacing the saved edit.
 
 **Error Scenarios**:
+- On battery, show the core’s power-held run on the call page, including after a repeat submission or reopening the call. **Run Now** releases that run once. Without an assistant, show **Add an Assistant…** when reading unwritten sections of a past call and when regeneration is refused.
 - `job_blocked` during capture: explain regeneration waits for the call to end; no timer retry.
 - If requesting regeneration is refused, keep the failed section visible and show the command's error beside it; preserve **Try Again** and **Use Local Model** where available.
 - A failed runtime leaves old output and offers explicit retry/local fallback.
@@ -130,6 +131,9 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, keep adjacent replacement words visibly separated without losing the before/after text or its marks, fold long unchanged stretches - `inst-diff`
 9. [x] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
 10. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
+11. [x] - `p1` - If regeneration is refused, explain the error at the action. For `runtime_unavailable`, offer **Add an Assistant…** to open Models & Runtimes - `inst-regen-refusal`
+12. [x] - `p1` - Show the queued run in Summary when submitted or reopened. Replace pending sections with the power notice, keep written sections readable, and let **Run Now** release only the named run - `inst-power-hold`
+13. [x] - `p1` - When the held run leaves the queue, refresh the outputs to clear the notice and show its progress - `inst-power-refresh`
 
 ### Copy or export a visible scope
 
@@ -268,7 +272,7 @@ The system **MUST** render ordered sections and output rows from typed core view
 
 **Touches**:
 - Commands: `outputs_get`, `output_edit`, `outputs_regenerate`, `output_versions`, `output_version_get`
-- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison with adjacent replacement text separated
+- Tests: unit ordering, stale progress, draft/conflict, version and diff-fold cases; conformance each command, job_blocked and edit/suppression preservation; real-core E2E `cpt-noter-seq-call-page-review-outputs` (all paths, History delegated); screenshots of writing, local writing, failed and empty sections, edited prose, the pre-submit regeneration sheet with runtime/section selections, a battery-held regeneration with Run Now, accepted in-progress regeneration retaining prior prose with progress shown, and before/after comparison with adjacent replacement text separated
 
 ### Sharing, tags, audio and notification routing
 

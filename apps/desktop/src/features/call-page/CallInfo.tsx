@@ -40,8 +40,11 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
               <span className="pc-chip__dot" aria-hidden="true">
                 {p.initials}
               </span>
-              {p.short_name}
+              {call.invited_ids?.includes(p.id) ? t("callpage.invited", { name: p.short_name }) : p.short_name}
             </span>
+          ))}
+          {call.invited_guests?.map((name, i) => (
+            <span key={i} className="pc-chip">{t("callpage.invited", { name })}</span>
           ))}
         </div>
       </div>

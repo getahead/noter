@@ -18,7 +18,7 @@ use crate::settings::invalid;
 use crate::{internal, lock, Core};
 
 const MAX_TAG: usize = 32;
-const DAY_MS: i64 = 86_400_000;
+
 const WEEK_DAYS: i64 = 7;
 /// Calls of the same people that Today carries work from.
 pub(crate) const CARRY_CALLS: usize = 2;
@@ -59,10 +59,19 @@ fn texts(values: &[String]) -> Vec<Sql> {
 }
 
 /// The person a calendar attendee names.
-fn known_person(c: &Connection, name: &str) -> Db<Option<PersonChip>> {
-    crate::people::by_name(c, name, None)?
-        .map(|id| owner_chip(c, &id))
-        .transpose()
+fn known_person(c: &Connection, name: &str, email: Option<&str>) -> Db<Option<PersonChip>> {
+    let Some(id) = crate::people::by_name(c, name, email)? else {
+        return Ok(None);
+    };
+    let mut chip = owner_chip(c, &id)?;
+    if chip.display_name.contains('@') {
+        chip.display_name = "Guest".into();
+        chip.initials = "G".into();
+    }
+    if chip.short_name.contains('@') {
+        chip.short_name = "Guest".into();
+    }
+    Ok(Some(chip))
 }
 
 #[derive(Default)]
@@ -167,10 +176,15 @@ fn card_of(
         .attendees
         .iter()
         .map(|a| {
+            let name = crate::people::invitee_name(a);
+            let person = known_person(c, name.unwrap_or_default(), a.email.as_deref())?;
             Ok(AttendeeChip {
-                person: known_person(c, &a.name)?,
-                name: a.name.clone(),
-                email: a.email.clone(),
+                name: name
+                    .or_else(|| person.as_ref().map(|p| p.display_name.as_str()))
+                    .unwrap_or("Guest")
+                    .into(),
+                person,
+                email: None,
             })
         })
         .collect::<Db<Vec<_>>>()?;
@@ -301,12 +315,15 @@ struct Sections {
 struct Window {
     ranking: TodayRanking,
     week: bool,
+    date: String,
     day_start: i64,
+    day_end: i64,
+    week_end: i64,
 }
 
 fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections> {
-    let day_end = w.day_start + DAY_MS;
-    let week_end = w.day_start + (WEEK_DAYS + 1) * DAY_MS;
+    let day_end = w.day_end;
+    let week_end = w.week_end;
     let (mut today, mut this_week, mut shown) = (vec![], vec![], BTreeSet::new());
     let mut ordered: Vec<&CalendarEvent> = events.iter().collect();
     ordered.sort_by_key(|e| e.event.starts_at.0);
@@ -324,7 +341,7 @@ fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections
             this_week.push(card);
         }
     }
-    let date = crate::history::date_of(w.day_start);
+    let date = w.date.clone();
     let mut due_without_call = items_where(
         c,
         "i.status IN ('open', 'carried') AND i.review_state = 'accepted'
@@ -550,10 +567,16 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-request
         let now = self.deps.clock.now().0;
         let settings = lock(&self.settings).today.clone();
+        let local = self.local_time();
+        let today = local.day(now);
+        let date = local.date(now);
         let window = Window {
             ranking: settings.ranking,
             week: settings.horizon == DashboardHorizon::ThisWeek,
-            day_start: now.div_euclid(DAY_MS) * DAY_MS,
+            date: date.clone(),
+            day_start: local.start(today),
+            day_end: local.start(today + 1),
+            week_end: local.start(today + WEEK_DAYS + 1),
         };
         let access = self.deps.native.permission(PermissionKind::Calendar);
         // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-request
@@ -561,7 +584,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-calendar
         let (calendar, events) = match access {
             PermissionState::Granted => {
-                let to = TimestampMs(window.day_start + (WEEK_DAYS + 1) * DAY_MS);
+                let to = TimestampMs(window.week_end);
                 let events = self
                     .deps
                     .native
@@ -610,7 +633,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-banners
         // @cpt-begin:cpt-noter-flow-core-items-today-dashboard:p1:inst-today-return
         Ok(TodayView {
-            date: LocalDate(crate::history::date_of(now)),
+            date: LocalDate(date),
             ranking: settings.ranking,
             calendar,
             live_call,

@@ -8,6 +8,8 @@ mod archive;
 mod ask;
 mod audio;
 mod audit;
+mod call_platform;
+mod call_type;
 mod capture;
 mod carry;
 mod chunks;
@@ -23,6 +25,7 @@ mod items;
 mod jobs;
 mod knowledge;
 mod library;
+mod local_time;
 mod log;
 mod mcp;
 mod merge;
@@ -368,6 +371,18 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 11,
         name: "the recorded length of a stopped call",
         sql: include_str!("../migrations/0011_recorded_length.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 12,
+        name: "automatic call titles and calendar invitations",
+        sql: include_str!("../migrations/0012_call_metadata.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 13,
+        name: "call-local calendar guests",
+        sql: include_str!("../migrations/0013_call_guests.sql"),
     },
 ];
 

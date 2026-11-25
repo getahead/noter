@@ -434,3 +434,21 @@ test.describe("cpt-noter-dod-ui-library-calls-table acceptance", () => {
     await expect.poll(() => content.evaluate((e) => e.scrollTop)).toBe(top);
   });
 });
+
+test("cpt-noter-seq-library-filter-calls — language badges use speaking time in the displayed transcript", async ({ page }) => {
+  await openCalls(page, (w) => {
+    const call = first(w);
+    const transcript = w.transcripts.find((t) => t.call_id === call.id)!;
+    // Archive audio: RU 89%, EN exactly 10%, DE 1%. A superseded German line is much longer.
+    const [ru, en] = transcript.segments;
+    ru!.t1_ms = ru!.t0_ms + 8900;
+    en!.t1_ms = en!.t0_ms + 1000;
+    transcript.segments.push(
+      { ...ru!, id: "seg_short_de", lang: "de", t0_ms: 0, t1_ms: 100 },
+      { ...ru!, id: "seg_superseded", lang: "de", pass: "live" },
+    );
+    call.languages = ["ru", "en"];
+  });
+  const row = page.locator(`[data-lib-row="${W.PAST_CALL}"]`);
+  await expect(row.locator(".np-lang")).toHaveText(["RU", "EN"]);
+});

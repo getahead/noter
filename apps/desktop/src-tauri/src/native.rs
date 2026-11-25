@@ -221,6 +221,10 @@ impl NativeServices for Mac {
         // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
     }
 
+    fn time_zone(&self) -> String {
+        objc2_foundation::NSTimeZone::localTimeZone().name().to_string()
+    }
+
     fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
         noter_native::utc_offset_minutes(at.0)
     }
@@ -235,12 +239,7 @@ impl NativeServices for Mac {
             .map(|events| {
                 events
                     .into_iter()
-                    .filter(|e| (from.0..to.0).contains(&e.starts_at.0))
-                    .map(|event| CalendarEvent {
-                        event,
-                        platform: None,
-                        attendees: vec![],
-                    })
+                    .filter(|e| (from.0..to.0).contains(&e.event.starts_at.0))
                     .collect()
             })
             .map_err(|_| CoreError::new(ErrorCode::CalendarUnavailable, "the calendar read failed"))

@@ -848,3 +848,44 @@ async fn the_background_loop_applies_guard_changes_and_polls_power() {
     tokio::time::sleep(Duration::from_secs(61)).await;
     assert_eq!(r.status(&again), JobRunStatus::Running);
 }
+
+#[tokio::test(start_paused = true)]
+async fn battery_override_is_scoped_to_one_queued_regeneration_and_keeps_capture_guard() {
+    let r = rig().await;
+    let call = CallId::new("call_1");
+    let other = CallId::new("call_2");
+    r.power.0.store(true, Ordering::SeqCst);
+    let regen = |id| Request::for_call(JobKind::Regeneration, Trigger::OnDemand, id);
+    let first = r.go(regen(&call));
+    let second = r.go(regen(&other));
+    assert_eq!(
+        r.sched.waiting_for_power(&call).unwrap(),
+        Some(first.clone())
+    );
+    assert_eq!(
+        r.sched
+            .run_regeneration_on_battery(&call, &second)
+            .unwrap_err()
+            .code,
+        ErrorCode::NotFound
+    );
+
+    r.live(true, None);
+    r.sched.run_regeneration_on_battery(&call, &first).unwrap();
+    assert_eq!(r.status(&first), JobRunStatus::Queued);
+    r.live(false, None);
+    settle().await;
+    assert_eq!(r.status(&first), JobRunStatus::Running);
+    r.step(JobKind::Regeneration, Step::Checkpoint);
+    r.step(JobKind::Regeneration, Step::Done);
+    settle().await;
+    assert_eq!(r.status(&first), JobRunStatus::Succeeded);
+    assert!(r.sched.waiting_for_power(&call).unwrap().is_none());
+    assert_eq!(
+        r.sched.waiting_for_power(&other).unwrap(),
+        Some(second.clone())
+    );
+    r.power.0.store(false, Ordering::SeqCst);
+    r.sched.tick();
+    assert_eq!(r.status(&second), JobRunStatus::Running);
+}

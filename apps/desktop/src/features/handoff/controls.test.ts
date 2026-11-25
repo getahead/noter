@@ -76,6 +76,15 @@ describe("footer and labels (cpt-noter-algo-ui-handoff-controls)", () => {
     expect(schemeHelp("iterm")).toBeUndefined();
     expect(schemeHelp("none")).toBeUndefined();
   });
+
+  it("explains where the terminal will run when the item has no repository mapping", () => {
+    expect(launchLine(view({ target: "codex", repo: null, ...plan("terminal") }))).toBe(
+      "No Codex link handler found. Noter will open Terminal and run codex in the repository folder you map.",
+    );
+    expect(launchLine(view({ repo: null, ...plan("iterm", true) }))).toContain(
+      "open iTerm and run claude in the repository folder you map; macOS asks once to allow Automation.",
+    );
+  });
 });
 
 describe("what is enabled", () => {

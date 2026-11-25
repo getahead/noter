@@ -1,7 +1,7 @@
 // The pure part of the History timeline: the read key, the day groups, the read state and the undo target of a row.
 import type { ActorFilter, ChangeRow, HistoryTarget, UiPrefs, UndoTarget } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
-import { dayOf, shortDay, t } from "../../i18n/format";
+import { dayOf, shiftDay, shortDay, t } from "../../i18n/format";
 import { runtimeLabel } from "../call-page/outputs-logic";
 
 export type HistoryState = "LOADING" | "READY" | "EMPTY" | "FILTERED_EMPTY" | "ERROR";
@@ -37,11 +37,12 @@ export async function readHistoryPages<T extends { status: "ok"; data: { rows: C
 /** Newest first, grouped as Today, Yesterday, then dates. */
 export function groupByDay(rows: ChangeRow[], now: number, prefs: UiPrefs): { day: string; rows: ChangeRow[] }[] {
   const groups: { key: string; day: string; rows: ChangeRow[] }[] = [];
-  const yesterday = dayOf(now - 86_400_000, prefs);
+  const today = dayOf(now, prefs);
+  const yesterday = shiftDay(today, -1);
   for (const r of [...rows].sort((a, b) => b.at - a.at)) {
     const key = dayOf(r.at, prefs);
     let g = groups.find((x) => x.key === key);
-    if (!g) groups.push((g = { key, day: key === dayOf(now, prefs) ? t("history.today") : key === yesterday ? t("history.yesterday") : shortDay(r.at, prefs), rows: [] }));
+    if (!g) groups.push((g = { key, day: key === today ? t("history.today") : key === yesterday ? t("history.yesterday") : shortDay(r.at, prefs), rows: [] }));
     g.rows.push(r);
   }
   return groups.map(({ day, rows }) => ({ day, rows }));

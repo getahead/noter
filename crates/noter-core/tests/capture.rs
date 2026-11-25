@@ -34,6 +34,8 @@ impl Clock for TestClock {
 /// A Mac with this much room on the disk and this microphone permission; it records each
 /// prompt it shows and whether the engine had been asked to start a session by then.
 struct Mac {
+    calendar: Mutex<Option<noter_core::CalendarEvent>>,
+    next_event: Mutex<Option<noter_core::CalendarEvent>>,
     disk_free_mb: u32,
     microphone: PermissionState,
     engine: ScriptedEngine,
@@ -44,6 +46,9 @@ impl NativeServices for Mac {
     fn permission(&self, kind: PermissionKind) -> PermissionState {
         match kind {
             PermissionKind::Microphone => self.microphone,
+            PermissionKind::Calendar if self.calendar.lock().unwrap().is_some() => {
+                PermissionState::Granted
+            }
             _ => PermissionState::NotAsked,
         }
     }
@@ -61,6 +66,27 @@ impl NativeServices for Mac {
             disk_free_mb: self.disk_free_mb,
             ..EnvironmentReading::default()
         }
+    }
+    fn calendar_event_near(&self, _: TimestampMs) -> Option<CalendarEventRef> {
+        self.calendar
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|e| e.event.clone())
+    }
+    fn calendar_events(
+        &self,
+        _: TimestampMs,
+        _: TimestampMs,
+    ) -> Result<Vec<noter_core::CalendarEvent>, CoreError> {
+        Ok(self
+            .calendar
+            .lock()
+            .unwrap()
+            .iter()
+            .chain(self.next_event.lock().unwrap().iter())
+            .cloned()
+            .collect())
     }
     fn set_login_item(&self, _: bool) -> Result<(), CoreError> {
         Ok(())
@@ -193,6 +219,8 @@ fn rig_in(dir: tempfile::TempDir, clock: Arc<TestClock>, setup: Setup) -> Rig {
     let events = Arc::new(Events::default());
     let shown = Arc::new(Shown::default());
     let mac = Arc::new(Mac {
+        calendar: Mutex::new(None),
+        next_event: Mutex::new(None),
         disk_free_mb: setup.disk_free_mb,
         microphone: setup.microphone,
         engine: engine.clone(),
@@ -1689,12 +1717,18 @@ async fn the_prompt_names_why_record_would_be_refused() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn record_on_the_prompt_starts_the_call_named_after_the_app() {
+async fn cpt_noter_seq_record_prompt_start_recording_stores_a_friendly_platform_until_a_topic_is_known(
+) {
     let r = rig();
     r.detection_on().await;
-    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    let call_id = r
+        .recording_detected(
+            "com.tinyspeck.slackmacgap.helper",
+            "com.tinyspeck.slackmacgap.helper",
+        )
+        .await;
     let state = r.state().await;
-    assert_eq!(state.title.as_deref(), Some("Zoom"));
+    assert_eq!(state.title.as_deref(), Some("Untitled call"));
     let id = call_id.clone();
     let (title, platform): (String, String) = r
         .core
@@ -1707,7 +1741,10 @@ async fn record_on_the_prompt_starts_the_call_named_after_the_app() {
             )
         })
         .unwrap();
-    assert_eq!((title.as_str(), platform.as_str()), ("Zoom", "Zoom"));
+    assert_eq!(
+        (title.as_str(), platform.as_str()),
+        ("Untitled call", "Slack")
+    );
     assert_eq!(r.detection().await, None, "the detection was used");
     assert!(r.shown.0.lock().unwrap().contains(&"close_record_prompt"));
 }
@@ -1754,7 +1791,7 @@ async fn a_missed_prompt_keeps_the_detection_for_the_menu_bar_and_the_hotkey() {
         .count();
     assert_eq!(prompts, 1, "never prompted twice for this call");
 
-    // The start hotkey still starts it, named after the app.
+    // The start hotkey still starts the unscheduled call.
     let started = r
         .core
         .capture_start(
@@ -1771,7 +1808,7 @@ async fn a_missed_prompt_keeps_the_detection_for_the_menu_bar_and_the_hotkey() {
         )
         .await
         .unwrap();
-    assert_eq!(started.title.as_deref(), Some("Zoom"));
+    assert_eq!(started.title.as_deref(), Some("Untitled call"));
 }
 
 #[tokio::test(start_paused = true)]
@@ -2555,7 +2592,7 @@ async fn a_new_meeting_splits_the_call_unless_kept() {
     r.session_started(&next.call_id);
     let s = r.phase_becomes(CapturePhase::Recording).await;
     assert_eq!(s.call_id, Some(next.call_id.clone()));
-    assert_eq!(s.title.as_deref(), Some("Microsoft Teams"));
+    assert_eq!(s.title.as_deref(), Some("Untitled call"));
     assert_eq!(s.started_at, Some(TimestampMs(detected_at)));
     let id = first.clone();
     let ended: i64 = r
@@ -4045,4 +4082,198 @@ async fn a_stopped_call_keeps_its_recorded_length() {
         .await
         .unwrap();
     assert_eq!(got.call.duration_ms, DurationMs(90_000));
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_record_prompt_start_recording_persists_the_matched_invitation() {
+    let r = rig();
+    r.core
+        .person_create(
+            &main_window(),
+            PersonCreateArgs {
+                display_name: "Tess Chan".into(),
+                email: Some("tess@example.test".into()),
+                role: None,
+                org: None,
+            },
+        )
+        .await
+        .unwrap();
+    let event = CalendarEventRef {
+        id: CalendarEventId("evt_review".into()),
+        title: "Release review".into(),
+        starts_at: TimestampMs(T0),
+        ends_at: TimestampMs(T0 + 3_600_000),
+    };
+    *r.mac.calendar.lock().unwrap() = Some(noter_core::CalendarEvent {
+        event: event.clone(),
+        platform: Some("Google Meet".into()),
+        attendees: vec![noter_core::CalendarAttendee {
+            name: String::new(),
+            email: Some("tess@example.test".into()),
+        }],
+    });
+    let call_id = r.recording().await;
+    let args = CallIdArgs {
+        call_id: call_id.clone(),
+    };
+    let detail = r.core.call_get(&main_window(), args.clone()).await.unwrap();
+    assert_eq!(detail.call.title, event.title);
+    assert_eq!(detail.calendar_event, Some(event));
+    assert_eq!(detail.call.platform.as_deref(), Some("Google Meet"));
+    assert_eq!(detail.call.participants.len(), 1);
+    assert_eq!(detail.call.participants[0].display_name, "Tess Chan");
+    let person_id = detail.call.participants[0].id.clone();
+    assert_eq!(detail.call.invited_ids, std::slice::from_ref(&person_id));
+
+    let person_args = PersonIdArgs {
+        person_id: person_id.clone(),
+    };
+    let person = r
+        .core
+        .person_get(&main_window(), person_args.clone())
+        .await
+        .unwrap();
+    assert!(person.calls.is_empty());
+    assert!(person.person.last_call_at.is_none());
+
+    seed_confirmed_segment(&r.core, &call_id);
+    r.core
+        .transcript_rename_speaker(
+            &main_window(),
+            RenameSpeakerArgs {
+                call_id,
+                speaker_id: SpeakerId::new("interrupted_speaker"),
+                person: PersonRef::Existing { person_id },
+                scope: RenameScope::WholeCall,
+            },
+        )
+        .await
+        .unwrap();
+    let confirmed = r.core.call_get(&main_window(), args).await.unwrap().call;
+    assert_eq!(confirmed.participants, detail.call.participants);
+    assert!(confirmed.invited_ids.is_empty());
+    let person = r
+        .core
+        .person_get(&main_window(), person_args)
+        .await
+        .unwrap();
+    assert_eq!(person.calls.len(), 1);
+    assert_eq!(person.person.last_call_at, Some(TimestampMs(T0)));
+}
+
+fn invitation(
+    title: &str,
+    attendees: Vec<noter_core::CalendarAttendee>,
+) -> noter_core::CalendarEvent {
+    noter_core::CalendarEvent {
+        event: CalendarEventRef {
+            id: CalendarEventId(title.into()),
+            title: title.into(),
+            starts_at: TimestampMs(T0),
+            ends_at: TimestampMs(T0 + 3_600_000),
+        },
+        platform: None,
+        attendees,
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_record_prompt_start_recording_keeps_unknown_invitees_on_the_call() {
+    let r = rig();
+    let mut attendees: Vec<_> = (0..100)
+        .map(|n| noter_core::CalendarAttendee {
+            name: if n == 0 {
+                String::new()
+            } else {
+                format!("guest{n}@example.test")
+            },
+            email: Some(format!("guest{n}@example.test")),
+        })
+        .collect();
+    attendees.push(noter_core::CalendarAttendee {
+        name: "Dana Ito".into(),
+        email: None,
+    });
+    *r.mac.calendar.lock().unwrap() = Some(invitation("All hands", attendees));
+    let call_id = r.recording().await;
+    let args = CallIdArgs {
+        call_id: call_id.clone(),
+    };
+    let row = r
+        .core
+        .call_get(&main_window(), args.clone())
+        .await
+        .unwrap()
+        .call;
+    assert_eq!(
+        r.query::<i64>("SELECT count(*) FROM people WHERE NOT is_you"),
+        0
+    );
+    let wire = serde_json::to_value(&row).unwrap();
+    assert!(!wire.to_string().contains("@example.test"));
+    let guests = row.invited_guests;
+    assert_eq!(guests.iter().filter(|name| *name == "Guest").count(), 100);
+    assert!(guests.iter().any(|name| name == "Dana Ito"));
+    assert_eq!(r.query::<i64>("SELECT count(*) FROM changes WHERE CAST(delta AS TEXT) LIKE '%@example.test%' OR after LIKE '%@example.test%'"), 0);
+    seed_confirmed_segment(&r.core, &call_id);
+    r.core
+        .transcript_rename_speaker(
+            &main_window(),
+            RenameSpeakerArgs {
+                call_id,
+                speaker_id: SpeakerId::new("interrupted_speaker"),
+                person: PersonRef::New {
+                    display_name: "Dana Ito".into(),
+                    email: None,
+                },
+                scope: RenameScope::WholeCall,
+            },
+        )
+        .await
+        .unwrap();
+    let confirmed = r.core.call_get(&main_window(), args).await.unwrap().call;
+    assert_eq!(confirmed.participants.len(), 1);
+    assert_eq!(confirmed.participants[0].display_name, "Dana Ito");
+    assert_eq!(confirmed.invited_guests.len(), 100);
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_screen_stop_at_call_end_split_uses_the_next_invitation_or_none() {
+    for has_next in [false, true] {
+        let r = rig();
+        r.detection_on().await;
+        let guest = |name: &str| noter_core::CalendarAttendee {
+            name: name.into(),
+            email: None,
+        };
+        *r.mac.calendar.lock().unwrap() = Some(invitation("First", vec![guest("First attendee")]));
+        let first = r.recording_detected(ZOOM, "Zoom").await;
+        r.pass(30_000).await;
+        let mut next = invitation("Next", vec![guest("Next attendee")]);
+        next.event.starts_at = TimestampMs(r.now() + 1_000);
+        *r.mac.next_event.lock().unwrap() = has_next.then_some(next.clone());
+        r.call_detected(TEAMS, "Microsoft Teams");
+        r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NewMeeting { .. })))
+            .await;
+        let new = r
+            .act(Act::StartAsNewCall, &first)
+            .await
+            .unwrap()
+            .call_id
+            .unwrap();
+        assert_ne!(first, new);
+        let args = CallIdArgs { call_id: new };
+        let detail = r.core.call_get(&main_window(), args).await.unwrap();
+        assert_eq!(detail.calendar_event, has_next.then_some(next.event));
+        assert_eq!(
+            detail.call.title,
+            if has_next { "Next" } else { "Untitled call" }
+        );
+        let row = serde_json::to_value(detail.call).unwrap();
+        assert!(!row.to_string().contains("First attendee"));
+        if has_next {
+            assert_eq!(row["invited_guests"], json!(["Next attendee"]));
+        }
+    }
 }

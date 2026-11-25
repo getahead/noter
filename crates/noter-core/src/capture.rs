@@ -99,7 +99,7 @@ const CONTINUE_MS: i64 = 5 * 60_000;
 const PAUSE_REMIND_MS: i64 = 5 * 60_000;
 /// How long a start or a stop waits for the engine's answer before it returns the phase it is in.
 const ENGINE_WAIT: Duration = Duration::from_secs(3);
-/// The call's title when no calendar event or meeting app names it.
+/// The provisional title of a call with no matching Calendar event.
 const UNTITLED: &str = "Untitled call";
 /// The call type until the post-call pipeline classifies the call (M2).
 const UNCLASSIFIED: &str = "unclassified";
@@ -122,6 +122,7 @@ pub(crate) struct Session {
     pub(crate) discard_requested: bool,
     /// The meeting app of the live call (bundle id, name), when a detection started it.
     pub(crate) app: Option<(String, String)>,
+    pub(crate) event_id: Option<CalendarEventId>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
     pub(crate) released: u64,
     /// Whether the call's open items were carried in already (its first segment did it).
@@ -142,7 +143,7 @@ pub(crate) struct Session {
 /// Where a new call starts: when, under which title, and from which meeting app.
 pub(crate) struct Begin {
     pub(crate) at: i64,
-    pub(crate) title: Option<String>,
+    pub(crate) event: Option<CalendarEventRef>,
     pub(crate) app: Option<(String, String)>,
 }
 
@@ -505,16 +506,14 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-start-call
         let now = self.deps.clock.now().0;
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-start-from-prompt
-        let detection = self.take_detection(&args, now)?;
+        let detection = self
+            .take_detection(&args, now)?
+            .or_else(|| self.detection_now());
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-start-from-prompt
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-start-call
         let begin = Begin {
             at: now,
-            title: detection.as_ref().map(|d| {
-                d.matched_event
-                    .as_ref()
-                    .map_or_else(|| d.app_name.clone(), |e| e.title.clone())
-            }),
+            event: self.start_event(detection.as_ref(), args.calendar_event_id.as_ref(), now),
             app: detection
                 .as_ref()
                 .map(|d| (d.bundle_id.clone(), d.app_name.clone())),
@@ -528,6 +527,31 @@ impl Core {
             self.deps.surfaces.close_record_prompt();
         }
         Ok(started)
+    }
+
+    pub(crate) fn start_event(
+        &self,
+        detection: Option<&CallDetection>,
+        selected: Option<&CalendarEventId>,
+        now: i64,
+    ) -> Option<CalendarEventRef> {
+        if self.deps.native.permission(PermissionKind::Calendar) != PermissionState::Granted {
+            return None;
+        }
+        let near = detection
+            .and_then(|d| d.matched_event.clone())
+            .or_else(|| self.deps.native.calendar_event_near(TimestampMs(now)));
+        match selected {
+            Some(id) if !near.as_ref().is_some_and(|e| e.id == *id) => self
+                .deps
+                .native
+                .calendar_events(TimestampMs(now - 86_400_000), TimestampMs(now + 600_001))
+                .ok()?
+                .into_iter()
+                .find(|e| e.event.id == *id)
+                .map(|e| e.event),
+            _ => near,
+        }
     }
 
     /// A new call from `begin`, through the start guard.
@@ -548,10 +572,30 @@ impl Core {
         // A stopped call's Continue window closes: the new call replaces it.
         *session = Session {
             app: begin.app.clone(),
+            event_id: begin.event.as_ref().map(|e| e.id.clone()),
             ..session.restart(now)
         };
-        let title = begin.title.unwrap_or_else(|| UNTITLED.into());
-        let platform = begin.app.map(|(_, name)| name);
+        let event = begin.event;
+        let title = event
+            .as_ref()
+            .map_or(UNTITLED, |e| e.title.as_str())
+            .to_owned();
+        let invitation = event.as_ref().and_then(|e| {
+            self.deps
+                .native
+                .calendar_events(e.starts_at, e.ends_at)
+                .ok()?
+                .into_iter()
+                .find(|found| found.event.id == e.id)
+        });
+        let platform = invitation
+            .as_ref()
+            .and_then(|e| e.platform.clone())
+            .or_else(|| {
+                begin
+                    .app
+                    .map(|(bundle, name)| crate::call_platform::display_name(&bundle, &name))
+            });
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-insert-call
         let call_id = CallId::new(format!("call_{}", ulid::Ulid::generate()));
@@ -568,6 +612,8 @@ impl Core {
                 ("started_at", json!(now)),
                 ("title", json!(title)),
                 ("platform", json!(platform)),
+                ("calendar_event_id", json!(event.as_ref().map(|e| &e.id))),
+                ("title_pending", json!(i64::from(event.is_none()))),
                 ("call_type", json!(UNCLASSIFIED)),
                 ("status", json!("recording")),
                 ("privacy_class", json!(class)),
@@ -575,6 +621,15 @@ impl Core {
                 ("mode_used", json!(mode_used(privacy, sensitive))),
             ],
         )?;
+        if let Some(invitation) = invitation.filter(|e| !e.attendees.is_empty()) {
+            // A calendar import failure must never prevent capture from starting.
+            match self.seed_invitees(&call_id, invitation.attendees) {
+                Ok(()) => self.publish_call_row(&call_id),
+                Err(e) => self.log(crate::object(
+                    json!({"level":"error", "module":"calendar", "code":e.code}),
+                )),
+            }
+        }
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-insert-call
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-phase-starting
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-start
@@ -962,6 +1017,11 @@ impl Core {
 
     /// Queue the per-call work after either a normal or interrupted stop.
     pub(crate) fn trigger_post_call_jobs(&self, call_id: &CallId) {
+        if let Err(e) = self.classify_stopped_call(call_id) {
+            self.log(crate::object(
+                json!({"level": "error", "module": "call_type", "code": e.code}),
+            ));
+        }
         // The post-call analysis runs first, then the archive pass. Repeated stops deduplicate.
         for kind in [JobKind::PostCall, JobKind::ArchivePass] {
             let req = Request::for_call(kind, Trigger::AfterCall, call_id);
@@ -1001,12 +1061,12 @@ impl Core {
         let mut meta = self.change_meta(ctx, "Continued recording".into(), "capture_continue");
         meta.undoable = false;
         let id = call_id.as_str().to_owned();
-        self.store().write_with(meta, move |tx| {
-            let (status, ended_at, archive_status): (String, Option<i64>, String) = tx
-                .query_row(
-                    "SELECT status, ended_at, archive_status FROM calls WHERE id = ?1",
+        let continued = self.store().write_with(meta, move |tx| {
+            let (status, ended_at, archive_status, title): (String, Option<i64>, String, String) =
+                tx.query_row(
+                    "SELECT status, ended_at, archive_status, title FROM calls WHERE id = ?1",
                     [&id],
-                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
                 )
                 .map_err(internal)?;
             tx.execute(
@@ -1026,7 +1086,7 @@ impl Core {
             )
             .map_err(internal)?;
             Ok((
-                (),
+                title,
                 vec![Logged {
                     entity_type: "call",
                     entity_id: id,
@@ -1049,6 +1109,7 @@ impl Core {
             .send_modify(|g| g.resumed_call = Some(call_id.clone()));
         self.set_capture(|c| {
             c.phase = CapturePhase::Recording;
+            c.title = Some(continued.value);
             c.continue_until = None;
             c.notice = None;
             c.recorded_ms = recorded;

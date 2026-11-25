@@ -47,7 +47,6 @@ const UNCLASSIFIED: &str = "unclassified";
 
 const DEFAULT_PAGE: u32 = 100;
 const MAX_PAGE: u32 = 500;
-const DAY_MS: i64 = 86_400_000;
 
 /// Call folders whose files could not be removed after their rows went; retried at the next start.
 const PENDING_FILE: &str = "audio/.pending-delete";
@@ -163,6 +162,8 @@ struct RowDetails {
     tags: Vec<String>,
     open_items: u32,
     participants: Vec<PersonChip>,
+    invited_ids: Vec<PersonId>,
+    invited_guests: Vec<String>,
     review_waiting: u32,
 }
 
@@ -179,12 +180,10 @@ fn assemble(
 
 fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDetails> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
-    let mut languages = c.prepare(
-        "SELECT lang FROM segments WHERE call_id = ?1 AND lang IS NOT NULL
-         GROUP BY lang ORDER BY min(t0_ms), lang",
-    )?;
-    let languages = languages
-        .query_map([call_id], |r| r.get::<_, String>(0).map(lang_of))?
+    let query = noter_retrieval::spoken_languages_sql("s.call_id = ?1");
+    let languages = c
+        .prepare(&format!("{query} ORDER BY first_at, lang"))?
+        .query_map([call_id], |r| r.get::<_, String>(1).map(lang_of))?
         .collect::<Result<Vec<_>, _>>()?;
     let unnamed_speakers: u32 = c.query_row(
         &format!(
@@ -205,15 +204,13 @@ fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDe
     )?;
     // @cpt-end:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-later
-    let participants = c
-        .prepare("SELECT person_id FROM call_participants WHERE call_id = ?1 ORDER BY person_id")?
-        .query_map([call_id], |r| {
-            crate::people::chip_of(c, &r.get::<_, String>(0)?)
-        })?
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .collect();
+    let mut people = RowDetails::default();
+    read_call_people(c, &[call_id.to_owned()], |_, chip, invited| {
+        people.add_person(chip, invited)
+    })?;
+    read_guests(c, &[call_id.to_owned()], |_, name| {
+        people.invited_guests.push(name)
+    })?;
     let review_waiting: u32 = c.query_row(
         "SELECT count(*) FROM items WHERE call_id = ?1 AND review_state = 'suggested'",
         [call_id],
@@ -225,9 +222,71 @@ fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDe
         unnamed_speakers,
         tags,
         open_items,
-        participants,
         review_waiting,
+        ..people
     })
+}
+
+impl RowDetails {
+    fn add_person(&mut self, chip: PersonChip, invited: bool) {
+        if invited {
+            self.invited_ids.push(chip.id.clone());
+        }
+        self.participants.push(chip);
+    }
+}
+
+fn read_guests(
+    c: &Connection,
+    ids: &[String],
+    mut add: impl FnMut(String, String),
+) -> noter_db::rusqlite::Result<()> {
+    let query = format!(
+        "SELECT call_id, display_name FROM unconfirmed_guests
+         WHERE call_id IN ({}) ORDER BY call_id, display_name, id",
+        crate::util::marks(ids.len())
+    );
+    for row in c
+        .prepare(&query)?
+        .query_map(params_from_iter(ids.iter()), |r| Ok((r.get(0)?, r.get(1)?)))?
+    {
+        let (call, name) = row?;
+        add(call, name);
+    }
+    Ok(())
+}
+
+fn read_call_people(
+    c: &Connection,
+    ids: &[String],
+    mut add: impl FnMut(String, PersonChip, bool),
+) -> noter_db::rusqlite::Result<()> {
+    let marks = crate::util::marks(ids.len());
+    let query = format!(
+        "SELECT call_id, id, display_name, short_name, is_you, invited_only
+             FROM call_people_labels WHERE call_id IN ({marks}) ORDER BY call_id, id"
+    );
+    for row in c
+        .prepare(&query)?
+        .query_map(params_from_iter(ids.iter()), |r| {
+            let display_name: String = r.get(2)?;
+            Ok((
+                r.get::<_, String>(0)?,
+                PersonChip {
+                    id: PersonId::new(r.get::<_, String>(1)?),
+                    display_name: display_name.clone(),
+                    short_name: r.get(3)?,
+                    initials: crate::people::initials_of(&display_name),
+                    is_you: r.get(4)?,
+                },
+                r.get::<_, bool>(5)?,
+            ))
+        })?
+    {
+        let (id, chip, invited) = row?;
+        add(id, chip, invited);
+    }
+    Ok(())
 }
 
 // @cpt-begin:cpt-noter-flow-core-library-calls-list:p1:inst-list-assemble
@@ -243,10 +302,8 @@ fn details_for_calls(
 
     for ids in call_ids.chunks(BATCH) {
         let marks = crate::util::marks(ids.len());
-        let query = format!(
-            "SELECT call_id, lang FROM segments WHERE call_id IN ({marks}) AND lang IS NOT NULL
-             GROUP BY call_id, lang ORDER BY call_id, min(t0_ms), lang"
-        );
+        let languages = noter_retrieval::spoken_languages_sql(&format!("s.call_id IN ({marks})"));
+        let query = format!("{languages} ORDER BY call_id, first_at, lang");
         for row in c
             .prepare(&query)?
             .query_map(params_from_iter(ids.iter()), |r| {
@@ -310,30 +367,12 @@ fn details_for_calls(
             row.review_waiting = review_waiting;
         }
 
-        let query = format!(
-            "SELECT cp.call_id, p.id, p.display_name, p.short_name, p.is_you
-             FROM call_participants cp JOIN people p ON p.id = cp.person_id
-             WHERE cp.call_id IN ({marks}) ORDER BY cp.call_id, cp.person_id"
-        );
-        for row in c
-            .prepare(&query)?
-            .query_map(params_from_iter(ids.iter()), |r| {
-                let display_name: String = r.get(2)?;
-                Ok((
-                    r.get::<_, String>(0)?,
-                    PersonChip {
-                        id: PersonId::new(r.get::<_, String>(1)?),
-                        display_name: display_name.clone(),
-                        short_name: r.get(3)?,
-                        initials: crate::people::initials_of(&display_name),
-                        is_you: r.get(4)?,
-                    },
-                ))
-            })?
-        {
-            let (id, chip) = row?;
-            details.entry(id).or_default().participants.push(chip);
-        }
+        read_guests(c, ids, |id, name| {
+            details.entry(id).or_default().invited_guests.push(name)
+        })?;
+        read_call_people(c, ids, |id, chip, invited| {
+            details.entry(id).or_default().add_person(chip, invited)
+        })?;
     }
 
     Ok(details)
@@ -360,7 +399,11 @@ fn assemble_with_details(
                 .unwrap_or(s.ended_at.unwrap_or(now) - s.started_at)
                 .clamp(0, u32::MAX.into()) as u32,
         ),
-        platform: s.platform,
+        platform: s
+            .platform
+            .map(|name| crate::call_platform::display_name("", &name)),
+        invited_ids: details.invited_ids,
+        invited_guests: details.invited_guests,
         participants: details.participants,
         unnamed_speakers: details.unnamed_speakers,
         languages: details.languages,
@@ -488,9 +531,7 @@ impl Core {
         }
         if !f.languages.is_empty() {
             let marks = w.bind_all(f.languages.iter().map(lang_code));
-            clauses.push(format!(
-                "EXISTS (SELECT 1 FROM segments s WHERE s.call_id = c.id AND s.lang IN ({marks}))"
-            ));
+            clauses.push(noter_retrieval::spoken_language_filter(&marks));
         }
         if !f.tags.is_empty() {
             let marks = w.bind_all(f.tags.iter().map(|t| t.to_lowercase()));
@@ -504,7 +545,7 @@ impl Core {
                 "EXISTS (SELECT 1 FROM speakers p WHERE p.call_id = c.id AND p.person_id IN ({marks}))"
             ));
         }
-        // shortcut: a day is a UTC day; use the user's time zone when settings carry one.
+        // The two local midnight boundaries can have different UTC offsets.
         let day = |d: &Option<LocalDate>, field: &str| match d {
             None => Ok(None),
             Some(d) => day_number(d)
@@ -516,11 +557,11 @@ impl Core {
             return Err(invalid("filter.to", ValidationRule::OutOfRange));
         }
         if let Some(from) = from {
-            let mark = w.bind(from * DAY_MS);
+            let mark = w.bind(self.local_time().start(from));
             clauses.push(format!("c.started_at >= {mark}"));
         }
         if let Some(to) = to {
-            let mark = w.bind((to + 1) * DAY_MS);
+            let mark = w.bind(self.local_time().start(to + 1));
             clauses.push(format!("c.started_at < {mark}"));
         }
         if let Some(open) = f.has_open_items {
@@ -648,10 +689,7 @@ impl Core {
         let (mut detail, calendar_event_id) = found
             .ok_or_else(|| CoreError::new(ErrorCode::NotFound, "this call no longer exists"))?;
         detail.calendar_event = calendar_event_id.and_then(|id| {
-            self.deps
-                .native
-                .calendar_event_near(detail.call.started_at)
-                .filter(|event| event.id.0 == id)
+            self.start_event(None, Some(&CalendarEventId(id)), detail.call.started_at.0)
         });
         detail.call = self.live_length(detail.call);
         Ok(detail)
@@ -677,6 +715,7 @@ impl Core {
                 return Err(invalid("title", ValidationRule::Required));
             }
             values.push(("title", json!(title)));
+            values.push(("title_pending", json!(0)));
         }
         if let Some(kind) = &args.call_type {
             if !self

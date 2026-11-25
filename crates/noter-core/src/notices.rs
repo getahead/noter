@@ -132,11 +132,33 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-notices:p1:inst-raise-notice
     }
 
+    fn next_meeting_event(
+        &self,
+        current: Option<&CalendarEventId>,
+        now: i64,
+    ) -> Option<CalendarEventRef> {
+        let near = self.start_event(None, None, now)?;
+        if Some(&near.id) != current {
+            return Some(near);
+        }
+        // The running event wins the usual start lookup even when the next
+        // invitation begins inside its ten-minute lookahead.
+        self.deps
+            .native
+            .calendar_events(TimestampMs(now), TimestampMs(now + 600_001))
+            .ok()?
+            .into_iter()
+            .map(|entry| entry.event)
+            .filter(|e| Some(&e.id) != current && (now..=now + 600_000).contains(&e.starts_at.0))
+            .min_by_key(|e| e.starts_at.0)
+    }
+
     /// The engine reported a meeting app holding audio.
     // @cpt-flow:cpt-noter-flow-core-capture-session-record-detected:p1
     // @cpt-dod:cpt-noter-dod-core-capture-session-detection:p1
     pub(crate) async fn call_detected(&self, bundle_id: String, app_name: String) {
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-detected-fact
+        let app_name = crate::call_platform::display_name(&bundle_id, &app_name);
         let mut session = self.capture.lock().await;
         let state = self.capture_now();
         let now = self.deps.clock.now().0;
@@ -147,7 +169,7 @@ impl Core {
             if !same_app && !asked {
                 // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
                 let notice = CaptureNotice::NewMeeting {
-                    event: None,
+                    event: self.next_meeting_event(session.event_id.as_ref(), now),
                     app_name: Some(app_name.clone()),
                     detected_at: TimestampMs(now),
                     expires_at: TimestampMs(now + NEW_MEETING_MS),
@@ -521,27 +543,23 @@ impl Core {
     }
 
     /// Start as New Call: the live call ends at the new meeting's `detected_at` and a new call
-    /// starts there, named after the calendar event, else the meeting app.
+    /// starts there with its own invitation and platform.
     // D-33: the saved call is closed for good; only the live call can be stopped and continued.
     async fn split_call(&self, ctx: &CommandCtx) -> Result<CaptureState, CoreError> {
         // The notice is checked and the old call stopped under one lock.
         let mut session = self.capture.lock().await;
-        let (call_id, detected_at, app, title) = {
+        let (call_id, detected_at, app, event) = {
             let state = self.capture_now();
             let (
                 Some(call_id),
                 Some(CaptureNotice::NewMeeting {
-                    detected_at,
-                    event,
-                    app_name,
-                    ..
+                    detected_at, event, ..
                 }),
             ) = (state.call_id, state.notice)
             else {
                 return Err(notice_expired());
             };
-            let title = event.map(|e| e.title).or(app_name);
-            (call_id, detected_at.0, session.new_meeting.take(), title)
+            (call_id, detected_at.0, session.new_meeting.take(), event)
         };
         // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-split
         let args = CallIdArgs { call_id };
@@ -549,7 +567,7 @@ impl Core {
             .await?;
         let begin = Begin {
             at: detected_at,
-            title,
+            event,
             app,
         };
         self.begin_call(ctx, false, begin).await
@@ -558,6 +576,7 @@ impl Core {
 
     /// The engine heard another app play into the call.
     pub(crate) async fn source_added(&self, call_id: CallId, bundle_id: String, app_name: String) {
+        let app_name = crate::call_platform::display_name(&bundle_id, &app_name);
         let session = self.capture.lock().await;
         if !live(&self.capture_now(), &call_id) || session.kept_sources.contains(&bundle_id) {
             return;

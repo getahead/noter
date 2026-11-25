@@ -1,6 +1,6 @@
 import { useState, type KeyboardEvent } from "react";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { ErrorCode, PlaybackState, SearchHit, TimeSpan } from "../../core/bindings";
+import type { ErrorCode, PlaybackState, SearchHit, TimeSpan, UiPrefs } from "../../core/bindings";
 import type { MsgKey } from "../../i18n/en";
 import { shortDay, t } from "../../i18n/format";
 import { IconButton } from "../../ui/primitives/icon-button";
@@ -39,7 +39,7 @@ export async function togglePlay(bridge: Bridge, span: TimeSpan, playing: boolea
 // @cpt-component:cpt-noter-component-ui-search-result-row:p1
 /** One hit: the call, the original snippet with the core's highlights (text nodes, never HTML), and › to open it. */
 /** `playback` is the window's playback state, handed down so Pause follows the real playback (it ends, or another span starts) and the row holds none of its own. */
-export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit: SearchHit; playback?: PlaybackState | null }) {
+export function SearchResultRow({ bridge, hit, playback, prefs }: { bridge: Bridge; hit: SearchHit; playback?: PlaybackState | null; prefs?: UiPrefs }) {
   const lang = hit.lang === null ? undefined : typeof hit.lang === "string" ? hit.lang : hit.lang.code;
   const go = () => {
     const x = hit.target;
@@ -86,7 +86,7 @@ export function SearchResultRow({ bridge, hit, playback }: { bridge: Bridge; hit
         {segments(hit.snippet, hit.highlights).map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : s.text))}
       </span>
       {/* @cpt-end:cpt-noter-algo-ui-library-search-topics-results:p1:inst-highlights */}
-      {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, undefined) })}</span>}
+      {hit.call && <span className="np-dim">{t("search.from_call", { title: hit.call.title, date: shortDay(hit.call.started_at, prefs) })}</span>}
       {hit.cross_language && <span className="np-dim">{t("search.cross_language")}</span>}
       <span className="lb-hit__go">
       {span && <IconButton icon={playing ? "pause" : "play"} label={t(playing ? "playback.pause" : "transcript.play")} size="inline" onAction={play} />}

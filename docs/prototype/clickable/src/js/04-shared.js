@@ -216,7 +216,7 @@
     if (variant === 'section') return comp('empty-state', { variant, cls: 'np-empty np-empty--section' }, o.title);
     return comp('empty-state', { variant, cls: 'np-empty np-empty--' + variant },
       html`${variant !== 'filtered' ? html`<div class="np-empty__glyph">${icon(o.icon || 'inbox', { size: 28 })}</div>` : ''}
-      <div class="np-empty__title">${o.title}</div>
+      ${o.heading ? html`<h2 class="np-empty__title">${o.title}</h2>` : html`<div class="np-empty__title">${o.title}</div>`}
       ${o.body ? html`<div class="np-empty__body">${o.body}</div>` : ''}
       ${o.actionLabel ? html`<div class="np-empty__act">${P.button(o.actionLabel, { variant: variant === 'filtered' ? 'secondary' : 'primary', action: o.action })}</div>` : ''}
       ${o.linkLabel ? html`<div>${P.link(o.linkLabel, { action: o.linkAction })}</div>` : ''}`);
@@ -271,7 +271,7 @@
   NP.on('nav.forward', () => { NP.forward(); return false; });
   NP.on('surface.show', (a) => { NP.show(a.surface); return false; });
   NP.on('call.show', () => {
-    if (NP.state.rec.status === 'idle') NP.startRecording();
+    Object.assign(NP.local('cw'), { hidden: null, closed: null });
     NP.show('call'); return false;
   });
   NP.on('call.makeSensitive', () => { NP.state.rec.mode = 'Sensitive · local'; NP.state.popover = null; NP.flash('call-status', 'From now on, nothing from this call leaves this Mac.', 3000); });

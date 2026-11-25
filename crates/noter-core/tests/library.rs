@@ -1200,3 +1200,126 @@ async fn a_call_row_carries_the_audio_retention_days_and_no_deletion_time_while_
         assert_eq!(days().await.0, expected, "{word}");
     }
 }
+
+#[test]
+fn cpt_noter_seq_record_prompt_start_recording_migrates_only_legacy_automatic_titles() {
+    use noter_db::rusqlite::{params, Connection};
+    let db = Connection::open_in_memory().unwrap();
+    for migration in noter_db::MIGRATIONS
+        .iter()
+        .chain(noter_core::MIGRATIONS.iter().filter(|m| m.version < 12))
+    {
+        db.execute_batch(migration.sql).unwrap();
+    }
+    let helper = "Microsoft Teams ModuleHost";
+    for id in ["automatic", "renamed"] {
+        db.execute(
+            "INSERT INTO calls (id, rev, started_at, title, platform, call_type, status, mode_used)
+                    VALUES (?1, 1, 0, ?2, ?2, 'unclassified', 'ready', 'local_only')",
+            params![id, helper],
+        )
+        .unwrap();
+        let delta =
+            serde_json::to_vec(&json!({"title": [null, helper], "platform": [null, helper]}))
+                .unwrap();
+        db.execute("INSERT INTO changes (id, ts, actor, entity_type, entity_id, delta, summary, reason, status)
+                    VALUES (?1, 0, 'you', 'call', ?1, ?2, 'Started recording', 'Started recording', 'applied')",
+                   params![id, delta]).unwrap();
+    }
+    db.execute("INSERT INTO changes (id, ts, actor, entity_type, entity_id, field, summary, reason, status)
+                VALUES ('edit', 1, 'you', 'call', 'renamed', 'title', 'Changed call info', 'call_update', 'applied')", []).unwrap();
+    db.execute_batch(include_str!("../migrations/0012_call_metadata.sql"))
+        .unwrap();
+    let title = |id| {
+        db.query_row(
+            "SELECT title, title_pending FROM calls WHERE id = ?1",
+            [id],
+            |r| Ok((r.get::<_, String>(0)?, r.get::<_, bool>(1)?)),
+        )
+        .unwrap()
+    };
+    assert_eq!(title("automatic"), ("Untitled call".into(), true));
+    assert_eq!(title("renamed"), (helper.into(), false));
+}
+
+#[tokio::test]
+async fn cpt_noter_seq_library_filter_calls_keeps_only_the_top_language_when_all_are_below_ten_percent(
+) {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    // Eleven equally short archive utterances; first spoken wins the tie. The live pass has RU/EN.
+    for i in 0..11 {
+        let mut line = segment(
+            "call_a",
+            100 + i,
+            "spk_a_you",
+            &format!("x-{i}"),
+            i64::from(i) * 5000,
+        );
+        line.values
+            .iter_mut()
+            .find(|(key, _)| *key == "pass")
+            .unwrap()
+            .1 = json!("archive");
+        core.store().insert_batch(vec![line]).unwrap();
+    }
+    let filter = |lang| CallFilter {
+        languages: vec![lang],
+        ..Default::default()
+    };
+    assert!(ids(&core, filter(Lang::En), CallSort::Newest)
+        .await
+        .is_empty());
+    let winner = Lang::Other { code: "x-0".into() };
+    let page = core
+        .calls_list(
+            &main_window(),
+            list_args(filter(winner.clone()), CallSort::Newest, None, None),
+        )
+        .await
+        .unwrap();
+    assert_eq!(page.rows.len(), 1);
+    assert_eq!(page.rows[0].languages, vec![winner]);
+}
+
+#[test]
+fn cpt_noter_seq_library_filter_calls_repairs_imported_email_labels_on_upgrade() {
+    use noter_db::rusqlite::{params, Connection};
+    let db = Connection::open_in_memory().unwrap();
+    for migration in noter_db::MIGRATIONS
+        .iter()
+        .chain(noter_core::MIGRATIONS.iter().filter(|m| m.version < 13))
+    {
+        db.execute_batch(migration.sql).unwrap();
+    }
+    for (id, display) in [
+        ("imported", "guest@example.test"),
+        ("renamed", "My colleague"),
+    ] {
+        db.execute(
+            "INSERT INTO people(id, rev, display_name, short_name, email) VALUES (?1, 1, ?2, ?2, 'guest@example.test')",
+            params![id, display],
+        ).unwrap();
+        let delta =
+            serde_json::to_vec(&json!({"display_name": [null, "guest@example.test"]})).unwrap();
+        db.execute("INSERT INTO changes (id, ts, actor, entity_type, entity_id, delta, summary, reason, status)
+                    VALUES (?1, 0, 'you', 'person', ?1, ?2, 'Imported call invitation', 'calendar_attendees', 'applied')",
+                   params![id, delta]).unwrap();
+    }
+    db.execute_batch(include_str!("../migrations/0013_call_guests.sql"))
+        .unwrap();
+    let label = |id| {
+        db.query_row(
+            "SELECT display_name, short_name FROM people WHERE id = ?1",
+            [id],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .unwrap()
+    };
+    assert_eq!(label("imported"), ("Guest".into(), "Guest".into()));
+    assert_eq!(
+        label("renamed"),
+        ("My colleague".into(), "My colleague".into())
+    );
+}

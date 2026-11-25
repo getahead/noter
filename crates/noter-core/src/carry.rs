@@ -1,10 +1,8 @@
 //! FEATURE cpt-noter-feature-core-people (slice 2): who took part in a call, and the carry-forward
 //! of open items into a live call with the same people (TL-39, moved from 2.18).
 
-use std::collections::BTreeSet;
-
 use noter_db::rusqlite::types::Value as Sql;
-use noter_db::rusqlite::{params, params_from_iter, Connection, OptionalExtension};
+use noter_db::rusqlite::{params, params_from_iter, Transaction};
 use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
@@ -13,29 +11,31 @@ use crate::people::{db, logged, new_id};
 use crate::today::CARRY_CALLS;
 use crate::{internal, lock, Core};
 
-/// The people a call's calendar attendees are, by email first and then by name or alias.
-fn attendee_people(
-    c: &Connection,
-    attendees: &[crate::CalendarAttendee],
-) -> Result<Vec<String>, CoreError> {
-    let mut found = BTreeSet::new();
-    for attendee in attendees {
-        if let Some(id) = crate::people::by_name(c, &attendee.name, attendee.email.as_deref())
-            .map_err(internal)?
-        {
-            let is_attendee: bool = c
-                .query_row("SELECT is_you = 0 FROM people WHERE id = ?1", [&id], |r| {
-                    r.get(0)
-                })
-                .optional()
-                .map_err(internal)?
-                .unwrap_or(false);
-            if is_attendee {
-                found.insert(id);
-            }
-        }
+fn add_participant(
+    tx: &Transaction<'_>,
+    call: &str,
+    person: &str,
+    invited: bool,
+    log: &mut Vec<noter_db::Logged>,
+) -> Result<(), CoreError> {
+    let id = new_id("cpp");
+    if db(tx.execute(
+        "INSERT OR IGNORE INTO call_participants (id, call_id, person_id, from_invite)
+                SELECT ?1, ?2, ?3, ?4 FROM people WHERE id = ?3 AND is_you = 0",
+        params![id, call, person, invited],
+    ))? != 0
+    {
+        log.push(logged(
+            "call_participant",
+            &id,
+            vec![
+                ("call_id", json!(null), json!(call)),
+                ("person_id", json!(null), json!(person)),
+                ("from_invite", json!(null), json!(i64::from(invited))),
+            ],
+        ));
     }
-    Ok(found.into_iter().collect())
+    Ok(())
 }
 
 impl Core {
@@ -62,22 +62,7 @@ impl Core {
         let done = self.store().write_with(meta, move |tx| {
             let mut log = Vec::new();
             for person in &people {
-                let pid = new_id("cpp");
-                let n = db(tx.execute(
-                    "INSERT OR IGNORE INTO call_participants (id, call_id, person_id)
-                     SELECT ?1, ?2, ?3 WHERE EXISTS (SELECT 1 FROM people WHERE id = ?3)",
-                    params![pid, id, person],
-                ))?;
-                if n == 1 {
-                    log.push(logged(
-                        "call_participant",
-                        &pid,
-                        vec![
-                            ("call_id", serde_json::Value::Null, json!(id)),
-                            ("person_id", serde_json::Value::Null, json!(person)),
-                        ],
-                    ));
-                }
+                add_participant(tx, &id, person, false, &mut log)?;
             }
             if log.is_empty() {
                 // Everyone took part already: abort so the writer records nothing.
@@ -114,26 +99,56 @@ impl Core {
         self.add_participants(call, named, batch)
     }
 
-    /// The calendar event running at the call's start: its attendees who are known people.
-    pub(crate) fn seed_participants(&self, call: &CallId) -> Result<(), CoreError> {
-        let at = self.deps.clock.now();
-        let attendees = self
-            .deps
-            .native
-            .calendar_event_near(at)
-            .and_then(|event| {
-                let events = self
-                    .deps
-                    .native
-                    .calendar_events(event.starts_at, event.ends_at)
-                    .ok()?;
-                events.into_iter().find(|e| e.event.id == event.id)
-            })
-            .map(|e| e.attendees)
-            .unwrap_or_default();
-        let people = crate::profiles::rd(self.store(), move |c| attendee_people(c, &attendees))?;
-        self.add_participants(call, people, None)?;
-        self.sync_participants(call)
+    /// Resolve and persist the matched invitation before the first segment (even for a silent call).
+    // @cpt-dbtable:cpt-noter-dbtable-call-participants:p1
+    pub(crate) fn seed_invitees(
+        &self,
+        call: &CallId,
+        attendees: Vec<crate::CalendarAttendee>,
+    ) -> Result<(), CoreError> {
+        let call = call.as_str().to_owned();
+        let mut meta = self.change_meta(
+            &crate::util::main_window_ctx(),
+            "Imported call invitation".into(),
+            "calendar_attendees",
+        );
+        meta.undoable = false;
+        self.store().write_with(meta, move |tx| {
+            let mut log = Vec::new();
+            for attendee in attendees {
+                let name = crate::people::invitee_name(&attendee);
+                let email = attendee
+                    .email
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|e| !e.is_empty());
+                if let Some(person) =
+                    db(crate::people::by_name(tx, name.unwrap_or_default(), email))?
+                {
+                    add_participant(tx, &call, &person, true, &mut log)?;
+                } else {
+                    let id = new_id("guest");
+                    let label = name.unwrap_or("Guest");
+                    if db(tx.execute(
+                        "INSERT INTO call_guests (id, call_id, display_name, email)
+                         VALUES (?1, ?2, ?3, ?4) ON CONFLICT DO NOTHING",
+                        params![id, call, label, email],
+                    ))? != 0
+                    {
+                        log.push(logged(
+                            "call_guest",
+                            &id,
+                            vec![
+                                ("call_id", json!(null), json!(call)),
+                                ("display_name", json!(null), json!(label)),
+                            ],
+                        ));
+                    }
+                }
+            }
+            Ok(((), log))
+        })?;
+        Ok(())
     }
 
     /// Moves items between `open` and `carried`; `ids` is every item to move and `to` the status.
@@ -205,7 +220,7 @@ impl Core {
     /// are offered and logged as carried. Only one call is live, so any item still carried is
     /// left over from a call a quit cut and returns to open first.
     pub(crate) fn carry_start(&self, call: &CallId) -> Result<usize, CoreError> {
-        self.seed_participants(call)?;
+        self.sync_participants(call)?;
         self.carry_end(call)?;
         // @cpt-begin:cpt-noter-flow-core-people-carry:p1:inst-carry-start
         let id = call.as_str().to_string();
@@ -227,8 +242,8 @@ impl Core {
                     "SELECT id FROM calls
                      WHERE id != ? AND started_at < (SELECT started_at FROM calls WHERE id = ?)
                        AND status NOT IN ('recording', 'paused')
-                       AND (EXISTS (SELECT 1 FROM call_participants p
-                                    WHERE p.call_id = calls.id AND p.person_id IN ({m}))
+                       AND (EXISTS (SELECT 1 FROM call_attendance p
+                                    WHERE NOT p.invited_only AND p.call_id = calls.id AND p.person_id IN ({m}))
                             OR EXISTS (SELECT 1 FROM speakers s
                                        WHERE s.call_id = calls.id AND s.person_id IN ({m})))
                      ORDER BY started_at DESC LIMIT {CARRY_CALLS}"
@@ -292,7 +307,7 @@ impl Core {
                        FROM segments g JOIN speakers s ON s.id = g.speaker_id
                        WHERE s.call_id = cp.call_id AND s.person_id = cp.person_id
                          AND s.pass = 'live'), 0)
-                     FROM call_participants cp WHERE cp.call_id = ?1 AND cp.talk_time_ms IS NULL",
+                     FROM call_attendance cp WHERE cp.call_id = ?1 AND NOT cp.invited_only AND cp.talk_time_ms IS NULL",
                 )
                 .and_then(|mut q| {
                     q.query_map([&id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?

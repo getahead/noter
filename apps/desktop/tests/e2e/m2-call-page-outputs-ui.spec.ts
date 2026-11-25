@@ -9,6 +9,7 @@ import path from "node:path";
 
 import type { Page } from "@playwright/test";
 
+import type { AccountsView, CallOutputs } from "../../src/core/bindings";
 import * as W from "../support/world-presets";
 import { coreReady, openWindow } from "./support/app";
 import { banner, body, navigate, openSummary, section, sent } from "./support/call-page";
@@ -32,7 +33,75 @@ const openReady = async (page: Page, call?: string) => {
   await shortcutsReady(page);
 };
 
+const submitRegeneration = async (page: Page) => {
+  await toolbar(page).getByRole("button", { name: "More" }).click();
+  await menu(page).getByRole("menuitem", { name: "Regenerate Outputs…" }).click();
+  await page.getByRole("dialog", { name: "Regenerate Outputs" }).getByRole("button", { name: "Regenerate", exact: true }).click();
+};
+
 test.describe("cpt-noter-seq-call-page-review-outputs", () => {
+  test("UI — #1251: regenerating without an assistant explains the failure and offers setup", async ({ page }) => {
+    const steer = await openWindow(page, "main", { world: (w) => {
+      O.unwritten(w);
+      if (!H.REAL) W.degrade(w, { type: "no_assistant" });
+    } });
+    if (H.REAL) {
+      await steer.invoke("harness.account_cli", { tool: "ollama", installed: false });
+      await steer.invoke("api_key_remove", { provider: "anthropic" }, "settings");
+      const accounts = await steer.invoke("accounts_get", {}) as AccountsView;
+      expect(accounts.keys.every((k) => k.status.type === "not_set")).toBe(true);
+      expect(accounts.accounts.every((a) => a.status.type === "not_signed_in")).toBe(true);
+      expect(accounts.local.running).toBe(false);
+    }
+    await openReady(page);
+    const summary = section(page, "Summary");
+    await expect(summary).toContainText("Couldn't write the summary (no assistant is set up)");
+    await submitRegeneration(page);
+    const sheet = page.getByRole("dialog", { name: "Regenerate Outputs" });
+    await expect(sheet.getByRole("alert")).toContainText(/no assistant|no API key/i);
+    await sheet.getByRole("button", { name: "Add an Assistant…" }).click();
+    await expect.poll(() => sent(page, "window_navigate")).toContainEqual({ target: { type: "settings", pane: "models_and_runtimes" } });
+    if (H.REAL) {
+      const dir = await steer.invoke("harness.data_dir", {}) as { path: string };
+      const records = fs.readFileSync(path.join(dir.path, "logs", "noter.log"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(records).toContainEqual(expect.objectContaining({ command: "outputs_regenerate", code: "runtime_unavailable" }));
+      await steer.invoke("api_key_set", { provider: "anthropic", key: "test-stand-in-value-0001" }, "settings");
+      await openReady(page);
+      await submitRegeneration(page);
+      await expect(sheet).toHaveCount(0);
+      await expect(summary).toContainText("Scripted summary.");
+      await expect(section(page, "Decisions")).toContainText("Scripted decision");
+    }
+  });
+
+  if (H.REAL) test("UI — #1251: a battery-held regeneration survives repeat submits and Run Now releases only that run", async ({ page }) => {
+    const steer = await openWindow(page, "main", { power: "battery", world: O.unwritten });
+    await openReady(page);
+    const outputs = () => steer.invoke("outputs_get", { call_id: W.PAST_CALL }) as Promise<CallOutputs>;
+    const held = body(page).getByText("Regeneration queued · waiting for power", { exact: true });
+    await submitRegeneration(page);
+    await expect(held).toBeVisible();
+    await expect(body(page)).toContainText("Connect power to regenerate the selected outputs, or run it now on battery.");
+    await expect(body(page)).not.toContainText("Waiting for the summary");
+    const run = (await outputs()).waiting_for_power;
+    expect(run).toBeTruthy();
+    await page.getByRole("tab", { name: "Transcript", exact: true }).click();
+    await submitRegeneration(page);
+    await expect(page.getByRole("dialog", { name: "Regenerate Outputs" })).toHaveCount(0);
+    await expect(held).toBeVisible();
+    expect((await outputs()).waiting_for_power).toBe(run);
+    await page.reload();
+    await openReady(page);
+    await expect(held).toBeVisible();
+    await body(page).getByRole("button", { name: "Run Now" }).click();
+    await expect(section(page, "Summary")).toContainText("Scripted summary.");
+    await expect(section(page, "Decisions")).toContainText("Scripted decision");
+    await expect(held).toHaveCount(0);
+    await submitRegeneration(page);
+    await expect(held).toBeVisible();
+    expect((await outputs()).waiting_for_power).not.toBe(run);
+  });
+
   test("UI — happy path: Summary meta line, the four sections, Edit, ⌘Return, Edited badge and Your Edit in the version menu", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
     await openReady(page);

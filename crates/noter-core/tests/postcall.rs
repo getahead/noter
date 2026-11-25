@@ -89,6 +89,7 @@ async fn privacy_changed_during_postcall_applies_to_every_later_section() {
                 .outputs_regenerate(
                     &main_window(),
                     RegenerateArgs {
+                        run_now_on_battery: None,
                         call_id: CallId::new(CALL),
                         sections: vec![],
                         runtime: None,
@@ -407,6 +408,7 @@ async fn try_again_on_the_failed_section_makes_the_call_ready() {
         .outputs_regenerate(
             &main_window(),
             RegenerateArgs {
+                run_now_on_battery: None,
                 call_id: CallId::new(CALL),
                 sections: vec![SectionKind::Decisions],
                 runtime: None,
@@ -792,9 +794,93 @@ async fn an_edit_is_in_the_history_of_everything_and_of_its_call_with_the_items(
 }
 
 #[tokio::test(start_paused = true)]
+async fn a_power_held_regeneration_checks_the_assistant_again_before_running_on_battery() {
+    struct Battery;
+    impl noter_core::PowerSource for Battery {
+        fn on_battery(&self) -> bool {
+            true
+        }
+    }
+    let dir = tempfile::tempdir().unwrap();
+    let tools = noter_core::ScriptedAccountCli::default();
+    let scripted = Scripted::new();
+    scripted.follow(&tools);
+    let deps = CoreDeps {
+        power: Arc::new(Battery),
+        llm: Adapters::scripted(&scripted),
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(Events::default()))
+    };
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    core.accounts_read_at_launch().await;
+    seed_call(&core, CALL, 3);
+    let mut args = RegenerateArgs {
+        call_id: CallId::new(CALL),
+        sections: vec![SectionKind::Decisions],
+        local: true,
+        model: None,
+        runtime: None,
+        skill: None,
+        run_now_on_battery: None,
+    };
+    let run = core
+        .outputs_regenerate(&main_window(), args.clone())
+        .await
+        .unwrap()
+        .job_run_id;
+    assert_eq!(
+        outputs(&core, CALL).await.waiting_for_power.as_ref(),
+        Some(&run)
+    );
+    args.run_now_on_battery = Some(run.clone());
+    args.sections.clear();
+    args.local = false;
+    tools.set(serde_json::from_value(json!({"tool":"ollama", "installed":false})).unwrap());
+    assert_eq!(
+        core.outputs_regenerate(&main_window(), args.clone())
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::RuntimeUnavailable
+    );
+    assert_eq!(
+        outputs(&core, CALL).await.waiting_for_power.as_ref(),
+        Some(&run)
+    );
+    let log = std::fs::read_to_string(dir.path().join("logs/noter.log")).unwrap();
+    for code in ["waiting_for_power", "runtime_unavailable"] {
+        assert!(log
+            .lines()
+            .map(|l| serde_json::from_str::<Value>(l).unwrap())
+            .any(|r| r["command"] == "outputs_regenerate" && r["code"] == code));
+    }
+    tools.set(serde_json::from_value(json!({"tool":"ollama", "installed":true})).unwrap());
+    assert_eq!(
+        core.outputs_regenerate(&main_window(), args)
+            .await
+            .unwrap()
+            .job_run_id,
+        run
+    );
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    let out = outputs(&core, CALL).await;
+    assert!(out.waiting_for_power.is_none());
+    assert_eq!(
+        out.sections
+            .iter()
+            .filter(|s| s.writer.is_some())
+            .map(|s| s.kind)
+            .collect::<Vec<_>>(),
+        [SectionKind::Decisions]
+    );
+    assert!(out.written_locally);
+}
+
+#[tokio::test(start_paused = true)]
 async fn regenerate_queues_a_regeneration_run_and_refuses_during_capture() {
     let (core, _events, _dir, _o) = written().await;
     let args = |call: &str| RegenerateArgs {
+        run_now_on_battery: None,
         call_id: CallId::new(call),
         sections: vec![SectionKind::Summary],
         runtime: None,
@@ -884,6 +970,7 @@ async fn regenerate_refuses_a_section_the_call_type_does_not_have() {
         )])
         .unwrap();
     let args = |sections: Vec<SectionKind>| RegenerateArgs {
+        run_now_on_battery: None,
         call_id: CallId::new("call_1on1"),
         sections,
         runtime: None,
@@ -1019,6 +1106,7 @@ async fn speaker_naming_substitutes_labels_preserving_edits_and_publishes_the_se
     core.outputs_regenerate(
         &main_window(),
         RegenerateArgs {
+            run_now_on_battery: None,
             call_id: CallId::new(CALL),
             sections: vec![SectionKind::Summary],
             runtime: None,
@@ -1039,4 +1127,50 @@ async fn speaker_naming_substitutes_labels_preserving_edits_and_publishes_the_se
             .unwrap()
             .names_updated
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_names_only_automatically_untitled_calls() {
+    let script = json!({"on": "post-call", "after_ms": 1000, "output": {
+        "title": "Release timing", "lang": "en", "summary_md": "Next week's release.",
+        "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": []
+    }});
+    for manual in [false, true] {
+        let (core, _, dir) = open(&script.to_string()).await;
+        seed_call(&core, CALL, 2);
+        let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+        db.execute(
+            "UPDATE calls SET title = 'Untitled call', title_pending = 1",
+            [],
+        )
+        .unwrap();
+        let run = post_call(&core, CALL);
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if manual {
+            core.call_update(
+                &main_window(),
+                noter_protocol::model::CallUpdateArgs {
+                    call_id: CallId::new(CALL),
+                    rev: Rev(1),
+                    title: Some("Untitled call".into()),
+                    call_type: None,
+                },
+            )
+            .await
+            .unwrap();
+        }
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+        let title: String = db
+            .query_row("SELECT title FROM calls", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            title,
+            if manual {
+                "Untitled call"
+            } else {
+                "Release timing"
+            }
+        );
+    }
 }
