@@ -8,7 +8,7 @@
 
 use noter_protocol::model::CliTool;
 use noter_protocol::{Effort, RuntimeChoice};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tokio::process::Command;
 
 use super::cli::{self, Cli, CliConfig, RunDir};
@@ -35,7 +35,7 @@ impl Codex {
         let api_key = call.runtime == RuntimeChoice::CodexApiKey;
         let resume = self.0.resume(call.session.as_deref())?;
         let run = RunDir::create(&self.0)?;
-        let schema = run.write("schema.json", call.schema.to_string().as_bytes())?;
+        let schema = run.write("schema.json", strict(&call.schema).to_string().as_bytes())?;
         let work = self.0.dir("work")?;
         let codex_home = self.0.dir(if api_key {
             "codex-api"
@@ -109,6 +109,88 @@ impl Codex {
     }
 }
 
+/// The app schema in OpenAI's strict structured-output form, which Codex sends with
+/// `--output-schema` and the API refuses otherwise (#1242): every object closed
+/// (`additionalProperties: false`) and every property required, an optional one nullable. `format`
+/// goes: strict mode knows only a few named formats, not `uint16` or `float`.
+fn strict(schema: &Value) -> Value {
+    let mut out = schema.clone();
+    close(&mut out);
+    out
+}
+
+fn close(node: &mut Value) {
+    let Value::Object(map) = node else { return };
+    map.remove("format");
+    for key in ["$defs", "definitions", "properties"] {
+        if let Some(Value::Object(children)) = map.get_mut(key) {
+            children.values_mut().for_each(close);
+        }
+    }
+    for key in ["items", "anyOf", "oneOf", "allOf"] {
+        match map.get_mut(key) {
+            Some(Value::Array(list)) => list.iter_mut().for_each(close),
+            Some(child) => close(child),
+            None => {}
+        }
+    }
+    let required = map.get("required").cloned().unwrap_or(json!([]));
+    let Some(Value::Object(props)) = map.get_mut("properties") else {
+        return;
+    };
+    for (name, prop) in props.iter_mut() {
+        let optional = !required
+            .as_array()
+            .is_some_and(|r| r.contains(&json!(name)));
+        if optional && !nullable(prop) {
+            *prop = json!({ "anyOf": [prop.take(), { "type": "null" }] });
+        }
+    }
+    let all: Vec<Value> = props.keys().map(|k| json!(k)).collect();
+    map.insert("required".into(), all.into());
+    map.insert("additionalProperties".into(), false.into());
+}
+
+fn nullable(schema: &Value) -> bool {
+    let null = json!("null");
+    schema["type"] == null
+        || schema["type"].as_array().is_some_and(|t| t.contains(&null))
+        || schema["anyOf"]
+            .as_array()
+            .is_some_and(|b| b.iter().any(|b| b["type"] == null))
+}
+
+/// Back to the app schema's shape: an optional field that takes no `null` there, answered with
+/// `null` under the strict schema, is absent again.
+fn denull(value: &mut Value, schema: &Value, root: &Value) {
+    let schema = match schema["$ref"].as_str().and_then(|r| r.strip_prefix('#')) {
+        Some(pointer) => root.pointer(pointer).unwrap_or(&Value::Null),
+        None => schema,
+    };
+    // shortcut: every anyOf branch is applied; fine while no two object branches share a key.
+    for branch in schema["anyOf"].as_array().into_iter().flatten() {
+        denull(value, branch, root);
+    }
+    match value {
+        Value::Array(list) => list
+            .iter_mut()
+            .for_each(|v| denull(v, &schema["items"], root)),
+        Value::Object(map) => {
+            let required = schema["required"].as_array();
+            // only the fields `close` made nullable; a null the app schema takes stays
+            map.retain(|k, v| {
+                let made_nullable = schema["properties"].get(k).is_some_and(|p| !nullable(p))
+                    && !required.is_some_and(|r| r.contains(&json!(k)));
+                !(made_nullable && v.is_null())
+            });
+            for (k, v) in map.iter_mut() {
+                denull(v, &schema["properties"][k.as_str()], root);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// The `--json` event stream: the thread id, the final agent message (the schema's JSON) and
 /// the turn's usage.
 fn parse(stdout: &[u8]) -> Result<Reply, String> {
@@ -171,7 +253,13 @@ impl RuntimeAdapter for Codex {
     }
 
     fn invoke(&self, call: Invocation) -> BoxFuture<'static, Result<Reply, String>> {
-        self.0.run(&call, self.prepare(&call), parse)
+        let schema = call.schema.clone();
+        let run = self.0.run(&call, self.prepare(&call), parse);
+        Box::pin(async move {
+            let mut reply = run.await?;
+            denull(&mut reply.output, &schema, &schema);
+            Ok(reply)
+        })
     }
 
     fn open_session(&self, _: RuntimeChoice, resume: Option<&str>) -> Result<String, String> {
@@ -184,5 +272,106 @@ impl RuntimeAdapter for Codex {
 
     fn last_failure(&self) -> Option<String> {
         self.0.last_failure()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::runtime::Skill;
+
+    /// What OpenAI strict mode demands of every schema node; the failures, empty when it passes.
+    fn strict_faults(node: &Value, at: &str, faults: &mut Vec<String>) {
+        match node {
+            Value::Array(list) => list.iter().for_each(|n| strict_faults(n, at, faults)),
+            Value::Object(map) => {
+                let object = node["type"] == "object" || map.contains_key("properties");
+                if object {
+                    if node["additionalProperties"] != false {
+                        faults.push(format!("{at}: additionalProperties is not false"));
+                    }
+                    let mut keys: Vec<&String> = map
+                        .get("properties")
+                        .and_then(Value::as_object)
+                        .map(|p| p.keys().collect())
+                        .unwrap_or_default();
+                    let mut required: Vec<&str> = node["required"]
+                        .as_array()
+                        .map(|r| r.iter().filter_map(Value::as_str).collect())
+                        .unwrap_or_default();
+                    keys.sort();
+                    required.sort();
+                    if keys.iter().map(|k| k.as_str()).ne(required.iter().copied()) {
+                        faults.push(format!("{at}: required is not every property"));
+                    }
+                }
+                if map.get("format").is_some_and(Value::is_string) {
+                    faults.push(format!("{at}: format"));
+                }
+                for (k, v) in map {
+                    strict_faults(v, &format!("{at}/{k}"), faults);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // cpt-noter-seq-settings-sign-in-account: the ChatGPT account check (and every Codex run)
+    // sends a schema the API takes.
+    #[test]
+    fn every_skill_schema_is_sent_in_strict_form() {
+        for skill in Skill::ALL {
+            let mut faults = Vec::new();
+            strict_faults(&skill.schema(), "", &mut faults);
+            assert!(
+                !faults.is_empty(),
+                "{}: the generated schema is already strict",
+                skill.id()
+            );
+            faults.clear();
+            strict_faults(&strict(&skill.schema()), "", &mut faults);
+            assert!(faults.is_empty(), "{}: {faults:?}", skill.id());
+        }
+    }
+
+    #[test]
+    fn a_strict_answer_with_nulls_validates_against_the_app_schema() {
+        let schema = Skill::CouncilTick.schema();
+        let card = |lang: Value| {
+            json!({
+                "agent": "a", "kind": "ask", "title": "t", "source": "this_call",
+                "evidence_segment_ids": [], "evidence_chunk_ids": [], "confidence": 0.9,
+                "reason": "r", "lang": lang, "body": null, "jira_key": null,
+            })
+        };
+        let mut answer = json!({ "cards": [card(json!("en")), card(json!({ "code": "fr" }))] });
+        denull(&mut answer, &schema, &schema);
+        // `body` and `jira_key` take null in the app schema too, so they stay as answered
+        assert_eq!(answer["cards"][0]["body"], Value::Null);
+        assert_eq!(answer["cards"][1]["jira_key"], Value::Null);
+        assert_eq!(answer["cards"][1]["lang"], json!({ "code": "fr" }));
+        Skill::CouncilTick.conforms(&answer).unwrap();
+    }
+
+    #[test]
+    fn an_optional_field_that_never_takes_null_becomes_nullable_and_comes_back_absent() {
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "tags": { "type": "array", "items": { "type": "string" } },
+                "n": { "type": "integer", "format": "uint16" },
+            },
+            "required": ["n"],
+        });
+        let sent = strict(&schema);
+        assert_eq!(sent["required"], json!(["n", "tags"]));
+        assert_eq!(
+            sent["properties"]["tags"]["anyOf"][1],
+            json!({ "type": "null" })
+        );
+        assert!(sent["properties"]["n"].get("format").is_none());
+        let mut answer = json!({ "tags": null, "n": 1 });
+        denull(&mut answer, &schema, &schema);
+        assert_eq!(answer, json!({ "n": 1 }));
     }
 }
