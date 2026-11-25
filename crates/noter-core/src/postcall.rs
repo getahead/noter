@@ -13,7 +13,7 @@ use std::sync::{Arc, Weak};
 
 use noter_db::rusqlite::{params, Connection, OptionalExtension};
 use noter_db::{Logged, Mutation};
-use noter_jobs::{BoxFuture, JobHandler, Request, RunCtx, Stop, Trigger};
+use noter_jobs::{BoxFuture, JobHandler, RunCtx, Stop};
 use noter_llm::{
     Failure, Packet, PacketContext, PacketItem, RunRequest, Skill, SourceClass, TaskKind,
 };
@@ -111,11 +111,7 @@ fn aggregate(states: &[SectionState]) -> OutputsStatus {
 // shortcut: in memory; after a restart an unwritten section of a failed run reads pending
 // until it is regenerated (no column for the failure in `summaries`).
 #[derive(Default)]
-pub(crate) struct Sections(
-    std::sync::Mutex<HashMap<(CallId, SectionKind), SectionState>>,
-    /// The options of the regeneration queued for a call (none for the archive's own).
-    std::sync::Mutex<HashMap<CallId, RegenerateArgs>>,
-);
+pub(crate) struct Sections(std::sync::Mutex<HashMap<(CallId, SectionKind), SectionState>>);
 
 impl Sections {
     fn get(&self, call: &CallId, kind: SectionKind) -> Option<SectionState> {
@@ -144,14 +140,6 @@ impl Sections {
     /// The run ended: what it was still writing goes back to pending.
     fn settle(&self, call: &CallId) {
         lock(&self.0).retain(|(c, _), s| c != call || !matches!(s, SectionState::Writing));
-    }
-
-    fn request(&self, args: &RegenerateArgs) {
-        lock(&self.1).insert(args.call_id.clone(), args.clone());
-    }
-
-    fn take_request(&self, call: &CallId) -> Option<RegenerateArgs> {
-        lock(&self.1).remove(call)
     }
 }
 
@@ -224,6 +212,14 @@ fn writer_at(
         return Ok(None);
     };
     Ok(Some(WriterInfo {
+        cost_usd: if matches!(
+            runtime,
+            RuntimeChoice::ClaudeApiKey | RuntimeChoice::CodexApiKey
+        ) {
+            r.get(at + 6)?
+        } else {
+            None
+        },
         runtime,
         model: r.get(at + 1)?,
         skill: r.get(at + 2)?,
@@ -236,7 +232,7 @@ fn writer_at(
 const STORED: &str = "SELECT s.id, s.call_id, s.rev, s.kind, v.body_md, v.lang, v.from_pass,
         s.user_edited, s.regenerated_with_edits,
         (SELECT count(*) FROM summary_versions WHERE summary_id = s.id),
-        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass, s.names_updated
+        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass, l.cost_usd, s.names_updated
     FROM summaries s
     JOIN calls c ON c.id = s.call_id
     JOIN summary_versions v ON v.id = s.current_version_id
@@ -260,7 +256,7 @@ fn stored_row(r: &noter_db::rusqlite::Row) -> noter_db::rusqlite::Result<Option<
         regenerated_with_edits: r.get(8)?,
         versions: r.get(9)?,
         writer: writer_at(r, 10)?,
-        names_updated: r.get(16)?,
+        names_updated: r.get(17)?,
     }))
 }
 
@@ -779,6 +775,7 @@ impl Core {
         );
         req.call_id = Some(call.clone());
         req.settings.pseudonyms = lock(&self.settings).privacy.pseudonymise_names;
+        req.settings.local_only = options.local;
         req.settings.configured = if options.local {
             Some(RuntimeChoice::Local)
         } else {
@@ -1350,29 +1347,30 @@ impl Core {
     /// The Regeneration run: the requested sections (all after the archive pass) written again
     /// from the active transcript, each merged with the user's edit and its reviewed items.
     async fn regenerate(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
-        let request = self.postcall.take_request(call);
+        // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-restore
+        let request = ctx.regeneration_request()?;
+        // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-restore
         let Some(head) = self.current(call)? else {
             return Ok(());
         };
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-merge
         let call_type = request
-            .as_ref()
-            .and_then(|r| r.skill.as_ref())
-            .map_or(head.call_type.clone(), |s| s.0.clone());
-        let kinds: Vec<SectionKind> = match &request {
-            Some(r) if !r.sections.is_empty() => r
+            .skill
+            .map_or_else(|| head.call_type.clone(), |s| s.0);
+        let kinds = if request.sections.is_empty() {
+            sections_of(&head.call_type)
+        } else {
+            request
                 .sections
-                .iter()
-                .filter(|k| **k != SectionKind::RoleReviews)
-                .copied()
-                .collect(),
-            _ => sections_of(&head.call_type),
+                .into_iter()
+                .filter(|k| *k != SectionKind::RoleReviews)
+                .collect()
         };
-        let options = request.map_or_else(Options::default, |r| Options {
-            runtime: r.runtime,
-            model: r.model,
-            local: r.local,
-        });
+        let options = Options {
+            runtime: request.runtime,
+            model: request.model,
+            local: request.local,
+        };
         let packet = self.packet(call, head.sensitive, &call_type)?;
         let total = kinds.len();
         let mut first_failure = None;

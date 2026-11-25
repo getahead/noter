@@ -12,6 +12,8 @@ import { useExtras, useTypes } from "./cache";
 import { callInfo } from "./logic";
 import { LanguageTag } from "../transcript/labels";
 import { deleteAudio } from "./share-actions";
+import { useOutputs } from "./outputs-cache";
+import { processingText } from "./outputs-logic";
 import { TagsField } from "./TagsField";
 import { PushButton } from "../../ui/primitives/push-button";
 
@@ -23,6 +25,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
   const degraded = useWindow(bridge, (s) => s.whole.degraded);
   const extras = useExtras(callId);
   const types = useTypes();
+  const outputs = useOutputs(callId);
   if (!call || !prefs) return null;
   const typeLabel = types.find((x) => x.id === call.call_type)?.label ?? call.call_type;
   const info = callInfo(call, { audio_not_stored: extras?.audio_not_stored ?? false }, Date.now(), prefs, typeLabel);
@@ -82,7 +85,7 @@ export function CallInfo({ bridge, callId }: { bridge: Bridge; callId: string })
       </div>
       <div className="pc-info__sec">
         <h3 className="pc-info__h">{t("callpage.info.processing")}</h3>
-        <p className="np-dim">{info.processing}</p>
+        <p className="np-dim">{processingText(call, outputs)}</p>
       </div>
     </div>
   );

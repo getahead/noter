@@ -6,16 +6,24 @@ import { t } from "../../i18n/format";
 import { summaryReadyNow } from "./outputs-logic";
 import { bodyOf, holdBody, holdOutputs, holdVersions } from "./outputs-cache";
 
+const pendingReads = new Map<string, Promise<unknown>>();
 export const outputsKey = (callId: string) => `outputs:get:${callId}`;
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
 /** `outputs_get`: the sections of the call, held for the view. */
 export async function loadOutputs(bridge: Bridge, callId: string) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-get
-  const r = await bridge.act(outputsKey(callId), "outputs_get", () => bridge.core.outputsGet({ call_id: callId }));
+  const read = bridge.act(outputsKey(callId), "outputs_get", () => bridge.core.outputsGet({ call_id: callId }));
+  pendingReads.set(callId, read);
+  try {
+    const r = await read;
+    // A job/section transition may have started a newer read while this one was in flight.
+    if (r.status === "ok" && pendingReads.get(callId) === read) holdOutputs(r.data);
+    return r;
+  } finally {
+    if (pendingReads.get(callId) === read) pendingReads.delete(callId);
+  }
   // @cpt-end:cpt-noter-flow-ui-call-page-outputs-read-edit:p1:inst-get
-  if (r.status === "ok") holdOutputs(r.data);
-  return r;
 }
 
 /** `output_edit` with the revision the draft started from; the core answers the whole section and sends it as `entity:changed` too. */

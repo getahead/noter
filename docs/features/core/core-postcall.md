@@ -130,7 +130,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Missing call, section or version: `not_found`; stale section revision: `conflict` with `current_rev`; wrong call/section association: `invalid_input`.
 
 **Steps**:
-1. [x] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count - `inst-edit-get`
+1. [x] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count. Include the call’s active or latest finished output job and the recorded cost on each API-key writer when available - `inst-edit-get`
 2. [x] - `p1` - API: `output_edit { call_id, summary_id, rev, body_md }`; validate membership, revision and Markdown without raw HTML on the writer - `inst-edit-validate`
 3. [x] - `p1` - Append a user-edit `summary_versions` row and logged change, update current version and revision in one transaction and preserve the generated base - `inst-edit-commit`
 4. [x] - `p1` - After commit refresh files and indexes, publish the whole changed section and return `OutputMutation` with `change_id` - `inst-edit-publish`
@@ -151,7 +151,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - User regeneration during capture: `job_blocked`; an unavailable chosen runtime: typed runtime failure; failed archive leaves the live transcript usable as archive pending.
 
 **Steps**:
-1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration - `inst-regen-request`
+1. [x] - `p1` - For `outputs_regenerate`, validate the call, requested sections and options, refuse during live capture and return `JobAccepted` for queued regeneration. Store the selected sections, runtime, model, skill and local-only choice with that run, including when updating a queued request. Keep the choices through restart and retry. When a local-only request finds no usable local runtime, fail it without sending a cloud request - `inst-regen-request`
 2. [x] - `p1` - For ArchivePass, wait until no call is live, then request `offline_pass` with the latest user constraints - `inst-regen-archive`
 3. [x] - `p1` - **IF** audio is absent or archive fails, retain the live transcript, expose archive pending or failed state and use the scheduled retry path when audio remains available - `inst-regen-archive-fail`
 4. [x] - `p1` - On archive success, re-read the latest live speakers and segments after the offline pass and its final checkpoint; map clusters by time overlap, retain user speaker and term corrections made while the pass ran, install archive segments and keep the live copy for seven days - `inst-regen-install`
@@ -159,6 +159,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 6. [x] - `p1` - Generate only the requested sections and run `cpt-noter-algo-core-postcall-merge` with current edits re-read at commit time - `inst-regen-merge`
 7. [x] - `p1` - Publish committed changes, including archive speaker relabelling information and section progress, then refresh per-call files - `inst-regen-publish`
 8. [x] - `p1` - **RETURN** the job's result; cancellation or a superseded generation cannot install late output, and install uses the current live correction snapshot - `inst-regen-return`
+9. [x] - `p1` - Recover the choices attached to this run before selecting a runtime or building its packet. Fail safely when a legacy run has no saved request - `inst-regen-restore`
 
 ## 3. Processes / Business Logic (CDSL)
 

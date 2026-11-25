@@ -45,6 +45,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "redo lookup index",
         sql: include_str!("../migrations/0004_changes_redo_index.sql"),
     },
+    Migration {
+        owner: "noter-db",
+        version: 5,
+        name: "durable regeneration request",
+        sql: include_str!("../migrations/0005_regeneration_request.sql"),
+    },
 ];
 
 const HISTORY: &str = "CREATE TABLE IF NOT EXISTS schema_migrations (

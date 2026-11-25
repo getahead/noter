@@ -161,6 +161,12 @@ enum Diarization {
     /// VBx learns the voices from speakers with this much speech alone in a window (pyannote's 20 %).
     static let trainingSpeechMs = 2_000
     static let threshold = 0.6
+    /// The length VBx's x-vector transform sees a vector at. The pinned WeSpeaker conversion ends in an L2
+    /// normalisation, but the transform centres raw vectors on `mean1` (length 1.42, so raw vectors are longer)
+    /// before it normalises: at length 1 the centring erased the voices and a whole call was one speaker (#1273).
+    /// shortcut: the raw length is unknown (any length from 2 to 32 split the owner's call alike); measure the
+    /// raw WeSpeaker lengths against pyannote and use theirs.
+    static let rawLength = 10.0
     static let fa = 0.07
     static let fb = 0.8
 
@@ -260,7 +266,8 @@ enum Diarization {
     static func cluster(_ vectors: [[Double]], training: [Bool], plda: PLDA, cannot: [(Int, Int)]) -> [Int] {
         let trained = vectors.indices.filter { training[$0] }
         let x = (trained.isEmpty ? Array(vectors.indices) : trained).map { vectors[$0] }
-        let (gamma, pi) = vbx(x.map(plda.features), phi: plda.psi, start: ahc(x, threshold: threshold))
+        let (gamma, pi) = vbx(
+            x.map { plda.features(scaled($0, to: rawLength)) }, phi: plda.psi, start: ahc(x, threshold: threshold))
         // The voices VBx kept, at their members' mean weighted by responsibility.
         let centroids = pi.indices.filter { pi[$0] > 1e-7 }.map { k in
             let total = gamma.reduce(0) { $0 + $1[k] }

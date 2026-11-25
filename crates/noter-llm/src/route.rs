@@ -37,7 +37,7 @@ pub(crate) struct Route<'a> {
     pub switched_to_local: bool,
     pub budget: &'a Budget,
     /// What this request's API-key attempts have cost so far.
-    pub spent_usd: f64,
+    pub spent_usd: Option<f64>,
     /// The validated fallback prefers local where it is available.
     pub prefer_local: bool,
 }
@@ -105,6 +105,7 @@ pub(crate) fn route(r: &Route) -> Result<Choice, Failure> {
     // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-order
     let preferred: Vec<RuntimeChoice> = match (forced, r.task) {
         (Some(_), _) => vec![RuntimeChoice::Local],
+        (None, _) if r.settings.local_only => vec![RuntimeChoice::Local],
         (None, TaskKind::Handoff { target }) => vec![*target, RuntimeChoice::Local],
         (None, _) => r.settings.configured.into_iter().chain(ORDER).collect(),
     };
@@ -138,7 +139,10 @@ pub(crate) fn route(r: &Route) -> Result<Choice, Failure> {
         }
         // @cpt-end:cpt-noter-algo-core-llm-gate-route:p1:inst-route-version
         // @cpt-begin:cpt-noter-algo-core-llm-gate-route:p1:inst-route-failover
-        let capped = r.budget.max_cost_usd.is_some_and(|cap| r.spent_usd >= cap);
+        let capped = r
+            .budget
+            .max_cost_usd
+            .is_some_and(|cap| r.spent_usd.map_or(true, |spent| spent >= cap));
         if is_api_key(runtime) && capped {
             return Err(Failure::Budget);
         }

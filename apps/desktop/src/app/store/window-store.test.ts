@@ -4,6 +4,7 @@ import type {
   AppSnapshot,
   CardView,
   EventPayloads,
+  JobRunRow,
   SegmentView,
   TranscriptSnapshot,
 } from "../../core/bindings";
@@ -279,6 +280,19 @@ describe("window store", () => {
     expect(s.jobs.r1).toBeDefined();
     expect(s.signin.x).toBeDefined();
     expect(s.nav).toEqual({ type: "today" });
+  });
+
+  it("cpt-noter-seq-call-page-review-outputs — rereads only for a transition of this call’s job", () => {
+    const run: JobRunRow = { id: "run", job_id: "regen", name: "Regeneration", kind: "regeneration", call_id: "call", started_at: 0, finished_at: null, status: "queued", progress: null, counts: [], error: null };
+    let s = applyEvent(initialState("main"), { event: "jobs:progress", payload: { run } });
+    expect(s.outputJobChanges.call).toBe(run);
+    const running: JobRunRow = { ...run, status: "running" };
+    s = applyEvent(s, { event: "jobs:progress", payload: { run: running } });
+    expect(s.outputJobChanges.call).toBe(running);
+    s = applyEvent(s, { event: "jobs:progress", payload: { run: { ...running, progress: 0.5 } } });
+    s = applyEvent(s, { event: "jobs:progress", payload: { run: { ...running, call_id: "other", id: "other-run" } } });
+    expect(s.outputJobChanges.call).toBe(running);
+    expect(s.jobs.run?.progress).toBe(0.5);
   });
 
   it("menu:fix_term counts each choice of the native Fix Term… item", () => {

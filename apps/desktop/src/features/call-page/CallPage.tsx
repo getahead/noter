@@ -14,6 +14,7 @@ import { audioLine, StoredTranscript } from "../transcript/hosts";
 import { LanguageTag } from "../transcript/labels";
 import { deleteCall, openCallPage, pageKey, readCall, readKey, reportView } from "./actions";
 import { holdDeleteError, useDeleteError, useExtras } from "./cache";
+import { loadOutputs } from "./outputs-actions";
 import { callViews, pageState } from "./logic";
 import { registeredViews, views } from "./views";
 import "./call-page.css";
@@ -52,6 +53,19 @@ export function CallPage({ bridge, callId, span, tab = "transcript" }: { bridge:
     // a refusal belongs to this visit: the page opened again later shows no old error
     return () => (globalThis.removeEventListener?.("keydown", on), holdDeleteError(callId, null));
   }, [bridge, callId]);
+
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
+  // The inspector is available on every tab. Read once on opening a past call and again on a job transition.
+  const jobChange = useWindow(bridge, (s) => s.outputJobChanges[callId]);
+  const showOutputs = !!call && (tab === "summary" || (call.status !== "recording" && call.status !== "paused"));
+  const requested = useRef<{ callId: string; jobChange: typeof jobChange } | null>(null);
+  useEffect(() => {
+    if (!showOutputs) return;
+    if (requested.current?.callId === callId && requested.current.jobChange === jobChange) return;
+    requested.current = { callId, jobChange };
+    void loadOutputs(bridge, callId);
+  }, [bridge, callId, jobChange, showOutputs]);
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-regenerate:p1:inst-power-refresh
 
   const state = pageState(read, call !== undefined);
   const skeleton = useAfter(300, state === "LOADING");

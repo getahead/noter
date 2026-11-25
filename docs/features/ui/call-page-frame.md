@@ -97,7 +97,8 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 7. [x] - `p1` - Flow: the stored transcript with `cpt-noter-flow-ui-live-transcript-stored` in PC-R5, with the playback bar PC-R6 from the first play - `inst-transcript`
 8. [x] - `p1` - **IF** the core opened the page after a stop (`nav:request` without activation) - `inst-if-background`
    1. [x] - `p1` - UI: render without taking focus or activating the window - `inst-background`
-9. [x] - `p1` - **RETURN** the call's page - `inst-return-open`
+9. [x] - `p1` - On any tab, Processing shows the call’s queued, running, paused or failed output job, including **Regeneration queued · waiting for power**. After a successful run, show the Summary writer, elapsed time after the call and recorded API-key cost when known and nonzero. Historical exact-zero prices are ambiguous. **Show Performance** awaits the M5 call-performance page - `inst-processing`
+10. [x] - `p1` - **RETURN** the call's page - `inst-return-open`
 
 ### Manage the call from its ⋯ menu
 
