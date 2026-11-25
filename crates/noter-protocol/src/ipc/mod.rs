@@ -501,6 +501,7 @@ commands! {
     person_delete(PersonIdArgs) -> DeleteResult [People, Frozen, Main];
     voice_profile_create(VoiceProfileArgs) -> VoiceProfileView [People, Frozen, Main];
     voice_profile_delete(PersonIdArgs) -> VoiceProfileView [People, Frozen, Main];
+    voice_profile_rematch(PersonIdArgs) -> VoiceRematch [People, Frozen, Main];
 
     // ── Agents (draft until the council gate) ─────────────────────────────
     agents_get(NoArgs) -> AgentsView [Agents, Draft, Main | Settings | FirstRun];

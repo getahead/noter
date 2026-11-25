@@ -1,6 +1,6 @@
 // The identity commands of People: each returns the core's answer and offers its change to the Undo strip.
 import type { Bridge } from "../../app/bridge/bridge";
-import type { PersonPatch, PersonRow } from "../../core/bindings";
+import type { PersonPatch, PersonRow, VoiceRematch } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { holdUndo } from "../history/undo";
 import { bumpPerson, setPersonStatus } from "./person-store";
@@ -54,6 +54,31 @@ export async function createProfile(bridge: Bridge, person: PersonRow): Promise<
   setPersonStatus({ id: person.id, text: t("person.voice.created", { name: person.short_name }) });
   bumpPerson();
   // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
+  // A new profile names its voice where past calls still have it unnamed (#1278); nothing found keeps "created".
+  await findInPastCalls(bridge, person, true);
+  return true;
+}
+
+/** The status line of a re-match: what was named, or that nothing matched. */
+export const rematchLine = (person: PersonRow, r: VoiceRematch): string =>
+  r.speakers
+    ? t("person.voice.found", { name: person.short_name, calls: t("person.voice.found_calls", { count: r.calls }), speakers: t("person.voice.found_speakers", { count: r.speakers }) })
+    : t("person.voice.found_none", { name: person.short_name });
+
+// @cpt-flow:cpt-noter-flow-ui-people-voice-rematch:p1
+// @cpt-dod:cpt-noter-dod-ui-people-voice-rematch:p1
+/** `voice_profile_rematch`: **Find in Past Calls**, and right after Create Profile; the names it gave go to Undo as one change. */
+export async function findInPastCalls(bridge: Bridge, person: PersonRow, quiet = false): Promise<boolean> {
+  // @cpt-begin:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-send
+  const res = await bridge.act("people:voice-rematch", "voice_profile_rematch", () => bridge.core.voiceProfileRematch({ person_id: person.id }), { screen: "people" });
+  // @cpt-end:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-send
+  if (res.status === "error") return false;
+  // @cpt-begin:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-result
+  const text = rematchLine(person, res.data);
+  if (res.data.change_id) holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: text, refresh: bumpPerson });
+  if (res.data.change_id || !quiet) setPersonStatus({ id: person.id, text });
+  bumpPerson();
+  // @cpt-end:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-result
   return true;
 }
 // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-create-profile

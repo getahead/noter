@@ -2463,7 +2463,7 @@ Some actions need the user's decision before anything can go on: an irreversible
 | **Remove Agent…** | native control (alert) | **Remove “Security reviewer”?** · **Its skill file moves to the Trash. Past cards and reviews keep its name.** · **Cancel** · **Remove** (destructive); from the agent editor |
 | **Sign In…** on **Your Claude account** or **Your ChatGPT account** | sheet, 520 wide, variants **sign-in-claude** and **sign-in-chatgpt** | Brand glyph, title **Sign in with your Claude account** (or **ChatGPT account**), the subtitle saying what changes (**Noter runs Claude Code with your Claude Pro, Max or Team plan instead of the Anthropic API key. Requests count against your plan's usage limits.**; for ChatGPT, Codex with a Plus, Pro, Business or Enterprise plan instead of a Codex API key), and a four-step indicator **Prepare** · **Sign in** · **Check** · **Use**. The steps are below this table. From Settings › Models & Runtimes, the agent editor's **Runtime** pop-up and the first-run **Assistants** step (PM-58) |
 | **Sign Out…** on an account row | native control (alert) | **Sign out of your Claude account in Noter?** · names the agents that switch back to the API key (**Product manager switches back to the Anthropic API key.**, adding **which isn't set, so they pause** when there is no key), then **Claude Code stays signed in for your own terminal use.** · checkbox **Also sign out of Claude Code on this Mac**, off · **Cancel** · **Sign Out** (default); the same for the ChatGPT account and Codex (PM-58) |
-| **Set Up Voice Profile…** | sheet, `cpt-noter-component-ui-primitives` | The person's full name as the subtitle; explanation **A voice profile is encrypted, stays on this Mac and can be deleted at any time.** and **Noter builds it from the lines already named as Anna K. in 31 calls.**; **Cancel** · **Create Profile**, then **Voice profile created for Anna K.**; a profile is only ever created by this explicit step for one person (D48; PRD › Feature specification › 2); from the Person page |
+| **Set Up Voice Profile…** | sheet, `cpt-noter-component-ui-primitives` | The person's full name as the subtitle; explanation **A voice profile is encrypted, stays on this Mac and can be deleted at any time.** and **Noter builds it from the lines already named as Anna K. in 31 calls.**, then **Noter then names this voice where it is still unnamed in past calls.**; **Cancel** · **Create Profile**, then **Voice profile created for Anna K.**, or **Found Anna K.’s voice in 6 calls · named 9 speakers** with **Undo** when past calls had it unnamed (#1278); a profile is only ever created by this explicit step for one person (D48; PRD › Feature specification › 2); from the Person page |
 | **Edit Details…** | sheet, 520 wide, `cpt-noter-component-ui-primitives` | Title **Edit details**; **Name**, **Also known as**, **Email**, **Role** and **Organisation** side by side, **Notes**; once the name changes, the checkbox **Keep “Pavel” as an alias**, ticked, appears under it; **Cancel** · **Save**; from the Person page ⋯ and the People row context menu (D94) |
 | **Merge With…** for a person, and **Merge 2 People…** | sheet, 540 wide, `cpt-noter-component-ui-person-picker` (merge variant, shown as a field) | Title **Merge Anna K. with another entry** and **Use this when one person has two entries. Their calls, items and names move to the person you keep.**; **Keep** (**Choose a person…**; the person being merged is not offered); once a person is chosen, the list **What moves to Anna Kuznetsova**: the calls and their speaker labels, the items the person owns, their names as aliases and the voice profile; **Cancel** · **Merge**, disabled until a person is chosen. The kept person keeps their name. No alert, because the merge is one batch with **Undo** (D95) |
 | **Merge With…** for a topic | sheet, 520 wide, `cpt-noter-component-ui-primitives` | Title **Merge “Websocket notifications” into “Notification service”?** and **The items move to “Notification service”, and “Websocket notifications” becomes one of its names. You can undo this in History.**; pop-up **Merge into**, set to the suggested topic, which changes the title; the list **What moves · 3 items from 4 calls** with each item's kind and text; **Cancel** · **Merge**; from the Topic thread ⋯, the Topics context menu, the merge banner's **Merge** and the rename sheet's **Merge Instead** (D95) |
@@ -2932,7 +2932,7 @@ The Person page puts on one page what a person owes the user, what they asked of
 
 ##### Responsibility boundaries
 
-- Does not match voices or propagate names to past calls; the core applies opted-in profiles, and the reconcile-people job proposes the rest in Activity (PRD › Maintenance jobs, evidence collection and history).
+- Does not match voices or propagate names itself; the core applies opted-in profiles, to new calls and, after **Create Profile** or **Find in Past Calls**, to speakers still unnamed in past calls (#1278); the reconcile-people job proposes the rest in Activity (PRD › Maintenance jobs, evidence collection and history).
 - Does not keep a stored page; the page is a set of queries the core answers (PRD › Search and cross-meeting memory › People).
 - Does not show talk-time share or “who was silent” unless the user switches them on in Settings › Privacy (D47).
 - Does not confirm deletes or create a voice profile itself; the native alerts and the voice-profile sheet do (`cpt-noter-component-screen-dialogs`).
@@ -3032,6 +3032,7 @@ Person page, Overview:
 | Commitment row | `cpt-noter-component-ui-action-item-row`, compact | Space ticks with **Done** · **Undo**; Return opens the evidence on the Call page; ⌘I opens the Item inspector; **Handoff** on an engineering item opens the Handoff drawer in the inspector slot; suggested items carry **Suggested** and offer **Accept**, **Edit…** and **Reject** in the context menu |
 | Topic chip | `cpt-noter-component-ui-topic-chip` | Library › Topic thread (`cpt-noter-component-screen-library`) |
 | **Set Up Voice Profile…** | Push button | Opens the voice-profile sheet with **Cancel** and **Create Profile**; a profile exists only after this explicit step (`cpt-noter-component-screen-dialogs`, D48) |
+| **Find in Past Calls** | Push button, shown while the profile is on | Names this voice where past calls still have it unnamed, with the same match as a new call (cosine above 0.75 with a margin over the runner-up, the call's attendees first); never changes a speaker the user, a calendar or another profile named. The names given are one change: the undo strip reads **Found Anna K.’s voice in 6 calls · named 9 speakers** · **Undo**, the status line repeats it and the person's History has the row; with nothing to name the status line reads **No unnamed speakers in past calls match Anna K.’s voice**. Runs on its own right after **Create Profile** (#1278) |
 | **Delete Profile…** | Push button, destructive | Alert **Delete Anna K.'s voice profile?** with **Noter stops recognising this voice in new calls. Names already given in past calls stay.** and **Delete Profile** and **Cancel**; afterwards the row reads **Off** with **Set Up Voice Profile…** (PM-59) |
 | Last call row and **Show All** | `cpt-noter-component-ui-call-row`, compact; push button | The row pushes the Call page; **Show All** switches to **Calls** |
 | History entry | `cpt-noter-component-ui-change-row` in `cpt-noter-component-ui-history-timeline` | **Undo** shows the undo strip above the timeline; **Open** opens the changed record; a text change shows its before and after inline (`cpt-noter-component-ui-diff-view`) |
@@ -3063,7 +3064,7 @@ Person page, Overview:
 | No calls with this person yet | PE-R2 to PE-R6 | **No calls with Anna K. yet** · **Their commitments, questions and topics appear after your first call together.** | UX B.10; PM-59 |
 |  Empty blocks | PE-R2, PE-R3, PE-R4 | **Nothing open**, **Nothing they are waiting for**, **No recurring topics yet** in place of the empty block's rows | PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Happy path); `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
 | Voice profile off | PE-R5 | **Off** · **Set Up Voice Profile…** | D48 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Happy path) |
-| Voice profile on | PE-R5 | **On since 3 Oct · 2 profiles · matched in 28 calls** (the profiles kept, and the calls a profile named a speaker in; a part whose count is 0 is left out, so right after **Create Profile** it reads **On since 22 Nov**; #1152) · **Delete Profile…** | UX B.10 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Other — Delete the profile) |
+| Voice profile on | PE-R5 | **On since 3 Oct · 2 profiles · matched in 28 calls** (the profiles kept, and the calls a profile named a speaker in; a part whose count is 0 is left out, so right after **Create Profile** it reads **On since 22 Nov** unless past calls had the voice unnamed; #1152) · **Find in Past Calls** · **Delete Profile…** | UX B.10 | `cpt-noter-seq-dialogs-set-up-voice-profile` (Other — Delete the profile) |
 | No history | History view | **No changes yet** · **Changes to Anna K.'s items, names and voice profile appear here, each with Undo.** | UX C.2; PM-59 | `cpt-noter-seq-people-prepare-one-on-one` (Empty — No calls with this person yet) |
 | Details edited | PE-R1 sheet | **Edit Details…** with **Keep “Pavel” as an alias** ticked after the name changed; the new name on every label, chip and owner | D94 | `cpt-noter-seq-people-name-unnamed-speaker` (Other — Rename a person) |
 | Two entries merged | PL-R2; Person page | **Merge 2 People…**, then the merge sheet; the kept person's page with **Merged Anna K. into Anna Kuznetsova · Undo** | D95; PM-59 | `cpt-noter-seq-people-name-unnamed-speaker` (Other — Merge two entries for one person) |
@@ -11506,6 +11507,49 @@ User:
 3. Sees **What moves to Anna Kuznetsova**: 31 calls and their speaker labels, the items Anna K. owns, the names Anna K. and Аня as aliases, and the voice profile
 4. Clicks **Merge**
 5. Gets Anna Kuznetsova's page with every call, item and alias, and **Merged Anna K. into Anna Kuznetsova · Undo** above it
+
+#### People — Find a voice in past calls
+
+**ID**: `cpt-noter-seq-people-find-voice-in-past-calls`
+
+**Use cases**: PRD › Problem, users and jobs to be done › Jobs to be done › Any time; PRD › Feature specification › 5
+
+**Actors**: Primary user (PRD › Problem, users and jobs to be done)
+
+**Components**: `cpt-noter-component-screen-people`, `cpt-noter-component-screen-dialogs`, `cpt-noter-component-ui-undo-strip`, `cpt-noter-component-ui-history-timeline`
+
+**Description**: Once Anna K. has a voice profile, Noter names her voice where past calls still show it as an unnamed speaker, without touching any name already given, as one change the user can undo (#1278).
+
+**Preconditions**: Anna K. has a voice profile; past calls hold her voice as unnamed speakers, and one call has that voice named Boris by the user.
+
+**Happy path**
+
+User:
+
+1. Opens Anna K.'s Person page and clicks **Find in Past Calls** under **Voice profile**
+2. Sees **Found Anna K.’s voice in 6 calls · named 9 speakers** with **Undo**
+3. Opens one of those calls and sees Anna K. on the lines that read **Speaker 2** before, while the call where the user named the voice Boris still reads Boris
+
+**Empty path — Nothing left to name**
+
+User:
+
+1. Clicks **Find in Past Calls** again
+2. Sees **No unnamed speakers in past calls match Anna K.’s voice**, and nothing changes
+
+**Other path — Right after Create Profile**
+
+User:
+
+1. Clicks **Create Profile** in **Set Up Voice Profile**
+2. Gets **Found Anna K.’s voice in 6 calls · named 9 speakers** with **Undo** instead of **Voice profile created for Anna K.** when past calls had the voice unnamed
+
+**Error path — Wrong voice named**
+
+User:
+
+1. Clicks **Undo** on the strip, or on the row in Anna K.'s **History**
+2. Gets every speaker the search named unnamed again, in all six calls, with the voice profile kept
 
 #### Activity — Decide what Noter proposes
 

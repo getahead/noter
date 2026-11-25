@@ -112,6 +112,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   person_delete: {"person_id": "per_anna"},
   voice_profile_create: {"person_id": "per_anna"},
   voice_profile_delete: {"person_id": "per_anna"},
+  voice_profile_rematch: {"person_id": "per_anna"},
   agents_get: {},
   agent_create: {"template": "security_reviewer"},
   agent_update: {"agent_id": "noter", "rev": 1, "patch": {}},

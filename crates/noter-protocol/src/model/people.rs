@@ -180,3 +180,13 @@ pub struct VoiceProfileView {
     pub centroids: u32,
     pub opted_in_at: Option<TimestampMs>,
 }
+
+/// What `voice_profile_rematch` named: unnamed speakers in past calls whose voice matches the
+/// person's profile. `change_id` undoes them all; `None` when nothing matched.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct VoiceRematch {
+    pub person_id: PersonId,
+    pub calls: u32,
+    pub speakers: u32,
+    pub change_id: Option<ChangeId>,
+}
