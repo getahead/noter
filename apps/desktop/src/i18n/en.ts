@@ -1798,6 +1798,7 @@ export const en = {
   "handoff.launch.link": "Opens {tool} in your usual terminal with the prompt filled in; nothing is sent until you press Return.",
   "handoff.launch.fallback": "No {tool} link handler found. Noter will open {app} and run {command} in {cwd}.",
   "handoff.launch.fallback_auto": "No {tool} link handler found. Noter will open {app} and run {command} in {cwd}; macOS asks once to allow Automation.",
+  "handoff.launch.unmapped_folder": "the repository folder you map",
   "handoff.launch.none": "{tool} can't be launched from here. Copy the prompt and paste it into your terminal.",
   "handoff.scheme.claude_cli_link": "Opens through claude-cli://open · no Automation prompt",
   "handoff.scheme.claude_desktop": "Opens through claude://code/new · no Automation prompt",
