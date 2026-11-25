@@ -41,6 +41,7 @@ import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { IconButton } from "../../ui/primitives/icon-button";
 import type { MenuItem } from "../../ui/primitives/menu";
 import { find, rendered } from "../../ui/testing";
+import { TranscriptLog, type TranscriptLogProps } from "../transcript/hosts";
 import { CallWindow, loadParticipants } from "./call-window";
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, MoreMenu, PersonChip, type StripProps } from "./strip";
@@ -197,6 +198,15 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     };
     expect(chip.speaker.id).toBe("spk_3");
     expect(() => chip.onRename({} as HTMLElement)).not.toThrow();
+  });
+
+  it("cpt-noter-seq-call-screen-name-speaker: the floating live transcript sends rename feedback to the status strip", async () => {
+    await open({}, { layout: "floating" });
+    const log = find(tree(), (_props, type) => type === TranscriptLog).props as Pick<TranscriptLogProps, "variant" | "onNamed">;
+    expect(log.variant).toBe("live");
+    const text = "Speaker 3 named Anna K.";
+    log.onNamed!(text, "change_rename");
+    expect(stateWrites).toContainEqual({ variant: "notice", text });
   });
 
   it("draws the floating layout and the collapsed strip, Paused 3 min while paused", async () => {
