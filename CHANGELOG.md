@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.2](https://github.com/getahead/noter/compare/v0.26.1...v0.26.2) (2026-11-25)
+
+
+### Bug fixes
+
+* **accounts:** the Claude sign-in works when Claude Code is already signed in, and a failed login names why ([#1236](https://github.com/getahead/noter/issues/1236)) ([2a54825](https://github.com/getahead/noter/commit/2a54825016878badc2c93ea8a00921691cf9f97f))
+
 ## [0.26.1](https://github.com/getahead/noter/compare/v0.26.0...v0.26.1) (2026-11-24)
 
 
