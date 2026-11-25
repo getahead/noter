@@ -78,9 +78,15 @@ impl ClaudeCode {
                 }
             }
         }
+        // Claude Code 2.1.325 refuses a schema that names its draft in `$schema` (#1235); the
+        // generated schemas carry it at the top level only.
+        let mut schema = call.schema.clone();
+        if let Some(top) = schema.as_object_mut() {
+            top.remove("$schema");
+        }
         command
             .args(["--output-format", "json"])
-            .args(["--json-schema", &call.schema.to_string()])
+            .args(["--json-schema", &schema.to_string()])
             .arg("--append-system-prompt-file")
             .arg(&skill)
             .arg("--strict-mcp-config")
@@ -156,5 +162,9 @@ impl RuntimeAdapter for ClaudeCode {
 
     fn close_session(&self, _: RuntimeChoice, session: &str) {
         self.0.close_session(session);
+    }
+
+    fn last_failure(&self) -> Option<String> {
+        self.0.last_failure()
     }
 }

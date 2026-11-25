@@ -257,6 +257,12 @@ impl Llm {
     }
     // @cpt-end:cpt-noter-algo-core-credentials-privacy-check-account:p1:inst-check-test
 
+    /// How the runtime's last failed CLI run ended, as `exit_<code>.<class>` for the log
+    /// (`exit_1.schema_rejected`); never the CLI's output. `None` when no run failed that way.
+    pub fn cli_failure(&self, runtime: RuntimeChoice) -> Option<String> {
+        self.0.gate.last_failure(runtime)
+    }
+
     /// Asks every runtime again what it has (CLI versions, Ollama's pulled models) and answers
     /// the availability that follows. The CLI probes block, so they run off the async workers.
     pub async fn refresh(&self) -> Vec<Availability> {

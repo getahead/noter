@@ -433,10 +433,16 @@ impl Core {
             offline: !self.app().environment.online,
         };
         let started = tokio::time::Instant::now();
-        self.llm
-            .verify_account(account_runtime(provider), privacy)
-            .await
-            .map_err(account_error)?;
+        let runtime = account_runtime(provider);
+        let checked = self.llm.verify_account(runtime, privacy).await;
+        if let Err(Failure::Runtime { code }) = &checked {
+            // Why the check failed, so the next failure is readable from noter.log (#1235).
+            self.log_signin_failure("account_check_failed", code);
+            if let Some(how) = self.llm.cli_failure(runtime) {
+                self.log_signin_failure("account_check_cli", &how);
+            }
+        }
+        checked.map_err(account_error)?;
         let ms = started.elapsed().as_millis();
         Ok(DurationMs(u32::try_from(ms).unwrap_or(u32::MAX)))
     }

@@ -19,7 +19,7 @@ file_mode() { stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1"; }
 
 codex=no
 [ "$1" = "exec" ] && codex=yes
-bare=no strict=no ignore_user=no docs=yes sources=unset resume=
+bare=no strict=no ignore_user=no docs=yes sources=unset resume= bad_schema=no
 prev=
 for a in "$@"; do
     line argv "$a"
@@ -31,6 +31,7 @@ for a in "$@"; do
         printf '\n' >>"$out"
         ;;
     --setting-sources) sources="$a" ;;
+    --json-schema) case "$a" in *'"$schema"'*) bad_schema=yes ;; esac ;;
     --resume | resume) resume="$a" ;;
     esac
     case "$a" in
@@ -86,6 +87,11 @@ fi
 line stdin "$(cat)"
 mv "$out" "$rec"
 mode=$(cat "$here/mode")
+# Claude Code 2.1.325 refuses a --json-schema that names its draft (#1235); its own words.
+if [ $bad_schema = yes ]; then
+    echo 'Error: --json-schema is not a valid JSON Schema: no schema with key or ref "https://json-schema.org/draft/2020-12/schema"' >&2
+    exit 1
+fi
 if [ "$mode" = hang ]; then
     echo $$ >"$here/pid"
     exec sleep 60
