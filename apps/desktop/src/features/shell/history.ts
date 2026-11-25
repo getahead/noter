@@ -9,8 +9,6 @@ export interface Route {
 export interface History {
   entries: readonly Route[];
   index: number;
-  /** Each section's last location. */
-  last: Partial<Record<SectionKey, Route>>;
   inspectorOpen: boolean;
 }
 
@@ -23,7 +21,7 @@ export type HistoryMove =
 const ROOT = (section: SectionKey): Route => ({ section, key: "root" });
 const same = (a: Route, b: Route) => a.section === b.section && a.key === b.key;
 
-export const INITIAL_HISTORY: History = { entries: [ROOT("today")], index: 0, last: { today: ROOT("today") }, inspectorOpen: false };
+export const INITIAL_HISTORY: History = { entries: [ROOT("today")], index: 0, inspectorOpen: false };
 
 // @cpt-algo:cpt-noter-algo-ui-main-window-shell-history:p1
 export function historyMove(h: History, m: HistoryMove): { history: History; route: Route } {
@@ -34,8 +32,8 @@ export function historyMove(h: History, m: HistoryMove): { history: History; rou
   switch (m.type) {
     // @cpt-begin:cpt-noter-algo-ui-main-window-shell-history:p1:inst-case-section
     case "section": {
-      // the section in view goes back to its root list; another opens where it was left (D17; owner, 21 Nov, issue 1044)
-      route = current.section === m.section ? ROOT(m.section) : (h.last[m.section] ?? ROOT(m.section));
+      // every section switch opens the section's root page, never a nested page left there before (owner: issues 1044, 1270)
+      route = ROOT(m.section);
       // shortcut: a section that is already showing is not pushed twice, so ⌘3 pressed twice adds no entry
       if (!same(route, current)) {
         entries = [...entries.slice(0, index + 1), route];
@@ -72,10 +70,8 @@ export function historyMove(h: History, m: HistoryMove): { history: History; rou
   const keeps = (m.type === "push" || m.type === "replace") && m.keepInspector === true;
   const opens = (m.type === "push" || m.type === "replace") && m.inspector === true;
   // @cpt-end:cpt-noter-algo-ui-main-window-shell-history:p1:inst-close-inspector
-  // @cpt-begin:cpt-noter-algo-ui-main-window-shell-history:p1:inst-remember-section
   // @cpt-begin:cpt-noter-algo-ui-main-window-shell-history:p1:inst-return-history
-  const history: History = { entries, index, last: { ...h.last, [route.section]: route }, inspectorOpen: keeps ? h.inspectorOpen || opens : false };
+  const history: History = { entries, index, inspectorOpen: keeps ? h.inspectorOpen || opens : false };
   return { history, route };
   // @cpt-end:cpt-noter-algo-ui-main-window-shell-history:p1:inst-return-history
-  // @cpt-end:cpt-noter-algo-ui-main-window-shell-history:p1:inst-remember-section
 }

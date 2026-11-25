@@ -683,7 +683,7 @@ The main window is the standard macOS window that holds every page outside the c
 - Shows the toolbar (MW-R1): **Back** and **Forward**, the page title and subtitle, the page's own view switch and actions, and the search field.
 - Shows one app-level state at a time in the banner slot (MW-R5), the most severe first (D35).
 - Hosts the selected page in the content area (MW-R3) and one trailing inspector in MW-R4: Call info, the Item inspector or the Handoff drawer (D18).
-- Keeps one Back and Forward history across all sections; each section remembers its last location (D17).
+- Keeps one Back and Forward history across all sections (D17); choosing a section in the sidebar, the View menu or with ⌘1 to ⌘8 always opens its root page, never a nested page left there before (owner rule, issues #1044 and #1270).
 - Applies the content-width classes and the one collapse order to every page (UX B.0).
 - Owns the app menu and the main-window keyboard map, so every in-app shortcut also sits in a menu (D51).
 
