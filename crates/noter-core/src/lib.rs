@@ -8,6 +8,7 @@ mod archive;
 mod ask;
 mod audio;
 mod audit;
+mod call_type;
 mod capture;
 mod carry;
 mod chunks;

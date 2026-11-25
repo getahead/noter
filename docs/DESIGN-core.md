@@ -1692,6 +1692,7 @@ sequenceDiagram
     E-->>Sup: session_stopped {timeline, mic, sys}
     Sup-->>Ses: session stopped
     Ses-->>W: capture:state {phase: stopped, continue_until: +5 min}
+    Ses->>Ses: Detect the type locally from the title and confirmed transcript if still unclassified
     Ses->>J: queue PostCall job (low priority; runs even if the next call starts)
     J->>PC: run
     PC->>L: post-call skill on the live transcript
