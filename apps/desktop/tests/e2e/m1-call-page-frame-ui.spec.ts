@@ -106,6 +106,15 @@ test.describe("cpt-noter-flow-ui-call-page-frame-open", () => {
     await expect.poll(async () => (await sent(page, "window_report_view")).at(-1)).toEqual({ call_id: null });
   });
 
+  test("cpt-noter-seq-call-page-check-evidence — Call info identifies invitees until a speaker is named", async ({ page }) => {
+    await openWindow(page, "main", {
+      world: quiet(false, (w) => patchCall(w, W.PAST_CALL, (c) => Object.assign(c, { invited_ids: ["per_oleg"] }))),
+    });
+    await openCall(page);
+    await expect(info(page).locator(".pc-chip").filter({ hasText: "Oleg M." })).toContainText("Invited");
+    await expect(info(page).locator(".pc-chip").filter({ hasText: "Dmitri S." })).not.toContainText("Invited");
+  });
+
   test("UI — other path: Call info docks without taking focus (a nav:request moves none); ⌥⌘I takes it and hiding returns it", async ({ page }) => {
     await openWindow(page, "main", { world: quiet() });
     await openCall(page);

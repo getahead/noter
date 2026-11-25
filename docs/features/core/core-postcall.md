@@ -173,6 +173,8 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 6. [x] - `p1` - Commit primary records, changes and derived indexes through the writer in batches of at most 200 rows; mark a section ready only after its complete committed state exists - `inst-store-commit`
 7. [x] - `p1` - **RETURN** section state ready, empty or failed; an empty valid section is not an error - `inst-store-return`
 
+The summary output may include a short title describing the call’s main topic (#1256). Commit it only while the title is still automatic and pending. Calendar titles and user edits take precedence, including on regeneration.
+
 ### Chunk and embed the active transcript
 
 - [x] `p1` - **ID**: `cpt-noter-algo-core-postcall-chunks`

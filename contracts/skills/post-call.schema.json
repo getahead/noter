@@ -185,6 +185,13 @@
     "summary_md": {
       "description": "5–10 sentences for someone who was not there.",
       "type": "string"
+    },
+    "title": {
+      "description": "A short, single-line title naming the main topic in the summary language. Null if there is no topic.",
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "required": [

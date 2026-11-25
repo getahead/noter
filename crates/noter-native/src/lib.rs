@@ -41,7 +41,8 @@ use std::time::Duration;
 
 pub use noter_protocol::model::EnvironmentReading as Reading;
 use noter_protocol::model::{
-    CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputRoute, Politeness,
+    CalendarEvent, CalendarEventRef, DisplayInfo, NavTarget, NotificationAuth, OutputRoute,
+    Politeness,
 };
 use noter_protocol::{CallId, DisplayId, PermissionKind, PermissionState};
 
@@ -346,29 +347,22 @@ pub fn announce(text: &str, politeness: Politeness) {
 /// The calendar event at `at_ms` (epoch ms): the one running then, or the next starting within
 /// 10 minutes. Never asks for access: none without it.
 pub fn calendar_event_near(at_ms: i64) -> Option<CalendarEventRef> {
-    // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
-    if permission(PermissionKind::Calendar) != PermissionState::Granted {
-        return None;
-    }
-    // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
-    let (from, to) = (at_ms - DAY_MS, at_ms + CALENDAR_LOOKAHEAD_MS);
-    #[cfg(target_os = "macos")]
-    let events = mac::calendar_events(from, to);
-    #[cfg(not(target_os = "macos"))]
-    let events = {
-        let _ = (from, to);
-        Vec::new()
-    };
+    let events = calendar_events(at_ms - DAY_MS, at_ms + CALENDAR_LOOKAHEAD_MS)
+        .into_iter()
+        .map(|e| e.event)
+        .collect();
     // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
     nearest_event(events, at_ms)
     // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-return-events
 }
 
 /// The events overlapping `from_ms..to_ms` (epoch ms). Never asks for access: none without it.
-pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEventRef> {
+pub fn calendar_events(from_ms: i64, to_ms: i64) -> Vec<CalendarEvent> {
+    // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
     if permission(PermissionKind::Calendar) != PermissionState::Granted {
         return Vec::new();
     }
+    // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-no-access
     #[cfg(target_os = "macos")]
     return mac::calendar_events(from_ms, to_ms);
     #[cfg(not(target_os = "macos"))]
@@ -432,4 +426,42 @@ pub fn nearest_event(events: Vec<CalendarEventRef>, at_ms: i64) -> Option<Calend
                 .min_by_key(|e| e.starts_at.0)
         })
         .cloned()
+}
+
+/// Recognized conference hosts in an EventKit URL or location (which may itself be a URL).
+#[cfg(any(target_os = "macos", test))]
+fn meeting_service(value: &str) -> Option<&'static str> {
+    let host = value
+        .trim()
+        .trim_start_matches("https://")
+        .split('/')
+        .next()?
+        .to_ascii_lowercase();
+    match host.as_str() {
+        "meet.google.com" => Some("Google Meet"),
+        "teams.microsoft.com" | "teams.live.com" | "teams.cloud.microsoft" => {
+            Some("Microsoft Teams")
+        }
+        "zoom.us" => Some("Zoom"),
+        h if h.ends_with(".zoom.us") => Some("Zoom"),
+        h if h.ends_with(".webex.com") => Some("Webex"),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod meeting_service_tests {
+    #[test]
+    fn cpt_noter_seq_record_prompt_start_recording_recognizes_calendar_meeting_links() {
+        for (input, expected) in [
+            ("https://meet.google.com/xyz", Some("Google Meet")),
+            ("teams.microsoft.com", Some("Microsoft Teams")),
+            ("https://team.zoom.us/j/42", Some("Zoom")),
+            ("https://team.webex.com/meet", Some("Webex")),
+            ("https://meet.google.com.example.org/", None),
+            ("Board room", None),
+        ] {
+            assert_eq!(super::meeting_service(input), expected);
+        }
+    }
 }
