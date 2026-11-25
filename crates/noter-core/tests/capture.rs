@@ -2153,6 +2153,12 @@ async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retr
         .await
         .unwrap_err();
     assert_eq!(retry.code, ErrorCode::EngineUnavailable);
+    let window = main_window();
+    let panel = r.core.window_call_state(&window, NoArgs {}).await.unwrap();
+    assert!(
+        panel.visible,
+        "a failed discard leaves the call window available"
+    );
     assert!(
         call_audio.exists(),
         "retry still waits for the in-flight writer"
@@ -2161,6 +2167,10 @@ async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retr
     std::fs::write(call_audio.join("mic.m4a"), b"late audio").unwrap();
     r.session_stopped(&call_id);
     r.pass(1).await;
+    r.core
+        .app_set_hidden_for_presenting(&window, HiddenArgs { hidden: true })
+        .await
+        .unwrap();
     assert_eq!(
         r.core
             .capture_discard(&main_window(), args)
@@ -2170,6 +2180,15 @@ async fn discard_does_not_claim_deletion_before_an_unconfirmed_stop_and_can_retr
         CapturePhase::Idle
     );
     assert!(!call_audio.exists());
+    r.core
+        .app_set_hidden_for_presenting(&window, HiddenArgs { hidden: false })
+        .await
+        .unwrap();
+    let panel = r.core.window_call_state(&window, NoArgs {}).await.unwrap();
+    assert!(
+        !panel.visible,
+        "ending presentation cannot restore a discarded call"
+    );
 }
 
 fn segment(call_id: &CallId) -> EngineEvent {

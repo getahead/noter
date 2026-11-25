@@ -1,4 +1,4 @@
-import { firstRun, idle, speechModel } from "../support/world-presets";
+import { firstRun, idle, notice, speechModel } from "../support/world-presets";
 import { openWindow } from "./support/app";
 import { sent } from "./support/call-page";
 import { expect, test } from "./support/fixtures";
@@ -24,6 +24,23 @@ test("cpt-noter-seq-floating-panel-hide-and-reopen — a live Call Screen recove
   await openWindow(page, "call-screen", { fail: [{ cmd: "window_call_state", code: "internal" }] });
   await page.getByRole("button", { name: "Try Again" }).click();
   await expect(page.getByRole("button", { name: "Pause", exact: true })).toBeVisible();
+});
+
+test("cpt-noter-seq-call-screen-recover-capture — Discard closes the silent call's panel until explicitly reopened", async ({ page }) => {
+  const steer = await openWindow(page, "call-screen", { world: idle });
+  const windowState = () => steer.invoke("window_call_state", {}, "call-screen");
+  const idleTitle = page.getByRole("heading", { name: "Not recording" });
+  await steer.invoke("window_show_call", {}, "main");
+  await page.getByRole("button", { name: "Start Recording", exact: true }).click();
+  await expect(page.getByRole("img", { name: "Recording", exact: true })).toBeVisible();
+  await steer.change((w) => notice(w, { type: "nothing_heard", since: Date.now() - 300_000 }));
+  await page.getByRole("button", { name: "Discard Recording", exact: true }).click();
+  await page.getByRole("button", { name: "Discard", exact: true }).click();
+  await expect.poll(() => steer.invoke("app_snapshot", {}, "call-screen")).toMatchObject({ capture: { phase: "idle", call_id: null } });
+  await expect.poll(windowState).toMatchObject({ visible: false, key: false });
+  await expect(idleTitle).toHaveCount(0);
+  await steer.invoke("window_show_call", {}, "main");
+  await expect(idleTitle).toBeVisible();
 });
 
 for (const blocker of ["model", "disk"] as const) {

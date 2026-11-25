@@ -1,6 +1,7 @@
 import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
 import * as shared from "./shared";
+import { hideCallWindow } from "./windows";
 
 export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
   const newId = (prefix: string) => shared.nextId(fake, prefix);
@@ -141,6 +142,7 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     world.items = world.items.filter((item) => item.call.id !== a.call_id);
     world.outputs = world.outputs.filter((o) => o.call_id !== a.call_id);
     emit("entity:changed", { type: "removed", kind: "call", id: a.call_id });
+    hideCallWindow(fake);
     return shared.setCapture(fake, { phase: "idle", call_id: null, title: null, started_at: null, recorded_ms: 0, pause: null, notice: null, continue_until: null });
   },
   capture_set_sensitive: (a, { world, fake, emit }) => {

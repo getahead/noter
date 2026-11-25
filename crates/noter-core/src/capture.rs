@@ -1126,6 +1126,7 @@ impl Core {
         self.drop_sources_of(&call_id);
         self.clear_engine_states();
         *session = session.restart(0);
+        self.hide_call();
         let idle = self.set_capture(to_idle);
         drop(session);
         self.release_held();

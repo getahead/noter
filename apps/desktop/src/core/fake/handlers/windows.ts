@@ -2,6 +2,12 @@ import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
 import * as shared from "./shared";
 
+export function hideCallWindow(fake: Core.FakeCore) {
+  Object.assign(fake.callWindow, { visible: false, key: false });
+  fake.publish("window:call");
+  return fake.callWindow;
+}
+
 export function windowsHandlers(fake: Core.FakeCore): Core.Handlers {
   return {
   // ── Windows ──────────────────────────────────────────────────────────
@@ -15,11 +21,7 @@ export function windowsHandlers(fake: Core.FakeCore): Core.Handlers {
     publish("window:call");
     return fake.callWindow;
   },
-  window_hide_call: (_a, { fake, publish }) => {
-    Object.assign(fake.callWindow, { visible: false, key: false });
-    publish("window:call");
-    return fake.callWindow;
-  },
+  window_hide_call: (_a, { fake }) => hideCallWindow(fake),
   // as the core does (call_window_now): the state follows the settings it carries
   window_call_state: (_a, { fake, world }) => Object.assign(fake.callWindow, { show_latency: world.settings.call_screen.show_latency, text_size_pct: world.settings.call_screen.text_size_pct }),
   window_share_warning_seen: (_a, { fake, publish }) => {
