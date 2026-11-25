@@ -167,6 +167,9 @@ export const formatDateTime = (ms: number, prefs: UiPrefs): string =>
 /** The calendar day in the user's zone, YYYY-MM-DD: the key two times share when they fall on one day. */
 export const dayOf = (ms: number, prefs: UiPrefs | undefined): string => zoned(ms, {}, prefs, "en-CA");
 
+/** `day` (YYYY-MM-DD) moved by `by` days; whole UTC days, so a DST change never shifts it. */
+export const shiftDay = (day: string, by: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + by * 86_400_000).toISOString().slice(0, 10);
+
 /** Milliseconds until the user's next calendar day begins, including DST-short and DST-long days. */
 export const untilNextDay = (now: number, prefs: UiPrefs | undefined): number => {
   const today = dayOf(now, prefs);

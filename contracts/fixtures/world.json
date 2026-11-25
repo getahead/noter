@@ -2277,6 +2277,7 @@
       ],
       "sensitive": false,
       "status": "ready",
+      "waiting_for_power": null,
       "written_locally": false
     }
   ],

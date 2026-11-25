@@ -221,6 +221,10 @@ impl NativeServices for Mac {
         // @cpt-end:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-fail
     }
 
+    fn time_zone(&self) -> String {
+        objc2_foundation::NSTimeZone::localTimeZone().name().to_string()
+    }
+
     fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
         noter_native::utc_offset_minutes(at.0)
     }

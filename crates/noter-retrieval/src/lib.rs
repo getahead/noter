@@ -28,8 +28,9 @@ pub use presets::scope_presets;
 #[cfg(test)]
 pub use retrieve::NoDocuments;
 pub use retrieve::{
-    day_number, prepare, retrieve, DocHits, DocQuery, DocumentSource, Evidence, Hit, Prepared,
-    Privacy, Query, Retrieved, Scope, MIN_SIMILARITY, OVER_FETCH, RRF_K,
+    day_number, prepare, retrieve, spoken_language_filter, spoken_languages_sql, DocHits, DocQuery,
+    DocumentSource, Evidence, Hit, Prepared, Privacy, Query, Retrieved, Scope, MIN_SIMILARITY,
+    OVER_FETCH, RRF_K,
 };
 pub use search::{search, search_request, DEFAULT_LIMIT, MAX_LIMIT};
 pub use topics::{

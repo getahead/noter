@@ -1017,6 +1017,11 @@ impl Core {
 
     /// Queue the per-call work after either a normal or interrupted stop.
     pub(crate) fn trigger_post_call_jobs(&self, call_id: &CallId) {
+        if let Err(e) = self.classify_stopped_call(call_id) {
+            self.log(crate::object(
+                json!({"level": "error", "module": "call_type", "code": e.code}),
+            ));
+        }
         // The post-call analysis runs first, then the archive pass. Repeated stops deduplicate.
         for kind in [JobKind::PostCall, JobKind::ArchivePass] {
             let req = Request::for_call(kind, Trigger::AfterCall, call_id);

@@ -1234,6 +1234,79 @@ async fn capture_runs_on_the_real_core_and_the_scripted_surfaces_record_what_was
     r.finish().await;
 }
 
+// cpt-noter-seq-core-call-end-outputs
+#[tokio::test]
+async fn cpt_noter_seq_core_call_end_outputs_detects_the_type_at_stop_on_battery() {
+    let mut r = start_with(Options {
+        fixture: true,
+        scenario: Some("idle".into()),
+        battery: true,
+        ..Options::default()
+    })
+    .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({"source": "today", "sensitive": false}),
+        )
+        .await;
+    let call = json!({"call_id": started["call_id"]});
+    let detail = r.ok("main", "call_get", call.clone()).await;
+    r.ok(
+        "main",
+        "call_update",
+        json!({
+            "call_id": started["call_id"], "rev": detail["call"]["rev"],
+            "title": "Sprint retrospective"
+        }),
+    )
+    .await;
+    r.ok("main", "capture_stop", call.clone()).await;
+    let stopped = r.ok("main", "call_get", call).await;
+    assert_eq!(stopped["call"]["call_type"], "retro");
+    r.finish().await;
+}
+
+// cpt-noter-seq-core-call-end-outputs
+#[tokio::test]
+async fn cpt_noter_seq_core_call_end_outputs_detects_an_untitled_sensitive_call_from_speech() {
+    let mut r = start_with(Options {
+        fixture: true,
+        scenario: Some("idle".into()),
+        battery: true,
+        ..Options::default()
+    })
+    .await;
+    let started = r
+        .ok(
+            "main",
+            "capture_start",
+            json!({"source": "hotkey", "sensitive": true}),
+        )
+        .await;
+    let id = &started["call_id"];
+    let mut line =
+        r.ok("main", "harness.world_get", json!({})).await["transcripts"][0]["segments"][0].clone();
+    line["call_id"] = id.clone();
+    line["id"] = json!("seg_outage");
+    line["state"] = json!("confirmed");
+    line["text"] = json!("Welcome to the incident bridge.");
+    r.ok(
+        "main",
+        "harness.push",
+        json!({
+            "cmd": "transcript_subscribe",
+            "body": {"event": {"type": "confirmed", "segment": line}}
+        }),
+    )
+    .await;
+    r.ok("main", "capture_stop", json!({"call_id": id})).await;
+    let detail = r.ok("main", "call_get", json!({"call_id": id})).await;
+    assert_eq!(detail["call"]["call_type"], "incident");
+    r.finish().await;
+}
+
 // TL-13: with no `--llm-script` the scripted runtime answers the post-call skill with its
 // built-in valid output, so a real-core call goes from `capture_stop` to its outputs.
 #[tokio::test]
@@ -3072,4 +3145,56 @@ async fn a_data_dir_from_the_launch_hooks_keeps_the_core_data_across_launches() 
     });
     assert!(relative.unwrap_err().contains("absolute"));
     let _ = std::fs::remove_dir_all(&path);
+}
+
+#[tokio::test]
+async fn cpt_noter_seq_call_page_review_outputs_today_and_export_share_local_midnight() {
+    let mut r = start().await;
+    r.ok("main", "harness.set_utc_offset", json!({"minutes": 60}))
+        .await;
+    // Fixture clock is 08:00 UTC on Oct 16. Move to Oct 17 00:30:00.123 local.
+    let moved = r
+        .ok(
+            "main",
+            "harness.advance_clock",
+            json!({"ms": 15 * 3_600_000 + 1_800_123}),
+        )
+        .await;
+    let today = r.ok("main", "today_get", json!({})).await;
+    assert_eq!(today["date"], "2026-10-17");
+
+    // Seed a change at this exact instant. The change log is append-only and its storage
+    // clock is independent of the scripted service clock.
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let mut row = world["changes"][0].clone();
+    row["id"] = json!("chg_after_local_midnight");
+    row["at"] = moved["now"].clone();
+    world["changes"].as_array_mut().unwrap().push(row);
+    r.ok("main", "harness.world_set", json!({"world": world}))
+        .await;
+
+    for format in ["markdown", "json"] {
+        let export = r
+            .ok(
+                "main",
+                "history_export",
+                json!({"scope": {"type": "today"}, "format": format}),
+            )
+            .await;
+        let path = export["path"].as_str().unwrap();
+        assert!(path.contains("noter-history-2026-10-17."));
+        let body = std::fs::read_to_string(path).unwrap();
+        if format == "markdown" {
+            assert!(body.contains("2026-10-17 00:30"));
+        } else {
+            let rows: Vec<Value> = serde_json::from_str(&body).unwrap();
+            let row = rows
+                .iter()
+                .find(|v| v["id"] == "chg_after_local_midnight")
+                .unwrap();
+            assert_eq!(row["at"], moved["now"]);
+            assert_eq!(row["at_iso"], "2026-10-17T00:30:00.123+01:00");
+        }
+    }
+    r.finish().await;
 }

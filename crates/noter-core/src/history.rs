@@ -12,6 +12,7 @@ use noter_protocol::model::*;
 use noter_protocol::*;
 use serde_json::json;
 
+use crate::local_time::{date_of, LocalTime, DAY_MS};
 use crate::settings::{invalid, section_of};
 use crate::{lock, object, Core, SaveKind};
 
@@ -519,26 +520,6 @@ fn runtime_choice(value: &str) -> Option<RuntimeChoice> {
     })
 }
 
-const DAY_MS: i64 = 86_400_000;
-
-/// `YYYY-MM-DD` of a day number (the inverse of the shared retrieval date converter).
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z + 719_468;
-    let era = z.div_euclid(146_097);
-    let doe = z - era * 146_097;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 };
-    (yoe + era * 400 + i64::from(m <= 2), m, d)
-}
-
-pub(crate) fn date_of(ms: i64) -> String {
-    let (y, m, d) = civil_from_days(ms.div_euclid(DAY_MS));
-    format!("{y:04}-{m:02}-{d:02}")
-}
-
 /// What an export scope selects: a target and a closed period in ms.
 struct Selection {
     target: HistoryTarget,
@@ -625,8 +606,10 @@ impl Core {
                             if !first {
                                 text.push_str(",\n");
                             }
+                            let mut value = serde_json::to_value(&row).map_err(crate::internal)?;
+                            value["at_iso"] = self.local_time().iso(row.at.0).into();
                             let pretty =
-                                serde_json::to_string_pretty(&row).map_err(crate::internal)?;
+                                serde_json::to_string_pretty(&value).map_err(crate::internal)?;
                             text.push_str("  ");
                             text.push_str(&pretty.replace('\n', "\n  "));
                             first = false;
@@ -636,7 +619,7 @@ impl Core {
                         }
                     }
                     LogFormat::Markdown => {
-                        let page = markdown_of(&selection.name, &rows);
+                        let page = markdown_of(&selection.name, &rows, self.local_time());
                         if first {
                             text.push_str(&page);
                             first = false;
@@ -684,14 +667,14 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-history-undo-read:p1:inst-export-result
     }
 
-    /// shortcut: a day is a UTC day (as in the calls list); use the user's time zone when
-    /// settings carry one.
+    /// Resolve each civil boundary independently, including across offset changes.
     fn selection_of(&self, scope: &LogScope) -> Result<Selection, CoreError> {
-        let today = self.deps.clock.now().0.div_euclid(DAY_MS);
+        let local = self.local_time();
+        let today = local.day(self.deps.clock.now().0);
         let period = |first: i64, last: i64, name: String| Selection {
             target: HistoryTarget::All,
-            from: Some(first * DAY_MS),
-            to: Some((last + 1) * DAY_MS - 1),
+            from: Some(local.start(first)),
+            to: Some(local.start(last + 1) - 1),
             name,
         };
         Ok(match scope {
@@ -735,22 +718,17 @@ impl Core {
 }
 
 /// One plain-language line per change, oldest first.
-fn markdown_of(scope: &str, rows: &[ChangeRow]) -> String {
+fn markdown_of(scope: &str, rows: &[ChangeRow], local: LocalTime) -> String {
     let mut out = format!("# Noter history: {scope}\n\n");
     for r in rows {
-        let ms = r.at.0;
-        let (h, m) = (
-            ms.rem_euclid(DAY_MS) / 3_600_000,
-            ms.rem_euclid(3_600_000) / 60_000,
-        );
         let who = match &r.actor {
             Actor::You => "You".to_string(),
             Actor::Job { name, .. } => format!("Job {name}"),
             Actor::Model { model, .. } => format!("Model {model}"),
         };
         out.push_str(&format!(
-            "- {} {h:02}:{m:02} · {who} · {}: {}",
-            date_of(ms),
+            "- {} · {who} · {}: {}",
+            local.date_time(r.at.0),
             r.summary,
             r.entity.label
         ));

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ItemView, OutputSection, SectionKind } from "../../core/bindings";
-import { currentItems, mergeSection, metaLine, orderSections, sectionCounts, summaryReadyNow, versionLabel } from "./outputs-logic";
+import type { ItemView, OutputSection, OutputsProgress, SectionKind } from "../../core/bindings";
+import { currentItems, mergeSection, metaLine, orderSections, sectionCounts, settledSince, summaryReadyNow, versionLabel } from "./outputs-logic";
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
@@ -73,6 +73,17 @@ describe("metaLine and versionLabel", () => {
 });
 
 describe("summaryReadyNow", () => {
+  it("cpt-noter-seq-notifications-open-outputs — sees a new completion even when the latest outputs_get already says ready", () => {
+    const outputs = { call_id: "past", sections: [sec("summary"), sec("decisions"), sec("open_questions")] };
+    const ready: OutputsProgress = { call_id: "past", section: "summary", state: { type: "ready" }, status: "ready" };
+    const current = {
+      "past/summary": ready,
+      "past/decisions": { ...ready, section: "decisions", state: { type: "writing" } },
+      "other/open_questions": { ...ready, call_id: "other", section: "open_questions" },
+    } satisfies Record<string, OutputsProgress>;
+    expect(settledSince(outputs, {}, current)).toBe("summary:ready");
+    expect(settledSince(outputs, current, { ...current })).toBe("");
+  });
   it("is true only when the Summary section itself settled as ready", () => {
     expect(summaryReadyNow("summary:ready")).toBe(true);
     expect(summaryReadyNow("decisions:ready,summary:ready")).toBe(true);

@@ -41,6 +41,10 @@ pub trait NativeServices: Send + Sync {
         let _ = at;
         None
     }
+    /// The host's named time zone for the WebView's calendar and clock formatters.
+    fn time_zone(&self) -> String {
+        "UTC".into()
+    }
     /// The Mac's local offset from UTC at `at`, in minutes (the menu shows local times).
     fn utc_offset_minutes(&self, at: TimestampMs) -> i32 {
         let _ = at;
@@ -356,6 +360,16 @@ impl Core {
         self.start_playback();
         self.start_transcript();
         self.start_jobs();
+        if let Some(runtime) = self.runtime.get() {
+            let core = self.clone();
+            runtime.spawn_blocking(move || {
+                if let Err(e) = core.backfill_call_types() {
+                    core.log(crate::object(serde_json::json!({
+                        "level": "error", "module": "call_type", "code": e.code
+                    })));
+                }
+            });
+        }
         // Recovery finalizes older interrupted calls through the same scheduler and transcript
         // path as a normal stop, so it must run after both services are ready.
         if let Err(e) = self.find_interrupted() {

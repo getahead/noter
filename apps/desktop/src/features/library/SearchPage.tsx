@@ -6,7 +6,7 @@ import { useBridge } from "../../app/bridge/context";
 import { useIdentityRevision, useWindow } from "../../app/use-window";
 import { useAnnounce, type AnnounceEvent } from "../../app/a11y/announce";
 import type { Bridge } from "../../app/bridge/bridge";
-import type { CallFilter, Lang, PlaybackState, SearchResults } from "../../core/bindings";
+import type { CallFilter, Lang, PlaybackState, SearchResults, UiPrefs } from "../../core/bindings";
 import { t } from "../../i18n/format";
 import { EmptyState } from "../../ui/feedback/empty-state";
 import { InlineBanner } from "../../ui/feedback/inline-banner";
@@ -73,10 +73,11 @@ export interface SearchViewProps {
   bar?: ReactNode;
   /** The window's playback state, for each row's Play / Pause. */
   playback?: PlaybackState | null;
+  prefs?: UiPrefs;
 }
 
 /** The results page for one read: loading, failed, no matches, only weak matches or ranked sections. */
-export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback }: SearchViewProps) {
+export function SearchView({ bridge, read, query, filter, open, onMore, onRetry, onClear, onAllLanguages, onAsk, bar, playback, prefs }: SearchViewProps) {
   const [how, setHow] = useState(false);
   const howAt = useRef<HTMLElement | null>(null);
   const announce = useAnnounce(bridge);
@@ -143,7 +144,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
             {groupByCall(s.strong, 3).map((g) => (
               <ul key={g.callId} className="lb-items">
                 {(open.has(`${s.key}:${g.callId}`) ? [...g.shown, ...g.hidden] : g.shown).map((h, i) => (
-                  <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
+                  <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} prefs={prefs} />
                 ))}
                 {g.hidden.length > 0 && !open.has(`${s.key}:${g.callId}`) && (
                   <li><button type="button" className="lb-fbtn" onClick={() => onMore(`${s.key}:${g.callId}`)}>{t("search.more_in_call", { count: g.hidden.length })}</button></li>
@@ -155,7 +156,7 @@ export function SearchView({ bridge, read, query, filter, open, onMore, onRetry,
                 {status !== "WEAK_ONLY" && <h4 className="lb-thmonth__h">{t("search.weaker")}</h4>}
                 <ul className="lb-items">
                   {s.weak.map((h, i) => (
-                    <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} />
+                    <SearchResultRow key={i} bridge={bridge} hit={h} playback={playback} prefs={prefs} />
                   ))}
                 </ul>
               </>
@@ -212,6 +213,7 @@ export function SearchPage({ query }: { query: string }) {
   const filter = fstate.filter;
   const identity = useIdentityRevision(bridge);
   const lists = useLists(bridge, identity);
+  const prefs = useWindow(bridge, (s) => s.app?.prefs);
   const playback = useWindow(bridge, (s) => s.whole.playback);
   // the bar changes the held filter; a changed filter reads the search again
   const onFilter = (a: FilterAction) => {
@@ -246,7 +248,8 @@ export function SearchPage({ query }: { query: string }) {
       onMore={(g) => setOpen(new Set(open).add(g))}
       onRetry={() => setAgain((n) => n + 1)}
       playback={playback}
-      bar={<><ModelDownloadNotice bridge={bridge} model="bge-m3" /><FilterBar state={fstate} lists={lists} onAction={onFilter} /></>}
+      prefs={prefs}
+      bar={<><ModelDownloadNotice bridge={bridge} model="bge-m3" /><FilterBar prefs={prefs} state={fstate} lists={lists} onAction={onFilter} /></>}
       onClear={() => onFilter({ type: "clear" })}
       onAllLanguages={() => {
         // one state from every toggle: separate actions would each start from the same stale state

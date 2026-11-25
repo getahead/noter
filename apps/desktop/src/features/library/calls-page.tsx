@@ -302,7 +302,7 @@ export function CallsPage() {
 
   return (
     <CallsView
-      bar={<FilterBar state={fstate} lists={lists} onAction={onFilter} />}
+      bar={<FilterBar prefs={prefs} state={fstate} lists={lists} onAction={onFilter} />}
       actions={
         <>
           {exported && <span role="status">{t("export.done", { path: exported })}</span>}

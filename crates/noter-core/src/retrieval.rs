@@ -173,7 +173,7 @@ impl Core {
         args: SearchArgs,
     ) -> Result<SearchResults, CoreError> {
         self.ready()?;
-        let request = noter_retrieval::search_request(&args)?;
+        let request = noter_retrieval::search_request(&args, |day| self.local_time().start(day))?;
         let (vector, mode) = self.query_vector(request.text()).await;
         let request = request.with_vector(vector);
         let mut results = self
@@ -210,10 +210,17 @@ impl Core {
     /// `ask_scope_presets`: readable scopes from the current library.
     pub(crate) fn scope_presets(&self) -> Result<ScopePresetList, CoreError> {
         self.ready()?;
-        let now = self.deps.clock.now();
+        let local = self.local_time();
+        let since = local.start(local.day(self.deps.clock.now().0) - 30);
         let types = self.call_types_now().call_types;
-        self.store()
-            .read(|c| noter_retrieval::scope_presets(c, now, &types))
+        self.store().read(|c| {
+            noter_retrieval::scope_presets(
+                c,
+                TimestampMs(since),
+                LocalDate(local.date(since)),
+                &types,
+            )
+        })
     }
 }
 

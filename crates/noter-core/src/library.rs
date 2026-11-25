@@ -47,7 +47,6 @@ const UNCLASSIFIED: &str = "unclassified";
 
 const DEFAULT_PAGE: u32 = 100;
 const MAX_PAGE: u32 = 500;
-const DAY_MS: i64 = 86_400_000;
 
 /// Call folders whose files could not be removed after their rows went; retried at the next start.
 const PENDING_FILE: &str = "audio/.pending-delete";
@@ -181,12 +180,10 @@ fn assemble(
 
 fn details_of(c: &Connection, call_id: &str) -> noter_db::rusqlite::Result<RowDetails> {
     // @cpt-begin:cpt-noter-algo-core-library-calls-row:p1:inst-row-derive
-    let mut languages = c.prepare(
-        "SELECT lang FROM segments WHERE call_id = ?1 AND lang IS NOT NULL
-         GROUP BY lang ORDER BY min(t0_ms), lang",
-    )?;
-    let languages = languages
-        .query_map([call_id], |r| r.get::<_, String>(0).map(lang_of))?
+    let query = noter_retrieval::spoken_languages_sql("s.call_id = ?1");
+    let languages = c
+        .prepare(&format!("{query} ORDER BY first_at, lang"))?
+        .query_map([call_id], |r| r.get::<_, String>(1).map(lang_of))?
         .collect::<Result<Vec<_>, _>>()?;
     let unnamed_speakers: u32 = c.query_row(
         &format!(
@@ -305,10 +302,8 @@ fn details_for_calls(
 
     for ids in call_ids.chunks(BATCH) {
         let marks = crate::util::marks(ids.len());
-        let query = format!(
-            "SELECT call_id, lang FROM segments WHERE call_id IN ({marks}) AND lang IS NOT NULL
-             GROUP BY call_id, lang ORDER BY call_id, min(t0_ms), lang"
-        );
+        let languages = noter_retrieval::spoken_languages_sql(&format!("s.call_id IN ({marks})"));
+        let query = format!("{languages} ORDER BY call_id, first_at, lang");
         for row in c
             .prepare(&query)?
             .query_map(params_from_iter(ids.iter()), |r| {
@@ -536,9 +531,7 @@ impl Core {
         }
         if !f.languages.is_empty() {
             let marks = w.bind_all(f.languages.iter().map(lang_code));
-            clauses.push(format!(
-                "EXISTS (SELECT 1 FROM segments s WHERE s.call_id = c.id AND s.lang IN ({marks}))"
-            ));
+            clauses.push(noter_retrieval::spoken_language_filter(&marks));
         }
         if !f.tags.is_empty() {
             let marks = w.bind_all(f.tags.iter().map(|t| t.to_lowercase()));
@@ -552,7 +545,7 @@ impl Core {
                 "EXISTS (SELECT 1 FROM speakers p WHERE p.call_id = c.id AND p.person_id IN ({marks}))"
             ));
         }
-        // shortcut: a day is a UTC day; use the user's time zone when settings carry one.
+        // The two local midnight boundaries can have different UTC offsets.
         let day = |d: &Option<LocalDate>, field: &str| match d {
             None => Ok(None),
             Some(d) => day_number(d)
@@ -564,11 +557,11 @@ impl Core {
             return Err(invalid("filter.to", ValidationRule::OutOfRange));
         }
         if let Some(from) = from {
-            let mark = w.bind(from * DAY_MS);
+            let mark = w.bind(self.local_time().start(from));
             clauses.push(format!("c.started_at >= {mark}"));
         }
         if let Some(to) = to {
-            let mark = w.bind((to + 1) * DAY_MS);
+            let mark = w.bind(self.local_time().start(to + 1));
             clauses.push(format!("c.started_at < {mark}"));
         }
         if let Some(open) = f.has_open_items {

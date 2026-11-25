@@ -141,6 +141,7 @@ Outputs must arrive after back-to-back calls while capture and live ASR keep pri
 4. [x] - `p1` - **IF** PostCall belongs to the currently resumed call, cancel its obsolete generation instead of admitting it - `inst-admit-same-call`
 5. [x] - `p1` - Order eligible jobs by configured priority with capture and live ASR ahead of all pipeline work - `inst-admit-priority`
 6. [x] - `p1` - **RETURN** runnable jobs and guards; do not hold the SQLite writer while models or native services run - `inst-admit-return`
+7. [x] - `p1` - Identify a call's queued regeneration held for power. On an explicit release of that run, allow it to run on battery while retaining the capture and job definition guards - `inst-regen-power`
 
 ### Commit bounded job batches
 

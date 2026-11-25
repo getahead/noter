@@ -79,7 +79,8 @@ impl Core {
                 }
                 owners_in(&mut clause, &mut args, &a.people);
                 read(&|c| {
-                    let items = items_of(c, &clause, args.clone(), t.cloud, None)?;
+                    let items =
+                        items_of(self.local_time(), c, &clause, args.clone(), t.cloud, None)?;
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
@@ -93,13 +94,20 @@ impl Core {
                     args.push(Sql::Text(topic.as_str().into()));
                 }
                 if let Some(since) = &a.since {
-                    crate::library::day_number(since).ok_or(PARAMS)?;
-                    clause.push_str(" AND date(c.started_at / 1000, 'unixepoch') >= ?");
-                    args.push(Sql::Text(since.0.clone()));
+                    let since = crate::library::day_number(since).ok_or(PARAMS)?;
+                    clause.push_str(" AND c.started_at >= ?");
+                    args.push(Sql::Integer(self.local_time().start(since)));
                 }
                 owners_in(&mut clause, &mut args, &a.people);
                 read(&|c| {
-                    let items = items_of(c, &clause, args.clone(), t.cloud, a.query.as_deref())?;
+                    let items = items_of(
+                        self.local_time(),
+                        c,
+                        &clause,
+                        args.clone(),
+                        t.cloud,
+                        a.query.as_deref(),
+                    )?;
                     Ok(Ok(to_json(&ItemsOutput { items })))
                 })
             }
@@ -109,7 +117,7 @@ impl Core {
                 {
                     return Err(PARAMS);
                 }
-                read(&|c| person_of(c, &a, t.cloud))
+                read(&|c| person_of(self.local_time(), c, &a, t.cloud))
             }
             _ => Err(FORBIDDEN),
         }
@@ -129,6 +137,7 @@ fn owners_in(clause: &mut String, args: &mut Vec<Sql>, people: &[PersonId]) {
 /// The newest matching items of `clause` (over `i` and `c`), without a cloud run's sensitive
 /// calls, with the segments their spans cover as evidence.
 fn items_of(
+    local: crate::local_time::LocalTime,
     c: &Connection,
     clause: &str,
     args: Vec<Sql>,
@@ -167,7 +176,7 @@ fn items_of(
             due: v.due,
             status: word_of(&v.status),
             call_id: v.call.id,
-            call_date: LocalDate(crate::history::date_of(v.call.started_at.0)),
+            call_date: LocalDate(local.date(v.call.started_at.0)),
             evidence_segment_ids: evidence,
         };
         items.push(item);
@@ -179,6 +188,7 @@ fn items_of(
 /// folded). A cloud run only finds people who took part in a call it may read, and sees only
 /// those calls.
 fn person_of(
+    local: crate::local_time::LocalTime,
     c: &Connection,
     a: &GetPersonInput,
     cloud: bool,
@@ -232,6 +242,7 @@ fn person_of(
             .collect::<Result<_, _>>()?
     };
     let open_items = items_of(
+        local,
         c,
         &format!("i.owner_person_id = ? AND {OPEN}"),
         vec![Sql::Text(id.clone())],

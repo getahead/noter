@@ -1,3 +1,4 @@
+import { dayOf } from "../../../i18n/format";
 import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
 import * as shared from "./shared";
@@ -97,7 +98,7 @@ export function historyHandlers(fake: Core.FakeCore): Core.Handlers {
     return { path: `~/Downloads/Noter log ${s.type}.${a.format === "json" ? "json" : "md"}`, files: 1 };
   },
   activity_get: (a, { world }) => ({
-    day: a.day ?? new Date(world.now).toISOString().slice(0, 10),
+    day: a.day ?? dayOf(world.now, world.app.prefs),
     needs_attention: world.jobs.jobs.flatMap((j) => (j.last_run?.status === "failed" ? [j.last_run] : [])),
     proposals: world.proposals,
     groups: [{ run: null, changes: world.changes.filter((c) => a.actor === "all" || (a.actor === "you") === (c.actor.type === "you")), total: world.changes.length }],

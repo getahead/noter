@@ -63,6 +63,7 @@ impl Core {
             .collect();
         let writing = sections.iter().any(|s| s.state == SectionState::Writing);
         Ok(CallOutputs {
+            waiting_for_power: self.jobs.waiting_for_power(call)?,
             call_id: call.clone(),
             status: if writing {
                 OutputsStatus::Writing
@@ -242,7 +243,7 @@ impl Core {
 
     /// `outputs_regenerate`: queues a Regeneration run of the call with the requested sections
     /// (none means all), runtime, model, skill and local rewrite.
-    pub(crate) fn queue_regeneration(
+    pub(crate) async fn queue_regeneration(
         &self,
         args: &RegenerateArgs,
     ) -> Result<JobAccepted, CoreError> {
@@ -267,12 +268,30 @@ impl Core {
         if self.capture_guard.borrow().live {
             return Err(blocked());
         }
+        if crate::accounts::no_assistant(&self.refresh_accounts().await) {
+            self.log(object(json!({ "level": "warn", "module": "postcall", "command": "outputs_regenerate", "code": ErrorCode::RuntimeUnavailable })));
+            return Err(CoreError::new(
+                ErrorCode::RuntimeUnavailable,
+                "no assistant is set up",
+            ));
+        }
+        if self.capture_guard.borrow().live {
+            return Err(blocked());
+        }
+        if let Some(run) = &args.run_now_on_battery {
+            self.in_runtime(|| self.jobs.run_regeneration_on_battery(&args.call_id, run))?;
+            return Ok(JobAccepted {
+                job_run_id: run.clone(),
+            });
+        }
         let req = Request::for_call(JobKind::Regeneration, Trigger::OnDemand, &args.call_id);
         self.postcall.request(args);
         let run = self.in_runtime(|| self.jobs.trigger(req))?;
-        Ok(JobAccepted {
-            job_run_id: run.ok_or_else(blocked)?,
-        })
+        let job_run_id = run.ok_or_else(blocked)?;
+        if matches!(self.jobs.waiting_for_power(&args.call_id), Ok(Some(id)) if id == job_run_id) {
+            self.log(object(json!({ "level": "info", "module": "postcall", "command": "outputs_regenerate", "code": "waiting_for_power", "id": job_run_id })));
+        }
+        Ok(JobAccepted { job_run_id })
         // @cpt-end:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-request
     }
 
