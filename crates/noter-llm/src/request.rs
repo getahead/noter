@@ -98,6 +98,8 @@ pub enum TaskKind {
 pub struct TaskSettings {
     /// The runtime chosen for the task in Settings, if any.
     pub configured: Option<RuntimeChoice>,
+    /// An explicit local-only request must never use a cloud fallback.
+    pub local_only: bool,
     pub model: Option<String>,
     pub effort: Effort,
     /// Tool names the router has admitted for this request.
@@ -110,6 +112,7 @@ impl Default for TaskSettings {
     fn default() -> Self {
         Self {
             configured: None,
+            local_only: false,
             model: None,
             effort: Effort::Medium,
             tools: Vec::new(),

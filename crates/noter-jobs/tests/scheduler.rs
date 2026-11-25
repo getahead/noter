@@ -593,6 +593,36 @@ async fn a_run_cancels_from_queued_running_and_paused() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_prefers_active_work_then_the_last_completion() {
+    let r = rig().await;
+    let call = CallId::new("call_1");
+    let processing = || r.sched.output_run(&call).unwrap().unwrap();
+    let post = r.go(r.post_call(call.as_str()));
+    let regen = r.go(Request::for_call(
+        JobKind::Regeneration,
+        Trigger::OnDemand,
+        &call,
+    ));
+    settle().await;
+    assert_eq!(processing().id, regen);
+
+    r.step(
+        JobKind::Regeneration,
+        Step::Fail(ErrorCode::RuntimeUnavailable),
+    );
+    settle().await;
+    assert_eq!(processing().id, post);
+
+    r.clock.0.store(2_000, Ordering::SeqCst);
+    r.step(JobKind::PostCall, Step::Done);
+    settle().await;
+    r.go(r.post_call("another_call"));
+    let finished = processing();
+    assert_eq!(finished.status, JobRunStatus::Succeeded);
+    assert_eq!(finished.id, post);
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_failure_records_its_typed_error_and_keeps_earlier_batches() {
     let r = rig().await;
     let id = r.go(r.post_call("call_1"));
@@ -712,6 +742,44 @@ async fn a_failed_batch_rolls_back_and_progress_stays_truthful() {
             .map(|e| e.status)
             .collect::<Vec<_>>(),
         [JobRunStatus::Failed]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_legacy_regeneration_never_runs_on_restart() {
+    let r = rig().await;
+    r.power.0.store(true, Ordering::SeqCst);
+    let call = CallId::new("call_legacy");
+    let run = r.go(Request::for_call(
+        JobKind::Regeneration,
+        Trigger::OnDemand,
+        &call,
+    ));
+    let db = noter_db::rusqlite::Connection::open(r.dir.path().join("noter.db")).unwrap();
+    db.execute(
+        "UPDATE job_runs SET regeneration_request = NULL WHERE id = ?1",
+        [run.as_str()],
+    )
+    .unwrap();
+    drop(db);
+    let restored = rig_on(r.dir, r.store, 9_000);
+    restored.sched.start().unwrap();
+    settle().await;
+    let row = restored.run(&run);
+    assert_eq!(
+        (row.status, row.error),
+        (JobRunStatus::Failed, Some(ErrorCode::InvalidInput))
+    );
+    assert!(restored.sched.waiting_for_power(&call).unwrap().is_none());
+    assert_eq!(
+        restored
+            .sched
+            .runs()
+            .unwrap()
+            .iter()
+            .filter(|r| r.kind == JobKind::Regeneration)
+            .count(),
+        1
     );
 }
 

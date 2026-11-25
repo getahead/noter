@@ -914,6 +914,7 @@ mod tests {
 
     fn outputs(sections: Vec<OutputSection>) -> CallOutputs {
         CallOutputs {
+            processing_run: None,
             waiting_for_power: None,
             call_id: CallId::new("call_1"),
             status: OutputsStatus::Ready,
