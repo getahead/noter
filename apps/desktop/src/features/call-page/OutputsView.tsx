@@ -13,7 +13,7 @@ import { extrasOf } from "./cache";
 import { OutputSection } from "./OutputSection";
 import { announceSummaryOnce, loadOutputs, outputsKey, outputsRegenerateKey, regenerate } from "./outputs-actions";
 import { useOutputs } from "./outputs-cache";
-import { isWriting, mergeSection, orderSections } from "./outputs-logic";
+import { isWriting, mergeSection, orderSections, settledSince } from "./outputs-logic";
 import { RegenerationError, useRegenerate } from "./RegenerateSheet";
 
 // @cpt-flow:cpt-noter-flow-ui-call-page-outputs-read-edit:p1
@@ -43,19 +43,18 @@ export function OutputsView({ bridge, callId }: { bridge: Bridge; callId: string
     asked.current = callId;
     void loadOutputs(bridge, callId);
   }, [bridge, callId]);
-  // a section that finished (or failed) since the last read: its text comes from the core, not from the event
-  const settled = (outputs?.sections ?? []).flatMap((s) => {
-    const p = progress[`${callId}/${s.kind}`]?.state.type;
-    return p && p !== s.state.type && p !== "pending" && p !== "writing" ? [`${s.kind}:${p}`] : [];
-  }).join();
-  const lastSettled = useRef("");
+  // A fast outputs_get may already show the new state when React renders the completion event.
+  // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+  const previousProgress = useRef(progress);
   useEffect(() => {
-    if (!settled) return void (lastSettled.current = "");
-    if (lastSettled.current === settled) return;
-    lastSettled.current = settled;
+    if (!outputs || progress === previousProgress.current) return;
+    const settled = settledSince(outputs, previousProgress.current, progress);
+    previousProgress.current = progress;
+    if (!settled) return;
     void loadOutputs(bridge, callId);
     announceSummaryOnce(announce, callId, settled);
-  }, [announce, bridge, callId, settled]);
+  }, [announce, bridge, callId, outputs, progress]);
+  // @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
 
   if (!call || !prefs) return null;
   // naming does not wait for the outputs: a call whose outputs cannot be read still names its speakers

@@ -93,5 +93,18 @@ export function versionLabel(v: VersionMeta, prefs: UiPrefs): string {
 /** Whether the outputs still wait for the model: the banner, and the sections that say so. */
 export const isWriting = (o: Pick<CallOutputs, "status"> | undefined): boolean => o?.status === "writing";
 
-/** Whether `settled` (the view's "kind:state" list of sections that finished since the last read) says the Summary is ready. */
+/** The displayed call's sections that received a new completion or failure event. */
+// @cpt-begin:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+export function settledSince(outputs: Pick<CallOutputs, "call_id" | "sections">, previous: Record<string, OutputsProgress>, current: Record<string, OutputsProgress>): string {
+  return outputs.sections.flatMap(({ kind }) => {
+    const key = `${outputs.call_id}/${kind}`;
+    const event = current[key];
+    if (!event || event === previous[key]) return [];
+    const state = event.state.type;
+    return state === "pending" || state === "writing" ? [] : [`${kind}:${state}`];
+  }).join();
+}
+// @cpt-end:cpt-noter-flow-ui-call-page-outputs-notification:p1:inst-visible
+
+/** Whether the view's newly settled sections include a ready Summary. */
 export const summaryReadyNow = (settled: string): boolean => settled.split(",").includes("summary:ready");
