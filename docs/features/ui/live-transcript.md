@@ -45,7 +45,7 @@ milestone: M1
 
 ### 1.1 Overview
 
-The transcript view renders a call's segments as a log: confirmed rows in time order that never move, one hypothesis row last, gap rows for time lost, mark rows for marked moments. It follows live speech while the user is at the end, stops following when the user scrolls up and offers **Jump to Live · 12 new lines**, and stays fast for a three-hour call by drawing only the rows on screen. The floating panel's tail maps only the rows it displays. Each row carries speaker, time and language; its play control replays the line where that is safe. The same components draw the live log in the call screen, the tail in the floating panel and the stored transcript on a call's page.
+The transcript view renders a call's segments as a log: confirmed rows in time order that never move, one hypothesis row last, gap rows for time lost, mark rows for marked moments. It follows live speech while the user is at the end, stops following when the user scrolls up and offers **Jump to Live · 12 new lines**, and stays fast for a three-hour call by drawing only the rows on screen. With the copilot off, the expanded floating panel uses the same live log with compact wrapping rows. With the copilot on, its transcript tail maps only the rows it displays. Each row carries speaker, time and language; its play control replays the line where that is safe. The same components draw the live log in either layout, the compact tail beside copilot cards and the stored transcript on a call's page.
 
 ### 1.2 Purpose
 
@@ -123,7 +123,7 @@ Success criteria: a 90-minute recorded stream replayed into the view adds no lag
 4. [x] - `p1` - Algorithm: decide the play control with `cpt-noter-algo-ui-live-transcript-play-control` - `inst-play-control`
 5. [x] - `p1` - **IF** the control is enabled and the user clicks it or presses Space - `inst-if-play`
    1. [x] - `p1` - API: `audio_play` (call id, span); the core plays it natively (no media in the WebView) - `inst-api-play`
-   2. [x] - `p1` - UI: the playback bar opens (CS-R2b, 40 pt; in the floating panel it takes the tail's place) with the live-headphones line; it follows `playback:state` - `inst-bar`
+   2. [x] - `p1` - UI: the playback bar opens (CS-R2b, 40 pt; in the floating panel it takes the transcript's place) with the live-headphones line; it follows `playback:state` - `inst-bar`
    3. [x] - `p1` - **IF** the result is `replay_needs_headphones`, `output_route_unknown` or `own_sounds_not_excluded`: the control shows its disabled reason as an inline status - `inst-play-refused`
 6. [x] - `p1` - **IF** the core reports the route switched to speakers while playing - `inst-if-route`
    1. [x] - `p1` - UI: the bar shows **Replay stopped: output switched to speakers** for 3 s, then closes; the controls return to disabled - `inst-route-stop`

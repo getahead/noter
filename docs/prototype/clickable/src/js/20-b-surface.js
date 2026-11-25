@@ -96,12 +96,13 @@
     return C.inlineBanner(Object.assign({ compact, region: compact ? 'FP-R3' : 'CS-R4d', dismissible: false }, map[b]));
   };
 
+  const liveTranscript = (l) => C.transcriptView({ variant: 'live', key: 'cw-live', callId: state.rec.callId, segments: segments(), waiting: l.newCall || l.waiting, detached: l.detached, newLines: l.newLines, route: l.route, playingAt: l.playback && l.playback.t });
+
   /* ---------------- dedicated layout: Call screen ---------------- */
   const callScreen = () => {
     const l = L();
     const off = l.copilot === 'off';
     const single = l.copilot === 'single';
-    const segs = segments();
     const paused = state.rec.status === 'paused';
     const recStatus = l.closing ? 'stopped' : NP.liveStatus();
     const langs = l.newCall ? ['EN'] : ['EN', 'RU', 'DE'];
@@ -123,7 +124,7 @@
     const transcript = html`<div class="cs-left">
       ${header}
       ${transcriptBanner(false) ? region('CS-R3', { cls: 'cs-r3' }, transcriptBanner(false)) : ''}
-      ${region('CS-R2', { cls: 'cs-r2', label: 'Transcript' }, C.transcriptView({ variant: 'live', key: 'cw-live', callId: state.rec.callId, segments: segs, waiting: l.newCall || l.waiting, detached: l.detached, newLines: l.newLines, route: l.route, playingAt: l.playback && l.playback.t }))}
+      ${region('CS-R2', { cls: 'cs-r2', label: 'Transcript' }, liveTranscript(l))}
       ${l.playback ? region('CS-R2b', { cls: 'cs-r2b' }, C.playbackBar({ variant: 'live-headphones', at: l.playback.t, speaker: l.playback.speaker, key: 'cw', stopped: l.playback.stopped })) : ''}
     </div>`;
     const right = off ? '' : html`<div class="cs-right">
@@ -171,7 +172,7 @@
       ${l.askOpen ? html`<div class="fp-ask">${P.textField({ id: 'cw-ask', placeholder: 'Ask about this call…', bind: 'local.cw.askText', value: l.askText, enter: 'cw.askSend', ariaLabel: 'Ask about this call' })}</div>` : ''}
       ${C.copilotCardStack({ variant: single ? 'single-agent' : 'compact', cards: l.muted ? [] : l.cards, held: l.held.length, maxVisible: maxCards, showAll: l.showAllCards, single, muted: l.muted })}`);
     const tailRegion = tail ? region('FP-R5', { cls: 'fp-r5' }, l.playback ? C.playbackBar({ variant: 'live-headphones', at: l.playback.t, speaker: l.playback.speaker, key: 'cw' }) : C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 3 })) : '';
-    const offBody = off ? region('FP-R5', { cls: 'fp-r5 fp-r5--full' }, C.transcriptView({ variant: 'tail', key: 'cw-tail', segments: segments(), tailLines: 8 })) : '';
+    const offBody = off ? region('FP-R5', { cls: 'fp-r5 fp-r5--full' }, l.playback ? C.playbackBar({ variant: 'live-headphones', at: l.playback.t, speaker: l.playback.speaker, key: 'cw', stopped: l.playback.stopped }) : liveTranscript(l)) : '';
     return comp('cpt-noter-component-screen-floating-panel', { cls: 'fp', state: l.engineStopped ? 'engine-stopped' : paused ? 'paused' : l.notice ? 'notice' : 'recording', variant: off ? 'copilot-off' : single ? 'single-agent' : 'council', attrs: { style: `height:${h}px` } },
       html`${header}${notice}${modeLine}${banners ? html`<div class="fp-r3" data-region="FP-R3">${banners}</div>` : ''}${cards}${tailRegion}${offBody}
       ${region('FP-R6', { cls: 'fp-r6', tag: 'footer' }, C.callStatusStrip({ variant: off ? 'copilot-off' : 'compact' }))}`);
