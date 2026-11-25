@@ -1043,9 +1043,9 @@
       },
       {
         "builtin": true,
-        "id": "retro",
-        "label": "Retro",
-        "skill_path": "skills/retro/SKILL.md"
+        "id": "presentation_demo",
+        "label": "Presentation/Demo",
+        "skill_path": "skills/presentation_demo/SKILL.md"
       },
       {
         "builtin": true,

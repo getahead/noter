@@ -92,7 +92,7 @@ pub enum SuggestedCallType {
     OneOnOne,
     Standup,
     Planning,
-    Retro,
+    PresentationDemo,
     CrossTeam,
     Vendor,
     Interview,
@@ -114,7 +114,8 @@ pub struct PostCallOutput {
     pub open_questions: Vec<ExtractedItem>,
     pub risks: Vec<ExtractedItem>,
     pub per_participant: Vec<ParticipantNotes>,
-    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.
+    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+    /// presentation/demo: what was shown, questions asked, feedback and follow-ups.
     pub extras_md: Option<String>,
 }
 

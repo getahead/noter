@@ -5778,7 +5778,7 @@ The output item row shows a decision, an open question, a risk or a call-type ex
 | Decision | PC-R3, TH-R3 | Decision glyph and quote |
 | Open question | PC-R3, TD-R3 | Carried to the next call with the same people |
 | Risk or disagreement | PC-R3 | **Resolved** or **Unresolved** status tag |
-| Blocker and other call-type extras | PC-R3 | Standup blockers, Jira-ready items, scorecard lines, incident timeline entries |
+| Blocker and other call-type extras | PC-R3 | Standup blockers, Jira-ready items, scorecard lines, incident timeline entries, presentation/demo follow-ups |
 | Full, compact, read-only | As for action item rows | Full rows carry the review actions and the info button; compact and read-only rows are one line with the glyph, text, relation, evidence, **Suggested** tag and topic chip (no topic chip in read-only) |
 
 **States.** Open; suggested; accepted (**Accepted** for 4 s); rejected (**Rejected · Undo** for 10 s, then into **Rejected (n)**); answered; carried; edited; hover, focus, selected, pressed. Editing happens in the Item inspector. Disabled, loading and error follow the section.

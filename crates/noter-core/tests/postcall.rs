@@ -1179,7 +1179,7 @@ async fn cpt_noter_seq_call_page_review_outputs_names_only_automatically_untitle
 async fn cpt_noter_seq_core_call_end_outputs_model_types_only_unclassified_calls_never_user_set() {
     let script = |kind: Value| {
         json!({"on": "post-call", "after_ms": 1000, "output": {
-            "call_type": kind, "lang": "en", "summary_md": "What went well and what to change.",
+            "call_type": kind, "lang": "en", "summary_md": "What the demo showed and the feedback.",
             "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": []
         }})
         .to_string()
@@ -1200,9 +1200,9 @@ async fn cpt_noter_seq_core_call_end_outputs_model_types_only_unclassified_calls
     };
     // (suggestion, the user picked a type and undid it) -> the type after a run and a retry.
     for (kind, user_undid, want) in [
-        (json!("retro"), false, "retro"),
+        (json!("presentation_demo"), false, "presentation_demo"),
         (json!(null), false, "unclassified"),
-        (json!("retro"), true, "unclassified"),
+        (json!("presentation_demo"), true, "unclassified"),
     ] {
         let (core, _, dir) = open(&script(kind)).await;
         seed_call(&core, CALL, 2);
@@ -1232,7 +1232,7 @@ async fn cpt_noter_seq_core_call_end_outputs_model_types_only_unclassified_calls
                 .unwrap()
         };
         assert_eq!(kind(), want);
-        if want == "retro" {
+        if want == "presentation_demo" {
             // Automatic, undoable History entry; the undone suggestion is not reapplied on retry.
             let change: String = db
                 .query_row(

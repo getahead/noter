@@ -1930,7 +1930,7 @@ pub fn world() -> FakeWorld {
                 ("one_on_one", "1:1"),
                 ("standup", "Standup"),
                 ("planning", "Planning"),
-                ("retro", "Retro"),
+                ("presentation_demo", "Presentation/Demo"),
                 ("cross_team", "Cross-team"),
                 ("vendor", "Vendor"),
                 ("interview", "Interview"),

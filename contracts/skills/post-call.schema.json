@@ -144,7 +144,7 @@
         "one_on_one",
         "standup",
         "planning",
-        "retro",
+        "presentation_demo",
         "cross_team",
         "vendor",
         "interview",
@@ -180,7 +180,7 @@
       "type": "array"
     },
     "extras_md": {
-      "description": "Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.",
+      "description": "Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,\npresentation/demo: what was shown, questions asked, feedback and follow-ups.",
       "type": [
         "string",
         "null"

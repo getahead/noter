@@ -33,8 +33,14 @@ use crate::{lock, object, to_json, Core};
 const SKILL_VERSION: &str = "1.2.0";
 
 /// The call types whose skill writes extras (standup blockers, planning Jira-ready items,
-/// interview scorecard, incident timeline).
-const EXTRAS: [&str; 4] = ["standup", "planning", "interview", "incident"];
+/// interview scorecard, incident timeline, what a presentation or demo showed and its feedback).
+const EXTRAS: [&str; 5] = [
+    "standup",
+    "planning",
+    "interview",
+    "incident",
+    "presentation_demo",
+];
 
 /// The sections of a call of this type, in the order they are written. Role reviews come last
 /// and only for enabled agents (none before the agents table, M4).
