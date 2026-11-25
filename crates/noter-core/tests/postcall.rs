@@ -528,6 +528,46 @@ async fn written() -> (Arc<Core>, Arc<Events>, tempfile::TempDir, CallOutputs) {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_reads_the_summary_run_and_its_recorded_price() {
+    let (core, _, dir, out) = written().await;
+    let summary_id = out.sections[0].summary_id.clone().unwrap();
+    let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+    for (runtime, cost, expected) in [
+        ("claude_api_key", Some(0.31), Some(0.31)),
+        ("codex_api_key", None, None),
+        ("local", Some(0.31), None),
+    ] {
+        let changed = db
+            .execute(
+                "UPDATE llm_runs SET runtime_choice = ?1, cost_usd = ?2 WHERE id =
+             (SELECT llm_run_id FROM summary_versions WHERE summary_id = ?3 AND n = 1)",
+                noter_db::rusqlite::params![runtime, cost, summary_id.as_str()],
+            )
+            .unwrap();
+        assert_eq!(changed, 1);
+        let outputs = outputs(&core, CALL).await;
+        let run = outputs.processing_run.unwrap();
+        assert_eq!(run.kind, JobKind::PostCall);
+        assert_eq!(run.call_id, Some(CallId::new(CALL)));
+        assert_eq!(run.status, JobRunStatus::Succeeded);
+        assert_eq!(
+            outputs.sections[0].writer.as_ref().unwrap().cost_usd,
+            expected
+        );
+        let list = core
+            .output_versions(
+                &main_window(),
+                SummaryIdArgs {
+                    summary_id: summary_id.clone(),
+                },
+            )
+            .await
+            .unwrap();
+        assert_eq!(list.versions[0].writer.as_ref().unwrap().cost_usd, expected);
+    }
+}
+
+#[tokio::test(start_paused = true)]
 async fn item_sections_list_their_items_and_suggested_ones_wait_for_review() {
     let (core, _events, _dir, o) = written().await;
     let items = core
@@ -909,6 +949,10 @@ async fn check_local_regeneration_after_restart(local_available: bool) {
         .iter()
         .all(|r| String::from_utf8_lossy(&r.bytes).contains("one_on_one")));
     let out = outputs(&restored, CALL).await;
+    let latest = out.processing_run.as_ref().unwrap();
+    assert_eq!(latest.id, run);
+    assert_eq!(latest.status, JobRunStatus::Succeeded);
+    assert_eq!(latest.call_id, Some(CallId::new(CALL)));
     assert_eq!(
         out.sections
             .iter()

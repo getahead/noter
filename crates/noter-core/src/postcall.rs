@@ -206,6 +206,14 @@ fn writer_at(
         return Ok(None);
     };
     Ok(Some(WriterInfo {
+        cost_usd: if matches!(
+            runtime,
+            RuntimeChoice::ClaudeApiKey | RuntimeChoice::CodexApiKey
+        ) {
+            r.get(at + 6)?
+        } else {
+            None
+        },
         runtime,
         model: r.get(at + 1)?,
         skill: r.get(at + 2)?,
@@ -218,7 +226,7 @@ fn writer_at(
 const STORED: &str = "SELECT s.id, s.call_id, s.rev, s.kind, v.body_md, v.lang, v.from_pass,
         s.user_edited, s.regenerated_with_edits,
         (SELECT count(*) FROM summary_versions WHERE summary_id = s.id),
-        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass, s.names_updated
+        l.runtime_choice, l.model, c.call_type, g.skill_version, g.created_at, g.from_pass, l.cost_usd, s.names_updated
     FROM summaries s
     JOIN calls c ON c.id = s.call_id
     JOIN summary_versions v ON v.id = s.current_version_id
@@ -242,7 +250,7 @@ fn stored_row(r: &noter_db::rusqlite::Row) -> noter_db::rusqlite::Result<Option<
         regenerated_with_edits: r.get(8)?,
         versions: r.get(9)?,
         writer: writer_at(r, 10)?,
-        names_updated: r.get(16)?,
+        names_updated: r.get(17)?,
     }))
 }
 

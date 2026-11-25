@@ -2,7 +2,7 @@
 
 use noter_db::{ChangeMeta, Mutation, Store};
 use noter_protocol::model::{Actor, CountEntry, JobKind, JobRunRow};
-use noter_protocol::{CoreError, ErrorCode, JobId, JobRunId, TimestampMs};
+use noter_protocol::{CallId, CoreError, ErrorCode, JobId, JobRunId, TimestampMs};
 use serde_json::{json, Value};
 
 /// What starts a job (`jobs.trigger`).
@@ -168,29 +168,44 @@ pub(crate) fn regeneration_request(
     })
 }
 
-pub(crate) fn runs(store: &Store) -> Result<Vec<Stored>, CoreError> {
+pub(crate) fn output_call(kind: JobKind, subject: Option<&str>) -> Option<CallId> {
+    subject
+        .filter(|_| matches!(kind, JobKind::Regeneration | JobKind::PostCall))
+        .map(CallId::new)
+}
+
+pub(crate) fn runs(store: &Store, call: Option<&CallId>) -> Result<Vec<Stored>, CoreError> {
     let raw = store.read(|c| {
-        let mut st = c.prepare(
+        let selection = if call.is_some() {
+            "WHERE r.subject = ?1 AND j.kind IN ('regeneration', 'post_call')
+             ORDER BY (r.status IN ('queued', 'running', 'paused')) DESC, r.finished_at DESC, r.rowid DESC LIMIT 1"
+        } else {
+            "ORDER BY r.started_at, r.id"
+        };
+        let mut st = c.prepare(&format!(
             "SELECT r.id, r.job_id, j.kind, r.subject, r.started_at, r.finished_at, r.status,
                     r.counts, r.error_code, r.progress
-             FROM job_runs r JOIN jobs j ON j.id = r.job_id ORDER BY r.started_at, r.id",
+             FROM job_runs r JOIN jobs j ON j.id = r.job_id {selection}",
+        ))?;
+        let rows = st.query_map(
+            noter_db::rusqlite::params_from_iter(call.map(CallId::as_str)),
+            |r| {
+                Ok((
+                    (
+                        r.get::<_, String>(0)?,
+                        r.get::<_, String>(1)?,
+                        r.get::<_, String>(2)?,
+                    ),
+                    (
+                        r.get::<_, Option<String>>(3)?,
+                        r.get::<_, i64>(4)?,
+                        r.get::<_, Option<i64>>(5)?,
+                    ),
+                    (r.get::<_, String>(6)?, r.get::<_, String>(7)?),
+                    (r.get::<_, Option<String>>(8)?, r.get::<_, Option<f64>>(9)?),
+                ))
+            },
         )?;
-        let rows = st.query_map([], |r| {
-            Ok((
-                (
-                    r.get::<_, String>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                ),
-                (
-                    r.get::<_, Option<String>>(3)?,
-                    r.get::<_, i64>(4)?,
-                    r.get::<_, Option<i64>>(5)?,
-                ),
-                (r.get::<_, String>(6)?, r.get::<_, String>(7)?),
-                (r.get::<_, Option<String>>(8)?, r.get::<_, Option<f64>>(9)?),
-            ))
-        })?;
         rows.collect::<Result<Vec<_>, _>>()
     })?;
     Ok(raw
@@ -203,9 +218,11 @@ pub(crate) fn runs(store: &Store) -> Result<Vec<Stored>, CoreError> {
                 (error, progress),
             )| {
                 let kind: JobKind = parse(kind)?;
+                let call_id = output_call(kind, subject.as_deref());
                 Some(Stored {
                     subject,
                     row: JobRunRow {
+                        call_id,
                         id: JobRunId::new(id),
                         job_id: JobId::new(job),
                         kind,

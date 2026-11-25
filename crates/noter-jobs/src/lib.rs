@@ -336,9 +336,16 @@ impl Scheduler {
         self.0.tick();
     }
 
+    /// The run whose state belongs in this call's Processing inspector.
+    pub fn output_run(&self, call: &CallId) -> Result<Option<JobRunRow>, CoreError> {
+        Ok(rows::runs(&self.0.deps.store, Some(call))?
+            .pop()
+            .map(|r| r.row))
+    }
+
     /// Every run, oldest first.
     pub fn runs(&self) -> Result<Vec<JobRunRow>, CoreError> {
-        Ok(rows::runs(&self.0.deps.store)?
+        Ok(rows::runs(&self.0.deps.store, None)?
             .into_iter()
             .map(|s| s.row)
             .collect())
@@ -360,6 +367,7 @@ impl Inner {
         let (trigger, battery) = rows::default_def(kind);
         let id = rows::job_id(kind);
         let row = JobRunRow {
+            call_id: None,
             id: JobRunId::new(""),
             job_id: id.clone(),
             kind,
@@ -405,7 +413,7 @@ impl Inner {
         let now = self.deps.clock.now();
         let defs = rows::defs(&self.deps.store)?;
         let mut retries = vec![];
-        for Stored { mut row, subject } in rows::runs(&self.deps.store)? {
+        for Stored { mut row, subject } in rows::runs(&self.deps.store, None)? {
             let active = matches!(
                 row.status,
                 JobRunStatus::Queued | JobRunStatus::Running | JobRunStatus::Paused
@@ -517,6 +525,7 @@ impl Inner {
                 return Ok(e.row.id.clone());
             }
             let row = JobRunRow {
+                call_id: rows::output_call(def.kind, subject.as_deref()),
                 id: JobRunId::new(format!("run_{}", ulid::Ulid::generate())),
                 job_id: def.id.clone(),
                 kind: def.kind,

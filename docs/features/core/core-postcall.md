@@ -128,7 +128,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - Missing call, section or version: `not_found`; stale section revision: `conflict` with `current_rev`; wrong call/section association: `invalid_input`.
 
 **Steps**:
-1. [x] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count - `inst-edit-get`
+1. [x] - `p1` - API: `outputs_get { call_id }`; join summaries, current versions and items into `CallOutputs`, including archive state, local writer and review count. Include the call’s active or latest finished output job and the recorded cost on each API-key writer when available - `inst-edit-get`
 2. [x] - `p1` - API: `output_edit { call_id, summary_id, rev, body_md }`; validate membership, revision and Markdown without raw HTML on the writer - `inst-edit-validate`
 3. [x] - `p1` - Append a user-edit `summary_versions` row and logged change, update current version and revision in one transaction and preserve the generated base - `inst-edit-commit`
 4. [x] - `p1` - After commit refresh files and indexes, publish the whole changed section and return `OutputMutation` with `change_id` - `inst-edit-publish`

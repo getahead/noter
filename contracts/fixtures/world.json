@@ -322,7 +322,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.34",
+    "contract_version": "2.35",
     "copilot": {
       "agents": [
         {
@@ -1925,6 +1925,7 @@
         "id": "job_evidence",
         "kind": "evidence_collection",
         "last_run": {
+          "call_id": null,
           "counts": [
             {
               "label": "closed",
@@ -2151,6 +2152,7 @@
     {
       "archive": "done",
       "call_id": "call_backend",
+      "processing_run": null,
       "review_waiting": 0,
       "sections": [
         {
@@ -2169,6 +2171,7 @@
           "user_edited": false,
           "version_count": 2,
           "writer": {
+            "cost_usd": null,
             "from_pass": "live",
             "generated_at": 1792140600000,
             "model": "claude-sonnet",
@@ -2249,6 +2252,7 @@
           "user_edited": false,
           "version_count": 1,
           "writer": {
+            "cost_usd": null,
             "from_pass": "live",
             "generated_at": 1792140600000,
             "model": "claude-sonnet",

@@ -593,6 +593,36 @@ async fn a_run_cancels_from_queued_running_and_paused() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_prefers_active_work_then_the_last_completion() {
+    let r = rig().await;
+    let call = CallId::new("call_1");
+    let processing = || r.sched.output_run(&call).unwrap().unwrap();
+    let post = r.go(r.post_call(call.as_str()));
+    let regen = r.go(Request::for_call(
+        JobKind::Regeneration,
+        Trigger::OnDemand,
+        &call,
+    ));
+    settle().await;
+    assert_eq!(processing().id, regen);
+
+    r.step(
+        JobKind::Regeneration,
+        Step::Fail(ErrorCode::RuntimeUnavailable),
+    );
+    settle().await;
+    assert_eq!(processing().id, post);
+
+    r.clock.0.store(2_000, Ordering::SeqCst);
+    r.step(JobKind::PostCall, Step::Done);
+    settle().await;
+    r.go(r.post_call("another_call"));
+    let finished = processing();
+    assert_eq!(finished.status, JobRunStatus::Succeeded);
+    assert_eq!(finished.id, post);
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_failure_records_its_typed_error_and_keeps_earlier_batches() {
     let r = rig().await;
     let id = r.go(r.post_call("call_1"));

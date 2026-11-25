@@ -63,6 +63,7 @@ impl Core {
             .collect();
         let writing = sections.iter().any(|s| s.state == SectionState::Writing);
         Ok(CallOutputs {
+            processing_run: self.jobs.output_run(call)?.map(Box::new),
             waiting_for_power: self.jobs.waiting_for_power(call)?,
             call_id: call.clone(),
             status: if writing {
@@ -186,7 +187,7 @@ impl Core {
         let rows = self.store().read(move |c| {
             let mut stmt = c.prepare(
                 "SELECT v.id, v.n, v.kind, v.body_md, l.runtime_choice, l.model, k.call_type,
-                        v.skill_version, v.created_at, v.from_pass
+                        v.skill_version, v.created_at, v.from_pass, l.cost_usd
                  FROM summary_versions v
                  JOIN summaries s ON s.id = v.summary_id
                  JOIN calls k ON k.id = s.call_id

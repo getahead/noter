@@ -113,7 +113,7 @@ Post-call and handoff can call a model without creating another path for user te
 4. [x] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
 5. [x] - `p1` - Start the locked-down adapter with the same app-owned schema, skill and allowed tools; apply effort, budget and task timeout - `inst-run-adapter`
 6. [x] - `p1` - Validate results through `cpt-noter-algo-core-llm-gate-validate`; map pseudonyms back only after cloud output is inside the core - `inst-run-validate`
-7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; cost is present for API-key runs and absent for own-account runs - `inst-run-usage`
+7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; record an API-key total only when every metered attempt reported its cost. Unknown spend prevents a further budget-capped API-key attempt. Own-account and local runs have no price - `inst-run-usage`
 8. [x] - `p1` - **IF** timeout or cancellation occurs, terminate the request and child process, invalidate late output and remove its temporary config - `inst-run-cancel`
 9. [x] - `p1` - **RETURN** validated output and provenance or the typed failure; capture remains independent - `inst-run-return`
 

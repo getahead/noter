@@ -518,7 +518,7 @@ fn choose(
         privacy,
         switched_to_local: false,
         budget: &Budget::default(),
-        spent_usd: 0.0,
+        spent_usd: Some(0.0),
         prefer_local: false,
     })
     .map(|c| c.runtime)
@@ -804,6 +804,24 @@ async fn the_run_row_records_usage_timing_and_cost_only_for_api_keys() {
     let mut req = f.post_call();
     req.settings.configured = Some(RuntimeChoice::ClaudeAccount);
     f.llm.run_once(req).await.unwrap();
+    assert!(f.row("SELECT cost_usd FROM llm_runs")["cost_usd"].is_null());
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_review_outputs_unknown_price_survives_retries_and_budget_checks() {
+    let unknown = r#"{"on":"post-call","cost_usd":null,"output":{}}"#;
+    let f = fixture(Some(unknown));
+    // The successful repair has a price, but the first attempt did not.
+    let result = f.llm.run_once(f.post_call()).await.unwrap();
+    assert_eq!(f.scripted.received().len(), 2);
+    assert_eq!(result.provenance.usage.cost_usd, None);
+    assert!(f.row("SELECT cost_usd FROM llm_runs")["cost_usd"].is_null());
+
+    let f = fixture(Some(unknown));
+    let mut req = f.post_call();
+    req.budget.max_cost_usd = Some(0.5);
+    assert!(matches!(f.llm.run_once(req).await, Err(Failure::Budget)));
+    assert_eq!(f.scripted.received().len(), 1);
     assert!(f.row("SELECT cost_usd FROM llm_runs")["cost_usd"].is_null());
 }
 

@@ -41,7 +41,17 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
     const out = world.outputs.find((o) => o.call_id === a.call_id);
     if (a.run_now_on_battery && a.run_now_on_battery !== out?.waiting_for_power) throw coreError("not_found");
     const run = out?.waiting_for_power ?? newId("run");
+    const publish = (status: Bindings.JobRunStatus) => {
+      const row: Bindings.JobRunRow = {
+        call_id: a.call_id, id: run, job_id: "job_regeneration", kind: "regeneration", name: "Regeneration",
+        status, started_at: world.now, finished_at: status === "succeeded" ? world.now : null,
+        progress: status === "succeeded" ? 1 : null, counts: [], error: null,
+      };
+      if (out) out.processing_run = row;
+      emit("jobs:progress", { run: row });
+    };
     if (out?.waiting_for_power && !a.run_now_on_battery) {
+      publish("queued");
       heldRequests.set(run, a);
       return { job_run_id: run };
     }
@@ -50,6 +60,7 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
     if (out) out.waiting_for_power = null;
     // No sections means all of them, as in the real core.
     const sections = request.sections.length ? request.sections : (out?.sections.map((x) => x.kind) ?? []);
+    publish(sections.length ? "running" : "succeeded");
     sections.forEach((kind, i) => {
       fake.later(300 * (i + 1), () => emit("outputs:progress", { call_id: a.call_id, status: "writing", section: kind, state: { type: "writing" } }));
       fake.later(300 * (i + 2), () => {
@@ -58,12 +69,13 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
           section.names_updated = false;
           // Use Local Model: the local runtime writes the section, as in the real core.
           if (request.local && section.writer) {
-            section.writer = { ...section.writer, runtime: "local", model: "local", generated_at: shared.now() };
+            section.writer = { ...section.writer, runtime: "local", model: "local", cost_usd: null, generated_at: shared.now() };
             world.outputs.find((o) => o.call_id === a.call_id)!.written_locally = true;
           }
           emit("entity:changed", { type: "section", call_id: a.call_id, section });
         }
         emit("outputs:progress", { call_id: a.call_id, status: "ready", section: kind, state: { type: "ready" } });
+        if (i === sections.length - 1) publish("succeeded");
       });
     });
     return { job_run_id: run };
