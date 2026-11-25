@@ -55,6 +55,10 @@ pub(crate) struct Cli {
     /// What the CLI's own status last said about the sign-in; `None` until it said anything.
     signed_in: Mutex<Option<bool>>,
     sessions: Sessions,
+    /// How the last run that exited with an error ended (`exit_1.schema_rejected`), for the log.
+    // shortcut: one slot per CLI, so concurrent runs overwrite each other; key it by run if the
+    // log ever has to tell them apart.
+    last_failure: Arc<Mutex<Option<String>>>,
 }
 
 impl Cli {
@@ -65,7 +69,12 @@ impl Cli {
             version: Mutex::default(),
             signed_in: Mutex::default(),
             sessions: Sessions::default(),
+            last_failure: Arc::default(),
         }
+    }
+
+    pub fn last_failure(&self) -> Option<String> {
+        lock(&self.last_failure).clone()
     }
 
     pub fn refresh(&self) {
@@ -193,9 +202,10 @@ impl Cli {
         let sessions = self.sessions.clone();
         let handle = call.session.clone();
         let packet = call.packet.clone();
+        let failed = self.last_failure.clone();
         Box::pin(async move {
             let (command, run) = prepared?;
-            let out = output(command, &packet).await;
+            let out = output(command, &packet, &failed).await;
             drop(run);
             let reply = parse(&out?)?;
             if let (Some(handle), Some(id)) = (handle, &reply.session_id) {
@@ -261,7 +271,11 @@ pub(crate) fn command(cli: &Cli, cwd: &Path, run: &RunDir) -> Command {
     command
 }
 
-async fn output(mut command: Command, stdin: &[u8]) -> Result<Vec<u8>, String> {
+async fn output(
+    mut command: Command,
+    stdin: &[u8],
+    failed: &Mutex<Option<String>>,
+) -> Result<Vec<u8>, String> {
     let mut child = command.spawn().map_err(|_| "cli_missing".to_owned())?;
     if let Some(mut input) = child.stdin.take() {
         input
@@ -274,11 +288,13 @@ async fn output(mut command: Command, stdin: &[u8]) -> Result<Vec<u8>, String> {
         .await
         .map_err(|_| "cli_failed".to_owned())?;
     if !out.status.success() {
-        // A newer CLI that dropped or renamed a lockdown flag fails closed (#1219).
-        let code = if usage_error(&out.stderr) {
-            "cli_incompatible"
-        } else {
-            "cli_failed"
+        let class = failure_class(&out.stderr);
+        *lock(failed) = Some(format!("{}.{class}", exit_id(out.status.code())));
+        // A newer CLI that dropped or renamed a lockdown flag, or that refuses the output
+        // schema, fails closed (#1219, #1235).
+        let code = match class {
+            "unknown_flag" | "schema_rejected" => "cli_incompatible",
+            _ => "cli_failed",
         };
         return Err(code.into());
     }
@@ -298,6 +314,36 @@ pub(crate) fn usage_error(stderr: &[u8]) -> bool {
     ]
     .iter()
     .any(|p| text.contains(p))
+}
+
+/// Why a CLI run exited with an error, as a word for the log; the stderr itself is never kept.
+// shortcut: only `schema_rejected` (Claude Code 2.1.325) and `unknown_flag` are matched against
+// real output; the other phrases are best guesses. Correct them when a real failure shows one.
+pub(crate) fn failure_class(stderr: &[u8]) -> &'static str {
+    let text = String::from_utf8_lossy(stderr).to_lowercase();
+    let has = |phrases: &[&str]| phrases.iter().any(|p| text.contains(p));
+    if has(&[
+        "not a valid json schema",
+        "invalid schema",
+        "invalid_json_schema",
+    ]) {
+        "schema_rejected"
+    } else if usage_error(stderr) {
+        "unknown_flag"
+    } else if has(&[
+        "not logged in",
+        "/login",
+        "authentication_error",
+        "oauth token",
+    ]) {
+        "not_logged_in"
+    } else if has(&["rate limit", "rate_limit", "usage limit", "429"]) {
+        "rate_limit"
+    } else if has(&["subscription", "your plan", "organization has disabled"]) {
+        "plan"
+    } else {
+        "other"
+    }
 }
 
 pub(crate) fn effort(effort: Effort) -> &'static str {
@@ -874,6 +920,21 @@ mod account_tests {
             ),
             Some(("https://claude.com/a?b=c".into(), None))
         );
+    }
+
+    // #1235: what Claude Code 2.1.325 printed for Noter's schema is a class of its own, and
+    // fails closed like an option the CLI does not know.
+    #[test]
+    fn a_failed_run_is_classified_without_keeping_its_stderr() {
+        let refused = b"Error: --json-schema is not a valid JSON Schema: no schema with key or ref \"https://json-schema.org/draft/2020-12/schema\"";
+        assert_eq!(failure_class(refused), "schema_rejected");
+        assert_eq!(
+            failure_class(b"error: unknown option '--tools'"),
+            "unknown_flag"
+        );
+        assert_eq!(failure_class(b"Not logged in. Run /login"), "not_logged_in");
+        assert_eq!(failure_class(b"API Error: 429 rate limit"), "rate_limit");
+        assert_eq!(failure_class(b"stub failure"), "other");
     }
 
     // #1235: a login that ends without printing its page says how it ended, never "failed".

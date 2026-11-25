@@ -547,6 +547,10 @@ impl Gate {
         }
     }
 
+    pub(crate) fn last_failure(&self, runtime: RuntimeChoice) -> Option<String> {
+        self.adapter(runtime)?.last_failure()
+    }
+
     pub(crate) fn close_session(&self, runtime: RuntimeChoice, session: &str) {
         if let Some(adapter) = self.adapter(runtime) {
             adapter.close_session(runtime, session);

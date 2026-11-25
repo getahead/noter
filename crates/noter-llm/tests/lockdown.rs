@@ -356,6 +356,14 @@ fn output() -> Value {
     .unwrap()
 }
 
+/// The schema as Claude Code gets it: without `$schema`, which 2.1.325 refuses (#1235). The
+/// stub refuses it the same way, so every Claude run here fails if the key is sent.
+fn claude_schema() -> Value {
+    let mut schema = Skill::PostCall.schema();
+    assert!(schema.as_object_mut().unwrap().remove("$schema").is_some());
+    schema
+}
+
 // cpt-noter-algo-core-credentials-privacy-check-account:inst-check-test
 #[tokio::test]
 async fn an_account_check_never_spends_a_key_when_its_cli_is_signed_out() {
@@ -437,7 +445,7 @@ async fn claude_api_key_runs_bare_with_every_restriction() {
     assert!(run.has("-p") && run.has("--bare"));
     assert_eq!(run.flag("--output-format"), Some("json"));
     let schema: Value = serde_json::from_str(run.flag("--json-schema").unwrap()).unwrap();
-    assert_eq!(schema, Skill::PostCall.schema());
+    assert_eq!(schema, claude_schema());
     assert!(run.has("--strict-mcp-config"));
     let mcp = run.flag("--mcp-config").unwrap();
     assert_eq!(run.copied(mcp), json!({"mcpServers": {}}));
@@ -810,6 +818,9 @@ async fn a_cli_that_rejects_or_ignores_the_lockdown_fails_closed() {
                 world.codex_only(&stub, Some("sk-test"), false)
             };
             let failed = llm.run_once(world.request(runtime)).await.unwrap_err();
+            // How the run ended, for noter.log: the exit and a class, never the stderr.
+            let how = (mode == "usage").then_some("exit_2.unknown_flag");
+            assert_eq!(llm.cli_failure(runtime).as_deref(), how, "{mode}");
             assert!(
                 matches!(&failed, Failure::Runtime { code } if code == "cli_incompatible"),
                 "{mode} {runtime:?}: {failed:?}"
@@ -897,6 +908,7 @@ async fn a_failed_run_leaves_nothing_behind() {
         };
         let failed = llm.run_once(world.request(runtime)).await.unwrap_err();
         assert!(matches!(failed, Failure::Runtime { .. }), "{failed:?}");
+        assert_eq!(llm.cli_failure(runtime).as_deref(), Some("exit_1.other"));
         assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());
     }
 }
@@ -986,7 +998,7 @@ async fn all_three_runtimes_conform_on_one_request() {
     let claude_run = claude.only();
     let claude_schema: Value =
         serde_json::from_str(claude_run.flag("--json-schema").unwrap()).unwrap();
-    assert_eq!(claude_schema, schema);
+    assert_eq!(claude_schema, self::claude_schema());
     let codex_run = codex.only();
     assert_eq!(
         codex_run.copied(codex_run.flag("--output-schema").unwrap()),

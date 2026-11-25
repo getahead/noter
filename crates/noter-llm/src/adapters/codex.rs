@@ -181,4 +181,8 @@ impl RuntimeAdapter for Codex {
     fn close_session(&self, _: RuntimeChoice, session: &str) {
         self.0.close_session(session);
     }
+
+    fn last_failure(&self) -> Option<String> {
+        self.0.last_failure()
+    }
 }
