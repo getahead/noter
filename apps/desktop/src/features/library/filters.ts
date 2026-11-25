@@ -1,5 +1,7 @@
 import type { CallFilter } from "../../core/bindings";
-import { t } from "../../i18n/format";
+import { shiftDay, t } from "../../i18n/format";
+
+export { shiftDay };
 
 export interface FilterState {
   words: string;
@@ -29,9 +31,6 @@ export interface Lookups {
 }
 
 const DAY = 86_400_000;
-/** `day` (YYYY-MM-DD) moved by `by` days; whole UTC days, so a DST change never shifts it. */
-export const shiftDay = (day: string, by: number): string => new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY).toISOString().slice(0, 10);
-
 /** The date menu's choice a filter stands for; a range that is not a preset is Custom. */
 export function datePreset(f: CallFilter): DatePreset {
   if (!f.from && !f.to) return "any";

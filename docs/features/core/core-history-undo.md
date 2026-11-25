@@ -79,7 +79,7 @@ The user can inspect and reverse a correction, review or job batch without losin
 
 - Hotkey and setup settings rows are not replayable: they live in memory beside their row, so `history_list` shows them with `undoable = false` and `change_undo` returns `not_undoable`.
 - The model's own bookkeeping rows (`llm_runs`, `audit_log`, written by the model actor, 2.15) are never listed or exported: no `EntityKind` names them, so not even the `models` actor filter shows them. Changes a model makes to user data are listed as usual.
-- Export scopes use UTC days until settings carry a time zone; a cancelled save panel returns `cancelled` and creates no file; the save panel is the `NativeOps` seam (TL-15).
+- Export scopes and Markdown timestamps use the Mac’s local calendar, including daylight-saving transitions. JSON preserves epoch milliseconds and includes an ISO 8601 timestamp with its offset; a cancelled save panel returns `cancelled` and creates no file; the save panel is the `NativeOps` seam (TL-15).
 
 ## 2. Actor Flows (CDSL)
 

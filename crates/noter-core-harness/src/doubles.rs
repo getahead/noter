@@ -218,6 +218,16 @@ impl NativeServices for ScriptedNative {
             .map(|event| event.event.clone())
     }
 
+    fn time_zone(&self) -> String {
+        let minutes = self.4.load(Ordering::SeqCst);
+        if minutes == 0 {
+            return "UTC".into();
+        }
+        // Intl accepts fixed offset identifiers for the scripted host, including half-hours.
+        let sign = if minutes < 0 { '-' } else { '+' };
+        format!("{sign}{:02}:{:02}", minutes.abs() / 60, minutes.abs() % 60)
+    }
+
     fn utc_offset_minutes(&self, _: TimestampMs) -> i32 {
         self.4.load(Ordering::SeqCst) as i32
     }

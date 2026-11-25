@@ -71,3 +71,9 @@ describe("history (cpt-noter-flow-ui-history-undo-read)", () => {
     expect(fieldLabel(null)).toBeUndefined();
   });
 });
+
+it("cpt-noter-seq-call-page-check-evidence — Yesterday follows the local calendar after a short DST day", () => {
+  const now = Date.parse("2026-03-30T00:15:00+02:00");
+  const previous = row("a", Date.parse("2026-03-29T12:00:00+02:00"));
+  expect(groupByDay([previous], now, { ...prefs, time_zone: "Europe/Berlin" })[0]?.day).toBe("Yesterday");
+});

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use noter_db::rusqlite::OptionalExtension;
 use noter_protocol::error::ValidationRule;
 use noter_protocol::model::*;
-use noter_protocol::{CallId, CoreError, ErrorCode, TimestampMs};
+use noter_protocol::{CallId, CoreError, ErrorCode};
 
 use crate::settings::invalid;
 use crate::speakers::speaker_name;
@@ -414,7 +414,7 @@ const MONTHS: [&str; 12] = [
 /// Oct", DESIGN 2467), from the local date of `local_ms`. Finder cannot name a folder with `/`
 /// or `:`, a leading dot would hide it, and the title is cut to 80 characters or 200 bytes.
 fn folder_name(title: &str, id: &str, local_ms: i64) -> String {
-    let date = crate::history::date_of(local_ms);
+    let date = crate::local_time::date_of(local_ms);
     let (month, day) = (&date[5..7], &date[8..10]);
     let month = MONTHS[month.parse::<usize>().unwrap_or(1).clamp(1, 12) - 1];
     let day = day.trim_start_matches('0');
@@ -559,6 +559,7 @@ fn write_payload(
 
 /// `# Title`, then the date and the participants, for the top of an exported Markdown file.
 fn markdown_header(
+    local: crate::local_time::LocalTime,
     c: &noter_db::rusqlite::Connection,
     id: &str,
 ) -> noter_db::rusqlite::Result<String> {
@@ -567,7 +568,7 @@ fn markdown_header(
         [id],
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
-    let mut line = vec![crate::history::date_of(started_at)];
+    let mut line = vec![local.date(started_at)];
     let mut people = c.prepare(
         "SELECT p.display_name || CASE WHEN cp.invited_only THEN ' (Invited)' ELSE '' END \
          FROM call_attendance cp JOIN people p ON p.id = cp.person_id \
@@ -690,11 +691,7 @@ impl Core {
         let mut suggested = "Noter export".to_owned();
         for id in &args.call_ids {
             let facts = self.call_facts(id.as_str())?;
-            let offset = self
-                .deps
-                .native
-                .utc_offset_minutes(TimestampMs(facts.started_at));
-            let local = facts.started_at + i64::from(offset) * 60_000;
+            let local = self.local_time().wall_ms(facts.started_at);
             let mut name = folder_name(&facts.title, id.as_str(), local);
             let n = taken.entry(name.clone()).or_default();
             *n += 1;
@@ -775,14 +772,15 @@ impl Core {
                 let outputs = self.outputs_for_share(&call.id)?;
                 let header = self
                     .store()
-                    .read(|c| markdown_header(c, call.id.as_str()))?;
+                    .read(|c| markdown_header(self.local_time(), c, call.id.as_str()))?;
                 let row = self.call_row(call.id.as_str())?.ok_or_else(not_found)?;
                 let items = if call.markdown {
                     scoped_items(&outputs, &scope)
                 } else {
                     vec![]
                 };
-                let json = serde_json::json!({ "call": row, "items": items });
+                let mut json = serde_json::json!({ "call": row, "items": items });
+                json["call"]["started_at_iso"] = self.local_time().iso(row.started_at.0).into();
                 tx.send(ExportPayload::CallJson {
                     dir: call.dir.clone(),
                     json: serde_json::to_vec_pretty(&json).map_err(internal)?,

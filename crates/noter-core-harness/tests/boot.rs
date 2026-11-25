@@ -3073,3 +3073,55 @@ async fn a_data_dir_from_the_launch_hooks_keeps_the_core_data_across_launches() 
     assert!(relative.unwrap_err().contains("absolute"));
     let _ = std::fs::remove_dir_all(&path);
 }
+
+#[tokio::test]
+async fn cpt_noter_seq_call_page_review_outputs_today_and_export_share_local_midnight() {
+    let mut r = start().await;
+    r.ok("main", "harness.set_utc_offset", json!({"minutes": 60}))
+        .await;
+    // Fixture clock is 08:00 UTC on Oct 16. Move to Oct 17 00:30:00.123 local.
+    let moved = r
+        .ok(
+            "main",
+            "harness.advance_clock",
+            json!({"ms": 15 * 3_600_000 + 1_800_123}),
+        )
+        .await;
+    let today = r.ok("main", "today_get", json!({})).await;
+    assert_eq!(today["date"], "2026-10-17");
+
+    // Seed a change at this exact instant. The change log is append-only and its storage
+    // clock is independent of the scripted service clock.
+    let mut world = r.ok("main", "harness.world_get", json!({})).await;
+    let mut row = world["changes"][0].clone();
+    row["id"] = json!("chg_after_local_midnight");
+    row["at"] = moved["now"].clone();
+    world["changes"].as_array_mut().unwrap().push(row);
+    r.ok("main", "harness.world_set", json!({"world": world}))
+        .await;
+
+    for format in ["markdown", "json"] {
+        let export = r
+            .ok(
+                "main",
+                "history_export",
+                json!({"scope": {"type": "today"}, "format": format}),
+            )
+            .await;
+        let path = export["path"].as_str().unwrap();
+        assert!(path.contains("noter-history-2026-10-17."));
+        let body = std::fs::read_to_string(path).unwrap();
+        if format == "markdown" {
+            assert!(body.contains("2026-10-17 00:30"));
+        } else {
+            let rows: Vec<Value> = serde_json::from_str(&body).unwrap();
+            let row = rows
+                .iter()
+                .find(|v| v["id"] == "chg_after_local_midnight")
+                .unwrap();
+            assert_eq!(row["at"], moved["now"]);
+            assert_eq!(row["at_iso"], "2026-10-17T00:30:00.123+01:00");
+        }
+    }
+    r.finish().await;
+}

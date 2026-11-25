@@ -370,7 +370,9 @@ describe.skipIf(isFake)("cpt-noter-seq-settings-check-privacy on the real core (
     const json = ok(await s.core("settings").auditExport({ format: "json" })) as ExportResult;
     expect(json.path).toContain("exports");
     const text = readFileSync(json.path, "utf8");
-    expect(JSON.parse(text)).toEqual(listed.rows);
+    expect(JSON.parse(text)).toEqual(listed.rows.map((row) => ({
+      ...row, at_iso: new Date(row.at).toISOString().replace("Z", "+00:00"),
+    })));
     const md = ok(await s.core("settings").auditExport({ format: "markdown" })) as ExportResult;
     const markdown = readFileSync(md.path, "utf8");
     expect(markdown).toContain("api.anthropic.com");

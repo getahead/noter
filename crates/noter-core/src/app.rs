@@ -12,6 +12,7 @@ use crate::Core;
 pub(super) fn app_snapshot(core: &Core, ctx: &CommandCtx) -> AppSnapshot {
     // @cpt-begin:cpt-noter-flow-core-ipc-host-window-open:p1:inst-app-snapshot
     let mut snapshot = core.app().clone();
+    snapshot.prefs.time_zone = core.deps.native.time_zone();
     snapshot.capture = core.capture_for_reader(snapshot.capture);
     snapshot.accounts = core.accounts.view();
     snapshot.window = match ctx.caller {
@@ -160,7 +161,7 @@ pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
             screen_context: false,
             behaviour_metrics: false,
         },
-        // shortcut: fixed prefs until the native services read the macOS locale (first-run feature).
+        // The window snapshot fills in the host time zone when read.
         prefs: UiPrefs {
             time_format: TimeFormat::H24,
             first_weekday: 1,

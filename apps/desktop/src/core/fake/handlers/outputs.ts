@@ -1,3 +1,4 @@
+import { dayOf } from "../../../i18n/format";
 import * as Bindings from "../../bindings";
 import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
@@ -119,7 +120,7 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
     const calls = a.call_ids.map((id) => shared.call(world, id));
     const per = (a.include.summary_and_items ? 2 : 0) + (a.include.transcript ? 2 : 0) + (a.include.audio ? 2 : 0);
     const files = a.scope ? calls.length : calls.length * Math.max(1, per);
-    return { path: `~/Downloads/Noter export ${new Date(world.now).toISOString().slice(0, 10)}`, files };
+    return { path: `~/Downloads/Noter export ${dayOf(world.now, world.app.prefs)}`, files };
   },
 
   };

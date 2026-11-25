@@ -238,10 +238,12 @@ impl Core {
                 for row in &rows {
                     if json {
                         let sep = if first { "\n" } else { ",\n" };
-                        let body = serde_json::to_string(row).map_err(crate::internal)?;
+                        let mut value = serde_json::to_value(row).map_err(crate::internal)?;
+                        value["at_iso"] = self.local_time().iso(row.at.0).into();
+                        let body = serde_json::to_string(&value).map_err(crate::internal)?;
                         write!(out, "{sep}{body}").map_err(io)?;
                     } else {
-                        writeln!(out, "{}", markdown_row(row)).map_err(io)?;
+                        writeln!(out, "{}", markdown_row(row, self.local_time())).map_err(io)?;
                     }
                     first = false;
                 }
@@ -276,12 +278,7 @@ fn escape_markdown(title: &str) -> String {
     out
 }
 
-fn markdown_row(r: &AuditEntry) -> String {
-    let ms = r.at.0;
-    let (h, m) = (
-        ms.rem_euclid(86_400_000) / 3_600_000,
-        ms.rem_euclid(3_600_000) / 60_000,
-    );
+fn markdown_row(r: &AuditEntry, local: crate::local_time::LocalTime) -> String {
     let runtime = r
         .runtime
         .and_then(|r| serde_json::to_value(r).ok())
@@ -292,8 +289,8 @@ fn markdown_row(r: &AuditEntry) -> String {
         .and_then(|v| v.as_str().map(str::to_owned))
         .unwrap_or_default();
     let mut line = format!(
-        "- {} {h:02}:{m:02} · {what} → {} ({runtime}) · {} bytes",
-        crate::history::date_of(ms),
+        "- {} · {what} → {} ({runtime}) · {} bytes",
+        local.date_time(r.at.0),
         r.destination,
         r.bytes_out
     );
