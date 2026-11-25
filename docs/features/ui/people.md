@@ -22,6 +22,7 @@ milestone: M3
   - [Add a person and name a speaker](#add-a-person-and-name-a-speaker)
   - [Edit, merge or delete a person](#edit-merge-or-delete-a-person)
   - [Opt in to a voice profile](#opt-in-to-a-voice-profile)
+  - [Find a voice in past calls](#find-a-voice-in-past-calls)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Present identity and privacy safely](#present-identity-and-privacy-safely)
 - [4. States (CDSL)](#4-states-cdsl)
@@ -29,6 +30,7 @@ milestone: M3
 - [5. Definitions of Done](#5-definitions-of-done)
   - [People and preparation views](#people-and-preparation-views)
   - [Identity edits and voice consent](#identity-edits-and-voice-consent)
+  - [Voice found in past calls](#voice-found-in-past-calls)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 - [7. Additional Context](#7-additional-context)
 

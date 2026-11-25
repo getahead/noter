@@ -29,6 +29,7 @@ design: docs/DESIGN-core.md
   - [Assemble pages and the unnamed queue](#assemble-pages-and-the-unnamed-queue)
   - [Merge all identity references](#merge-all-identity-references)
   - [Build and match local profiles](#build-and-match-local-profiles)
+  - [Name a voice in past calls](#name-a-voice-in-past-calls)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Voice profile lifecycle](#voice-profile-lifecycle)
 - [5. Definitions of Done](#5-definitions-of-done)
