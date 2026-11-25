@@ -102,6 +102,14 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect(region(page, "HD-R3")).toContainText("No repository mapped for VSTOR");
     await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Claude Code" })).toBeDisabled();
     await expect(region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" })).toBeEnabled();
+    await region(page, "HD-R2").getByRole("radio", { name: "Codex" }).click();
+    const codex = region(page, "HD-R7").getByRole("button", { name: "Open in Codex" });
+    await expect(codex).toBeDisabled();
+    // The real host still plans Terminal without a mapping. The fake reports no launch path.
+    const explanation = REAL ? /open Terminal and run codex in the repository folder you map\./ : /Codex can't be launched from here/;
+    await expect(region(page, "HD-R5")).toBeVisible();
+    await expect(region(page, "HD-R5")).toContainText(explanation);
+    await expect(codex).toHaveAccessibleDescription(explanation);
   });
 
   test("UI — other path: Escape on the Add Mapping sheet returns focus to the Add Mapping… button", async ({ page }) => {
@@ -171,6 +179,7 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await expect.poll(() => sent(page, "handoff_copy")).toHaveLength(1);
     expect(await sent(page, "handoff_open")).toEqual([]);
     await expect(footer).toContainText("Copied");
+    await expect(row(page).getByText("Not reviewed")).toHaveCount(0);
     await expect(row(page)).toContainText("Dmitri S.");
   });
 
@@ -206,10 +215,16 @@ test.describe("cpt-noter-seq-call-page-hand-off-item", () => {
     await region(page, "HD-R2").getByRole("radio", { name: "Codex" }).click();
     await expect(region(page, "HD-R2").getByRole("radio", { name: "Codex" })).toBeChecked();
     expect(await sent(page, "handoff_set_target")).toEqual([expect.objectContaining({ item_id: H.ITEM, target: "codex" })]);
-    await expect(region(page, "HD-R7").getByRole("button", { name: "Open in Codex" })).toBeVisible();
-    await expect(region(page, "HD-R5")).toContainText("Codex");
-    await region(page, "HD-R7").getByRole("button", { name: "Copy Prompt" }).click();
-    await expect(row(page).getByText("Not reviewed")).toHaveCount(0); // copying accepted the suggestion
+    const codex = region(page, "HD-R7").getByRole("button", { name: "Open in Codex" });
+    const mapping = await region(page, "HD-R3").locator("option:checked").innerText();
+    const folder = mapping.replace(/ \(VSTOR\)$/, "");
+    const explanation = `No Codex link handler found. Noter will open Terminal and run codex in ${folder}.`;
+    await expect(region(page, "HD-R5")).toBeVisible();
+    await expect(region(page, "HD-R5")).toHaveText(explanation);
+    await expect(codex).toHaveAccessibleDescription(explanation);
+    await codex.click();
+    await expect(region(page, "HD-R6")).toContainText("Opened in Terminal · item marked Handed off");
+    await expect(row(page).getByText("Not reviewed")).toHaveCount(0);
   });
 
   test("UI — empty path: Sensitive call — the drawer says This call is sensitive. The prompt reaches a cloud model when you press Return in the terminal., nothing is sent by Noter", async ({ page }) => {

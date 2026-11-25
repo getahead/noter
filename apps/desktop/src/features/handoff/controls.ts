@@ -64,7 +64,12 @@ export function launchLine(view: HandoffView): string {
       return t("handoff.launch.link", { tool });
     case "terminal":
     case "iterm":
-      return t(launch.needs_automation ? "handoff.launch.fallback_auto" : "handoff.launch.fallback", { tool, app: launch.path === "iterm" ? "iTerm" : "Terminal", command: COMMAND[target], cwd: repo?.local_path ?? "" });
+      return t(launch.needs_automation ? "handoff.launch.fallback_auto" : "handoff.launch.fallback", {
+        tool,
+        app: launch.path === "iterm" ? "iTerm" : "Terminal",
+        command: COMMAND[target],
+        cwd: repo?.local_path ?? t("handoff.launch.unmapped_folder"),
+      });
     case "none":
       return t("handoff.launch.none", { tool });
   }
