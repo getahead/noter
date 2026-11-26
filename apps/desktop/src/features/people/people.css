@@ -43,5 +43,5 @@
 /* Add Person: padded, and opaque so the table behind never shows through */
 .pe-add { padding: 12px; }
 .np-pop[data-variant="new-person-form"] { background: var(--card-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
-.pe-kvact { margin-top: 6px; }
+.pe-kvact { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
 .pe-status { font-size: 12px; color: var(--label); margin-bottom: 8px; }

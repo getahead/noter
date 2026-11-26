@@ -1190,6 +1190,7 @@ Four contracts, all defined in `crates/noter-protocol`. The first is the one the
 | Command | `person_delete` | People. Unnames their speakers everywhere and deletes the voice profile. `PersonIdArgs → DeleteResult`. Windows: M. | frozen |
 | Command | `voice_profile_create` | People. `VoiceProfileArgs → VoiceProfileView`. Windows: M. | frozen |
 | Command | `voice_profile_delete` | People. `PersonIdArgs → VoiceProfileView`. Windows: M. | frozen |
+| Command | `voice_profile_rematch` | People. Names the person's voice where it is still unnamed in past calls, never over a given name; one change (#1278). `PersonIdArgs → VoiceRematch`. Windows: M. | frozen |
 | Command | `agents_get` | Agents. `NoArgs → AgentsView`. Windows: MSF. | draft |
 | Command | `agent_create` | Agents. `AgentCreateArgs → AgentMutation`. Windows: M. | draft |
 | Command | `agent_update` | Agents. Edit an agent, including its runtime choice (PM-58). Takes effect at the next tick. `AgentUpdateArgs → AgentMutation`. Windows: M. | draft |

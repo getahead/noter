@@ -29,6 +29,7 @@ export function VoiceProfileSheet({ close, bridge, person, calls }: { close: () 
       <div className="np-sheet__body">
         <p>{t("person.voice.body")}</p>
         <p className="np-muted">{t("person.voice.built", { name: person.short_name, count: calls })}</p>
+        <p className="np-muted">{t("person.voice.past")}</p>
         {failed && <InlineBanner banner={{ id: "person-voice-error", severity: "error", text: t("person.voice.err") }} />}
       </div>
       <SheetFooter defaultButton={<PushButton label={t("person.voice.create")} variant="primary" submit loading={busy} onAction={() => void create()} />}>

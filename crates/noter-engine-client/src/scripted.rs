@@ -389,6 +389,12 @@ fn tag(cmd: &EngineCommand) -> &'static str {
     }
 }
 
+/// The voice `speaker_embedding` reports for every speaker of `call_id`, for scenarios that
+/// give another speaker the same voice.
+pub fn speaker_vector(call_id: &str) -> Vec<f32> {
+    vector_of(call_id, SPEAKER_DIMS)
+}
+
 /// A deterministic vector of finite values in 0..1, its own for each text.
 fn vector_of(text: &str, dims: usize) -> Vec<f32> {
     let seed = text

@@ -22,6 +22,7 @@ milestone: M3
   - [Add a person and name a speaker](#add-a-person-and-name-a-speaker)
   - [Edit, merge or delete a person](#edit-merge-or-delete-a-person)
   - [Opt in to a voice profile](#opt-in-to-a-voice-profile)
+  - [Find a voice in past calls](#find-a-voice-in-past-calls)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Present identity and privacy safely](#present-identity-and-privacy-safely)
 - [4. States (CDSL)](#4-states-cdsl)
@@ -29,6 +30,7 @@ milestone: M3
 - [5. Definitions of Done](#5-definitions-of-done)
   - [People and preparation views](#people-and-preparation-views)
   - [Identity edits and voice consent](#identity-edits-and-voice-consent)
+  - [Voice found in past calls](#voice-found-in-past-calls)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 - [7. Additional Context](#7-additional-context)
 
@@ -64,8 +66,8 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 - **PRD**: [PRD.md](../../PRD.md) › Feature specification › 5; Search and cross-meeting memory › People
 - **Design**: [DESIGN.md](../../DESIGN.md) › Screen — People and Person page; Dialogs — Create a voice profile
 - **Design elements**: `cpt-noter-component-screen-people`; reuses `cpt-noter-component-ui-person-picker`, `cpt-noter-component-ui-person-chip`, `cpt-noter-component-ui-speaker-label`, action rows, history and dialogs
-- **Stories (M3)**: `cpt-noter-seq-people-prepare-one-on-one`, `cpt-noter-seq-people-name-unnamed-speaker`, `cpt-noter-seq-dialogs-set-up-voice-profile`
-- **Frozen commands delivered (M3)**: `people_list`, `person_get`, `person_create`, `person_update`, `people_merge`, `person_delete`, `voice_profile_create`, `voice_profile_delete`
+- **Stories (M3)**: `cpt-noter-seq-people-prepare-one-on-one`, `cpt-noter-seq-people-name-unnamed-speaker`, `cpt-noter-seq-dialogs-set-up-voice-profile`, `cpt-noter-seq-people-find-voice-in-past-calls` (#1278)
+- **Frozen commands delivered (M3)**: `people_list`, `person_get`, `person_create`, `person_update`, `people_merge`, `person_delete`, `voice_profile_create`, `voice_profile_delete`, `voice_profile_rematch` (#1278)
 - **Earlier commands reused**: `transcript_rename_speaker`, `transcript_name_speakers`, `transcript_span`, item commands through Items; `history_list`, `change_undo`, `change_redo` through History
 - **Data**: core-owned `cpt-noter-dbtable-people`, `cpt-noter-dbtable-voice-profiles`; no UI tables
 - **Events**: `entity:changed`, `settings:changed`; mutation responses refresh profile state
@@ -177,6 +179,23 @@ Implement PL-R1 to PL-R3, PE-R1 to PE-R6, Calls and History views, and the New p
 5. [x] - `p1` - User confirms; API: `voice_profile_delete`; success shows Off and Set Up Voice Profile again - `inst-delete-profile`
 6. [x] - `p1` - **RETURN** Identity with the core's profile status; no audio or profile leaves the Mac - `inst-return-profile`
 
+### Find a voice in past calls
+
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-people-voice-rematch`
+
+**Actor**: Primary user
+
+**Success Scenarios**:
+- Find in Past Calls, or Create Profile, names the voice where past calls still have it unnamed, as one change with Undo
+- Nothing left to name says so in the status line
+
+**Error Scenarios**:
+- A refused re-match changes nothing and shows nothing new
+
+**Steps**:
+1. [x] - `p1` - User clicks Find in Past Calls on Identity, or Create Profile succeeds; API: `voice_profile_rematch` with the person id - `inst-rematch-send`
+2. [x] - `p1` - UI: with a change id, offer Undo with **Found Anna K.’s voice in 6 calls · named 9 speakers** and show it as the status line; without one, the explicit button shows **No unnamed speakers in past calls match Anna K.’s voice** and Create Profile keeps its own line; re-read the person - `inst-rematch-result`
+
 ## 3. Processes / Business Logic (CDSL)
 
 ### Present identity and privacy safely
@@ -255,6 +274,21 @@ The system **MUST** support create, edit, previewed merge, confirmed deletion an
 - Tests: unit tests for duplicate/blank names, alias preservation and merge guards; conformance for revision conflict, deletion and profile opt-in; E2E `cpt-noter-seq-people-name-unnamed-speaker`, `cpt-noter-seq-dialogs-set-up-voice-profile`, with unsupported paths explicitly reported
 
 **Completion gate**: `just gate` passes.
+
+### Voice found in past calls
+
+- [x] `p4` - **ID**: `cpt-noter-dod-ui-people-voice-rematch`
+
+The system **MUST** offer Find in Past Calls while a profile is on, run it after Create Profile, and show what the core named as one change with Undo (#1278).
+
+**Implements**:
+- `cpt-noter-flow-ui-people-voice-rematch`
+
+**Constraints**: `cpt-noter-constraint-local-only-ui`, `cpt-noter-constraint-accessibility-baseline`
+
+**Touches**:
+- Commands: `voice_profile_rematch`; shared Undo
+- Tests: unit tests for the line and the Undo offer; conformance example; E2E `cpt-noter-seq-people-find-voice-in-past-calls` against the real core
 
 ## 6. Acceptance Criteria
 

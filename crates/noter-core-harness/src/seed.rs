@@ -87,6 +87,34 @@ impl Harness {
         Ok(json!({}))
     }
 
+    /// Give a speaker the voice the scripted engine reports for another call's speakers (#1278).
+    pub(super) fn seed_speaker_voice(&self, args: Value) -> Result<Value, CoreError> {
+        let (Some(speaker), Some(as_call)) =
+            (args["speaker_id"].as_str(), args["as_call"].as_str())
+        else {
+            return Err(CoreError::new(
+                ErrorCode::InvalidInput,
+                "speaker_voice needs { speaker_id, as_call }",
+            ));
+        };
+        let vector = noter_engine_client::scripted::speaker_vector(as_call);
+        let blob = noter_core::testing::seal_centroid(&self.core, &vector)?;
+        let db = noter_db::rusqlite::Connection::open(self.dir.join("noter.db"))
+            .map_err(crate::internal)?;
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .map_err(crate::internal)?;
+        let n = db
+            .execute(
+                "UPDATE speakers SET centroid = ?1 WHERE id = ?2",
+                noter_db::rusqlite::params![blob, speaker],
+            )
+            .map_err(crate::internal)?;
+        if n == 0 {
+            return Err(CoreError::new(ErrorCode::NotFound, "no such speaker"));
+        }
+        Ok(json!({}))
+    }
+
     /// The fixture's owned slices, through the core's own commands.
     pub(super) async fn seed(&self, w: &FakeWorld) -> Result<(), CoreError> {
         let wanted = to_json(w);

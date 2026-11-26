@@ -1160,6 +1160,9 @@ impl Controls for Harness {
                 "world_get" => self.world_get().await,
                 "world_set" => self.world_set(args).await,
                 "topic_centroids" => self.seed_topic_centroids(args),
+                // `{ speaker_id, as_call }`: the speaker's stored voice becomes the one the scripted
+                // engine reports for `as_call`'s speakers, sealed as the core seals centroids.
+                "speaker_voice" => self.seed_speaker_voice(args),
                 "push" => self.push(args).await,
                 // `{}`: the next self-test waits for scenario events instead of its timed script.
                 "hold_next_self_test" => {

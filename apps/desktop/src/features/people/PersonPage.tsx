@@ -16,6 +16,7 @@ import { TopicChip } from "../../ui/primitives/topic-chip";
 import { languagesLine, voiceLine } from "./person-lines";
 import { PushButton } from "../../ui/primitives/push-button";
 import { confirmDeleteProfile, usePeopleSheets } from "./sheets";
+import { findInPastCalls } from "./actions";
 import { afterVoiceAlert, afterVoiceChange } from "./focus-return";
 import { holdPerson, setPersonNotice, setPersonStatus, setPersonTab, usePersonNotice, usePersonReread, usePersonStatus, usePersonTab, type PersonTab } from "./person-store";
 import "../library/library.css";
@@ -95,7 +96,8 @@ export function PersonPage({ id }: { id: string }) {
     // @cpt-begin:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
     onSetUpVoice={() => state.page && sheets.open("person-voice", { bridge, person: state.page.person, calls: state.page.calls.length })}
     // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-open-profile
-    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice).finally(() => afterVoiceAlert(document)))} />;
+    onDeleteVoice={() => state.page && (setPersonNotice(null), void confirmDeleteProfile(bridge, state.page.person, setPersonNotice).finally(() => afterVoiceAlert(document)))}
+    onFindVoice={() => state.page && void findInPastCalls(bridge, state.page.person)} />;
 }
 
 export interface PersonBodyProps {
@@ -113,10 +115,11 @@ export interface PersonBodyProps {
   status?: string | null;
   onSetUpVoice?: () => void;
   onDeleteVoice?: () => void;
+  onFindVoice?: () => void;
 }
 
 /** What the page draws for a read of the person. */
-export function PersonBody({ modelNotice, bridge, state, tab, prefs, slow, onRetry, onShowAll, notice, status, onSetUpVoice, onDeleteVoice }: PersonBodyProps) {
+export function PersonBody({ modelNotice, bridge, state, tab, prefs, slow, onRetry, onShowAll, notice, status, onSetUpVoice, onDeleteVoice, onFindVoice }: PersonBodyProps) {
   const { page } = state;
   if (!page) {
     if (state.status === "ERROR")
@@ -154,7 +157,7 @@ export function PersonBody({ modelNotice, bridge, state, tab, prefs, slow, onRet
           {/* @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-history */}
         </div>
       ) : (
-        <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} onSetUpVoice={onSetUpVoice} onDeleteVoice={onDeleteVoice} />
+        <Overview bridge={bridge} page={page} prefs={prefs} onShowAll={onShowAll} onSetUpVoice={onSetUpVoice} onDeleteVoice={onDeleteVoice} onFindVoice={onFindVoice} />
       )}
     </div>
     // @cpt-end:cpt-noter-flow-ui-people-prepare:p1:inst-return-prepare
@@ -196,7 +199,7 @@ const Block = ({ region, title, count, children }: { region: string; title: stri
 );
 
 // @cpt-begin:cpt-noter-flow-ui-people-prepare:p1:inst-calls
-export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDeleteVoice }: { bridge: Bridge; page: Page; prefs: UiPrefs | undefined; onShowAll?: () => void; onSetUpVoice?: () => void; onDeleteVoice?: () => void }) {
+export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDeleteVoice, onFindVoice }: { bridge: Bridge; page: Page; prefs: UiPrefs | undefined; onShowAll?: () => void; onSetUpVoice?: () => void; onDeleteVoice?: () => void; onFindVoice?: () => void }) {
   const p: PersonRow = page.person;
   const names = useMemo(() => [...new Set([p.short_name, ...p.aliases])].join(", "), [p]);
   const languages = languagesLine(page.languages ?? []);
@@ -237,6 +240,8 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
             <dd>
               <div>{!p.voice_profile ? t("person.voice_off") : p.voice_profile_stats ? voiceLine(p.voice_profile_stats, prefs) : t("person.voice_on")}</div>
               <div className="pe-kvact">
+                {p.voice_profile && <PushButton id="pe-voice-find" label={t("person.voice.find")} size="small" onAction={onFindVoice} />}
+                {/* one slot for Set Up and Delete: the same button node swaps, so focus stays on it when Create Profile closes the sheet */}
                 {p.voice_profile ? <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>

@@ -629,17 +629,36 @@ impl Core {
         let Some(key) = self.voice_key(false)? else {
             return Ok(0);
         };
+        let mut named = 0;
+        for (speaker, score) in Self::verdicts(&key, &profiles, &speakers, &attendees) {
+            if self.commit_match(call, &speaker, &score, now)? {
+                named += 1;
+            }
+        }
+        // @cpt-begin:cpt-noter-algo-core-people-profile-match:p1:inst-match-return
+        // The decrypted vectors and the key are wiped as they drop here.
+        Ok(named)
+        // @cpt-end:cpt-noter-algo-core-people-profile-match:p1:inst-match-return
+    }
+
+    /// The profile each speaker's voice matches, when one does: attendees first, then everyone.
+    fn verdicts(
+        key: &SecretKey,
+        profiles: &[Row],
+        speakers: &[(String, Vec<u8>)],
+        attendees: &[String],
+    ) -> Vec<(String, Score)> {
         let mut vectors = Wiped(Vec::new());
         let mut owners: Vec<(&str, &str)> = Vec::new();
-        for row in &profiles {
-            if let Some(v) = Self::open_blob(&key, &row.blob) {
+        for row in profiles {
+            if let Some(v) = Self::open_blob(key, &row.blob) {
                 vectors.0.push(v);
                 owners.push((&row.person, &row.id));
             }
         }
-        let mut named = 0;
-        for (speaker, blob) in &speakers {
-            let Some(mut mine) = Self::open_blob(&key, blob) else {
+        let mut out = Vec::new();
+        for (speaker, blob) in speakers {
+            let Some(mut mine) = Self::open_blob(key, blob) else {
                 continue;
             };
             let mut best: HashMap<&str, Score> = HashMap::new();
@@ -663,17 +682,176 @@ impl Core {
                 .filter(|s| attendees.contains(&s.person))
                 .cloned()
                 .collect();
-            let choice = verdict(narrowed).or_else(|| verdict(best.into_values().collect()));
-            if let Some(score) = choice {
-                if self.commit_match(call, speaker, &score, now)? {
-                    named += 1;
+            if let Some(score) = verdict(narrowed).or_else(|| verdict(best.into_values().collect()))
+            {
+                out.push((speaker.clone(), score));
+            }
+        }
+        // The decrypted vectors are wiped as they drop here.
+        out
+    }
+
+    // @cpt-algo:cpt-noter-algo-core-people-profile-rematch:p1
+    /// Names the person's voice where it is still unnamed in past calls (#1278): the same
+    /// match as a new call, never over a name already given, one change that undoes as a whole.
+    pub(crate) fn rematch_voice(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonIdArgs,
+    ) -> Result<VoiceRematch, CoreError> {
+        self.ready()?;
+        let now = self.deps.clock.now().0;
+        let person = args.person_id.as_str().to_string();
+        let nothing = VoiceRematch {
+            person_id: args.person_id.clone(),
+            calls: 0,
+            speakers: 0,
+            change_id: None,
+        };
+        // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-load
+        let who = person.clone();
+        type Unnamed = BTreeMap<String, (Vec<(String, Vec<u8>)>, Vec<String>)>;
+        let (calls, profiles): (Unnamed, Vec<Row>) = rd(self.store(), move |c| {
+            optin_of(c, &who)?;
+            let mut calls: Unnamed = BTreeMap::new();
+            let mut q = db(c.prepare(
+                "SELECT call_id, id, centroid FROM speakers WHERE pass = 'archive'
+                   AND person_id IS NULL AND centroid IS NOT NULL ORDER BY call_id, rowid",
+            ))?;
+            let rows = db(q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?))))?;
+            for row in rows {
+                let (call, speaker, blob) = db(row)?;
+                calls.entry(call).or_default().0.push((speaker, blob));
+            }
+            let mut q = db(c.prepare("SELECT call_id, person_id FROM call_participants"))?;
+            let rows = db(q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?))))?;
+            for row in rows {
+                let (call, who) = db(row)?;
+                if let Some(entry) = calls.get_mut(&call) {
+                    entry.1.push(who);
+                }
+            }
+            Ok((calls, live_profiles(c, now).map_err(internal)?))
+        })?;
+        // @cpt-end:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-load
+        if calls.is_empty() || !profiles.iter().any(|p| p.person == person) {
+            return Ok(nothing);
+        }
+        let Some(key) = self.voice_key(false)? else {
+            return Ok(nothing);
+        };
+        // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-score
+        // Every profile scores, so the runner-up margin is the same as for a new call; only
+        // this person's wins are applied.
+        let mut found: Vec<(String, String, String)> = Vec::new();
+        for (call, (speakers, attendees)) in &calls {
+            for (speaker, score) in Self::verdicts(&key, &profiles, speakers, attendees) {
+                if score.person == person {
+                    found.push((call.clone(), speaker, score.profile));
                 }
             }
         }
-        // @cpt-begin:cpt-noter-algo-core-people-profile-match:p1:inst-match-return
-        // The decrypted vectors and the key are wiped as they drop here.
-        Ok(named)
-        // @cpt-end:cpt-noter-algo-core-people-profile-match:p1:inst-match-return
+        // @cpt-end:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-score
+        if found.is_empty() {
+            return Ok(nothing);
+        }
+        // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-write
+        let meta = self.change_meta(ctx, "Named a voice in past calls".into(), "voice_rematch");
+        let target = person.clone();
+        let done = self.store().write_with(meta, move |tx| {
+            let mut log = Vec::new();
+            let mut named: Vec<(String, String)> = Vec::new();
+            let mut used: BTreeMap<String, i64> = BTreeMap::new();
+            for (call, speaker, profile) in found {
+                // Rechecked in the transaction: a name the user gave meanwhile, a deletion
+                // or an opt-out wins, and that speaker is left as it is.
+                let ok: bool = db(tx.query_row(
+                    "SELECT EXISTS (
+                       SELECT 1 FROM people p JOIN voice_profiles v ON v.person_id = p.id
+                       WHERE p.id = ?1 AND p.voice_profile_optin = 1 AND v.id = ?2)
+                     AND EXISTS (SELECT 1 FROM speakers WHERE id = ?3 AND person_id IS NULL)",
+                    params![target, profile, speaker],
+                    |r| r.get(0),
+                ))?;
+                if !ok {
+                    continue;
+                }
+                db(tx.execute(
+                    "UPDATE speakers SET person_id = ?1, named_by = 'voice_profile' WHERE id = ?2",
+                    params![target, speaker],
+                ))?;
+                log.push(logged(
+                    "speaker",
+                    &speaker,
+                    vec![
+                        ("person_id", Value::Null, json!(target)),
+                        ("named_by", Value::Null, json!("voice_profile")),
+                    ],
+                ));
+                if let std::collections::btree_map::Entry::Vacant(slot) = used.entry(profile) {
+                    let last: i64 = db(tx.query_row(
+                        "SELECT last_used_at FROM voice_profiles WHERE id = ?1",
+                        [slot.key()],
+                        |r| r.get(0),
+                    ))?;
+                    slot.insert(last);
+                }
+                named.push((call, speaker));
+            }
+            if named.is_empty() {
+                return Err(stale());
+            }
+            for (profile, last) in used {
+                db(tx.execute(
+                    "UPDATE voice_profiles SET last_used_at = ?1 WHERE id = ?2",
+                    params![now, profile],
+                ))?;
+                log.push(logged(
+                    "voice_profile",
+                    &profile,
+                    vec![("last_used_at", json!(last), json!(now))],
+                ));
+            }
+            Ok((named, log))
+        });
+        let done = match done {
+            Ok(done) => done,
+            Err(e) if e.code == ErrorCode::NotFound => return Ok(nothing),
+            Err(e) => return Err(e),
+        };
+        // @cpt-end:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-write
+        // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-publish
+        let mut by_call: BTreeMap<String, Vec<String>> = BTreeMap::new();
+        for (call, speaker) in &done.value {
+            by_call
+                .entry(call.clone())
+                .or_default()
+                .push(speaker.clone());
+        }
+        for (call, speakers) in &by_call {
+            let call = CallId::new(call.clone());
+            // A speaker named as a person takes part in the call, undone with the naming.
+            self.sync_participants_in(&call, done.batch_id.clone())?;
+            let ids = speakers.clone();
+            let segments: Vec<SegmentId> = rd(self.store(), move |c| {
+                let marks = crate::util::marks(ids.len());
+                let mut q = db(c.prepare(&format!(
+                    "SELECT id FROM segments WHERE speaker_id IN ({marks}) ORDER BY t0_ms"
+                )))?;
+                let rows =
+                    db(q.query_map(params_from_iter(ids.iter()), |r| r.get::<_, String>(0)))?;
+                db(rows.map(|r| r.map(SegmentId::new)).collect())
+            })?;
+            self.publish_corrected(&call, &segments)?;
+        }
+        self.publish_person(&person)?;
+        Ok(VoiceRematch {
+            person_id: args.person_id,
+            calls: by_call.len() as u32,
+            speakers: done.value.len() as u32,
+            change_id: done.change_ids.first().cloned(),
+        })
+        // @cpt-end:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-publish
     }
 
     /// Suggestions for an unnamed queue, with one profile/key load for the whole request.
