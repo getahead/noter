@@ -55,7 +55,8 @@ export async function createProfile(bridge: Bridge, person: PersonRow): Promise<
   bumpPerson();
   // @cpt-end:cpt-noter-flow-ui-people-voice-profile:p1:inst-profile-result
   // A new profile names its voice where past calls still have it unnamed (#1278); nothing found keeps "created".
-  await findInPastCalls(bridge, person, true);
+  // Not awaited: the sheet closes now, so focus moves to Delete Profile… as without a re-match.
+  void findInPastCalls(bridge, person, true);
   return true;
 }
 
@@ -75,9 +76,12 @@ export async function findInPastCalls(bridge: Bridge, person: PersonRow, quiet =
   if (res.status === "error") return false;
   // @cpt-begin:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-result
   const text = rematchLine(person, res.data);
-  if (res.data.change_id) holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: text, refresh: bumpPerson });
   if (res.data.change_id || !quiet) setPersonStatus({ id: person.id, text });
-  bumpPerson();
+  // Only names given need the person read again; a needless re-read would take focus from Delete Profile….
+  if (res.data.change_id) {
+    holdUndo({ target: { type: "change", change_id: res.data.change_id }, message: text, refresh: bumpPerson });
+    bumpPerson();
+  }
   // @cpt-end:cpt-noter-flow-ui-people-voice-rematch:p1:inst-rematch-result
   return true;
 }

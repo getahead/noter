@@ -240,14 +240,9 @@ export function Overview({ bridge, page, prefs, onShowAll, onSetUpVoice, onDelet
             <dd>
               <div>{!p.voice_profile ? t("person.voice_off") : p.voice_profile_stats ? voiceLine(p.voice_profile_stats, prefs) : t("person.voice_on")}</div>
               <div className="pe-kvact">
-                {p.voice_profile ? (
-                  <>
-                    <PushButton id="pe-voice-find" label={t("person.voice.find")} size="small" onAction={onFindVoice} />
-                    <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} />
-                  </>
-                ) : (
-                  <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />
-                )}
+                {p.voice_profile && <PushButton id="pe-voice-find" label={t("person.voice.find")} size="small" onAction={onFindVoice} />}
+                {/* one slot for Set Up and Delete: the same button node swaps, so focus stays on it when Create Profile closes the sheet */}
+                {p.voice_profile ? <PushButton id="pe-voice-delete" label={t("person.voice_delete")} size="small" variant="destructive" onAction={onDeleteVoice} /> : <PushButton id="pe-voice-setup" label={t("person.voice_setup")} size="small" onAction={onSetUpVoice} />}
               </div>
             </dd>
             {languages && (
