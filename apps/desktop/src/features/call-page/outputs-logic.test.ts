@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ItemView, OutputSection, OutputsProgress, SectionKind } from "../../core/bindings";
-import { currentItems, mergeSection, metaLine, orderSections, sectionCounts, settledSince, summaryReadyNow, versionLabel } from "./outputs-logic";
+import type { CallOutputs, JobRunRow, WriterInfo, ItemView, OutputSection, OutputsProgress, SectionKind } from "../../core/bindings";
+import { currentItems, mergeSection, metaLine, orderSections, processingText, sectionCounts, settledSince, summaryReadyNow, versionLabel } from "./outputs-logic";
 
 const item = (review: ItemView["review"]) => ({ id: `i_${review}_${Math.random()}`, review }) as unknown as ItemView;
 const sec = (kind: SectionKind, o: Partial<OutputSection> = {}): OutputSection =>
@@ -69,6 +69,33 @@ describe("metaLine and versionLabel", () => {
     const prefs = { time_format: "h24", first_weekday: 1, time_zone: "UTC" } as never;
     expect(versionLabel({ id: "v", n: 3, kind: "user_edit", writer: null, created_at: Date.UTC(2026, 10, 5, 10, 42) }, prefs)).toBe("Your Edit · 10:42");
     expect(versionLabel({ id: "v", n: 1, kind: "generated", writer, created_at: 0 }, prefs)).toBe("v1 · Claude Code · 00:00");
+  });
+});
+
+describe("cpt-noter-seq-call-page-review-outputs — Call info Processing", () => {
+  const call = { status: "failed", started_at: 1_000_000, duration_ms: 60_000 } as const;
+  const writer: WriterInfo = { runtime: "claude_api_key", model: "m", skill: "planning", skill_version: "1", generated_at: 1_160_000, from_pass: "archive" };
+  const outputs: CallOutputs = { call_id: "past", status: "ready", sections: [sec("summary", { writer })], archive: "not_started", review_waiting: 0, sensitive: false, written_locally: false };
+  const run: JobRunRow = { id: "run", job_id: "regen", kind: "regeneration", name: "Regeneration", started_at: 0, finished_at: null, status: "queued", counts: [], error: null, progress: null };
+  it("shows the current job even when an earlier run wrote a summary and the call is marked failed", () => {
+    expect(processingText(call, { ...outputs, processing_run: run })).toBe("Regeneration queued");
+    expect(processingText(call, { ...outputs, processing_run: run, waiting_for_power: run.id })).toBe("Regeneration queued · waiting for power");
+    expect(processingText(call, { ...outputs, processing_run: { ...run, status: "running" } })).toBe("Regenerating outputs");
+    expect(processingText(call, { ...outputs, processing_run: { ...run, status: "paused" } })).toBe("Regeneration paused");
+    expect(processingText(call, { ...outputs, processing_run: { ...run, status: "failed" } })).toBe("Regeneration failed");
+    expect(processingText(call, { ...outputs, processing_run: { ...run, kind: "post_call", status: "cancelled" } })).toBe("Writing outputs cancelled");
+  });
+  it("shows the Summary writer and elapsed time, with a price only for a metered API-key generation", () => {
+    const line = (w: WriterInfo) => processingText(call, { ...outputs, processing_run: { ...run, status: "succeeded" }, sections: [sec("summary", { writer: w })] });
+    expect(line({ ...writer, cost_usd: 0.31 })).toBe("Claude Code · summary 1 min 40 s after the call · $0.31");
+    expect(line({ ...writer, cost_usd: 0 })).toBe("Claude Code · summary 1 min 40 s after the call");
+    expect(line(writer)).toBe("Claude Code · summary 1 min 40 s after the call");
+    expect(line({ ...writer, runtime: "local", cost_usd: 1 })).toBe("Local model · summary 1 min 40 s after the call");
+  });
+  it("uses the output state when there is no writer and keeps the live recording state", () => {
+    expect(processingText(call)).toBe("");
+    expect(processingText(call, { ...outputs, sections: [], status: "partially_failed" })).toBe("Some outputs failed");
+    expect(processingText({ ...call, status: "recording" })).toBe("Recording");
   });
 });
 

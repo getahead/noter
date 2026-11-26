@@ -62,6 +62,7 @@ test.describe("cpt-noter-dod-ui-call-page-outputs-actions sharing surfaces", () 
     await open(page);
     await expect(page.getByRole("button", { name: "Remove release" })).toBeVisible();
     await expect(page.locator(".pc-sec__meta")).toContainText("1 min 40 s after the call");
+    await expect(page.locator(".pc-info")).toContainText("Claude Code · summary 1 min 40 s after the call");
     await shot(page, "call-page-call-info-tags");
   });
 
@@ -80,6 +81,7 @@ test.describe("cpt-noter-feature-ui-call-page-outputs section states", () => {
       outputsOf(w).waiting_for_power = "run_regeneration";
     });
     await expect(outputBody(page).getByRole("button", { name: "Run Now" })).toBeInViewport();
+    await expect(page.locator(".pc-info")).toContainText("Regeneration queued · waiting for power");
     await shot(page, "outputs-regeneration-waiting-for-power");
   });
 

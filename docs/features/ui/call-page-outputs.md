@@ -130,10 +130,11 @@ It implements `cpt-noter-component-ui-output-section`, `cpt-noter-component-ui-o
 7. [x] - `p1` - User selects a version; `output_version_get` returns its body for read-only inspection; selecting it never writes it over the current edit - `inst-version`
 8. [x] - `p1` - User toggles Compare or Show Diff; fetch the two required bodies, show word changes with insertions underlined and deletions struck through, keep adjacent replacement words visibly separated without losing the before/after text or its marks, fold long unchanged stretches - `inst-diff`
 9. [x] - `p1` - **IF** version read fails: keep current prose and the chosen edit; show retry beside the version control - `inst-error`
-10. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
+10. [x] - `p1` - If a previous version lost the queued regeneration settings, explain this in Summary and offer **Regenerate again** to choose sections and model - `inst-recover-settings`
 11. [x] - `p1` - If regeneration is refused, explain the error at the action. For `runtime_unavailable`, offer **Add an Assistant…** to open Models & Runtimes - `inst-regen-refusal`
 12. [x] - `p1` - Show the queued run in Summary when submitted or reopened. Replace pending sections with the power notice, keep written sections readable, and let **Run Now** release only the named run - `inst-power-hold`
-13. [x] - `p1` - When the held run leaves the queue, refresh the outputs to clear the notice and show its progress - `inst-power-refresh`
+13. [x] - `p1` - Read outputs on opening the call page and refresh when the call’s output job changes state, including when a held run leaves the queue - `inst-power-refresh`
+14. [x] - `p1` - **RETURN** plain text again on Compare or Hide Diff; History opens the reusable timeline and Export Log flow - `inst-return`
 
 ### Copy or export a visible scope
 

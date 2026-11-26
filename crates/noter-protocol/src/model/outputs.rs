@@ -16,7 +16,8 @@ pub enum SectionKind {
     PerParticipant,
     RoleReviews,
     Risks,
-    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.
+    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+    /// presentation/demo: what was shown, questions asked, feedback and follow-ups.
     CallTypeExtras,
 }
 
@@ -35,6 +36,10 @@ pub enum SectionState {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct WriterInfo {
+    /// Recorded cost of this generation on an API key, when available.
+    #[serde(default)]
+    #[specta(optional)]
+    pub cost_usd: Option<f64>,
     pub runtime: RuntimeChoice,
     pub model: String,
     pub skill: String,
@@ -90,6 +95,10 @@ pub enum OutputsStatus {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallOutputs {
+    /// The active output job for this call, or its most recent completed output job.
+    #[serde(default)]
+    #[specta(optional)]
+    pub processing_run: Option<Box<crate::model::JobRunRow>>,
     /// Queued regeneration for this call waiting for external power. Run Now names this exact run.
     #[serde(default)]
     #[specta(optional)]

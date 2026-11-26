@@ -384,6 +384,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "call-local calendar guests",
         sql: include_str!("../migrations/0013_call_guests.sql"),
     },
+    Migration {
+        owner: "noter-core",
+        version: 14,
+        name: "the built-in Retro type becomes Presentation/Demo",
+        sql: include_str!("../migrations/0014_presentation_demo.sql"),
+    },
 ];
 
 impl Core {

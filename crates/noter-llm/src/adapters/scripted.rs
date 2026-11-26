@@ -37,7 +37,13 @@ struct Line {
     output: Option<Value>,
     fail: Option<String>,
     after_ms: Option<u64>,
+    #[serde(default = "default_cost")]
     cost_usd: Option<f64>,
+}
+
+// Omitted uses the fixture price; explicit null models a provider that reports no price.
+fn default_cost() -> Option<f64> {
+    Some(0.001)
 }
 
 /// One packet the scripted runtime received, as the gate released it.
@@ -202,7 +208,7 @@ impl RuntimeAdapter for Scripted {
                 output,
                 tokens_in: call.packet.len() as u64 / 4 + 1,
                 tokens_out,
-                cost_usd: Some(line.and_then(|l| l.cost_usd).unwrap_or(0.001)),
+                cost_usd: line.map_or_else(default_cost, |l| l.cost_usd),
                 first_token_ms: Some(after_ms.unwrap_or(0)),
                 session_id: call.session,
             })
@@ -262,6 +268,7 @@ pub(crate) fn built_in(skill: Skill, ids: &[String]) -> Value {
         Skill::PostCall => serde_json::to_value(PostCallOutput {
             lang: Lang::En,
             title: None,
+            call_type: None,
             summary_md: "Scripted summary.".into(),
             decisions: vec![item("Scripted decision")],
             action_items: vec![item("Scripted action item")],

@@ -113,7 +113,7 @@ Post-call and handoff can call a model without creating another path for user te
 4. [x] - `p1` - Use `cpt-noter-algo-core-llm-gate-egress` for the selected attempt before invoking an adapter - `inst-run-gate`
 5. [x] - `p1` - Start the locked-down adapter with the same app-owned schema, skill and allowed tools; apply effort, budget and task timeout - `inst-run-adapter`
 6. [x] - `p1` - Validate results through `cpt-noter-algo-core-llm-gate-validate`; map pseudonyms back only after cloud output is inside the core - `inst-run-validate`
-7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; cost is present for API-key runs and absent for own-account runs - `inst-run-usage`
+7. [x] - `p1` - Record usage, duration, first token, validation, retry and session id; record an API-key total only when every metered attempt reported its cost. Unknown spend prevents a further budget-capped API-key attempt. Own-account and local runs have no price - `inst-run-usage`
 8. [x] - `p1` - **IF** timeout or cancellation occurs, terminate the request and child process, invalidate late output and remove its temporary config - `inst-run-cancel`
 9. [x] - `p1` - **RETURN** validated output and provenance or the typed failure; capture remains independent - `inst-run-return`
 
@@ -147,7 +147,7 @@ Post-call and handoff can call a model without creating another path for user te
 **Output**: An allowed runtime choice or `runtime_unavailable` with its reason and fix.
 
 **Steps**:
-1. [x] - `p1` - Force local for local-only mode, sensitive calls or offline execution; sensitive sources are never admitted to a cloud packet - `inst-route-local`
+1. [x] - `p1` - Force local for an explicit local-only request, local-only mode, sensitive calls or offline execution; sensitive sources are never admitted to a cloud packet - `inst-route-local`
 2. [x] - `p1` - For post-call, prefer the configured available runtime, then the PRD fallback order Claude Code, Codex, local; handoff prefers its target runtime then local - `inst-route-order`
 3. [x] - `p1` - Keep embeddings and redaction local; if the local redaction model is unavailable, retain regex redaction - `inst-route-redaction`
 4. [x] - `p1` - Refuse a CLI older than its tested version with `cli_version_unsupported`; a newer one runs (marked untested for the UI's warning, owner 23 Nov, #1219), still with every lockdown flag, and a run whose CLI rejects a flag (a usage error) or answers in a shape the adapter cannot read fails as `cli_incompatible`, never retried without the flags - `inst-route-version`

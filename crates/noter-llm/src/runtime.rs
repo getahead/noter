@@ -298,7 +298,7 @@ struct Tally {
     fallback: bool,
     schema_ok: bool,
     usage: Usage,
-    spent_usd: f64,
+    spent_usd: Option<f64>,
     first_token_ms: Option<u64>,
     session_id: Option<String>,
     audit_ids: Vec<AuditId>,
@@ -357,7 +357,7 @@ impl Inner {
     fn route(
         &self,
         req: &RunRequest,
-        spent_usd: f64,
+        spent_usd: Option<f64>,
         prefer_local: bool,
         verifying: Option<RuntimeChoice>,
     ) -> Result<Choice, Failure> {
@@ -382,7 +382,7 @@ impl Inner {
     async fn route_async(
         self: &Arc<Self>,
         req: &RunRequest,
-        spent_usd: f64,
+        spent_usd: Option<f64>,
         prefer_local: bool,
         verifying: Option<RuntimeChoice>,
     ) -> Result<Choice, Failure> {
@@ -438,7 +438,7 @@ impl Inner {
         // @cpt-begin:cpt-noter-flow-core-llm-gate-run:p1:inst-run-route
         let verifying = verifying.or_else(|| candidate.as_ref().map(|(runtime, _)| *runtime));
         let routed = self
-            .route_async(&req, 0.0, false, verifying)
+            .route_async(&req, Some(0.0), false, verifying)
             .await
             .and_then(|choice| match &session {
                 // A session never carries a turn to another runtime (privacy changed, say).
@@ -471,7 +471,7 @@ impl Inner {
             fallback: false,
             schema_ok: false,
             usage: Usage::default(),
-            spent_usd: 0.0,
+            spent_usd: Some(0.0),
             first_token_ms: None,
             session_id: session.as_ref().map(|(_, s)| s.clone()),
             audit_ids: Vec::new(),
@@ -594,7 +594,8 @@ impl Inner {
                 .budget
                 .max_cost_usd
                 .filter(|_| route::is_api_key(tally.choice.runtime))
-                .map(|cap| (cap - tally.spent_usd).max(0.0));
+                .zip(tally.spent_usd)
+                .map(|(cap, spent)| (cap - spent).max(0.0));
             let key = self.key(tally.choice.runtime, candidate);
             let sent = (self.gate).send(
                 &approved,
@@ -635,9 +636,12 @@ impl Inner {
             tally.usage.tokens_in += reply.tokens_in;
             tally.usage.tokens_out += reply.tokens_out;
             if route::is_api_key(tally.choice.runtime) {
-                let cost = reply.cost_usd.unwrap_or(0.0);
-                tally.usage.cost_usd = Some(tally.usage.cost_usd.unwrap_or(0.0) + cost);
-                tally.spent_usd += cost;
+                // One unpriced metered attempt makes the total and remaining budget unknown.
+                tally.spent_usd = tally
+                    .spent_usd
+                    .zip(reply.cost_usd)
+                    .map(|(spent, cost)| spent + cost);
+                tally.usage.cost_usd = tally.spent_usd;
             }
             tally.first_token_ms = tally.first_token_ms.or(reply.first_token_ms);
             tally.session_id = reply.session_id.or(tally.session_id.take());
@@ -817,9 +821,9 @@ impl Inner {
         let inner = Arc::clone(self);
         let route_req = req.clone();
         tokio::task::spawn_blocking(move || {
-            let first = inner.route(&route_req, 0.0, false, None)?;
+            let first = inner.route(&route_req, Some(0.0), false, None)?;
             inner.gate.refresh(first.runtime);
-            inner.route(&route_req, 0.0, false, None)
+            inner.route(&route_req, Some(0.0), false, None)
         })
         .await
         .map_err(|_| Failure::Timeout)?

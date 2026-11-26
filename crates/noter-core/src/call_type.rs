@@ -106,6 +106,20 @@ impl Core {
     // @cpt-seq:cpt-noter-seq-core-call-end-outputs:p1
     // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-classify
     pub(crate) fn classify_stopped_call(&self, id: &CallId) -> Result<(), CoreError> {
+        self.assign_call_type(id, "Call type detection", |c, title| detect(c, id, title))
+    }
+
+    /// Apply the post-call model's suggestion under the same guard as local detection.
+    pub(crate) fn suggest_call_type(&self, id: &CallId, kind: &str) -> Result<(), CoreError> {
+        self.assign_call_type(id, "Post-call analysis", |_, _| Ok(Some(kind)))
+    }
+
+    fn assign_call_type<'k>(
+        &self,
+        id: &CallId,
+        writer: &str,
+        pick: impl Fn(&Connection, &str) -> noter_db::rusqlite::Result<Option<&'k str>>,
+    ) -> Result<(), CoreError> {
         loop {
             let candidate = self.store().read(|c| {
                 // Legacy captures sometimes used the capture process name as their title.
@@ -131,7 +145,7 @@ impl Core {
                 let Some((rev, title)) = header else {
                     return Ok(None);
                 };
-                Ok(detect(c, id, &title)?.map(|kind| (rev, kind)))
+                Ok(pick(c, &title)?.map(|kind| (rev, kind)))
             })?;
             let Some((rev, kind)) = candidate else {
                 return Ok(());
@@ -147,7 +161,7 @@ impl Core {
             let meta = ChangeMeta {
                 actor: Actor::Job {
                     job_id: JobId::new("job_call_type"),
-                    name: "Call type detection".into(),
+                    name: writer.into(),
                 },
                 summary: "Automatically detected call type".into(),
                 reason: REASON.into(),

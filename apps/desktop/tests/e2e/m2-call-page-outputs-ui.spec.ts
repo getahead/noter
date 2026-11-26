@@ -102,6 +102,38 @@ test.describe("cpt-noter-seq-call-page-review-outputs", () => {
     expect((await outputs()).waiting_for_power).not.toBe(run);
   });
 
+  if (H.REAL) test("UI — #1259: Call info Processing follows the held regeneration through completion", async ({ page }) => {
+    await openWindow(page, "main", { power: "battery", world: O.unwritten });
+    await openReady(page);
+    const processing = page.locator(".pc-info__sec").filter({ has: page.getByRole("heading", { name: "Processing", exact: true }) });
+    await submitRegeneration(page);
+    await expect(body(page).getByRole("button", { name: "Run Now" })).toBeVisible();
+    const showInspector = page.getByRole("button", { name: "Show Inspector", exact: true });
+    if (await showInspector.isVisible()) await showInspector.click();
+    await expect(processing).toBeVisible();
+    await expect(processing).toContainText("Regeneration queued · waiting for power");
+    await body(page).getByRole("button", { name: "Run Now" }).click();
+    await expect(section(page, "Summary")).toContainText("Scripted summary.");
+    const writer = await section(page, "Summary").locator(".pc-sec__meta").innerText();
+    const [, , runtime, elapsed] = writer.split(" · ");
+    expect(runtime).toBeTruthy();
+    expect(elapsed).toContain("after the call");
+    await expect(processing).toContainText(`${runtime} · summary ${elapsed}`);
+  });
+
+  if (!H.REAL) test("UI — #1263: Regenerate again opens the options for a legacy run with missing settings", async ({ page }) => {
+    await openWindow(page, "main", { world: (w) => {
+      O.unwritten(w);
+      O.outputsOf(w).processing_run = {
+        id: "run_legacy", job_id: "job_regeneration", kind: "regeneration", name: "Regeneration", call_id: W.PAST_CALL,
+        started_at: w.now, finished_at: w.now, status: "failed", counts: [], progress: null, error: "invalid_input",
+      };
+    } });
+    await openReady(page);
+    await body(page).getByRole("button", { name: "Regenerate again" }).click();
+    await expect(page.getByRole("dialog", { name: "Regenerate Outputs" })).toBeVisible();
+  });
+
   test("UI — happy path: Summary meta line, the four sections, Edit, ⌘Return, Edited badge and Your Edit in the version menu", async ({ page }) => {
     await openWindow(page, "main", { world: O.written });
     await openReady(page);

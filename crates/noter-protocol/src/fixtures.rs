@@ -320,6 +320,7 @@ fn item(
 
 fn writer(rt: RuntimeChoice, model: &str) -> WriterInfo {
     WriterInfo {
+        cost_usd: None,
         runtime: rt,
         model: s(model),
         skill: s("planning"),
@@ -1258,6 +1259,7 @@ pub fn world() -> FakeWorld {
     ];
 
     let backend_outputs = CallOutputs {
+        processing_run: None,
         waiting_for_power: None,
         call_id: CallId(s(BACKEND)),
         status: OutputsStatus::Ready,
@@ -1787,6 +1789,7 @@ pub fn world() -> FakeWorld {
                     trigger: s("Hourly while items are open, after each call"),
                     allow_on_battery: false,
                     last_run: Some(JobRunRow {
+                        call_id: None,
                         id: JobRunId(s("run_1")),
                         job_id: JobId(s("job_evidence")),
                         kind: JobKind::EvidenceCollection,
@@ -1932,7 +1935,7 @@ pub fn world() -> FakeWorld {
                 ("one_on_one", "1:1"),
                 ("standup", "Standup"),
                 ("planning", "Planning"),
-                ("retro", "Retro"),
+                ("presentation_demo", "Presentation/Demo"),
                 ("cross_team", "Cross-team"),
                 ("vendor", "Vendor"),
                 ("interview", "Interview"),

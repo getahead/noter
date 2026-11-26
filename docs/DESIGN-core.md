@@ -1700,6 +1700,7 @@ sequenceDiagram
     loop each section in order
         L-->>PC: section validated
         PC->>I: write section, suggested items
+        PC->>I: with Summary, the suggested call type if the call is still unclassified and never set by the user
         I-->>M: outputs:progress {section, ready}
     end
     PC->>Ses: outputs ready

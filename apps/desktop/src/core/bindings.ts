@@ -657,6 +657,8 @@ export type CallMutation = {
 };
 
 export type CallOutputs = {
+	/**  The active output job for this call, or its most recent completed output job. */
+	processing_run?: JobRunRow | null,
 	/**  Queued regeneration for this call waiting for external power. Run Now names this exact run. */
 	waiting_for_power?: JobRunId | null,
 	call_id: CallId,
@@ -2108,6 +2110,8 @@ export type JobRow = {
 export type JobRunId = string;
 
 export type JobRunRow = {
+	/**  The call whose post-call analysis or regeneration this row describes. */
+	call_id?: CallId | null,
 	id: JobRunId,
 	job_id: JobId,
 	kind: JobKind,
@@ -2987,7 +2991,10 @@ export type SearchResults = {
 };
 
 export type SectionKind = "summary" | "decisions" | "action_items" | "open_questions" | "per_participant" | "role_reviews" | "risks" | 
-/**  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline. */
+/**
+ *  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+ *  presentation/demo: what was shown, questions asked, feedback and follow-ups.
+ */
 "call_type_extras";
 
 export type SectionState = { type: "pending" } | { type: "writing" } | { type: "ready" } | { type: "empty" } | { type: "failed"; code: ErrorCode; local_fallback_available: boolean };
@@ -3862,6 +3869,8 @@ export type WindowLabel = "main" |
 "call-screen" | "record-prompt" | "settings" | "first-run";
 
 export type WriterInfo = {
+	/**  Recorded cost of this generation on an API key, when available. */
+	cost_usd?: number | null,
 	runtime: RuntimeChoice,
 	model: string,
 	skill: string,
