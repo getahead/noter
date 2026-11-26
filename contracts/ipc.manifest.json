@@ -1313,6 +1313,18 @@
       ]
     },
     {
+      "args": "PersonIdArgs",
+      "channel": null,
+      "doc": "",
+      "group": "people",
+      "name": "voice_profile_rematch",
+      "result": "VoiceRematch",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
       "args": "NoArgs",
       "channel": null,
       "doc": "",
@@ -2262,7 +2274,7 @@
       ]
     }
   ],
-  "contract_version": "2.35",
+  "contract_version": "2.37",
   "default_retryable": [
     "not_ready",
     "internal",

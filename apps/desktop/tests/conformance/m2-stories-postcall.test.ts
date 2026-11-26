@@ -166,6 +166,24 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
     expect(versions[2].writer).toMatchObject({ from_pass: "archive" });
   });
 
+  it("cpt-noter-seq-core-call-end-outputs (other path, #1269): the model types a call the local rules left unclassified, History marks it automatic, and after Undo a regeneration leaves it unclassified", async () => {
+    const typed = (summary: string, call_type: string | null) => ({ ...postCall(summary), output: { ...postCall(summary).output, call_type } });
+    open({ llm: [...Array(6).fill(typed("Demo.", "presentation_demo")), typed("Again.", "presentation_demo")], emptyArchive: true });
+    const call = await record();
+    await stop(call);
+    await written(call);
+    const callType = async () => ok(await s.core("main").callGet({ call_id: call })).call.call_type;
+    expect(await callType()).toBe("presentation_demo");
+    const history = ok(await s.core("main").historyList({ target: { type: "call", call_id: call }, actor: "all", job_id: null, from: null, to: null, page: {} }));
+    const entry = history.rows.find((row) => row.field === "call_type")!;
+    expect(entry).toMatchObject({ actor: { type: "job" }, reason: "automatic_call_type", undoable: true });
+    expect(ok(await s.core("main").changeUndo({ target: { type: "change", change_id: entry.id } })).undone).toBe(1);
+    expect(await callType()).toBe("unclassified");
+    ok(await s.core("main").outputsRegenerate({ call_id: call, sections: ["summary"], local: false }));
+    await until(async () => sectionOf(await outputs(call), "summary").body_md === "Again.", "the summary regenerated");
+    expect(await callType()).toBe("unclassified");
+  });
+
   it("cpt-noter-seq-call-page-review-outputs: the built-in archive pass uses live transcript segments when audio exists", async () => {
     open({ engine: null });
     const call = await record(LINES.slice(0, 2));

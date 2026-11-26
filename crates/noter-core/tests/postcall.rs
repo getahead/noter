@@ -921,6 +921,13 @@ async fn check_local_regeneration_after_restart(local_available: bool) {
     core.shutdown().await;
     let first = Arc::downgrade(&core);
     drop(core);
+    // A background task may still hold the core for a moment after the drop (#1285): it must let go, soon.
+    for _ in 0..200 {
+        if first.upgrade().is_none() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     assert!(first.upgrade().is_none());
 
     if !local_available {
@@ -1344,5 +1351,82 @@ async fn cpt_noter_seq_call_page_review_outputs_names_only_automatically_untitle
                 "Release timing"
             }
         );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_core_call_end_outputs_model_types_only_unclassified_calls_never_user_set() {
+    let script = |kind: Value| {
+        json!({"on": "post-call", "after_ms": 1000, "output": {
+            "call_type": kind, "lang": "en", "summary_md": "What the demo showed and the feedback.",
+            "decisions": [], "action_items": [], "open_questions": [], "risks": [], "per_participant": []
+        }})
+        .to_string()
+    };
+    let undo = |core: &Arc<Core>, change: &str| {
+        let core = core.clone();
+        let change_id = noter_protocol::ChangeId::new(change);
+        async move {
+            core.change_undo(
+                &main_window(),
+                UndoArgs {
+                    target: UndoTarget::Change { change_id },
+                },
+            )
+            .await
+            .unwrap();
+        }
+    };
+    // (suggestion, the user picked a type and undid it) -> the type after a run and a retry.
+    for (kind, user_undid, want) in [
+        (json!("presentation_demo"), false, "presentation_demo"),
+        (json!(null), false, "unclassified"),
+        (json!("presentation_demo"), true, "unclassified"),
+    ] {
+        let (core, _, dir) = open(&script(kind)).await;
+        seed_call(&core, CALL, 2);
+        let db = noter_db::rusqlite::Connection::open(dir.path().join("noter.db")).unwrap();
+        db.execute("UPDATE calls SET call_type = 'unclassified'", [])
+            .unwrap();
+        if user_undid {
+            let set = core
+                .call_update(
+                    &main_window(),
+                    noter_protocol::model::CallUpdateArgs {
+                        call_id: CallId::new(CALL),
+                        rev: Rev(1),
+                        title: None,
+                        call_type: Some(noter_protocol::CallTypeId("planning".into())),
+                    },
+                )
+                .await
+                .unwrap();
+            undo(&core, set.change_id.as_str()).await;
+        }
+        let run = post_call(&core, CALL);
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        assert_eq!(run_status(&core, &run).0, JobRunStatus::Succeeded);
+        let kind = || -> String {
+            db.query_row("SELECT call_type FROM calls", [], |r| r.get(0))
+                .unwrap()
+        };
+        assert_eq!(kind(), want);
+        if want == "presentation_demo" {
+            // Automatic, undoable History entry; the undone suggestion is not reapplied on retry.
+            let change: String = db
+                .query_row(
+                    "SELECT id FROM changes WHERE entity_id = ?1 AND actor LIKE 'job:%'
+                     AND reason = 'automatic_call_type' AND undoable = 1",
+                    [CALL],
+                    |r| r.get(0),
+                )
+                .unwrap();
+            undo(&core, &change).await;
+            assert_eq!(kind(), "unclassified");
+            let retry = post_call(&core, CALL);
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            assert_eq!(run_status(&core, &retry).0, JobRunStatus::Succeeded);
+            assert_eq!(kind(), "unclassified");
+        }
     }
 }

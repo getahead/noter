@@ -72,7 +72,8 @@ pub(crate) trait RuntimeAdapter: Send + Sync {
 /// user-editable `skills/<type>/SKILL.md` files replace it when post-call (2.17) brings them.
 pub(crate) fn instructions(skill: Skill) -> String {
     let topic_title = if skill == Skill::PostCall {
-        " Include a short title naming the main topic in the summary language. Use null if there is no topic."
+        " Include a short title naming the main topic in the summary language. Use null if there is no topic. \
+         Set call_type only when the conversation clearly is one of the listed types; use null when unsure or when several fit."
     } else {
         ""
     };

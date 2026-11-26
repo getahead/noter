@@ -2991,7 +2991,10 @@ export type SearchResults = {
 };
 
 export type SectionKind = "summary" | "decisions" | "action_items" | "open_questions" | "per_participant" | "role_reviews" | "risks" | 
-/**  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline. */
+/**
+ *  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+ *  presentation/demo: what was shown, questions asked, feedback and follow-ups.
+ */
 "call_type_extras";
 
 export type SectionState = { type: "pending" } | { type: "writing" } | { type: "ready" } | { type: "empty" } | { type: "failed"; code: ErrorCode; local_fallback_available: boolean };
@@ -3849,6 +3852,17 @@ export type VoiceProfileView = {
 	opted_in_at: TimestampMs | null,
 };
 
+/**
+ *  What `voice_profile_rematch` named: unnamed speakers in past calls whose voice matches the
+ *  person's profile. `change_id` undoes them all; `None` when nothing matched.
+ */
+export type VoiceRematch = {
+	person_id: PersonId,
+	calls: number,
+	speakers: number,
+	change_id: ChangeId | null,
+};
+
 /**  Tauri window labels. Command scoping (PM-08) is per label. */
 export type WindowLabel = "main" | 
 /**  One window, two layouts (dedicated and floating). */
@@ -3868,7 +3882,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.35";
+export const CONTRACT_VERSION = "2.37";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3979,6 +3993,7 @@ export const COMMANDS = {
   person_delete: { group: "people", stability: "frozen", windows: ["main"], channel: false },
   voice_profile_create: { group: "people", stability: "frozen", windows: ["main"], channel: false },
   voice_profile_delete: { group: "people", stability: "frozen", windows: ["main"], channel: false },
+  voice_profile_rematch: { group: "people", stability: "frozen", windows: ["main"], channel: false },
   agents_get: { group: "agents", stability: "draft", windows: ["main", "settings", "first-run"], channel: false },
   agent_create: { group: "agents", stability: "draft", windows: ["main"], channel: false },
   agent_update: { group: "agents", stability: "draft", windows: ["main"], channel: false },
@@ -4163,6 +4178,7 @@ export interface CommandArgs {
   person_delete: PersonIdArgs;
   voice_profile_create: VoiceProfileArgs;
   voice_profile_delete: PersonIdArgs;
+  voice_profile_rematch: PersonIdArgs;
   agents_get: NoArgs;
   agent_create: AgentCreateArgs;
   agent_update: AgentUpdateArgs;
@@ -4345,6 +4361,7 @@ export interface CommandResults {
   person_delete: DeleteResult;
   voice_profile_create: VoiceProfileView;
   voice_profile_delete: VoiceProfileView;
+  voice_profile_rematch: VoiceRematch;
   agents_get: AgentsView;
   agent_create: AgentMutation;
   agent_update: AgentMutation;
@@ -4923,6 +4940,7 @@ export function createCore(transport: Transport) {
     personDelete: (args: PersonIdArgs) => call("person_delete", args),
     voiceProfileCreate: (args: VoiceProfileArgs) => call("voice_profile_create", args),
     voiceProfileDelete: (args: PersonIdArgs) => call("voice_profile_delete", args),
+    voiceProfileRematch: (args: PersonIdArgs) => call("voice_profile_rematch", args),
     agentsGet: (args: NoArgs) => call("agents_get", args),
     agentCreate: (args: AgentCreateArgs) => call("agent_create", args),
     /**

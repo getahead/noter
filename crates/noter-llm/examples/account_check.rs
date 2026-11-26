@@ -7,6 +7,8 @@
 //! `account_check <claude> <run-root> schemas` instead sends one empty request per skill, so
 //! each generated output schema goes through the CLI's `--json-schema` check; a line says
 //! `accepted` when the CLI ran with it, or how the CLI's run ended.
+//! `account_check codex <codex> <run-root>` sends the ChatGPT account's test request to Codex
+//! instead (`scripts/dev/codex-account-check.sh` passes a recording stand-in, #1242).
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -22,9 +24,10 @@ use tokio::sync::watch;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let mut args = std::env::args_os().skip(1).map(PathBuf::from);
+    let mut args = std::env::args_os().skip(1).map(PathBuf::from).peekable();
+    let codex = args.next_if(|a| a.as_os_str() == "codex").is_some();
     let (Some(program), Some(run_root)) = (args.next(), args.next()) else {
-        eprintln!("usage: account_check <claude> <run-root>");
+        eprintln!("usage: account_check [codex] <program> <run-root>");
         std::process::exit(2);
     };
     let home = PathBuf::from(std::env::var_os("HOME").expect("HOME"));
@@ -34,14 +37,22 @@ async fn main() {
         program,
         home: home.clone(),
         run_root: run_root.join("runtimes"),
-        signed_in: false,
+        // Codex: the check is sent whatever the stand-in answers about the sign-in
+        signed_in: codex,
         models: Vec::new(),
     };
     let ollama = OllamaConfig {
         url: "http://127.0.0.1:9".into(),
         models: Vec::new(),
     };
-    let adapters = Adapters::real(cli(program), cli(run_root.join("no-codex")), ollama);
+    let missing = cli(run_root.join("no-cli"));
+    let (runtime, adapters) = if codex {
+        let adapters = Adapters::real(missing, cli(program), ollama);
+        (RuntimeChoice::ChatgptAccount, adapters)
+    } else {
+        let adapters = Adapters::real(cli(program), missing, ollama);
+        (RuntimeChoice::ClaudeAccount, adapters)
+    };
     let llm = Llm::new(Arc::new(store), adapters, || TimestampMs(0));
     llm.refresh().await;
     let privacy = Privacy {
@@ -52,13 +63,11 @@ async fn main() {
     if args.next().is_some() {
         std::process::exit(schemas(&llm, privacy).await);
     }
-    match llm
-        .verify_account(RuntimeChoice::ClaudeAccount, privacy)
-        .await
-    {
+    match llm.verify_account(runtime, privacy).await {
         Ok(()) => println!("ok"),
         Err(failure) => {
-            println!("failed: {failure:?}");
+            let how = llm.cli_failure(runtime).unwrap_or_default();
+            println!("failed: {failure:?} {how}");
             std::process::exit(1);
         }
     }

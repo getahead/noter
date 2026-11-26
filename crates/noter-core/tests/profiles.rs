@@ -645,3 +645,107 @@ async fn unknown_people_carry_nothing_and_metrics_off_leaves_talk_time_alone() {
         5000
     );
 }
+
+fn anna() -> PersonIdArgs {
+    PersonIdArgs {
+        person_id: PersonId::new("per_anna"),
+    }
+}
+
+// #1278: a profile names its voice where it is still unnamed in past calls, as one undoable change.
+#[tokio::test]
+async fn rematch_names_only_unnamed_past_speakers_and_undoes_as_one_change() {
+    let dir = tempfile::tempdir().unwrap();
+    let Rig { core, .. } = open(dir.path());
+    world(
+        dir.path(),
+        &core,
+        &voice(3, 0.2),
+        &voice(40, 0.1),
+        &voice(3, 0.25),
+        &voice(90, 0.0),
+    );
+    // A second past call with Anna's voice unnamed, and one where the user named that voice Boris.
+    core.store()
+        .insert_batch(vec![
+            call("call_two", NOW - 2 * DAY),
+            call("call_three", NOW - 3 * DAY),
+            archive("two_a", "call_two", None, 1),
+            archive("three_a", "call_three", Some("per_boris"), 1),
+        ])
+        .unwrap();
+    set_centroid(dir.path(), &core, "two_a", &voice(3, 0.22));
+    set_centroid(dir.path(), &core, "three_a", &voice(3, 0.21));
+    enable(&core, "per_anna", "old_anna").await;
+
+    let done = core.voice_profile_rematch(&ctx(), anna()).await.unwrap();
+    assert_eq!((done.calls, done.speakers), (2, 2));
+    assert_eq!(
+        named(&core, "new_a", dir.path()).await.1.as_deref(),
+        Some("voice_profile")
+    );
+    assert_eq!(
+        named(&core, "two_a", dir.path()).await.0.as_deref(),
+        Some("per_anna")
+    );
+    // Never over a name the user gave, and never a voice that does not match.
+    assert_eq!(
+        named(&core, "three_a", dir.path()).await.0.as_deref(),
+        Some("per_boris")
+    );
+    assert_eq!(named(&core, "new_b", dir.path()).await.0, None);
+    // Both calls now count Anna as a participant.
+    assert_eq!(
+        count(dir.path(), "SELECT count(*) FROM call_participants WHERE person_id = 'per_anna' AND call_id IN ('call_new', 'call_two')"),
+        2
+    );
+
+    // A second run finds nothing left: no change handle.
+    let again = core.voice_profile_rematch(&ctx(), anna()).await.unwrap();
+    assert_eq!((again.calls, again.speakers, again.change_id), (0, 0, None));
+
+    // One Undo takes back every name it gave.
+    core.change_undo(
+        &ctx(),
+        UndoArgs {
+            target: UndoTarget::Change {
+                change_id: done.change_id.unwrap(),
+            },
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(named(&core, "new_a", dir.path()).await, (None, None));
+    assert_eq!(named(&core, "two_a", dir.path()).await, (None, None));
+    assert_eq!(
+        named(&core, "three_a", dir.path()).await.0.as_deref(),
+        Some("per_boris")
+    );
+}
+
+#[tokio::test]
+async fn rematch_without_a_profile_names_no_one_and_an_unknown_person_is_not_found() {
+    let dir = tempfile::tempdir().unwrap();
+    let Rig { core, .. } = open(dir.path());
+    world(
+        dir.path(),
+        &core,
+        &voice(3, 0.2),
+        &voice(40, 0.1),
+        &voice(3, 0.25),
+        &voice(90, 0.0),
+    );
+    let none = core.voice_profile_rematch(&ctx(), anna()).await.unwrap();
+    assert_eq!((none.calls, none.speakers, none.change_id), (0, 0, None));
+    assert_eq!(named(&core, "new_a", dir.path()).await.0, None);
+    let err = core
+        .voice_profile_rematch(
+            &ctx(),
+            PersonIdArgs {
+                person_id: PersonId::new("per_nobody"),
+            },
+        )
+        .await
+        .unwrap_err();
+    assert_eq!(err.code, ErrorCode::NotFound);
+}

@@ -41,7 +41,7 @@ A team lead with 15 reports spends most of the working day in calls and keeps a 
 | --- | --- | --- | --- |
 | 1:1s (weekly, 15 people) | 30 min | Commitments, blockers, follow-ups, how the person is doing | Memory per person across weeks; you are talking, not typing |
 | Daily / standup | 60 min | Blockers, who is on what | Too short to take notes at all |
-| Planning, grooming, retro | 60–90 min | Decisions, owners, estimates, open questions, Jira-ready items | Long, many voices, few decisions buried in talk |
+| Planning, grooming, presentation/demo | 60–90 min | Decisions, owners, estimates, open questions, Jira-ready items | Long, many voices, few decisions buried in talk |
 | Cross-team syncs (backend, QA, product) | 30–60 min | Agreements, dependencies, who owes whom what | Mixed English / Russian / German, 5–10 speakers |
 | External: vendors, interviews, customers | 30–60 min | Facts stated, questions to ask, promises made | You must listen, think and talk at once |
 | Incident and debugging calls | Variable | Timeline, hypotheses tried, actions taken | Fast, technical, precision matters |
@@ -159,7 +159,7 @@ Within two minutes of the call ending, one document per call, every item linked 
 | Per participant | What each person said, committed to, asked for, pushed back on | The feature that makes 1:1 and cross-team history useful |
 | Role reviews | One short review per enabled council role: what the PM, Designer, Backend, Frontend, Teamlead and Architect each saw and would push back on | Six sceptical readings of the same call |
 | Risks and disagreements | Where people disagreed and whether it was resolved | Optional per call type |
-| Call-type extras | Standup: blockers per person. Planning: Jira-ready items. Interview: scorecard. Incident: timeline | Driven by the skill library |
+| Call-type extras | Standup: blockers per person. Planning: Jira-ready items. Interview: scorecard. Incident: timeline. Presentation/Demo: what was shown, questions asked, feedback, follow-ups | Driven by the skill library |
 
 All outputs are editable; edits are kept when you regenerate, and the diff is shown.
 
@@ -258,7 +258,7 @@ The dashboard is the first screen after launch: what matters before the calls yo
 | Authentication | API keys: Anthropic and Codex, in the Keychain. Your own accounts: Your Claude account (Claude Code, Pro, Max or Team plan, personal use only) and Your ChatGPT account (Codex, Plus, Pro, Business or Enterprise plan), each signed in separately in the browser through the CLI, which keeps the sign-in; either, both or neither. Codex and Claude Code from their tested version up: a newer version works with a warning, an older one is refused (owner, 23 Nov) | API keys; no account signed in |
 | LLM runtime per task | Any connected runtime: Claude Code or Codex on an API key or on your own account, or local (Ollama / MLX) — set separately for live copilot, post-call analysis and search answers | Claude Code; local for live if latency demands it |
 | Agents | Per agent: skill, runtime, model, effort, tools, call types, budget share; + to add from a template, remove added agents; council mode per call type (fused / parallel) | Six built-in agents; fused live, parallel post-call |
-| Call types | Built-in list (1:1, standup, planning, retro, cross-team sync, vendor, interview, incident) plus any call type the user adds as a skill folder under skills/; each type has its own SKILL.md, output schema and examples | Built-in list |
+| Call types | Built-in list (1:1, standup, planning, presentation/demo, cross-team sync, vendor, interview, incident) plus any call type the user adds as a skill folder under skills/; each type has its own SKILL.md, output schema and examples | Built-in list |
 | Privacy mode | Cloud allowed, cloud with redaction, local only | Cloud with redaction |
 | Sensitive call | Per-call toggle forcing local-only processing | Off |
 | Audio retention | Keep 7 / 30 / 90 days / forever / never store audio; a change applies to existing calls from the next nightly run, and the row says how many calls' audio that run deletes | 30 days |
@@ -912,6 +912,7 @@ Choices made so far, newest first. Rows marked "Product owner" are the owner's a
 
 | Date | Decision | Decided by | Rationale |
 | --- | --- | --- | --- |
+| 2026-11-25 | The built-in call type Retro is replaced by Presentation/Demo (`presentation_demo`): its extras are what was shown, questions asked, feedback and follow-ups; calls and saved Ask scopes typed Retro move to it with a History note. The post-call model may suggest a built-in type for a call the local rules leave unclassified, never over a type the user set (#1269) | Product owner | #1272: the only Retro call was a demo; #1269: the local rules abstained on the owner's ambiguous calls |
 | 2026-11-23 | Codex and Claude Code versions newer than the tested one are allowed, with a warning in the sign-in sheet and on the account row and one `cli_version_untested` line in noter.log; versions older than the tested one are still refused (`cli_version_unsupported`); a CLI that rejects or ignores a lockdown flag fails the run closed (`cli_incompatible`), never retried without the flags. The network-monitor runbook still moves the tested version (#1219) | Product owner | Request: Codex 0.171.0 was refused while 0.163 was the only tested minor |
 | 2026-10-18 | Every pull request is reviewed by the agent that delivers it, locally in its own session: the Constructor Studio review (cf-sdlc-pr-review) and the ponytail review, never in CI and never with an API token. The agent fixes and repeats until the verdict passes, publishes it and turns on auto-merge; the published verdict becomes the required status review next to gate and hygiene, and it stays valid while the PR's diff is unchanged | Product owner | Request; review quality is the delivering agent's job, and no review runs on a secret in CI |
 | 2026-10-18 | No API tokens in the delivery pipeline: the release-please Release PR gets its required checks from workflows the release workflow dispatches, not from a personal access token | Product owner | Request |

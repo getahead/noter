@@ -160,6 +160,8 @@ export function peopleHandlers(fake: Core.FakeCore): Core.Handlers {
     p.voice_profile_stats = null;
     return { person_id: p.id, enabled: false, centroids: 0, opted_in_at: null };
   },
+  // The fake world stores no voice samples, so a re-match finds nothing to name.
+  voice_profile_rematch: (a, { world }) => ({ person_id: shared.person(world, a.person_id).id, calls: 0, speakers: 0, change_id: null }),
 
   };
 }

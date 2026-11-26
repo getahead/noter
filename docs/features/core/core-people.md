@@ -29,6 +29,7 @@ design: docs/DESIGN-core.md
   - [Assemble pages and the unnamed queue](#assemble-pages-and-the-unnamed-queue)
   - [Merge all identity references](#merge-all-identity-references)
   - [Build and match local profiles](#build-and-match-local-profiles)
+  - [Name a voice in past calls](#name-a-voice-in-past-calls)
 - [4. States (CDSL)](#4-states-cdsl)
   - [Voice profile lifecycle](#voice-profile-lifecycle)
 - [5. Definitions of Done](#5-definitions-of-done)
@@ -243,6 +244,20 @@ Read only the requested person's aggregate rows for a person page. For `people_l
 6. [x] - `p1` - Recheck opt-in and person existence before committing any match or updated profile; deletion wins over pending inference - `inst-match-recheck`
 7. [x] - `p1` - **RETURN** the encrypted profile view or local match; release decrypted buffers after use - `inst-match-return`
 
+### Name a voice in past calls
+
+- [x] `p4` - **ID**: `cpt-noter-algo-core-people-profile-rematch`
+
+**Input**: The person id, every archive speaker still unnamed with a stored centroid, each call's attendees, the live opted-in profiles and the Keychain key.
+
+**Output**: `VoiceRematch` with the calls and speakers named and one change id, or zeros without one (#1278).
+
+**Steps**:
+1. [x] - `p1` - Read the person (absent is `not_found`), the unnamed archive speakers with centroids grouped by call, the calls' attendees and the live profiles - `inst-rematch-load`
+2. [x] - `p1` - Score each call's speakers against every live profile as `cpt-noter-algo-core-people-profile-match` does (attendees first, threshold and runner-up margin), and keep only this person's wins - `inst-rematch-score`
+3. [x] - `p1` - In one transaction recheck each win (the speaker still unnamed, the profile and opt-in still there), name it with `named_by = voice_profile`, update the used profiles' `last_used_at`, and log every row under one batch whose change id undoes it as a whole; a speaker named meanwhile is left alone - `inst-rematch-write`
+4. [x] - `p1` - Add the person to each call's participants in the same batch, publish the corrected speakers and lines per call and the person, and **RETURN** the counts - `inst-rematch-publish`
+
 ## 4. States (CDSL)
 
 ### Voice profile lifecycle
@@ -303,14 +318,15 @@ The system **MUST** create profiles only on explicit opt-in, encrypt their sever
 **Implements**:
 - `cpt-noter-flow-core-people-profile`
 - `cpt-noter-algo-core-people-profile-match`
+- `cpt-noter-algo-core-people-profile-rematch`
 - `cpt-noter-state-core-people-profile`
 
 **Constraints**: `cpt-noter-constraint-core-local-data`
 
 **Touches**:
-- API: `voice_profile_create`, `voice_profile_delete`
-- DB: `people`, `voice_profiles`, `changes`
-- Entities: `VoiceProfileView`
+- API: `voice_profile_create`, `voice_profile_delete`, `voice_profile_rematch`
+- DB: `people`, `voice_profiles`, `speakers`, `call_participants`, `changes`
+- Entities: `VoiceProfileView`, `VoiceRematch`
 
 ## 6. Acceptance Criteria
 

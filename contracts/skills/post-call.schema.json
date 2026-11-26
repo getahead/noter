@@ -137,6 +137,20 @@
     "SegmentId": {
       "description": "Opaque identifier: a core-generated ULID with a type prefix (see `PREFIX`); the UI never parses it.",
       "type": "string"
+    },
+    "SuggestedCallType": {
+      "description": "A built-in call type the post-call skill may suggest for an unclassified call.",
+      "enum": [
+        "one_on_one",
+        "standup",
+        "planning",
+        "presentation_demo",
+        "cross_team",
+        "vendor",
+        "interview",
+        "incident"
+      ],
+      "type": "string"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -148,6 +162,17 @@
       },
       "type": "array"
     },
+    "call_type": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SuggestedCallType"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The built-in type this call clearly is. Null when unsure or when several fit."
+    },
     "decisions": {
       "items": {
         "$ref": "#/$defs/ExtractedItem"
@@ -155,7 +180,7 @@
       "type": "array"
     },
     "extras_md": {
-      "description": "Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.",
+      "description": "Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,\npresentation/demo: what was shown, questions asked, feedback and follow-ups.",
       "type": [
         "string",
         "null"

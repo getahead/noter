@@ -346,6 +346,7 @@ fn output() -> Value {
     serde_json::to_value(PostCallOutput {
         lang: Lang::En,
         title: None,
+        call_type: None,
         summary_md: "Importer ships Friday.".into(),
         decisions: vec![item.clone()],
         action_items: vec![item],
@@ -362,6 +363,29 @@ fn output() -> Value {
 fn claude_schema() -> Value {
     let mut schema = Skill::PostCall.schema();
     assert!(schema.as_object_mut().unwrap().remove("$schema").is_some());
+    schema
+}
+
+/// The schema as Codex gets it: OpenAI strict form (#1242). Every object is closed and requires
+/// every property, and `format` goes; the post-call optional fields already take null.
+fn codex_schema() -> Value {
+    fn close(node: &mut Value) {
+        match node {
+            Value::Array(list) => list.iter_mut().for_each(close),
+            Value::Object(map) => {
+                map.remove("format");
+                if let Some(props) = map.get("properties").and_then(Value::as_object) {
+                    let all: Vec<Value> = props.keys().map(|k| Value::from(k.as_str())).collect();
+                    map.insert("required".into(), all.into());
+                    map.insert("additionalProperties".into(), false.into());
+                }
+                map.values_mut().for_each(close);
+            }
+            _ => {}
+        }
+    }
+    let mut schema = Skill::PostCall.schema();
+    close(&mut schema);
     schema
 }
 
@@ -536,7 +560,7 @@ async fn codex_api_key_runs_in_an_isolated_codex_home() {
     assert_eq!(run.flag("-C"), Some(world.work().as_str()));
     assert_eq!(run.flag("-m"), Some("stub-model"));
     let schema = run.flag("--output-schema").unwrap();
-    assert_eq!(run.copied(schema), Skill::PostCall.schema());
+    assert_eq!(run.copied(schema), codex_schema());
     assert!(run.has("model_reasoning_effort=\"high\""));
     // No AGENTS.md, from the home or the working directory, joins the prompt.
     assert!(run.has("project_doc_max_bytes=0"));
@@ -1019,7 +1043,7 @@ async fn all_three_runtimes_conform_on_one_request() {
     let codex_run = codex.only();
     assert_eq!(
         codex_run.copied(codex_run.flag("--output-schema").unwrap()),
-        schema
+        codex_schema()
     );
     assert_eq!(seen.lock().unwrap()[0].1["format"], schema);
     assert_eq!(world.leftover_runs(), Vec::<PathBuf>::new());

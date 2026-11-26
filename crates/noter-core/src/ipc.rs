@@ -448,6 +448,14 @@ impl CoreApi for Core {
         self.delete_voice_profile(ctx, args)
     }
 
+    async fn voice_profile_rematch(
+        &self,
+        ctx: &CommandCtx,
+        args: PersonIdArgs,
+    ) -> Result<VoiceRematch, CoreError> {
+        self.rematch_voice(ctx, args)
+    }
+
     async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {
         self.today_view()
     }

@@ -50,7 +50,14 @@ describe("cpt-noter-flow-ui-people-prepare", () => {
   });
   it("the voice profile row follows the person", () => {
     const on = page({ calls: [call], person: person({ voice_profile: true }) });
-    expect(renderToString(<PersonBody {...props({ state: { status: "OK", page: on, error: null } })} />)).toContain("Delete Profile…");
+    const h = renderToString(<PersonBody {...props({ state: { status: "OK", page: on, error: null } })} />);
+    expect(h).toContain("Delete Profile…");
+    // #1278: with a profile, Find in Past Calls runs the match again
+    expect(h).toContain("Find in Past Calls");
+    const find1 = vi.fn();
+    const tree = rendered(Overview, { bridge, page: on, prefs: undefined, onFindVoice: find1 });
+    (find(tree, (x) => x.id === "pe-voice-find").props.onAction as () => void)();
+    expect(find1).toHaveBeenCalledOnce();
   });
   it("Identity offers Set Up Voice Profile… when Off and Delete Profile… when On, and shows a done action as a status line", () => {
     const off = renderToString(<PersonBody {...props({ state: { status: "OK", page: page({ calls: [call] }), error: null }, status: "Voice profile created for Anna K." })} />);

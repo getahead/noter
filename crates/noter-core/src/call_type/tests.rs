@@ -42,10 +42,10 @@ fn builtins_match_a_title_or_a_distinctive_spoken_agenda() {
             "Wie viele Storypunkte?",
         ),
         (
-            "retro",
-            "Sprint retrospective",
-            "What went well?",
-            "What could we improve?",
+            "presentation_demo",
+            "Product demo",
+            "Let me show you the new drawer.",
+            "Any questions?",
         ),
         (
             "cross_team",
@@ -138,7 +138,7 @@ fn titles_distinguish_hiring_interviews_and_daily_scrums_from_other_meetings() {
 #[test]
 fn uncertain_evidence_abstains_and_the_current_transcript_is_used() {
     let incident = ("live", "Welcome to the incident bridge.");
-    let retro = ("archive", "Let's begin our retrospective.");
+    let demo = ("archive", "Welcome to our demo.");
     assert_eq!(transcript_matches("Weekly sync", &[]), None);
     assert_eq!(transcript_matches("Release 1.1", &[]), None);
     assert_eq!(
@@ -152,17 +152,17 @@ fn uncertain_evidence_abstains_and_the_current_transcript_is_used() {
         Some("planning")
     );
     assert_eq!(
-        transcript_matches("Metropolitan team", &[("live", "What went well?")]),
+        transcript_matches("Metropolitan team", &[("live", "Let me show you.")]),
         None
     );
-    assert_eq!(transcript_matches("Retro and planning", &[incident]), None);
+    assert_eq!(transcript_matches("Demo and planning", &[incident]), None);
     assert_eq!(
-        transcript_matches("Untitled", &[incident, ("live", retro.1)]),
+        transcript_matches("Untitled", &[incident, ("live", demo.1)]),
         None
     );
     assert_eq!(
-        transcript_matches("Untitled", &[incident, retro]),
-        Some("retro")
+        transcript_matches("Untitled", &[incident, demo]),
+        Some("presentation_demo")
     );
     assert_eq!(
         transcript_matches("Vendor review", &[incident]),
@@ -206,7 +206,7 @@ fn backfill_runs_once_and_respects_manual_choices_and_undo() {
     };
     let core = open();
     for id in ["legacy", "manual", "reverted", "reverted_with_title"] {
-        seed(&core, id, "Sprint retrospective");
+        seed(&core, id, "Sprint demo");
     }
     // A legacy process-name fallback (“Daily”) is not a meeting label. An actual
     // matched event of that name is.
@@ -231,7 +231,7 @@ fn backfill_runs_once_and_respects_manual_choices_and_undo() {
                 CallUpdateArgs {
                     call_id: CallId::new(id),
                     rev: Rev(1),
-                    title: (id == "reverted_with_title").then(|| "My retro".into()),
+                    title: (id == "reverted_with_title").then(|| "My demo".into()),
                     call_type: Some(CallTypeId("planning".into())),
                 },
             )
@@ -248,7 +248,7 @@ fn backfill_runs_once_and_respects_manual_choices_and_undo() {
     }
     core.backfill_call_types().unwrap();
     let kind = |core: &Core, id| core.call_row(id).unwrap().unwrap().call_type.0;
-    assert_eq!(kind(&core, "legacy"), "retro");
+    assert_eq!(kind(&core, "legacy"), "presentation_demo");
     assert_eq!(kind(&core, "process"), "unclassified");
     assert_eq!(kind(&core, "calendar"), "standup");
     assert_eq!(kind(&core, "manual"), "planning");

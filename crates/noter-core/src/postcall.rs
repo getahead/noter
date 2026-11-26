@@ -20,7 +20,7 @@ use noter_llm::{
 use noter_protocol::ipc::event_names;
 use noter_protocol::model::settings::{AuditWhat, SummaryLanguage};
 use noter_protocol::model::*;
-use noter_protocol::skills::{ExtractedItem, ParticipantNotes, PostCallOutput};
+use noter_protocol::skills::{ExtractedItem, ParticipantNotes, PostCallOutput, SuggestedCallType};
 use noter_protocol::*;
 use serde_json::{json, Value};
 
@@ -30,11 +30,17 @@ use crate::speakers::speaker_name;
 use crate::{lock, object, to_json, Core};
 
 /// The post-call skill's contract version, as `summary_versions.skill_version` records it.
-const SKILL_VERSION: &str = "1.1.0";
+const SKILL_VERSION: &str = "1.2.0";
 
 /// The call types whose skill writes extras (standup blockers, planning Jira-ready items,
-/// interview scorecard, incident timeline).
-const EXTRAS: [&str; 4] = ["standup", "planning", "interview", "incident"];
+/// interview scorecard, incident timeline, what a presentation or demo showed and its feedback).
+const EXTRAS: [&str; 5] = [
+    "standup",
+    "planning",
+    "interview",
+    "incident",
+    "presentation_demo",
+];
 
 /// The sections of a call of this type, in the order they are written. Role reviews come last
 /// and only for enabled agents (none before the agents table, M4).
@@ -514,6 +520,7 @@ pub(crate) fn switches_off(per_call: &[(u32, u32)]) -> bool {
 /// One section's generated text and items, as the job commits them.
 struct Generated {
     title: Option<String>,
+    call_type: Option<SuggestedCallType>,
     body_md: String,
     lang: Lang,
     llm_run_id: Option<String>,
@@ -737,6 +744,7 @@ impl Core {
             // Nothing was said: every section is validly empty, and nothing goes to a model.
             return Ok(Generated {
                 title: None,
+                call_type: None,
                 body_md: String::new(),
                 lang: Lang::En,
                 llm_run_id: None,
@@ -786,6 +794,7 @@ impl Core {
                 (kind == SectionKind::Summary && !short.is_empty())
                     .then(|| short.chars().take(120).collect())
             }),
+            call_type: out.call_type.filter(|_| kind == SectionKind::Summary),
             lang: out.lang,
             llm_run_id: Some(done.provenance.llm_run_id.as_str().to_owned()),
         })
@@ -968,6 +977,16 @@ impl Core {
         if g.title.is_some() {
             self.publish_call_row(call);
         }
+        // @cpt-begin:cpt-noter-flow-core-postcall-write:p1:inst-write-suggest-type
+        // The Summary is already committed: a failed suggestion leaves the type as it was.
+        if let Some(Value::String(call_type)) = g.call_type.map(|t| json!(t)) {
+            if let Err(e) = self.suggest_call_type(call, &call_type) {
+                self.log(object(
+                    json!({"level": "error", "module": "call_type", "code": e.code}),
+                ));
+            }
+        }
+        // @cpt-end:cpt-noter-flow-core-postcall-write:p1:inst-write-suggest-type
         self.store_items(ctx, call, kind, &g.items).await?;
         // @cpt-begin:cpt-noter-algo-core-postcall-store:p1:inst-store-return
         let state = section(self.stored_section(call, kind)?.as_ref(), kind, None).state;
@@ -1544,6 +1563,7 @@ mod tests {
         let out = PostCallOutput {
             lang: Lang::En,
             title: None,
+            call_type: None,
             summary_md: " S. ".into(),
             decisions: vec![item.clone()],
             action_items: vec![],
