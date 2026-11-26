@@ -919,6 +919,13 @@ async fn check_local_regeneration_after_restart(local_available: bool) {
     assert_eq!(scripted.received().len(), setup_packets);
     let first = Arc::downgrade(&core);
     drop(core);
+    // A background task may still hold the core for a moment after the drop (#1285): it must let go, soon.
+    for _ in 0..200 {
+        if first.upgrade().is_none() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
     assert!(first.upgrade().is_none());
 
     if !local_available {
