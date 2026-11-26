@@ -740,7 +740,10 @@ async fn call_update_renames_with_the_rev_guard_and_broadcasts() {
         call_type: kind.map(|k| CallTypeId(k.into())),
     };
     let done = core
-        .call_update(&main_window(), update(1, Some("Renamed"), Some("retro")))
+        .call_update(
+            &main_window(),
+            update(1, Some("Renamed"), Some("presentation_demo")),
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -749,7 +752,7 @@ async fn call_update_renames_with_the_rev_guard_and_broadcasts() {
             done.call.call_type.0.as_str(),
             done.call.rev
         ),
-        ("Renamed", "retro", Rev(2))
+        ("Renamed", "presentation_demo", Rev(2))
     );
     let sent = entity(&events);
     assert_eq!(sent.len(), 1);
@@ -821,7 +824,7 @@ async fn call_types_are_the_eight_built_ins_plus_readable_user_folders() {
             "one_on_one",
             "standup",
             "planning",
-            "retro",
+            "presentation_demo",
             "cross_team",
             "vendor",
             "interview",
@@ -840,7 +843,7 @@ async fn call_types_are_the_eight_built_ins_plus_readable_user_folders() {
             "1:1",
             "Standup",
             "Planning",
-            "Retro",
+            "Presentation/Demo",
             "Cross-team",
             "Vendor",
             "Interview",
@@ -1240,6 +1243,57 @@ fn cpt_noter_seq_record_prompt_start_recording_migrates_only_legacy_automatic_ti
     };
     assert_eq!(title("automatic"), ("Untitled call".into(), true));
     assert_eq!(title("renamed"), (helper.into(), false));
+}
+
+#[test]
+fn cpt_noter_seq_library_filter_calls_moves_retro_calls_and_scopes_to_presentation_demo() {
+    use noter_db::rusqlite::Connection;
+    let dir = tempfile::tempdir().unwrap();
+    drop(open(dir.path()));
+    // A database from before #1272: a call the user typed Retro and a saved Ask scope.
+    let db = Connection::open(dir.path().join("noter.db")).unwrap();
+    db.execute_batch(
+        r#"DELETE FROM schema_migrations WHERE (owner, version) IN
+             (VALUES ('noter-core', 14), ('noter-retrieval', 8));
+           INSERT INTO calls (id, rev, started_at, title, platform, call_type, status, mode_used)
+             VALUES ('demo', 1, 0, 'Call', 'Zoom', 'retro', 'ready', 'local_only'),
+                    ('other', 1, 0, 'Call', 'Zoom', 'planning', 'ready', 'local_only');
+           INSERT INTO ask_threads (id, title, scope, updated_at)
+             VALUES ('t', 'Demos', '{"call_types":["planning","retro"]}', 0);"#,
+    )
+    .unwrap();
+    drop(open(dir.path()));
+    let kind = |id| -> (String, i64) {
+        db.query_row(
+            "SELECT call_type, rev FROM calls WHERE id = ?1",
+            [id],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap()
+    };
+    assert_eq!(kind("demo"), ("presentation_demo".into(), 2));
+    assert_eq!(kind("other"), ("planning".into(), 1));
+    let note: (String, String, String, bool) = db
+        .query_row(
+            "SELECT actor, before, after, undoable FROM changes
+             WHERE entity_id = 'demo' AND reason = 'call_type_renamed'",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
+        )
+        .unwrap();
+    assert_eq!(
+        note,
+        (
+            "job:job_call_type".into(),
+            "retro".into(),
+            "presentation_demo".into(),
+            false
+        )
+    );
+    let scope: String = db
+        .query_row("SELECT scope FROM ask_threads", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(scope, r#"{"call_types":["planning","presentation_demo"]}"#);
 }
 
 #[tokio::test]

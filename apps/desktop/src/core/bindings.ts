@@ -2991,7 +2991,10 @@ export type SearchResults = {
 };
 
 export type SectionKind = "summary" | "decisions" | "action_items" | "open_questions" | "per_participant" | "role_reviews" | "risks" | 
-/**  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline. */
+/**
+ *  Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+ *  presentation/demo: what was shown, questions asked, feedback and follow-ups.
+ */
 "call_type_extras";
 
 export type SectionState = { type: "pending" } | { type: "writing" } | { type: "ready" } | { type: "empty" } | { type: "failed"; code: ErrorCode; local_fallback_available: boolean };
@@ -3868,7 +3871,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.35";
+export const CONTRACT_VERSION = "2.36";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 

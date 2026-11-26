@@ -87,6 +87,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "per-turn Ask scope, measured metadata and feedback",
         sql: include_str!("../migrations/0007_ask_metadata.sql"),
     },
+    Migration {
+        owner: "noter-retrieval",
+        version: 8,
+        name: "Ask scopes name Presentation/Demo instead of Retro",
+        sql: include_str!("../migrations/0008_presentation_demo_scopes.sql"),
+    },
 ];
 
 #[cfg(test)]

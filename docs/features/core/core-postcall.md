@@ -95,6 +95,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 - The transcript remains readable while Summary, Decisions, Action items, Open questions and Per participant appear; risks and call-type extras follow where applicable, and role reviews run last.
 - Before queuing PostCall, normal and interrupted stops classify an unclassified call locally. A matched calendar title or call title takes precedence over confirmed transcript cues. A unique match selects one of the eight built-ins. A tie or insufficient evidence leaves the call unclassified. A user-selected type survives detection.
 - At launch, a one-time background pass applies the same rule to previously stopped, unclassified calls. Detection works on battery without a model. The backfill updates only the type. Existing outputs can be regenerated explicitly. Each assignment has an automatic, undoable History entry. An undone choice is respected on retry or relaunch.
+- When the rules leave a call unclassified, the post-call model may suggest one of the eight built-ins with the summary. The suggestion applies under the same guard: never over a type the user set, even one they undid, nor after an undone automatic assignment. It has an automatic, undoable History entry. A null answer, for an ambiguous or unclear call, leaves the call unclassified.
 - Another live call keeps PostCall running at low priority; local results identify their writer and role reviews follow in the background.
 
 **Error Scenarios**:
@@ -109,7 +110,8 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 5. [x] - `p1` - **FOR EACH** output section in the stated order - `inst-write-sections`
    1. [x] - `p1` - Mark writing and publish `outputs:progress`; validate that section and its evidence before persistence - `inst-write-validate`
    2. [x] - `p1` - Commit its version and items through `cpt-noter-algo-core-postcall-store`; publish ready or empty and complete changed entities after commit - `inst-write-commit`
-   3. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
+   3. [x] - `p1` - After the Summary commits, apply the model's call-type suggestion to a still-eligible unclassified call - `inst-write-suggest-type`
+   4. [x] - `p1` - **IF** the section fails, store its typed failure and local-fallback availability, publish failed and continue with independent sections - `inst-write-failed-section`
 6. Role reviews run last: delivered by `core-agents` (M4), which owns the `agents` table; `inst-write-reviews` is there.
 7. [x] - `p1` - Write `items.json` and `summary.md` from committed records; derive ready, partially_failed or failed status - `inst-write-files`
 8. [x] - `p1` - Tell the session manager outputs are ready or failed; apply `cpt-noter-algo-core-postcall-notify` - `inst-write-notify`

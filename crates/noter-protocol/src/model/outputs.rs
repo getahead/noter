@@ -16,7 +16,8 @@ pub enum SectionKind {
     PerParticipant,
     RoleReviews,
     Risks,
-    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline.
+    /// Standup blockers, planning Jira-ready items, interview scorecard, incident timeline,
+    /// presentation/demo: what was shown, questions asked, feedback and follow-ups.
     CallTypeExtras,
 }
 

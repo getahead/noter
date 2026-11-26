@@ -268,6 +268,7 @@ pub(crate) fn built_in(skill: Skill, ids: &[String]) -> Value {
         Skill::PostCall => serde_json::to_value(PostCallOutput {
             lang: Lang::En,
             title: None,
+            call_type: None,
             summary_md: "Scripted summary.".into(),
             decisions: vec![item("Scripted decision")],
             action_items: vec![item("Scripted action item")],

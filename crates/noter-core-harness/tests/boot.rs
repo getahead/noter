@@ -1258,13 +1258,13 @@ async fn cpt_noter_seq_core_call_end_outputs_detects_the_type_at_stop_on_battery
         "call_update",
         json!({
             "call_id": started["call_id"], "rev": detail["call"]["rev"],
-            "title": "Sprint retrospective"
+            "title": "Product demo"
         }),
     )
     .await;
     r.ok("main", "capture_stop", call.clone()).await;
     let stopped = r.ok("main", "call_get", call).await;
-    assert_eq!(stopped["call"]["call_type"], "retro");
+    assert_eq!(stopped["call"]["call_type"], "presentation_demo");
     r.finish().await;
 }
 
