@@ -26,7 +26,6 @@
 .pe-block { display: grid; gap: 6px; min-width: 0; }
 .pe-topics { display: flex; flex-wrap: wrap; gap: 6px; }
 /* the prototype's topic capsule: a filled chip, not the white control the search suggestion uses */
-.pe-topics .np-topic { background: var(--sel-unemph); padding: 0 7px; font-size: 12px; }
 .pe-identity { padding: 12px 14px; border: 1px solid var(--sep); border-radius: var(--r-card); background: var(--card-bg); }
 .pe-sel { user-select: text; }
 .pe-showall { justify-self: start; }

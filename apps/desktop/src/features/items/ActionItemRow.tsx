@@ -65,7 +65,7 @@ export function focusNext(id: string): boolean {
   // @cpt-end:cpt-noter-flow-ui-items-review:p1:inst-return
 }
 
-function Owner({ person }: { person: PersonChip }) {
+export function Owner({ person }: { person: PersonChip }) {
   const variant = person.is_you ? "you" : "link";
   return (
     <span data-component="cpt-noter-component-ui-person-chip" data-variant={variant} className="np-person" title={person.display_name}>

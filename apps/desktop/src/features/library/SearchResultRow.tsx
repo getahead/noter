@@ -74,7 +74,7 @@ export function SearchResultRow({ bridge, hit, playback, prefs }: { bridge: Brid
   if (hit.target.type === "item" && hit.item)
     return (
       <li className="lb-hit lb-hit--item" data-component="cpt-noter-component-ui-search-result-row" data-strength={hit.strength} tabIndex={0} onKeyDown={key}>
-        {hit.item.kind === "action_item" ? <ActionItemRow bridge={bridge} item={hit.item} variant="compact" showCall /> : <ul className="lb-items"><OutputItemRow bridge={bridge} item={hit.item} compact /></ul>}
+        {hit.item.kind === "action_item" ? <ActionItemRow bridge={bridge} item={hit.item} variant="compact" showCall /> : <ul className="lb-items"><OutputItemRow bridge={bridge} item={hit.item} compact showCall /></ul>}
       </li>
     );
   return (

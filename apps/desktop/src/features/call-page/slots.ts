@@ -22,7 +22,7 @@ export const slots: {
   /** **Rejected (n)** under the section's list: the rejected items with **Restore** (2.17). */
   rejectedList: ComponentType<{ bridge: Bridge; items: ItemView[] }> | null;
   /** What follows a decision, question or risk row: its provenance time, review buttons and (i) (2.17). */
-  itemTail: ComponentType<{ bridge: Bridge; item: ItemView; afterTime?: ReactNode }> | null;
+  itemTail: ComponentType<{ bridge: Bridge; item: ItemView; afterTime?: ReactNode; part?: "meta" | "actions" }> | null;
   /** The review keys (A, E, R, ⇧A) on a decision, question or risk row (2.17). */
   itemKeys: ((bridge: Bridge, item: ItemView, e: KeyboardEvent) => void) | null;
   /** **Add Action Item** under the action items list (2.17); `callId` is the call the section belongs to. */
