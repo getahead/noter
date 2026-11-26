@@ -568,6 +568,9 @@ test.describe("cpt-noter-seq-call-page-review-suggested-items", () => {
             }),
         );
         expect(parts.length, id).toBeGreaterThan(1);
+        // the controls wrap before they squeeze the text: with Call info open it keeps at least 40 % of the row
+        const text = (await row.locator(".it-row__main").first().boundingBox())!; // the text column
+        expect(text.width, `${id}: the text is squeezed to ${Math.round(text.width)} of ${Math.round(box.width)} px`).toBeGreaterThanOrEqual(box.width * 0.4);
         for (const p of parts) {
           expect(p.clipped, `${id}: ${p.label} is cut`).toBe(false);
           expect(p.x + p.w, `${id}: ${p.label} runs past the row`).toBeLessThanOrEqual(box.x + box.width + 1);
