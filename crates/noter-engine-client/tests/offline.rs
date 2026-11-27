@@ -530,6 +530,7 @@ async fn engine_exit_rejects_every_pending_request_and_capture_restarts_first() 
         store_audio: true,
         mic_device_uid: None,
         exclude_bundle_ids: vec![],
+        capture_bundle_id: None,
         languages: vec![],
         backend: AsrBackend::WhisperTurbo,
         glossary: vec![],

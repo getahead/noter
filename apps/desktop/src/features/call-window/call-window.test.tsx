@@ -209,6 +209,19 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     expect(page).toContain("Speaker 3");
   });
 
+  it("shows each confirmed language once in the dedicated header", async () => {
+    await open();
+    const source = fake.world.transcripts.find((transcript) => transcript.call_id === live.call_id)!;
+    const [first, second, third] = source.segments;
+    const [guess] = source.hypotheses;
+    source.segments = [{ ...first!, lang: "ru" }, { ...second!, lang: "en" }, { ...third!, lang: "ru" }];
+    source.hypotheses = [{ ...guess!, lang: "de" }];
+    await bridge!.subscribe("transcript_subscribe", live);
+    const header = find(tree(), (p) => p["data-region"] === "CS-R1");
+    const tags = renderToString(header).match(/data-variant="call"[^>]*aria-label="[^"]+"/g) ?? [];
+    expect(tags.map((tag) => tag.match(/aria-label="([^"]+)"/)?.[1])).toEqual(["Russian", "English"]);
+  });
+
   // cpt-noter-algo-ui-call-window-layout-content (#1162, #1163): the latency line only while Show latency is on; Text size scales the text.
   it("draws the latency line while Show latency is on and scales the text by Text size", async () => {
     await open();
@@ -261,6 +274,16 @@ describe("CallWindow (cpt-noter-component-shell-call-window)", () => {
     (find(tree(), (_p, type) => type === CollapsedCallStrip).props.onExpand as () => void)();
     await settle();
     expect(args("window_set_collapsed")).toEqual([{ collapsed: false }]);
+  });
+
+  it("stops the paused recording directly from the collapsed strip and opens the closing controls", async () => {
+    await open({ phase: "paused" }, { layout: "floating", collapsed: true });
+    const collapsed = find(tree(), (_p, type) => type === CollapsedCallStrip);
+    await (collapsed.props.onStop as () => Promise<void>)();
+    await settle();
+    expect(args("capture_stop")).toEqual([live]);
+    expect(args("window_set_collapsed")).toEqual([{ collapsed: false }]);
+    expect(html()).toContain("Continue Recording");
   });
 
   it("maps degraded states to banners in CS-R3 and runs their fixes", async () => {

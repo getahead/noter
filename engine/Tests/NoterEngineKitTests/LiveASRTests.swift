@@ -119,6 +119,19 @@ final class LiveASRTests: XCTestCase {
         XCTAssertEqual(LiveASR.language([:], among: []).lang, "en")
     }
 
+    func testChangingLanguagesReplacesPreviousHypothesisAndConfirmedLanguage() {
+        let t = FakeTranscriber("hallo zusammen")
+        let a = asr(t)
+        play(a, .mic, from: 0, 2500, speaking: true)
+        play(a, .mic, from: 2500, 1000, speaking: false)
+        play(a, .mic, from: 3500, 1500, speaking: true)
+        a.setLanguages(.array([.string("de")]))
+        play(a, .mic, from: 5000, 1000, speaking: true)
+        XCTAssertEqual(t.asked.last?.languages, ["de"])
+        play(a, .mic, from: 6000, 1000, speaking: false)
+        XCTAssertEqual(t.asked.last?.languages, ["de"])
+    }
+
     func testWhisperLanguageConfidenceConvertsLogProbabilitiesAndKeepsSingleLanguageCertain() {
         XCTAssertEqual(WhisperTranscriber.languageProbabilities(["en"], [:]), ["en": 1])
         let confidence = WhisperTranscriber.languageProbabilities([], ["en": -0.1])["en"]

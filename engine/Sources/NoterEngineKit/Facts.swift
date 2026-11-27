@@ -30,10 +30,9 @@ public struct Detector: Sendable {
     private var enabled = false
     private var known: [String] = []
     private var detected: Set<String> = []
-    private var session: (callId: String, seen: Set<String>)?
+    private var session: (callId: String, seen: Set<String>, captureBundleId: String?)?
     private var excluded: Set<String> = []
-    /// An app other than an excluded one plays audio: zeros on the system channel then likely mean
-    /// no permission. Any app, not only a meeting app: speech from `say` or a video counts (#1142).
+    /// A process included in the system tap plays audio. Exact zeros then suggest missing permission.
     public private(set) var outputPlaying = false
 
     public init() {}
@@ -46,10 +45,12 @@ public struct Detector: Sendable {
     }
     // @cpt-end:cpt-noter-flow-core-engine-capture-detect:p1:inst-listen
 
-    /// From now on a new sound source is reported; what plays already and the excluded apps are not.
-    public mutating func startSession(callId: String, current: [ProcessAudio], excluded: [String]) {
+    /// System-wide sessions report new sources that were neither playing already nor excluded.
+    public mutating func startSession(
+        callId: String, current: [ProcessAudio], excluded: [String], captureBundleId: String? = nil
+    ) {
         self.excluded = Set(excluded)
-        session = (callId, Set(current.filter(\.output).map { owner($0.bundleId) }))
+        session = (callId, Set(current.filter(\.output).map { owner($0.bundleId) }), captureBundleId)
     }
 
     public mutating func exclude(_ bundleId: String) { excluded.insert(bundleId) }
@@ -68,13 +69,18 @@ public struct Detector: Sendable {
         // a process without a bundle (`say`, `afplay`) has no app to name or exclude: it only counts as playing (#1196)
         let byApp = Dictionary(grouping: processes.filter { !$0.bundleId.isEmpty }) { owner($0.bundleId) }
         func main(_ id: String) -> ProcessAudio? { byApp[id].flatMap { ps in ps.first { $0.bundleId == id } ?? ps.first } }
-        outputPlaying = processes.contains { $0.bundleId.isEmpty && $0.output }
-            || byApp.contains { id, ps in !Exclusion.matches(id, excluded) && ps.contains(where: \.output) }
+        let captureBundleId = session?.captureBundleId
+        outputPlaying = processes.contains { process in
+            process.output && !Exclusion.matches(process.bundleId, excluded)
+                && (captureBundleId.map { Exclusion.matches(process.bundleId, [$0]) } ?? true)
+        }
         if enabled {
             for id in known {
                 let ps = byApp[id] ?? []
                 let (output, input) = (ps.contains(where: \.output), ps.contains(where: \.input))
-                if !detected.contains(id), output, input, let app = main(id) {
+                if !detected.contains(id), output, input,
+                    captureBundleId == nil || captureBundleId == id, let app = main(id)
+                {
                     detected.insert(id)
                     events.append(.callDetected(bundleId: id, appName: app.name, pid: app.pid))
                 } else if detected.contains(id), !output, !input {
@@ -83,7 +89,7 @@ public struct Detector: Sendable {
                 }
             }
         }
-        if var s = session {
+        if var s = session, s.captureBundleId == nil {
             for id in byApp.keys.sorted() where !s.seen.contains(id) && !Exclusion.matches(id, excluded) {
                 guard byApp[id]?.contains(where: \.output) == true, let app = main(id) else { continue }
                 s.seen.insert(id)

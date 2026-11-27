@@ -106,6 +106,7 @@ pub(crate) fn fresh_snapshot(app_version: &str) -> AppSnapshot {
             version: v1,
             phase: CapturePhase::Idle,
             call_id: None,
+            transcription_language: None,
             title: None,
             started_at: None,
             recorded_ms: DurationMs(0),

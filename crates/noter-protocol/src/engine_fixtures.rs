@@ -27,6 +27,7 @@ pub fn commands() -> Vec<EngineCommandLine> {
             store_audio: true,
             mic_device_uid: Some("BuiltInMicrophoneDevice".into()),
             exclude_bundle_ids: vec!["com.apple.Music".into()],
+            capture_bundle_id: Some("us.zoom.xos".into()),
             languages: vec![Lang::En, Lang::Other { code: "fr".into() }],
             backend: AsrBackend::ParakeetTdtV3,
             glossary: vec![glossary()],

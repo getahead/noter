@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEve
 import { announcerFor, writeLive } from "../../app/a11y/announce";
 import type { ActOptions, Bridge } from "../../app/bridge/bridge";
 import { useIdentityRevision, useWindow } from "../../app/use-window";
-import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, NavTarget, PermissionKind, PersonChip as PersonChipView, Result, SegmentId, SpeakerView } from "../../core/bindings";
+import type { CallLayoutPreference, CaptureState, CommandArgs, CommandName, DegradedState, HotkeyAction, Lang, NavTarget, PermissionKind, PersonChip as PersonChipView, Result, SegmentId, SpeakerView } from "../../core/bindings";
 import { callTime, clock as timeOf, quote, t } from "../../i18n/format";
 import { BannerSlot, InlineBanner } from "../../ui/feedback/inline-banner";
 import { Icon } from "../../ui/icons";
@@ -28,6 +28,8 @@ import { captureAnnouncements, captureView, closingTitle, degradedBanners, failu
 import { CaptureNotice, ClosingState, type NoticeHandlers } from "./notice";
 import { CallStatusStrip, CollapsedCallStrip, LatencyLine, MoreMenu, PersonChip, RecordingIndicator, type Feedback } from "./strip";
 import { TranscriptBar, TranscriptLog, useTranscript } from "../transcript/hosts";
+import { LanguageTag } from "../transcript/labels";
+import { langAttr, langName } from "../transcript/model";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 
 const NO_STATES: readonly DegradedState[] = [];
@@ -154,6 +156,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const transcriptFor = cw && callId && live(cap) ? callId : null;
   // one transcript Channel for the window: both layouts share it, so a layout switch keeps it
   const tr = useTranscript(bridge, transcriptFor ?? "");
+  const languages = useMemo(() => new Map(tr.data?.segments.map((segment) => [langAttr(segment.lang), segment.lang])), [tr.data?.segments]);
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-crash-restore
   // @cpt-end:cpt-noter-flow-ui-call-window-hide-reopen:p1:inst-if-crash
   // The You and Others meters of the nothing-heard notice (the transcript holds them already while it waits for speech).
@@ -309,7 +312,10 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const pause = (paused: boolean) => void run("capture_set_paused", () => bridge.core.captureSetPaused({ ...id, paused }), capture);
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-case-pause
   // @cpt-begin:cpt-noter-flow-ui-call-window-controls:p1:inst-case-stop
-  const stop = () => void run("capture_stop", () => bridge.core.captureStop(id), capture);
+  const stop = async () => {
+    await run("capture_stop", () => bridge.core.captureStop(id), capture);
+    if (cw.collapsed) collapse(false);
+  };
   // @cpt-end:cpt-noter-flow-ui-call-window-controls:p1:inst-case-stop
   // @cpt-begin:cpt-noter-flow-ui-call-window-controls:p1:inst-case-sensitive
   const makeSensitive = async () => {
@@ -407,6 +413,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
   const hideForPresenting = (
     <IconButton icon="eyeSlash" label={t("cw.hide_presenting")} help={t("cw.hide_presenting_help", { key: key("hide_for_presenting") })} size={floating ? "inline" : "toolbar"} onAction={present} />
   );
+  const transcriptionChoices: (Lang | null)[] = [null, "en", "ru", "de"];
   const moreItems: MenuItem[] = [
     {
       label: t("mode.make_sensitive"),
@@ -427,6 +434,16 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
             },
           ]
         : []),
+    ...((cap.phase === "recording" || cap.phase === "paused") ? ([
+      { divider: true },
+      { header: t("cw.transcription_language") },
+      ...transcriptionChoices.map((language) => ({
+        label: language ? langName(language) : t("cw.transcription_language_auto"),
+        checked: (cap.transcription_language ?? null) === language,
+        disabled: busy("capture_set_language"),
+        onSelect: () => void run("capture_set_language", () => bridge.core.captureSetLanguage({ ...id, language }), capture),
+      })),
+    ] satisfies MenuItem[]) : []),
   ];
   const noticeSlot = noticeShown && (
     // @cpt-begin:cpt-noter-flow-ui-call-window-stop-at-call-end:p1:inst-show-notice
@@ -507,6 +524,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                     {hideForPresenting}
                     <MoreMenu items={moreItems} />
                   </div>{" "}
+                  {/* @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-dedicated-regions */}
                   <div className="cs-r1__line cs-r1__people">
                     {/* @cpt-begin:cpt-noter-flow-ui-speakers-live-name:p1:inst-open */}
                     {speakers.map((s) => (
@@ -520,8 +538,11 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
                       />
                     ))}
                     {/* @cpt-end:cpt-noter-flow-ui-speakers-live-name:p1:inst-open */}
+                    {languages.size > 0 && <>
+                      <span className="np-tb__spacer" />
+                      {Array.from(languages, ([code, lang]) => <LanguageTag key={code} lang={lang} variant="call" />)}
+                    </>}
                   </div>
-                  {/* @cpt-begin:cpt-noter-algo-ui-call-window-layout-content:p1:inst-dedicated-regions */}
                   {cw.show_latency && <LatencyLine hypothesis={tr.data?.hypothesis_lag} confirmed={tr.data?.confirmed_lag} />}
                   {/* @cpt-end:cpt-noter-algo-ui-call-window-layout-content:p1:inst-dedicated-regions */}
                 </header>
@@ -558,7 +579,7 @@ export function CallWindow({ bridge }: { bridge: Bridge }) {
     body = (
       // @cpt-begin:cpt-noter-flow-ui-call-window-collapse:p1:inst-render-strip
       // @cpt-begin:cpt-noter-flow-ui-call-window-collapse:p1:inst-return-collapse
-      <CollapsedCallStrip status={status} clock={clock} pausedFor={cap.phase === "paused" && cap.pause ? pausedMinutes(cap.pause, now) : null} mode={mode} onExpand={() => collapse(false)} />
+      <CollapsedCallStrip status={status} clock={clock} pausedFor={cap.phase === "paused" && cap.pause ? pausedMinutes(cap.pause, now) : null} mode={mode} stopKey={key("start_stop")} stopping={busy("capture_stop")} onStop={stop} onExpand={() => collapse(false)} />
       // @cpt-end:cpt-noter-flow-ui-call-window-collapse:p1:inst-return-collapse
       // @cpt-end:cpt-noter-flow-ui-call-window-collapse:p1:inst-render-strip
     );

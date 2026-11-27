@@ -613,7 +613,7 @@ impl Core {
     }
 
     /// The constraints file the archive pass reads: what the user named and linked, with the
-    /// call's languages and glossary.
+    /// call's language override or detected languages, and glossary.
     pub(crate) fn write_constraints_file(&self, call_id: &CallId) -> Result<(), CoreError> {
         let id = call_id.as_str().to_string();
         let (languages, links, names) = self.store().read(move |c| {
@@ -678,7 +678,9 @@ impl Core {
                 .collect()
         };
         let file = OfflineConstraints {
-            languages,
+            languages: self
+                .transcription_language(call_id)?
+                .map_or(languages, |lang| vec![lang]),
             glossary: self
                 .glossary()?
                 .terms

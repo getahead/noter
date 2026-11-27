@@ -68,6 +68,7 @@ public struct StartSession: Equatable, Sendable {
     public var storeAudio: Bool
     public var micDeviceUid: String?
     public var excludeBundleIds: [String]
+    public var captureBundleId: String?
     public var languages: JSONValue
     public var backend: String
     public var glossary: JSONValue
@@ -228,6 +229,7 @@ extension EngineCommand: Decodable {
                     storeAudio: try c.decode(Bool.self, forKey: key("store_audio")),
                     micDeviceUid: try c.decode(String?.self, forKey: key("mic_device_uid")),
                     excludeBundleIds: try c.decode([String].self, forKey: key("exclude_bundle_ids")),
+                    captureBundleId: try c.decodeIfPresent(String.self, forKey: key("capture_bundle_id")),
                     languages: try c.decode(JSONValue.self, forKey: key("languages")),
                     backend: try c.decode(String.self, forKey: key("backend")),
                     glossary: try c.decode(JSONValue.self, forKey: key("glossary")),

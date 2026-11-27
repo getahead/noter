@@ -216,7 +216,9 @@ public final class EngineLoop: @unchecked Sendable {
             session = (capture, audio)
             let current = processes()
             facts.withLock {
-                detector.startSession(callId: start.callId, current: current, excluded: start.excludeBundleIds)
+                detector.startSession(
+                    callId: start.callId, current: current, excluded: start.excludeBundleIds,
+                    captureBundleId: start.captureBundleId)
                 capturing = capture
             }
             writer.emit(.ack(cmdId: id))

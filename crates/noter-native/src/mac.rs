@@ -1,5 +1,6 @@
 //! The macOS calls behind the crate's API. Reads never prompt; `request_permission` does.
 
+use std::cell::RefCell;
 use std::ffi::c_void;
 use std::path::Path;
 use std::ptr::NonNull;
@@ -35,9 +36,10 @@ use objc2_core_graphics::{
     CGDirectDisplayID, CGDisplayBounds, CGDisplayIsBuiltin, CGGetActiveDisplayList,
     CGMainDisplayID, CGPreflightScreenCaptureAccess, CGRequestScreenCaptureAccess,
 };
-use objc2_event_kit::{EKEntityType, EKEventStore};
+use objc2_event_kit::{EKEntityType, EKEventStore, EKEventStoreChangedNotification};
 use objc2_foundation::{
-    NSBundle, NSDate, NSDictionary, NSError, NSNumber, NSOperationQueue, NSProcessInfo, NSString,
+    NSBundle, NSDate, NSDictionary, NSError, NSNotification, NSNotificationCenter, NSNumber,
+    NSOperationQueue, NSProcessInfo, NSString,
 };
 use objc2_service_management::SMAppService;
 use objc2_user_notifications::{
@@ -690,6 +692,41 @@ pub fn announce(text: &str, priority: isize) {
     });
     // SAFETY: the block captures only owned, Send data and runs once on the main queue.
     unsafe { NSOperationQueue::mainQueue().addOperationWithBlock(&block) };
+}
+
+struct CalendarWatch {
+    _store: Retained<EKEventStore>,
+    token: Retained<ProtocolObject<dyn NSObjectProtocol>>,
+}
+
+impl Drop for CalendarWatch {
+    fn drop(&mut self) {
+        // The token was registered with this notification center.
+        unsafe { NSNotificationCenter::defaultCenter().removeObserver(self.token.as_ref()) };
+    }
+}
+
+thread_local! {
+    static CALENDAR_WATCH: RefCell<Option<CalendarWatch>> = const { RefCell::new(None) };
+}
+
+// @cpt-algo:cpt-noter-algo-core-native-surfaces-calendar:p2
+pub fn watch_calendar(_main: MainThreadMarker, changed: impl Fn() + Send + Sync + 'static) {
+    let store = unsafe { EKEventStore::new() };
+    let block = RcBlock::new(move |_: NonNull<NSNotification>| changed());
+    // The block captures only a Send + Sync callback; EventKit delivers on the main queue.
+    let token = unsafe {
+        NSNotificationCenter::defaultCenter().addObserverForName_object_queue_usingBlock(
+            Some(EKEventStoreChangedNotification),
+            Some(&store),
+            Some(&NSOperationQueue::mainQueue()),
+            &block,
+        )
+    };
+    CALENDAR_WATCH.set(Some(CalendarWatch {
+        _store: store,
+        token,
+    }));
 }
 
 // @cpt-begin:cpt-noter-algo-core-native-surfaces-calendar:p1:inst-read-events

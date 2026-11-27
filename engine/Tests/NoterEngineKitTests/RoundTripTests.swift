@@ -37,7 +37,7 @@ extension EngineCommandLine: Encodable {
 extension EngineCommand: Encodable {
     private enum Keys: String, CodingKey {
         case type, enabled, known_bundle_ids, play_clip, timeout_ms, call_id, bundle_id, entries, languages
-        case session_dir, store_audio, mic_device_uid, exclude_bundle_ids, backend, glossary, speaker_priors
+        case session_dir, store_audio, mic_device_uid, exclude_bundle_ids, capture_bundle_id, backend, glossary, speaker_priors
         case enrolled_embeddings_path, resume_from_ms, from_ms, to_ms, channel
         case result_path, constraints_path, request_id, spans, out_path, texts
     }
@@ -61,6 +61,7 @@ extension EngineCommand: Encodable {
             try c.encode(s.storeAudio, forKey: .store_audio)
             try c.encode(s.micDeviceUid, forKey: .mic_device_uid)
             try c.encode(s.excludeBundleIds, forKey: .exclude_bundle_ids)
+            try c.encode(s.captureBundleId, forKey: .capture_bundle_id)
             try c.encode(s.languages, forKey: .languages)
             try c.encode(s.backend, forKey: .backend)
             try c.encode(s.glossary, forKey: .glossary)

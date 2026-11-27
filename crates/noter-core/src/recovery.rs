@@ -135,29 +135,33 @@ impl Core {
             // @cpt-begin:cpt-noter-flow-core-capture-session-resume:p1:inst-resume-interrupted
             // @cpt-begin:cpt-noter-state-core-capture-session-phase:p1:inst-st-resume-interrupted
             let t1 = now - started_at;
+            let id = call_id.as_str().to_string();
+            let (class, not_stored, capture_bundle_id): (String, bool, Option<String>) =
+                self.store().read(move |c| {
+                    c.query_row(
+                        "SELECT privacy_class, audio_not_stored, capture_bundle_id FROM calls WHERE id = ?1",
+                        [id],
+                        |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                    )
+                })?;
             self.insert_gap(&call_id, last, t1, GapReason::Interrupted)?;
             *session = session.restart(started_at);
+            session.capture_bundle_id = capture_bundle_id.clone();
             session.away_ms = t1 - last;
             let mut banners = self.app().banners.banners.clone();
             banners.retain(|b| b.kind() != BannerKind::RecordingInterruptedByQuit);
             self.set_banners(banners);
             let status = vec![("status", json!("recording"))];
             self.write_call(ctx, &call_id, "Resumed recording", false, status)?;
-            let id = call_id.as_str().to_string();
-            let (class, not_stored): (String, bool) = self.store().read(move |c| {
-                c.query_row(
-                    "SELECT privacy_class, audio_not_stored FROM calls WHERE id = ?1",
-                    [id],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
-                )
-            })?;
-            let start = self.session_for(&call_id, Some(t1))?;
+            let start = self.session_for(&call_id, Some(t1), capture_bundle_id)?;
+            let transcription_language = self.transcription_language(&call_id)?;
             let recorded = session.recorded(now, None);
             self.set_capture(|c| {
                 *c = CaptureState {
                     version: c.version,
                     phase: CapturePhase::Recording,
                     call_id: Some(call_id.clone()),
+                    transcription_language,
                     title: Some(call.title),
                     started_at: Some(call.started_at),
                     recorded_ms: recorded,
@@ -208,7 +212,7 @@ impl Core {
             // The supervisor restarts its session and reports the `engine_restart` gap itself.
             self.engine.try_again().await?;
         } else {
-            let start = self.session_for(&call_id, Some(t1))?;
+            let start = self.session_for(&call_id, Some(t1), session.capture_bundle_id.clone())?;
             self.engine.start_session(start).await?;
             self.insert_gap(&call_id, t0, t1, GapReason::EngineRestart)?;
             // The engine runs again: the failure it reported is over for this call.

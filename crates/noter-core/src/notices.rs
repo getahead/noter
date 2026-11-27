@@ -163,11 +163,10 @@ impl Core {
         let state = self.capture_now();
         let now = self.deps.clock.now().0;
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-detected-fact
+        // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
         if matches!(state.phase, CapturePhase::Recording | CapturePhase::Paused) {
-            let same_app = session.app.as_ref().is_some_and(|(b, _)| *b == bundle_id);
             let asked = matches!(state.notice, Some(CaptureNotice::NewMeeting { .. }));
-            if !same_app && !asked {
-                // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
+            if session.capture_bundle_id.is_none() && !asked {
                 let notice = CaptureNotice::NewMeeting {
                     event: self.next_meeting_event(session.event_id.as_ref(), now),
                     app_name: Some(app_name.clone()),
@@ -182,10 +181,10 @@ impl Core {
                         let _ = core.split_call(&timer_ctx()).await;
                     }
                 });
-                // @cpt-end:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
             }
             return;
         }
+        // @cpt-end:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-new-meeting
         // @cpt-begin:cpt-noter-flow-core-capture-session-record-detected:p1:inst-run-detection
         let Some(detection) = self.detection_for(&bundle_id, &app_name, state.phase, now) else {
             return;
@@ -335,7 +334,7 @@ impl Core {
         }
         // @cpt-end:cpt-noter-flow-core-capture-session-record-detected:p1:inst-detection-ends
         let state = self.capture_now();
-        let ours = session.app.as_ref().is_some_and(|(b, _)| *b == bundle_id);
+        let ours = session.capture_bundle_id.as_ref() == Some(&bundle_id);
         if !ours || !matches!(state.phase, CapturePhase::Recording | CapturePhase::Paused) {
             return;
         }
@@ -578,11 +577,14 @@ impl Core {
     pub(crate) async fn source_added(&self, call_id: CallId, bundle_id: String, app_name: String) {
         let app_name = crate::call_platform::display_name(&bundle_id, &app_name);
         let session = self.capture.lock().await;
-        if !live(&self.capture_now(), &call_id) || session.kept_sources.contains(&bundle_id) {
+        // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-second-source
+        if !live(&self.capture_now(), &call_id)
+            || session.capture_bundle_id.is_some()
+            || session.kept_sources.contains(&bundle_id)
+        {
             return;
         }
         let since = self.deps.clock.now();
-        // @cpt-begin:cpt-noter-algo-core-capture-session-notice-timers:p1:inst-timer-second-source
         self.edit_degraded(|states| {
             let shown = states.iter().any(|s| {
                 matches!(s, DegradedState::SecondAudioSource { bundle_id: b, .. } if *b == bundle_id)
