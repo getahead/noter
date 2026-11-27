@@ -320,9 +320,10 @@
       "sensitive": false,
       "started_at": 1792137600000,
       "title": "Planning: VHI 8.0 drawer redesign",
+      "transcription_language": null,
       "version": 1
     },
-    "contract_version": "2.37",
+    "contract_version": "2.38",
     "copilot": {
       "agents": [
         {

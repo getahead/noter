@@ -749,3 +749,70 @@ async fn rematch_without_a_profile_names_no_one_and_an_unknown_person_is_not_fou
         .unwrap_err();
     assert_eq!(err.code, ErrorCode::NotFound);
 }
+
+#[tokio::test]
+async fn a_first_profile_finds_voices_archived_before_enrollment() {
+    let dir = tempfile::tempdir().unwrap();
+    let deps = CoreDeps {
+        engine: Arc::new(
+            noter_engine_client::scripted::ScriptedEngine::new().with_container(dir.path()),
+        ),
+        ..CoreDeps::new(
+            Arc::new(Moving(AtomicI64::new(NOW))),
+            Arc::new(Events::default()),
+        )
+    };
+    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    core.start_first_run();
+    core.store()
+        .insert_batch(vec![
+            call("call_retained", NOW - DAY),
+            person("per_anna", "Anna Koval"),
+            archive("old_anna", "call_retained", Some("per_anna"), 1),
+            archive("unnamed", "call_retained", None, 2),
+            row(
+                "segments",
+                &[
+                    ("id", json!("sg_seed")),
+                    ("call_id", json!("call_retained")),
+                    ("speaker_id", json!("old_anna")),
+                    ("channel", json!("sys")),
+                    ("t0_ms", json!(0)),
+                    ("t1_ms", json!(5000)),
+                    ("text", json!("first sample")),
+                    ("text_norm", json!("first sample")),
+                    ("pass", json!("archive")),
+                ],
+            ),
+            row(
+                "segments",
+                &[
+                    ("id", json!("sg_past")),
+                    ("call_id", json!("call_retained")),
+                    ("speaker_id", json!("unnamed")),
+                    ("channel", json!("sys")),
+                    ("t0_ms", json!(5000)),
+                    ("t1_ms", json!(10000)),
+                    ("text", json!("second sample")),
+                    ("text_norm", json!("second sample")),
+                    ("pass", json!("archive")),
+                ],
+            ),
+        ])
+        .unwrap();
+    // The scripted engine returns the same vector for both spans of this call.
+    enable(&core, "per_anna", "old_anna").await;
+    let result = core.voice_profile_rematch(&ctx(), anna()).await.unwrap();
+    assert_eq!((result.calls, result.speakers), (1, 1));
+    assert_eq!(
+        named(&core, "unnamed", dir.path()).await,
+        (Some("per_anna".into()), Some("voice_profile".into()))
+    );
+    assert_eq!(
+        count(
+            dir.path(),
+            "SELECT count(*) FROM speakers WHERE centroid IS NOT NULL"
+        ),
+        0
+    );
+}

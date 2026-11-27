@@ -248,13 +248,13 @@ Read only the requested person's aggregate rows for a person page. For `people_l
 
 - [x] `p4` - **ID**: `cpt-noter-algo-core-people-profile-rematch`
 
-**Input**: The person id, every archive speaker still unnamed with a stored centroid, each call's attendees, the live opted-in profiles and the Keychain key.
+**Input**: The person id, unnamed archive speakers with stored centroids or retained system audio, each call's attendees, the live opted-in profiles and the Keychain key.
 
 **Output**: `VoiceRematch` with the calls and speakers named and one change id, or zeros without one (#1278).
 
 **Steps**:
-1. [x] - `p1` - Read the person (absent is `not_found`), the unnamed archive speakers with centroids grouped by call, the calls' attendees and the live profiles - `inst-rematch-load`
-2. [x] - `p1` - Score each call's speakers against every live profile as `cpt-noter-algo-core-people-profile-match` does (attendees first, threshold and runner-up margin), and keep only this person's wins - `inst-rematch-score`
+1. [x] - `p1` - Read the person (absent is `not_found`), the eligible unnamed archive speakers grouped by call, the calls' attendees and the live profiles - `inst-rematch-load`
+2. [x] - `p1` - For an active profile, derive missing speaker embeddings locally from retained audio and keep those embeddings only for this scan. Score each call's speakers against every live profile as `cpt-noter-algo-core-people-profile-match` does (attendees first, threshold and runner-up margin), and keep only this person's wins - `inst-rematch-score`
 3. [x] - `p1` - In one transaction recheck each win (the speaker still unnamed, the profile and opt-in still there), name it with `named_by = voice_profile`, update the used profiles' `last_used_at`, and log every row under one batch whose change id undoes it as a whole; a speaker named meanwhile is left alone - `inst-rematch-write`
 4. [x] - `p1` - Add the person to each call's participants in the same batch, publish the corrected speakers and lines per call and the person, and **RETURN** the counts - `inst-rematch-publish`
 

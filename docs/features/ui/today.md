@@ -186,7 +186,7 @@ It implements `cpt-noter-component-screen-today` and `cpt-noter-component-ui-upc
 3. [x] - `p1` - **FROM** ASKING **TO** LOADING **WHEN** permission_request settles; re-read the actual permission - `inst-answer`
 4. [x] - `p1` - **FROM** DENIED **TO** LOADING **WHEN** Today is revisited after System Settings changes - `inst-settings`
 5. [x] - `p1` - **FROM** ERROR **TO** LOADING **WHEN** Try Again is chosen - `inst-retry`
-6. [x] - `p1` - **FROM** READY, NO_CALLS **TO** LOADING **WHEN** the date or calendar environment changes - `inst-date`
+6. [x] - `p1` - **FROM** READY, NO_CALLS **TO** LOADING **WHEN** the date or calendar environment changes, including EventKit changes while Today stays open - `inst-date`
 
 ### Call card disclosure
 

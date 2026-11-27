@@ -10,6 +10,7 @@ use std::time::Duration;
 use noter_db::{Insert, Logged, Mutation};
 use noter_jobs::{CaptureGuardState, Request, Trigger};
 use noter_protocol::engine::{AsrBackend, EngineCommand, EngineEvent, GlossaryEntry, StartSession};
+use noter_protocol::error::ValidationRule;
 use noter_protocol::ipc::{event_names, CommandCtx};
 use noter_protocol::model::*;
 use noter_protocol::*;
@@ -120,8 +121,8 @@ pub(crate) struct Session {
     pub(crate) stop_rejected: bool,
     /// Discard has ended the transcript; every retry must finish deletion, never resume it.
     pub(crate) discard_requested: bool,
-    /// The meeting app of the live call (bundle id, name), when a detection started it.
-    pub(crate) app: Option<(String, String)>,
+    /// The sole system-audio source when this recording started from a detected app.
+    pub(crate) capture_bundle_id: Option<String>,
     pub(crate) event_id: Option<CalendarEventId>,
     /// Counts the meeting app's audio releases; a call-end timer acts only for the latest.
     pub(crate) released: u64,
@@ -191,6 +192,7 @@ fn ms(v: i64) -> u32 {
 pub(crate) fn to_idle(c: &mut CaptureState) {
     c.phase = CapturePhase::Idle;
     c.call_id = None;
+    c.transcription_language = None;
     c.title = None;
     c.started_at = None;
     c.recorded_ms = DurationMs(0);
@@ -477,16 +479,23 @@ impl Core {
         &self,
         call_id: &CallId,
         resume_from_ms: Option<i64>,
+        capture_bundle_id: Option<String>,
     ) -> Result<StartSession, CoreError> {
         let audio = lock(&self.settings).audio.clone();
+        let language = if resume_from_ms.is_some() {
+            self.transcription_language(call_id)?
+        } else {
+            None
+        };
         Ok(StartSession {
             call_id: call_id.clone(),
             session_dir: format!("audio/{call_id}/"),
             store_audio: audio.retention != AudioRetention::NeverStore,
             mic_device_uid: audio.mic_device,
             exclude_bundle_ids: vec![],
+            capture_bundle_id,
             // Settings › Languages, read at each session start ("apply from the next call").
-            languages: audio.languages,
+            languages: language.map_or(audio.languages, |lang| vec![lang]),
             backend: backend(audio.live_backend),
             glossary: entries(&self.glossary()?),
             speaker_priors: vec![],
@@ -571,7 +580,7 @@ impl Core {
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // A stopped call's Continue window closes: the new call replaces it.
         *session = Session {
-            app: begin.app.clone(),
+            capture_bundle_id: begin.app.as_ref().map(|(bundle, _)| bundle.clone()),
             event_id: begin.event.as_ref().map(|e| e.id.clone()),
             ..session.restart(now)
         };
@@ -599,7 +608,7 @@ impl Core {
         // @cpt-end:cpt-noter-flow-core-capture-session-start:p1:inst-close-continue
         // @cpt-begin:cpt-noter-flow-core-capture-session-start:p1:inst-insert-call
         let call_id = CallId::new(format!("call_{}", ulid::Ulid::generate()));
-        let start = self.session_for(&call_id, None)?;
+        let start = self.session_for(&call_id, None, session.capture_bundle_id.clone())?;
         let store_audio = start.store_audio;
         let privacy = lock(&self.settings).privacy.mode;
         let class = if sensitive { "sensitive" } else { "normal" };
@@ -612,6 +621,7 @@ impl Core {
                 ("started_at", json!(now)),
                 ("title", json!(title)),
                 ("platform", json!(platform)),
+                ("capture_bundle_id", json!(session.capture_bundle_id)),
                 ("calendar_event_id", json!(event.as_ref().map(|e| &e.id))),
                 ("title_pending", json!(i64::from(event.is_none()))),
                 ("call_type", json!(UNCLASSIFIED)),
@@ -639,6 +649,7 @@ impl Core {
                 version: c.version,
                 phase: CapturePhase::Starting,
                 call_id: Some(call_id.clone()),
+                transcription_language: None,
                 title: Some(title),
                 started_at: Some(TimestampMs(now)),
                 recorded_ms: DurationMs(0),
@@ -732,6 +743,78 @@ impl Core {
             }
             _ => {}
         }
+    }
+
+    pub(crate) fn transcription_language(
+        &self,
+        call_id: &CallId,
+    ) -> Result<Option<Lang>, CoreError> {
+        let id = call_id.clone();
+        self.store()
+            .read(move |c| {
+                c.query_row(
+                    "SELECT transcription_language FROM calls WHERE id = ?1",
+                    [id.as_str()],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+            })
+            .map(|code| code.map(crate::library::lang_of))
+    }
+
+    // @cpt-algo:cpt-noter-algo-core-engine-capture-live-asr:p1
+    pub(crate) async fn set_capture_language(
+        &self,
+        ctx: &CommandCtx,
+        args: CaptureLanguageArgs,
+    ) -> Result<CaptureState, CoreError> {
+        let _session = self.capture.lock().await;
+        let state = self.capture_now();
+        if !live(&state, &args.call_id) {
+            return Err(not_recording());
+        }
+        if state.transcription_language == args.language {
+            return Ok(state);
+        }
+        let auto = lock(&self.settings).audio.languages.clone();
+        if args
+            .language
+            .as_ref()
+            .is_some_and(|lang| matches!(lang, Lang::Other { .. }) && !auto.contains(lang))
+        {
+            return Err(invalid("language", ValidationRule::OutOfRange));
+        }
+        let languages =
+            |lang: &Option<Lang>| lang.clone().map_or_else(|| auto.clone(), |l| vec![l]);
+        self.engine
+            .command(EngineCommand::SetLanguages {
+                languages: languages(&args.language),
+            })
+            .await
+            .map_err(|_| {
+                CoreError::new(
+                    ErrorCode::EngineUnavailable,
+                    "could not change recognition language",
+                )
+            })?;
+        if let Err(error) = self.write_call(
+            ctx,
+            &args.call_id,
+            "Changed transcription language",
+            false,
+            vec![(
+                "transcription_language",
+                json!(args.language.as_ref().map(crate::library::lang_code)),
+            )],
+        ) {
+            let _ = self
+                .engine
+                .command(EngineCommand::SetLanguages {
+                    languages: languages(&state.transcription_language),
+                })
+                .await;
+            return Err(error);
+        }
+        Ok(self.set_capture(|c| c.transcription_language = args.language))
     }
 
     // @cpt-flow:cpt-noter-flow-core-capture-session-pause-mark:p1
@@ -1102,7 +1185,7 @@ impl Core {
             ))
         })?;
         // @cpt-end:cpt-noter-state-core-library-calls-status:p1:inst-st-continued
-        let start = self.session_for(&call_id, Some(t1))?;
+        let start = self.session_for(&call_id, Some(t1), session.capture_bundle_id.clone())?;
         let recorded = session.recorded(now, None);
         // The call's queued and running pipeline is obsolete: the scheduler cancels it.
         self.capture_guard

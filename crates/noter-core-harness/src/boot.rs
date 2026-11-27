@@ -185,6 +185,7 @@ pub fn scenario(name: &str, now: TimestampMs, w: &mut FakeWorld) -> Result<(), S
     let idle = CaptureState {
         phase: CapturePhase::Idle,
         call_id: None,
+        transcription_language: None,
         title: None,
         started_at: None,
         recorded_ms: DurationMs(0),

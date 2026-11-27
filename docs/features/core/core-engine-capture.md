@@ -54,7 +54,7 @@ design: docs/DESIGN-core.md
 
 ### 1.1 Overview
 
-The engine gains its main job: a global Core Audio process tap (excluding the engine's and the app's PIDs) and the microphone on one clock, written into a capture ring that is a memory-mapped file in the data folder, and to AAC-LC files unless the call stores no audio. VAD, per-utterance language ID and Noter's streaming decode loop on WhisperKit produce hypotheses about once a second and confirmed segments with live speaker labels. Detection listeners report meeting apps. Replay plays a span natively. On the Rust side, the supervisor restarts a crashed engine in capture-first mode and translates engine facts into degraded states.
+The engine gains its main job: a Core Audio process tap and the microphone on one clock, written into a capture ring that is a memory-mapped file in the data folder, and to AAC-LC files unless the call stores no audio. VAD, per-utterance language ID and Noter's streaming decode loop on WhisperKit produce hypotheses about once a second and confirmed segments with live speaker labels. Detection listeners report meeting apps. Replay plays a span natively. On the Rust side, the supervisor restarts a crashed engine in capture-first mode and translates engine facts into degraded states.
 
 > **M1 decisions (Backend Teamlead, 21 Oct 2026).** There are two restart rules in `noter-engine-client`: the idle restart (3 in 60 s, M0) and the capture-first restart (3 in 30 s, then `CaptureFailed`); the supervisor picks one by whether a session is running (TL-8). The Swift protocol types stay hand-written for M1, without code generation (TL-9). The scripted engine follows `.plans/engine-script-format.md` (JSON Lines with `on`, `after_ms` and `event` or `kill`), so the Q7 kill drill is proven on it before the owner runs it on the Mac (TL-3). M1 live labels are per side (You and `spk_1`, one `speakers` row of pass `live`); diarization stays with the offline pass (D-32).
 
@@ -106,8 +106,8 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 - The live model fails to load: `error { model_load_failed }`; the supervisor reports `engine_unavailable`.
 
 **Steps**:
-1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
-2. [x] - `p1` - Engine validates the session directory inside the data folder, then opens the global tap (excluding its own and the app's PIDs and excluded bundles) and the microphone on one clock - `inst-open-streams`
+1. [x] - `p1` - Supervisor sends `start_session { call_id, session_dir, store_audio, mic_device_uid, exclude_bundle_ids, capture_bundle_id?, languages, backend, glossary, speaker_priors, resume_from_ms }` - `inst-start-session`
+2. [x] - `p1` - Engine validates the session directory inside the data folder, then opens the system-audio tap and the microphone on one clock. When `capture_bundle_id` is present, the tap includes that app's processes and its helpers, following process changes. Otherwise use the global tap, excluding the engine and app PIDs and excluded bundles - `inst-open-streams`
 3. [x] - `p1` - Engine writes both channels into the capture ring and, if `store_audio`, into `audio/<call_id>/mic.m4a` and `sys.m4a` - `inst-write-ring`
 4. [x] - `p1` - Engine emits `session_started { call_id, mic_device, output_device }` - `inst-session-started`
 5. [x] - `p1` - Engine runs `cpt-noter-algo-core-engine-capture-live-asr` on both channels and emits `levels` about every 100 ms - `inst-run-asr`
@@ -124,7 +124,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Actor**: Meeting app
 
 **Success Scenarios**:
-- A known meeting app starts playing call audio while holding the microphone: `call_detected { bundle_id, app_name, pid }`. It lets go of both: `call_audio_released { bundle_id }`. A second app starts sending audio during a session: `audio_source_added`.
+- A known meeting app starts playing call audio while holding the microphone: `call_detected { bundle_id, app_name, pid }`. It lets go of both: `call_audio_released { bundle_id }`. A second app starts sending audio during a system-wide session: `audio_source_added`.
 
 **Error Scenarios**:
 - Detection is off (`set_detection { enabled: false }`): no detection events; capture started by hand still works.
@@ -132,7 +132,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 **Steps**:
 1. [x] - `p1` - Supervisor sends `set_detection { enabled, known_bundle_ids }` whenever the detection rule changes - `inst-set-detection`
 2. [x] - `p1` - **IF** enabled, engine listens for audio-process and microphone-use changes of known bundles - `inst-listen`
-3. [x] - `p1` - Engine emits `call_detected`, `call_audio_released` or `audio_source_added` as facts; it never decides to record - `inst-emit-facts`
+3. [x] - `p1` - Engine reports detection, release and new-source facts. During app-scoped capture, suppress new detection and new-source facts for other apps - `inst-emit-facts`
 4. [x] - `p1` - **RETURN** - `inst-return-detect`
 
 ### Recover from an engine crash during capture
@@ -223,7 +223,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 **Steps**:
 1. [x] - `p1` - Count consecutive buffers made of exact digital zeros (a real quiet room is never exact zero) - `inst-count-zeros`
-2. [x] - `p1` - **IF** zeros persist past 5, 15 and 30 s while any app the user did not exclude plays audio (a meeting app, a video, speech from `say`; owner decision, #1142; a process with no app bundle, such as `say` or `afplay`, counts too but is never reported as a new audio source, #1196), emit the fact with a confidence that grows with the duration - `inst-emit-silent`
+2. [x] - `p1` - **IF** zeros persist past 5, 15 and 30 s while a process included in the tap plays audio, emit the fact with a confidence that grows with the duration. During system-wide capture, a process with no app bundle like `say` or `afplay` counts for silence detection (#1142, #1196) - `inst-emit-silent`
 3. [x] - `p1` - **RETURN** - `inst-return-zero`
 
 ### Translate engine facts into degraded states
@@ -270,7 +270,7 @@ Capture is the release blocker: 99 % of calls recorded end to end without dropou
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-pipeline`
 
-The system **MUST** capture the tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the data folder; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring. When a stop was missed or finalization was interrupted, archive and replay recover available AAC parts and preserve the saved timeline duration. A completed recording followed by Continue Recording retains both the earlier M4A and new parts. Shutdown and live stdin EOF wait for queued stop finalization.
+The system **MUST** capture the scoped meeting app or global tap (excluding the engine and app PIDs) and the microphone on one clock into a memory-mapped capture ring in the data folder; when no microphone resolves, it still starts with the system tap alone and reports `device_unavailable`. Downsampling to 16 kHz MUST apply low-pass filtering and preserve converter state across chunks. Write AAC-LC files only when audio is stored, pause both streams on `pause`, and write `timeline.json` on stop. A clean stop clears the entire capture ring, including both PCM channels and recovery metadata, regardless of `store_audio`; an engine crash preserves it for recovery. Finishing a stopped call must not clear a newer call's ring. When a stop was missed or finalization was interrupted, archive and replay recover available AAC parts and preserve the saved timeline duration. A completed recording followed by Continue Recording retains both the earlier M4A and new parts. Shutdown and live stdin EOF wait for queued stop finalization.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-session`
@@ -299,7 +299,7 @@ The system **MUST** emit hypotheses about once a second and confirmed segments w
 
 - [x] `p1` - **ID**: `cpt-noter-dod-core-engine-capture-detection`
 
-The system **MUST** report `call_detected`, `call_audio_released` and `audio_source_added` only while detection is enabled (or, for a second source, while a session runs) and never act on them itself.
+The system **MUST** report `call_detected`, `call_audio_released` and `audio_source_added` only while detection is enabled (or, for a second source, while a system-wide session runs) and never act on them itself.
 
 **Implements**:
 - `cpt-noter-flow-core-engine-capture-detect`

@@ -360,8 +360,10 @@
 .cw-strip__row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
-  height: 44px;
+  min-height: 44px;
+  padding: 6px 0;
 }
 .cw-strip--compact .cw-strip__fb {
   padding-top: 6px;

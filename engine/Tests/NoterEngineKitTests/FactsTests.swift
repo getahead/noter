@@ -60,6 +60,20 @@ final class DetectorTests: XCTestCase {
         XCTAssertEqual(d.update([app("com.apple.Safari", output: true)]), [])
     }
 
+    func testOtherAppsDoNotCountAsSoundSourcesOrTriggerSilenceChecksInATargetedCall() {
+        var d = Detector()
+        d.rule(enabled: true, known: [zoom, chrome])
+        let browserCall = app(chrome, output: true, input: true)
+        d.startSession(callId: "call_1", current: [], excluded: [], captureBundleId: zoom)
+        XCTAssertEqual(d.update([browserCall, app("ru.keepcoder.Telegram", output: true), app("", output: true)]), [])
+        XCTAssertFalse(d.outputPlaying)
+        XCTAssertEqual(d.update([app("\(zoom).helper", output: true)]), [])
+        XCTAssertTrue(d.outputPlaying)
+        d.stopSession()
+        XCTAssertEqual(d.update([browserCall]), [.callDetected(bundleId: chrome, appName: "Chrome", pid: browserCall.pid)])
+        XCTAssertTrue(d.outputPlaying)
+    }
+
     // cpt-noter-seq-call-screen-recover-capture — #1142: any app playing counts, not only a known meeting app
     func testAnyAppPlayingCountsForSilenceDetection() {
         var d = Detector()

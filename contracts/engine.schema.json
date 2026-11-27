@@ -679,6 +679,13 @@
           "call_id": {
             "$ref": "#/$defs/CallId"
           },
+          "capture_bundle_id": {
+            "description": "Scope the system tap to this meeting app and its helpers. None taps system-wide.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "enrolled_embeddings_path": {
             "description": "Up to four enrolled attendees switch live diarization to Sortformer.",
             "type": [

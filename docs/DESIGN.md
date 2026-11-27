@@ -1837,10 +1837,10 @@ The floating panel is the compact layout of the call window beside the call app,
 | FP-R3 Banner | Optional, under FP-R2 | `cpt-noter-component-ui-inline-banner`, compact, with the messages of CS-R3 and CS-R4d; the first time the floating layout opens, the info line **Hidden from window shares only. Before sharing your whole screen, press** ⌃⌥⌘0. · **Got It** | PRD › Live copilot loop › Degraded states; PM-49 |
 | FP-R4 Cards | Fills the middle | The ask field **Ask about this call…** on top while it is open; `cpt-noter-component-ui-copilot-card-stack` with compact cards (13/19) and number badges; **1 more** when more cards exist than fit | D82, PM-59 |
 | FP-R5 Transcript | With the copilot off, a wrapping live log with history and **Jump to Live** fills the space between the header or banners and FP-R6. With it on, a tail of 2 to 4 lines (12/17) appears at heights of 680 and up or with **Show Transcript** | `cpt-noter-component-ui-transcript-view` with `cpt-noter-component-ui-speaker-label` and `cpt-noter-component-ui-language-tag`. The playback bar takes its place during headphone replay. | D82, D85, D92 |
-| FP-R6 Footer | 44 high | **Mark Moment**, **Catch Me Up**, ⋯ (**Pause** or **Resume**, **Stop Recording**, **Ask…**), budget text; card-key feedback | D72 |
+| FP-R6 Footer | At least 44 high | **Mark Moment**, **Catch Me Up**, ⋯ (**Pause** or **Resume**, **Ask…**), **Stop Recording**, budget text; card-key feedback | D12, D72 |
 | FP-C1 State | Collapsed strip, leading | Recording dot and clock (`cpt-noter-component-ui-recording-indicator`), mode glyph | D83 |
 | FP-C2 Newest card | Collapsed strip, middle | The newest card's number badge, type label and first line, tail-truncated; **Pin** and **Dismiss** icon buttons on hover or focus; the listening line when there is no card | D83, PM-59 |
-| FP-C3 Controls | Collapsed strip, trailing | Card count badge **3**, **Expand** | D83 |
+| FP-C3 Controls | Collapsed strip, trailing | Card count badge **3**, **Stop Recording**, **Expand** | D12, D83 |
 
 **Wireframe** — about 550 high on a 13-inch screen, the first time the floating layout opens, with **Show Transcript** on, and the collapsed strip:
 
@@ -1867,12 +1867,13 @@ The floating panel is the compact layout of the call window beside the call app,
 ├─ FP-R5 tail (680 high and up, or Show Transcript) ───────┤
 │ 00:21:02  Anna K.  Then the drawer has to sho…        EN │
 ├─ FP-R6 ──────────────────────────────────────────────────┤
-│ [Mark Moment]  [Catch Me Up]  [⋯]          $0.31 / $1.00 │
+│ [Mark Moment] [Catch Me Up] [⋯] [Stop Recording]         │
+│                                           $0.31 / $1.00 │
 └──────────────────────────────────────────────────────────┘
 
 Collapsed strip, 56 high:
 ┌─ FP-C1 ──────────┬─ FP-C2 ──────────────────────────────────────────────────────────────┬─ FP-C3 ────┐
-│ ● 00:21:08   ◐   │ 2   Ask: Who owns the acceptance criteria for the reconnec…          │ 3   [˅]    │
+│ ● 00:21:08   ◐   │ 2   Ask: Who owns the acceptance criteria…       │ 3 [Stop Recording] [˅] │
 └──────────────────┴──────────────────────────────────────────────────────────────────────┴────────────┘
 ```
 
@@ -1893,7 +1894,8 @@ Collapsed strip, 56 high:
 | **1 more** | `cpt-noter-component-ui-copilot-card-stack` | Shows the remaining cards; the stack then scrolls inside the panel (PM-59) |
 | Tail rows | `cpt-noter-component-ui-transcript-segment-row` (tail), `cpt-noter-component-ui-speaker-label`, `cpt-noter-component-ui-language-tag` | Show the same speaker label and language tag as the call screen; the label opens the rename popover while the panel is key (D92) |
 | **Mark Moment** and **Catch Me Up** | `cpt-noter-component-ui-call-status-strip` (compact) | As on the call screen; **Mark Moment** becomes an icon button with that help tag only when German text runs short; a Catch-up card expands a collapsed strip for a while |
-| ⋯ **Pause**, **Resume**, **Stop Recording**, **Ask…** | `cpt-noter-component-ui-call-status-strip` (compact) | **Ask…** opens the ask field over the cards |
+| ⋯ **Pause**, **Resume**, **Ask…** | `cpt-noter-component-ui-call-status-strip` (compact) | **Ask…** opens the ask field over the cards |
+| **Stop Recording** | `cpt-noter-component-ui-call-status-strip` (compact), `cpt-noter-component-ui-collapsed-call-strip` | Ends capture. The collapsed strip expands to show the closing actions. |
 | Budget **$0.31 / $1.00** | `cpt-noter-component-ui-call-status-strip` (compact) | Warning colour and a warning icon near the cap |
 | **Expand** (˅) | `cpt-noter-component-ui-collapsed-call-strip` | Help tag **Expand Panel**; a double-click on the strip or ⌃⌥⌘N does the same |
 | FP-C2 card line | `cpt-noter-component-ui-copilot-card` (peek) | Full text in the help tag; hover or focus shows **Pin** and **Dismiss** icon buttons; the card keys act on every card, shown or not (PM-59) |
@@ -1909,7 +1911,7 @@ Collapsed strip, 56 high:
 - German text about 30 % longer: buttons never truncate; the title truncates with the full title in a help tag; in the strip the type label and clock never truncate and the card text gives way first; the listening line wraps to two lines.
 - Cyrillic: card text and transcript lines carry their own language attribute.
 
-**Focus order**: FP-R0 actions → FP-R1 (**Move to Display 2**, **Hide for Presenting**, ⋯, **Collapse**, **Hide**) → FP-R2 **Mute** → FP-R3 **Got It** → cards (body → **Pin** → **Dismiss**) → FP-R5 → FP-R6 (**Mark Moment**, **Catch Me Up**, ⋯); collapsed, the strip (Return or Space expands) → card actions → **Expand**.
+**Focus order**: FP-R0 actions → FP-R1 (**Move to Display 2**, **Hide for Presenting**, ⋯, **Collapse**, **Hide**) → FP-R2 **Mute** → FP-R3 **Got It** → cards (body → **Pin** → **Dismiss**) → FP-R5 → FP-R6 (**Mark Moment**, **Catch Me Up**, ⋯, **Stop Recording**); collapsed, the strip (Return or Space expands) → card actions → **Stop Recording** → **Expand**.
 
 ##### States
 
@@ -4384,7 +4386,7 @@ The call status strip puts the call's state and its controls in one line at the 
 | Variant | Used where | Difference |
 | --- | --- | --- |
 | Dedicated | CS-R5, 60 pt high, full width | All parts |
-| Compact | FP-R6, 44 pt high | Small buttons **Mark Moment** and **Catch Me Up** with their hotkeys in help tags (**Mark Moment** becomes an icon button only when German text runs short), a ⋯ menu with **Pause** or **Resume** ⌃⌥⌘P, **Stop Recording** ⌃⌥⌘R, a separator and **Ask…** ⌃⌥⌘A, then the budget as **$0.31 / $1.00** at the trailing end; no clock, indicator or **2 Pinned** (the FP-R1 header shows them); feedback appears on a line above the buttons (PM-59) |
+| Compact | FP-R6, at least 44 pt high | Small buttons **Mark Moment** and **Catch Me Up** with their hotkeys in help tags (**Mark Moment** becomes an icon button only when German text runs short), a ⋯ menu with **Pause** or **Resume** ⌃⌥⌘P, a separator and **Ask…** ⌃⌥⌘A, a visible **Stop Recording** button with its hotkey in the help tag and the budget as **$0.31 / $1.00** at the trailing end; no clock, indicator or **2 Pinned** (the FP-R1 header shows them); feedback appears on a line above the buttons (PM-59) |
 | Copilot off | Copilot flag off (D9) | No budget, no **2 Pinned**, no **Catch Me Up** |
 
 **States.**
@@ -4440,7 +4442,7 @@ A full-screen call app on a laptop leaves room for one line, not a side panel. T
 
 ##### Responsibility scope
 
-- Shows the state (FP-C1), the newest card (FP-C2), and the card count with **Expand** (FP-C3).
+- Shows the state (FP-C1), the newest card (FP-C2), and the card count with **Stop Recording** and **Expand** (FP-C3).
 - Shows **Pin** and **Dismiss** for the newest card on hover.
 - Expands the panel on **Expand**, a double-click, Return or Space, or ⌃⌥⌘N, which leaves focus with the call app (PM-40).
 
@@ -4448,7 +4450,7 @@ A full-screen call app on a laptop leaves room for one line, not a side panel. T
 
 - The strip does not move or resize the window; the core does, keeping the snapped edge fixed (D8).
 - It holds no cards; it shows a one-line peek of the newest card from `cpt-noter-component-ui-copilot-card-stack`.
-- It does not decide when to expand on its own; the panel expands only for a Catch-up card, a solicited Answer card, a capture notice, or when the user opens **Ask…** (⌃⌥⌘A) (D83, PM-59).
+- The panel expands for a Catch-up card, a solicited Answer card, a capture notice, or when the user opens **Ask…** (⌃⌥⌘A) or presses **Stop Recording** (D83, PM-59).
 
 ##### Related components (by ID)
 
@@ -4466,8 +4468,8 @@ A full-screen call app on a laptop leaves room for one line, not a side panel. T
 
 1. FP-C1 state: recording dot, clock (00:21:08) and mode glyph.
 2. FP-C2 newest card: number badge, type label (**Ask**) and the first line, tail-truncated.
-3. FP-C3 controls: card count badge (3) and **Expand** (chevron icon button, help tag **Expand Panel**).
-4. On hover or keyboard focus inside the strip: **Pin** and **Dismiss** icon buttons after the card line. **Expand** is always visible.
+3. FP-C3 controls: card count badge (3), **Stop Recording** while recording or paused and **Expand** (chevron icon button, help tag **Expand Panel**).
+4. On hover or keyboard focus inside the strip: **Pin** and **Dismiss** icon buttons after the card line. **Stop Recording** and **Expand** stay visible during capture.
 
 The strip is 56 pt high, at least 300 pt wide, and as wide as the expanded panel by default.
 

@@ -182,14 +182,14 @@ enum Diarization {
 
     // @cpt-algo:cpt-noter-algo-core-engine-offline-decode:p1
     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
-    /// The system channel's segments labelled by voice, `spk_1`, `spk_2`… in order of first words;
-    /// with no speech turn they keep the live label.
-    static func label(
-        _ segments: inout [Segment], samples: [Float], time: CallTime, constraints c: OfflineConstraints,
+    /// System-channel utterances cut at voice changes as well as pauses, with their cluster ids.
+    static func utterances(
+        _ samples: [Float], time: CallTime, constraints c: OfflineConstraints,
         _ models: (clustering: () throws -> Clustering, speaker: SpeakerModel), yieldIfNeeded: () -> Void = {}
-    ) throws {
+    ) throws -> [(range: Range<Int>, voice: Int?)] {
         let turns = try turns(samples, { try models.clustering().segmentation }, yieldIfNeeded: yieldIfNeeded)
-        guard !turns.isEmpty else { return }
+        let gapCuts = time.cuts.map { $0 * Archive.rate / 1000 }
+        guard !turns.isEmpty else { return Archive.utterances(samples, cuts: gapCuts).map { ($0, nil) } }
         let rate = Archive.rate
         let runs = turns.map {
             $0.runs.map { (t0: time.call($0.lowerBound * 1000 / rate), t1: time.call($0.upperBound * 1000 / rate, end: true)) }
@@ -217,17 +217,29 @@ enum Diarization {
         let voices = cluster(
             vectors, training: turns.map { $0.speech * 1000 >= trainingSpeechMs * rate }, plda: try models.clustering().plda,
             cannot: cannot)
-        var names: [Int: String] = [:]
-        for i in segments.indices where segments[i].channel == .sys {
-            let s = segments[i]
+        let speech = zip(turns, voices).flatMap { turn, voice in
+            turn.runs.map { (range: $0, voice: voice) }
+        }.sorted { ($0.range.lowerBound, $0.range.upperBound, $0.voice) < ($1.range.lowerBound, $1.range.upperBound, $1.voice) }
+        var cuts = gapCuts
+        if var current = speech.first {
+            for next in speech.dropFirst() where next.range.upperBound > current.range.upperBound {
+                if next.voice != current.voice && next.range.lowerBound > current.range.lowerBound {
+                    // A brief overlap is part of a handoff; a contained backchannel doesn't end the turn.
+                    cuts.append(max(next.range.lowerBound, (current.range.upperBound + next.range.lowerBound) / 2))
+                }
+                current = next
+            }
+        }
+        return Archive.utterances(samples, cuts: cuts).map { range in
+            let start = time.call(range.lowerBound * 1000 / rate)
+            let end = time.call(range.upperBound * 1000 / rate, end: true)
             var heard: [Int: Int] = [:]
-            for k in turns.indices { heard[voices[k], default: 0] += overlap(k, s.t0Ms, s.t1Ms) }
-            let gap = { (k: Int) in runs[k].map { max($0.t0 - s.t1Ms, s.t0Ms - $0.t1) }.min() ?? .max }
-            let nearest = turns.indices.min { gap($0) < gap($1) }!
-            let voice = heard.filter { $0.value > 0 }.max { ($0.value, -$0.key) < ($1.value, -$1.key) }?.key ?? voices[nearest]
-            let name = names[voice] ?? "spk_\(names.count + 1)"
-            names[voice] = name
-            segments[i].speakerLabel = name
+            for k in turns.indices { heard[voices[k], default: 0] += overlap(k, start, end) }
+            if let voice = heard.filter({ $0.value > 0 }).max(by: { ($0.value, -$0.key) < ($1.value, -$1.key) })?.key {
+                return (range, voice)
+            }
+            let gap = { (k: Int) in runs[k].map { max($0.t0 - end, start - $0.t1) }.min() ?? .max }
+            return (range, turns.indices.min { gap($0) < gap($1) }.map { voices[$0] })
         }
     }
 

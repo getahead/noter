@@ -272,6 +272,25 @@ test.describe("cpt-noter-seq-call-screen-stop-at-call-end", () => {
     await expect(button(page, "Mark Moment")).toBeVisible();
   });
 
+  for (const collapsed of [false, true]) {
+    test(`UI — direct Stop Recording from the ${collapsed ? "collapsed strip" : "floating footer"} shows the closing actions`, async ({ page }) => {
+      await page.setViewportSize({ width: 340, height: 560 });
+      await startLive(page, still);
+      await coreWindow(page, { layout: "floating", collapsed });
+      if (collapsed) await page.setViewportSize({ width: 300, height: 56 });
+      const controls = page.locator(collapsed ? '[data-region="FP-C3"]' : '[data-region="FP-R6"]');
+      const stop = controls.getByRole("button", { name: "Stop Recording", exact: true });
+      await expect(stop).toBeInViewport({ ratio: 1 });
+      await stop.click();
+      if (collapsed) {
+        await expect.poll(async () => (await sent(page, "window_set_collapsed")).at(-1)).toEqual({ collapsed: false });
+        await page.setViewportSize({ width: 340, height: 560 });
+      }
+      await expect(button(page, "Continue Recording")).toBeVisible();
+      expect(await sent(page, "capture_stop")).toContainEqual(live);
+    });
+  }
+
   test("UI — empty path: No answer to the notice — Stopped at hh:mm · the call had ended · N min saved, Continue Recording and Open in Noter", async ({ page }) => {
     await startLive(page, (w) =>
       Object.assign(w.app.capture, { phase: "stopped", notice: { type: "stopped_automatically", call_id: W.LIVE_CALL }, continue_until: Date.now() + 5 * W.MIN }),
@@ -456,6 +475,25 @@ test.describe("cpt-noter-seq-floating-panel-hide-and-reopen", () => {
 });
 
 test.describe("cpt-noter-flow-ui-call-window-controls", () => {
+  test("cpt-noter-seq-call-screen-recover-capture — correct a live transcription language and return to automatic", async ({ page }) => {
+    await startLive(page);
+    const openLanguage = async () => {
+      await header(page).getByRole("button", { name: "More", exact: true }).click();
+      await expect(page.getByText("Transcription Language", { exact: true })).toBeVisible();
+    };
+    const choice = (name: string) => page.getByRole("menuitemcheckbox", { name, exact: true });
+    await openLanguage();
+    await expect(choice("Automatic")).toBeChecked();
+    await choice("German").click();
+    expect(await sent(page, "capture_set_language")).toContainEqual({ ...live, language: "de" });
+    await toFloating(page);
+    await page.setViewportSize({ width: 340, height: 560 });
+    await openLanguage();
+    await expect(choice("German")).toBeChecked();
+    await choice("Automatic").click();
+    expect(await sent(page, "capture_set_language")).toContainEqual({ ...live, language: null });
+  });
+
   test("UI — happy path: Mark Moment reads Marked 00:23:00 for 2 s", async ({ page }) => {
     await startLive(page);
 

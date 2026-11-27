@@ -373,6 +373,14 @@ fn boot<R: Runtime>(
             surfaces.attach(&core);
             // On the async runtime, which first run keeps for macOS's notices (other threads).
             tauri::async_runtime::block_on(async { core.start_first_run() });
+            if let Some(main) = objc2::MainThreadMarker::new() {
+                let weak = Arc::downgrade(&core);
+                noter_native::watch_calendar(main, move || {
+                    if let Some(core) = weak.upgrade() {
+                        core.calendar_changed();
+                    }
+                });
+            }
             Booted(Ok(core))
         }
         Err(e) => {

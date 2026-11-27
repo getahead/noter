@@ -317,13 +317,16 @@ impl Core {
 
     /// The embedding the engine reads from a speaker's longest archive spans.
     async fn embed_voice(&self, voice: &Voice) -> Option<Vec<f32>> {
+        let call = voice.call.clone();
         let id = voice.id.clone();
         let mut spans: Vec<(i64, i64)> = self
             .store()
             .read(move |c| {
-                c.prepare("SELECT t0_ms, t1_ms FROM segments WHERE speaker_id = ?1")?
-                    .query_map([id], |r| Ok((r.get(0)?, r.get(1)?)))?
-                    .collect::<Result<_, _>>()
+                c.prepare(
+                    "SELECT t0_ms, t1_ms FROM segments WHERE call_id = ?1 AND speaker_id = ?2",
+                )?
+                .query_map([call, id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<Result<_, _>>()
             })
             .ok()?;
         spans.sort_by_key(|(a, b)| std::cmp::Reverse(b - a));
@@ -694,7 +697,7 @@ impl Core {
     // @cpt-algo:cpt-noter-algo-core-people-profile-rematch:p1
     /// Names the person's voice where it is still unnamed in past calls (#1278): the same
     /// match as a new call, never over a name already given, one change that undoes as a whole.
-    pub(crate) fn rematch_voice(
+    pub(crate) async fn rematch_voice(
         &self,
         ctx: &CommandCtx,
         args: PersonIdArgs,
@@ -710,18 +713,29 @@ impl Core {
         };
         // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-load
         let who = person.clone();
-        type Unnamed = BTreeMap<String, (Vec<(String, Vec<u8>)>, Vec<String>)>;
+        type Unnamed = BTreeMap<String, (Vec<Voice>, Vec<String>)>;
         let (calls, profiles): (Unnamed, Vec<Row>) = rd(self.store(), move |c| {
             optin_of(c, &who)?;
             let mut calls: Unnamed = BTreeMap::new();
             let mut q = db(c.prepare(
-                "SELECT call_id, id, centroid FROM speakers WHERE pass = 'archive'
-                   AND person_id IS NULL AND centroid IS NOT NULL ORDER BY call_id, rowid",
+                "SELECT s.call_id, s.id, s.channel, s.centroid FROM speakers s
+                 JOIN calls c ON c.id = s.call_id
+                 WHERE s.pass = 'archive' AND s.person_id IS NULL
+                   AND (s.centroid IS NOT NULL OR
+                        (s.channel = 'sys' AND NOT c.audio_deleted AND NOT c.audio_not_stored))
+                 ORDER BY s.call_id, s.rowid",
             ))?;
-            let rows = db(q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?, r.get(2)?))))?;
+            let rows = db(q.query_map([], |r| {
+                Ok(Voice {
+                    call: r.get(0)?,
+                    id: r.get(1)?,
+                    channel: channel_of(&r.get::<_, String>(2)?),
+                    blob: r.get(3)?,
+                })
+            }))?;
             for row in rows {
-                let (call, speaker, blob) = db(row)?;
-                calls.entry(call).or_default().0.push((speaker, blob));
+                let voice = db(row)?;
+                calls.entry(voice.call.clone()).or_default().0.push(voice);
             }
             let mut q = db(c.prepare("SELECT call_id, person_id FROM call_participants"))?;
             let rows = db(q.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get(1)?))))?;
@@ -744,8 +758,23 @@ impl Core {
         // Every profile scores, so the runner-up margin is the same as for a new call; only
         // this person's wins are applied.
         let mut found: Vec<(String, String, String)> = Vec::new();
-        for (call, (speakers, attendees)) in &calls {
-            for (speaker, score) in Self::verdicts(&key, &profiles, speakers, attendees) {
+        for (call, (voices, attendees)) in calls {
+            let mut speakers = Vec::new();
+            for voice in voices {
+                let blob = match voice.blob {
+                    Some(blob) => blob,
+                    None => {
+                        let Some(vector) = self.embed_voice(&voice).await else {
+                            continue;
+                        };
+                        // Only existing profiles are retained. The scan keeps new embeddings in memory.
+                        let samples = Wiped(vec![vector]);
+                        Self::seal(&key, &samples.0[0])?
+                    }
+                };
+                speakers.push((voice.id, blob));
+            }
+            for (speaker, score) in Self::verdicts(&key, &profiles, &speakers, &attendees) {
                 if score.person == person {
                     found.push((call.clone(), speaker, score.profile));
                 }
@@ -756,6 +785,7 @@ impl Core {
             return Ok(nothing);
         }
         // @cpt-begin:cpt-noter-algo-core-people-profile-rematch:p1:inst-rematch-write
+        let now = self.deps.clock.now().0;
         let meta = self.change_meta(ctx, "Named a voice in past calls".into(), "voice_rematch");
         let target = person.clone();
         let done = self.store().write_with(meta, move |tx| {
@@ -768,9 +798,10 @@ impl Core {
                 let ok: bool = db(tx.query_row(
                     "SELECT EXISTS (
                        SELECT 1 FROM people p JOIN voice_profiles v ON v.person_id = p.id
-                       WHERE p.id = ?1 AND p.voice_profile_optin = 1 AND v.id = ?2)
-                     AND EXISTS (SELECT 1 FROM speakers WHERE id = ?3 AND person_id IS NULL)",
-                    params![target, profile, speaker],
+                       WHERE p.id = ?1 AND p.voice_profile_optin = 1 AND v.id = ?2
+                         AND ?3 - v.last_used_at <= ?4)
+                     AND EXISTS (SELECT 1 FROM speakers WHERE id = ?5 AND person_id IS NULL)",
+                    params![target, profile, now, DECAY_MS, speaker],
                     |r| r.get(0),
                 ))?;
                 if !ok {

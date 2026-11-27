@@ -52,7 +52,9 @@ case .live:
         processes: { ProcessWatcher.snapshot() },
         transcriber: speechModel, offline: offline
     ) { start in
-        LiveAudioSource(micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [])
+        LiveAudioSource(
+            micUid: start?.micDeviceUid, excluding: start?.excludeBundleIds ?? [],
+            captureBundleId: start?.captureBundleId)
     }
     engine.start()
     engine.watchProcesses()

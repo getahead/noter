@@ -258,6 +258,8 @@ During a call Noter must never steal focus from the call app, never appear in a 
 3. [x] - `p1` - **IF** the read fails, add `CalendarAccessDenied` or log it, and **RETURN** none - `inst-read-fail`
 4. [x] - `p1` - **RETURN** the events as `CalendarEventRef` - `inst-return-events`
 
+The host keeps an EventKit observer on the main thread. Calendar database changes invalidate the current environment version so an open Today fetches fresh events through `today_get`.
+
 ### Native E2E command log
 
 - [x] `p2` - **ID**: `cpt-noter-algo-core-native-surfaces-e2e-log`

@@ -102,7 +102,13 @@ final class LiveASR: @unchecked Sendable {
         }
     }
 
-    func setLanguages(_ languages: JSONValue) { lock.withLock { self.languages = Self.codes(languages) } }
+    func setLanguages(_ languages: JSONValue) {
+        lock.withLock {
+            self.languages = Self.codes(languages)
+            utteranceLang.removeAll()
+            lastLang.removeAll()
+        }
+    }
     func setGlossary(_ entries: JSONValue) { lock.withLock { glossary = Glossary(entries) } }
 
     /// The model to decode with, after the jobs already queued (the taps run before it loads).
@@ -248,10 +254,11 @@ final class LiveASR: @unchecked Sendable {
         }
         // Language ID once per utterance for its hypotheses; the confirmation decides on all of it.
         let (transcriber, languages, glossary) = lock.withLock {
-            let session = self.languages.isEmpty
-                ? []
-                : lastLang[channel].map { last in [last] + self.languages.filter { $0 != last } } ?? self.languages
-            return (self.transcriber, confirmed ? session : utteranceLang[u.id].map { [$0] } ?? session, self.glossary)
+            let allowed = { (lang: String) in self.languages.isEmpty || self.languages.contains(lang) }
+            let preferred = lastLang[channel].flatMap { self.languages.contains($0) ? $0 : nil }
+            let session = preferred.map { last in [last] + self.languages.filter { $0 != last } } ?? self.languages
+            let picked = utteranceLang[u.id].flatMap { allowed($0) ? [$0] : nil }
+            return (self.transcriber, confirmed ? session : picked ?? session, self.glossary)
         }
         let samples = confirmed ? Array(u.audio.prefix(u.speechSamples)) : u.audio
         let d = transcriber.flatMap { try? $0.decode(samples, languages: languages) }

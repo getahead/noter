@@ -453,7 +453,7 @@ impl CoreApi for Core {
         ctx: &CommandCtx,
         args: PersonIdArgs,
     ) -> Result<VoiceRematch, CoreError> {
-        self.rematch_voice(ctx, args)
+        self.rematch_voice(ctx, args).await
     }
 
     async fn today_get(&self, _ctx: &CommandCtx, _args: NoArgs) -> Result<TodayView, CoreError> {
@@ -925,6 +925,14 @@ impl CoreApi for Core {
         args: CapturePauseArgs,
     ) -> Result<CaptureState, CoreError> {
         self.pause_call(ctx, args).await
+    }
+
+    async fn capture_set_language(
+        &self,
+        ctx: &CommandCtx,
+        args: CaptureLanguageArgs,
+    ) -> Result<CaptureState, CoreError> {
+        self.set_capture_language(ctx, args).await
     }
 
     async fn capture_mark_moment(

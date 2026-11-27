@@ -390,6 +390,18 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "the built-in Retro type becomes Presentation/Demo",
         sql: include_str!("../migrations/0014_presentation_demo.sql"),
     },
+    Migration {
+        owner: "noter-core",
+        version: 15,
+        name: "selected call capture application",
+        sql: include_str!("../migrations/0015_capture_bundle.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 16,
+        name: "per-call transcription language selection",
+        sql: include_str!("../migrations/0016_transcription_language.sql"),
+    },
 ];
 
 impl Core {

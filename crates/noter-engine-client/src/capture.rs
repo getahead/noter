@@ -720,6 +720,7 @@ mod tests {
             store_audio: true,
             mic_device_uid: None,
             exclude_bundle_ids: vec![],
+            capture_bundle_id: None,
             languages: vec![],
             backend: AsrBackend::WhisperTurbo,
             glossary: vec![],
