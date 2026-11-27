@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.2](https://github.com/getahead/noter/compare/v0.27.1...v0.27.2) (2026-11-27)
+
+
+### Bug fixes
+
+* **diarization:** safely rerun a call archive ([#1289](https://github.com/getahead/noter/issues/1289)) ([9c4c67e](https://github.com/getahead/noter/commit/9c4c67e62ed1361fb14f960bbbd0bfa26b512c89))
+
 ## [0.27.1](https://github.com/getahead/noter/compare/v0.27.0...v0.27.1) (2026-11-27)
 
 
