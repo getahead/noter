@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.27.1](https://github.com/getahead/noter/compare/v0.27.0...v0.27.1) (2026-11-27)
+
+
+### Bug fixes
+
+* address exploratory call workflow regressions ([#1287](https://github.com/getahead/noter/issues/1287)) ([cdbbfc1](https://github.com/getahead/noter/commit/cdbbfc1ce3eb71109b487beb4719928fc5d8ee70))
+
 ## [0.27.0](https://github.com/getahead/noter/compare/v0.26.3...v0.27.0) (2026-11-26)
 
 
