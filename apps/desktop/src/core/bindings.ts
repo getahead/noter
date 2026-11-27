@@ -279,6 +279,11 @@ export type ArchiveChange = {
 	after: string,
 };
 
+export type ArchiveRerunArgs = {
+	call_id: CallId,
+	expected_rev: Rev,
+};
+
 export type ArchiveStatus = 
 /**  Live call, or nothing scheduled yet. */
 "not_started" | "pending" | "running" | "done" | 
@@ -578,6 +583,8 @@ export type CalendarEventRef = {
 /**  Call page header and Call info. */
 export type CallDetail = {
 	call: CallRow,
+	/**  Latest requested archive replacement, including a queued run restored on startup. */
+	archive_rerun?: JobRunRow | null,
 	calendar_event: CalendarEventRef | null,
 	speakers: SpeakerView[],
 	marks: MarkView[],
@@ -3882,7 +3889,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.37";
+export const CONTRACT_VERSION = "2.38";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3944,6 +3951,7 @@ export const COMMANDS = {
   item_answer_handoff_landed: { group: "items", stability: "frozen", windows: ["main", "call-screen"], channel: false },
   today_get: { group: "today", stability: "frozen", windows: ["main"], channel: false },
   outputs_get: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
+  archive_rerun: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
   output_edit: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
   outputs_regenerate: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
   output_versions: { group: "outputs_and_sharing", stability: "frozen", windows: ["main"], channel: false },
@@ -4129,6 +4137,7 @@ export interface CommandArgs {
   item_answer_handoff_landed: HandoffLandedArgs;
   today_get: NoArgs;
   outputs_get: CallIdArgs;
+  archive_rerun: ArchiveRerunArgs;
   output_edit: OutputEditArgs;
   outputs_regenerate: RegenerateArgs;
   output_versions: SummaryIdArgs;
@@ -4312,6 +4321,7 @@ export interface CommandResults {
   item_answer_handoff_landed: ItemMutation;
   today_get: TodayView;
   outputs_get: CallOutputs;
+  archive_rerun: JobAccepted;
   output_edit: OutputMutation;
   outputs_regenerate: JobAccepted;
   output_versions: VersionList;
@@ -4840,6 +4850,10 @@ export function createCore(transport: Transport) {
     itemAnswerHandoffLanded: (args: HandoffLandedArgs) => call("item_answer_handoff_landed", args),
     todayGet: (args: NoArgs) => call("today_get", args),
     outputsGet: (args: CallIdArgs) => call("outputs_get", args),
+    /**
+     * Replace an installed archive after reprocessing retained audio and reconciling edits.
+     */
+    archiveRerun: (args: ArchiveRerunArgs) => call("archive_rerun", args),
     outputEdit: (args: OutputEditArgs) => call("output_edit", args),
     /**
      * Regenerate sections with another runtime, model or skill; edits are kept and diffed.

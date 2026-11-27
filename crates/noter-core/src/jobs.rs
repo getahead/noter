@@ -102,6 +102,9 @@ impl Core {
         crate::credentials::register(self);
         crate::knowledge::register(self);
         crate::retrieval::register(self);
+        if let Err(e) = self.recover_archive_files() {
+            self.log(object(json!({"level":"error", "module":"postcall", "code":"transcript_file", "message_len":e.message.len()})));
+        }
         if let Err(e) = self.jobs.start() {
             self.log(object(json!({
                 "level": "error", "module": "jobs", "message": e.message

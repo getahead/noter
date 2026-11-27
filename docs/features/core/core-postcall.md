@@ -145,6 +145,7 @@ A 60-minute call produces usable outputs within two minutes on cloud or ten minu
 
 **Success Scenarios**:
 - Archive upgrade reconciles labels, re-chunks and regenerates; manual regeneration can choose runtime, model, skill and sections or request a local rewrite of a failed section.
+- For #1282, `archive_rerun { call_id, expected_rev }` queues one new pass for a stopped call with an installed archive and retained audio. The previous archive remains readable during the run. Reconcile user names, speaker links, moved lines and term corrections before replacing the archive rows and searchable chunks in one writer transaction. Ambiguous corrections fail with `conflict` and preserve the active archive. Refresh the transcript file and readers after commit. Output regeneration remains a separate user action for this path.
 
 **Error Scenarios**:
 - Without an assistant, refuse regeneration with `runtime_unavailable` and log the code. A battery-held regeneration remains queued and visible through `outputs_get`. A user can release that run on battery without changing the job definition or bypassing the remaining guards.
@@ -325,6 +326,7 @@ Open: the skill evaluations on `evals/golden`, the Mac-runner timing and the `co
 - [ ] (waits on the UI M2 native XCUITest) Real-app/native E2E `cpt-noter-seq-notifications-open-outputs` opens the correct call for ready and failed outcomes, suppresses a notice for the visible call and holds it through a subsequent recording. XCUITest uses `test_cpt_noter_seq_notifications_open_outputs` in its test name.
 - [x] Accepted, pinned and edited items survive regeneration; rejected suggestions never return; missing or unknown citations cannot be persisted.
 - [x] Archive failure leaves live evidence usable; archive success resolves the same evidence spans to new text and labels while preserving corrections and edits.
+- Rerun evidence for #1282: unit reconciliation and rollback, IPC conformance for duplicate and stale requests, and real-core call-page naming (`cpt-noter-seq-call-page-name-speakers`) with saved archive edits, a conflict and refreshed search. `just gate` passes.
 - [x] Concurrent user edits and Continue Recording cannot be overwritten by a late job result; unit tests prove both races.
 - [ ] (owner: skill evals on the golden set and Mac timing) Fake/real conformance and skill schema, citation and rubric evaluations pass; Mac timing evidence reports the stated cloud/local output targets.
 - [ ] `just gate` passes.

@@ -717,6 +717,18 @@
       ]
     },
     {
+      "args": "ArchiveRerunArgs",
+      "channel": null,
+      "doc": "Replace an installed archive after reprocessing retained audio and reconciling edits.",
+      "group": "outputs_and_sharing",
+      "name": "archive_rerun",
+      "result": "JobAccepted",
+      "stability": "frozen",
+      "windows": [
+        "main"
+      ]
+    },
+    {
       "args": "OutputEditArgs",
       "channel": null,
       "doc": "",
@@ -2274,7 +2286,7 @@
       ]
     }
   ],
-  "contract_version": "2.37",
+  "contract_version": "2.38",
   "default_retryable": [
     "not_ready",
     "internal",

@@ -215,6 +215,37 @@ describe.skipIf(isFake)("post-call stories on the real core (2.17)", { timeout: 
     expect(span.segments.map((segment) => segment.text)).toContain(LINES[0]);
   });
 
+  it("cpt-noter-seq-call-page-name-speakers: rerun keeps an archive correction, rejects a stale request and leaves edited outputs alone", async () => {
+    open({ archiveAfterMs: 250 });
+    const call = await record();
+    await giveCallAudio(call);
+    await stop(call);
+    const progress = await s.events("jobs:progress");
+    const main = s.core("main");
+    const details = async () => ok(await main.callGet({ call_id: call }));
+    await until(async () => (await details()).call.archive === "done", "the first archive");
+    await until(async () => (await outputs(call)).processing_run?.status === "succeeded"
+      && (await outputs(call)).processing_run?.kind === "regeneration", "the original output regeneration");
+    const span = { call_id: call, t0_ms: 0, t1_ms: 3000 };
+    const segment = ok(await main.transcriptSpan({ span })).segments[0]!;
+    const correction = ok(await main.transcriptFixTerm({ call_id: call, segment_id: segment.id,
+      range: { start: 6, end: 10 }, replacement: "release", add_to_glossary: false }));
+    const summary = sectionOf(await outputs(call), "summary");
+    const edited = ok(await main.outputEdit({ call_id: call, summary_id: summary.summary_id!, rev: summary.rev!, body_md: "Keep my notes." }));
+    const request = { call_id: call, expected_rev: (await details()).call.rev };
+    const run = ok(await main.archiveRerun(request));
+    expect(ok(await main.archiveRerun(request))).toEqual(run);
+    expect(ok(await main.transcriptSpan({ span })).segments[0]?.text).toBe(correction.segment.text);
+    await until(() => progress.all.find(({ run: entry }) => entry.id === run.job_run_id && entry.finished_at !== null), "the rerun to finish");
+    const finished = progress.all.find(({ run: entry }) => entry.id === run.job_run_id && entry.finished_at !== null)?.run;
+    expect(finished).toMatchObject({ status: "succeeded", call_id: call });
+    expect(ok(await main.transcriptSpan({ span })).segments[0]).toMatchObject({ id: segment.id, text: correction.segment.text });
+    expect(sectionOf(await outputs(call), "summary")).toMatchObject({ body_md: edited.section.body_md, version_count: edited.section.version_count });
+    expect(refused(await main.archiveRerun(request)).code).toBe("conflict");
+    expect(ok(await main.changeUndo({ target: { type: "change", change_id: correction.change_id } })).undone).toBeGreaterThan(0);
+    expect(ok(await main.transcriptSpan({ span })).segments[0]).toMatchObject({ id: segment.id, text: segment.text });
+  });
+
   it("cpt-noter-seq-call-page-review-outputs: the sections fill in order, the user edits the summary, the version menu ends with Your Edit and Undo restores the written text", async () => {
     // The first run writes the summary as four lines; a regeneration changes the last one.
     open({ llm: [...Array(6).fill(postCall("A.\nB.\nC.\nD.")), postCall("A.\nB.\nC.\nD2.")], emptyArchive: true });

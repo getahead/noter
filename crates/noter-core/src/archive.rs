@@ -18,6 +18,9 @@ use serde_json::json;
 use crate::transcript::{lang_word, shadow};
 use crate::{lock, object, Core};
 
+#[path = "archive_rerun.rs"]
+mod rerun;
+
 /// A live speaker as the install copies it onto its archive row.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LiveSpeaker {
@@ -26,6 +29,7 @@ pub(crate) struct LiveSpeaker {
     pub n: Option<i64>,
     pub channel: AudioChannel,
     pub named_by: Option<String>,
+    pub undo_ref: bool,
     pub person_id: Option<String>,
     /// What the user called the speaker (2.13); `label` stays the engine's label.
     pub name: Option<String>,
@@ -34,6 +38,7 @@ pub(crate) struct LiveSpeaker {
 /// A live segment: its speaker, time and the user's term fixes.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LiveLine {
+    id: String,
     pub speaker_id: String,
     pub channel: AudioChannel,
     pub t0: i64,
@@ -67,7 +72,10 @@ fn most(votes: BTreeMap<String, i64>) -> Option<String> {
 /// Overlap with each live speaker of `channel` over `t0..t1`.
 fn votes(live: &[LiveLine], channel: AudioChannel, t0: i64, t1: i64) -> BTreeMap<String, i64> {
     let mut by = BTreeMap::new();
-    for l in live.iter().filter(|l| l.channel == channel) {
+    for l in live
+        .iter()
+        .filter(|l| l.channel == channel && !l.speaker_id.is_empty())
+    {
         let o = overlap(t0, t1, l.t0, l.t1);
         if o > 0 {
             *by.entry(l.speaker_id.clone()).or_default() += o;
@@ -254,18 +262,20 @@ struct Audio {
     status: String,
     archive_status: String,
     absent: bool,
+    rev: u32,
 }
 
 fn audio(c: &Connection, call: &str) -> noter_db::rusqlite::Result<Option<Audio>> {
     use noter_db::rusqlite::OptionalExtension;
     c.query_row(
-        "SELECT status, archive_status, audio_deleted OR audio_not_stored FROM calls WHERE id = ?1",
+        "SELECT status, archive_status, audio_deleted OR audio_not_stored, rev FROM calls WHERE id = ?1",
         [call],
         |r| {
             Ok(Audio {
                 status: r.get(0)?,
                 archive_status: r.get(1)?,
                 absent: r.get(2)?,
+                rev: r.get(3)?,
             })
         },
     )
@@ -284,12 +294,25 @@ fn live_of(
     c: &Connection,
     call: &str,
 ) -> noter_db::rusqlite::Result<(Vec<LiveSpeaker>, Vec<LiveLine>)> {
+    pass_of(c, call, "live")
+}
+
+fn pass_of(
+    c: &Connection,
+    call: &str,
+    pass: &str,
+) -> noter_db::rusqlite::Result<(Vec<LiveSpeaker>, Vec<LiveLine>)> {
     let mut stmt = c.prepare(
-        "SELECT id, label, n, channel, named_by, person_id, name FROM speakers
-         WHERE call_id = ?1 AND pass = 'live' ORDER BY rowid",
+        "SELECT p.id, p.label, p.n, p.channel, p.named_by, p.person_id, p.name,
+                p.pass = 'archive' AND EXISTS (
+                    SELECT 1 FROM segments s JOIN changes h ON h.entity_type = 'segment' AND h.entity_id = s.id
+                    WHERE s.call_id = p.call_id AND s.pass = p.pass AND h.reason = 'speaker_name'
+                      AND h.field = 'speaker_id' AND h.undoable = 1 AND p.id IN (h.before, h.after)
+                )
+         FROM speakers p WHERE p.call_id = ?1 AND p.pass = ?2 ORDER BY p.rowid",
     )?;
     let speakers = stmt
-        .query_map([call], |r| {
+        .query_map([call, pass], |r| {
             Ok(LiveSpeaker {
                 id: r.get(0)?,
                 label: r.get(1)?,
@@ -298,27 +321,37 @@ fn live_of(
                 named_by: r.get(4)?,
                 person_id: r.get(5)?,
                 name: r.get(6)?,
+                undo_ref: r.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
     let mut stmt = c.prepare(
         // A moved line opens a cannot-link whose first span is the line (speakers.rs, inst-correct-split).
-        "SELECT speaker_id, channel, t0_ms, t1_ms, text, corrections,
-                EXISTS (SELECT 1 FROM speaker_constraints k WHERE k.call_id = s.call_id
-                          AND k.kind = 'cannot_link' AND k.a_t0_ms = s.t0_ms AND k.a_t1_ms = s.t1_ms)
+        "SELECT COALESCE(speaker_id, ''), channel, t0_ms, t1_ms, text, corrections, id,
+                speaker_id IS NOT NULL AND ((channel = 'sys' AND EXISTS (SELECT 1 FROM speaker_constraints k WHERE k.call_id = s.call_id
+                          AND k.kind = 'cannot_link' AND k.a_t0_ms = s.t0_ms AND k.a_t1_ms = s.t1_ms))
+                OR EXISTS (SELECT 1 FROM changes h WHERE h.entity_type = 'segment' AND h.entity_id = s.id
+                            AND h.reason = 'speaker_name' AND h.status = 'applied'))
          FROM segments s
-         WHERE call_id = ?1 AND pass = 'live' AND speaker_id IS NOT NULL ORDER BY t0_ms",
+         WHERE call_id = ?1 AND pass = ?2 ORDER BY t0_ms, rowid",
     )?;
     let lines = stmt
-        .query_map([call], |r| {
+        .query_map([call, pass], |r| {
             Ok(LiveLine {
                 speaker_id: r.get(0)?,
                 channel: channel(r.get(1)?),
                 t0: r.get(2)?,
                 t1: r.get(3)?,
                 text: r.get(4)?,
-                corrections: serde_json::from_str(&r.get::<_, String>(5)?).unwrap_or_default(),
-                moved: r.get(6)?,
+                corrections: serde_json::from_str(&r.get::<_, String>(5)?).map_err(|err| {
+                    noter_db::rusqlite::Error::FromSqlConversionFailure(
+                        5,
+                        noter_db::rusqlite::types::Type::Text,
+                        Box::new(err),
+                    )
+                })?,
+                id: r.get(6)?,
+                moved: r.get(7)?,
             })
         })?
         .collect::<Result<Vec<_>, _>>()?;
@@ -483,12 +516,12 @@ impl Core {
     }
 
     /// Ensure the archive pass receives the same complete constraints as the speakers flow.
-    fn constraints_file(&self, call: &CallId) -> Result<Option<String>, CoreError> {
+    fn constraints_file(&self, call: &CallId, name: &str) -> Result<Option<String>, CoreError> {
         let Some(container) = self.deps.engine.container() else {
             return Ok(None);
         };
-        self.write_constraints_file(call)?;
-        let rel = format!("audio/{call}/constraints.json");
+        self.write_constraints_file_named(call, name)?;
+        let rel = format!("audio/{call}/{name}");
         if container.join(&rel).exists() {
             Ok(Some(rel))
         } else {
@@ -499,7 +532,10 @@ impl Core {
     /// The archive pass of `call`. A run stopped after it started leaves the call as it found
     /// it: cancelled (Continue Recording) back to pending for the next stop, failed as failed.
     pub(crate) async fn archive_pass(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
-        let result = self.archive_run(ctx, call).await;
+        if let Some(rev) = ctx.archive_rerun_rev() {
+            return self.archive_run(ctx, call, Some(rev)).await;
+        }
+        let result = self.archive_run(ctx, call, None).await;
         let status = match &result {
             Err(Stop::Cancelled) => "pending",
             Err(Stop::Failed(_)) => "failed",
@@ -520,7 +556,12 @@ impl Core {
 
     // @cpt-flow:cpt-noter-flow-core-postcall-regenerate:p1
     // @cpt-dod:cpt-noter-dod-core-postcall-regeneration:p1
-    async fn archive_run(&self, ctx: &mut RunCtx, call: &CallId) -> Result<(), Stop> {
+    async fn archive_run(
+        &self,
+        ctx: &mut RunCtx,
+        call: &CallId,
+        rerun_rev: Option<u32>,
+    ) -> Result<(), Stop> {
         // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-archive
         // The scheduler holds this run while a call is live (TL-23); the checkpoint waits for it.
         ctx.checkpoint().await?;
@@ -531,17 +572,31 @@ impl Core {
         if matches!(head.status.as_str(), "recording" | "paused") {
             return Err(Stop::Cancelled);
         }
-        if head.archive_status == "done" {
+        if let Some(rev) = rerun_rev {
+            rerun::check_head(&head, rev)?;
+        } else if head.archive_status == "done" {
             return Ok(());
         }
         if head.absent {
             return self.archive_failed(ctx, call, "no audio");
         }
-        self.set_archive(ctx, call, "running")?;
+        if rerun_rev.is_none() {
+            self.set_archive(ctx, call, "running")?;
+        }
         let id = call.as_str().to_owned();
         let (_, live) = self.store().read(move |c| live_of(c, &id))?;
-        let constraints = self.constraints_file(call).map_err(Stop::Failed)?;
-        let result_path = format!("audio/{call}/archive-{}.json", ulid::Ulid::generate());
+        let links = rerun_rev
+            .map(|_| self.store().read(|c| rerun::links_of(c, call)))
+            .transpose()?;
+        let stem = format!("archive-{}", ulid::Ulid::generate());
+        let mut artifacts = rerun_rev.map(|_| rerun::Artifacts::new(self.call_dir(call), &stem));
+        let constraints_name = artifacts
+            .as_ref()
+            .map_or("constraints.json", |files| files.constraints());
+        let constraints = self
+            .constraints_file(call, constraints_name)
+            .map_err(Stop::Failed)?;
+        let result_path = format!("audio/{call}/{stem}.json");
         let backend = if lock(&self.downloads)
             .status()
             .bundles
@@ -567,6 +622,13 @@ impl Core {
             let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
             serde_json::from_slice::<ArchiveResult>(&bytes).map_err(|e| e.to_string())
         });
+        if let (Some(rev), Some(links), Some(artifacts)) = (rerun_rev, links, artifacts.as_mut()) {
+            let result = read.map_err(crate::internal)?;
+            ctx.checkpoint().await?;
+            return self
+                .replace_archive(ctx, call, rev, links, result, artifacts)
+                .await;
+        }
         let result = match read {
             Ok(r) if r.segments.is_empty() && !live.is_empty() => {
                 return self.archive_failed(ctx, call, "the archive heard none of the live speech");
@@ -667,6 +729,7 @@ mod tests {
 
     fn line(speaker: &str, t0: i64, t1: i64, text: &str) -> LiveLine {
         LiveLine {
+            id: String::new(),
             speaker_id: speaker.into(),
             channel: AudioChannel::Sys,
             t0,
@@ -675,6 +738,110 @@ mod tests {
             corrections: vec![],
             moved: false,
         }
+    }
+
+    #[test]
+    fn rerun_keeps_the_manual_move_and_rejects_an_unresolvable_cannot_link() {
+        let call = CallId::new("c");
+        let named = |id: &str| LiveSpeaker {
+            id: id.into(),
+            label: id.into(),
+            n: None,
+            channel: AudioChannel::Sys,
+            undo_ref: false,
+            named_by: Some("you".into()),
+            person_id: Some(format!("person_{id}")),
+            name: Some(id.into()),
+        };
+        let mut moved = line("Moved", 0, 3_000, "moved");
+        moved.id = "manual_segment".into();
+        moved.moved = true;
+        let mut rest = line("Original", 4_000, 9_000, "rest");
+        rest.id = "original_segment".into();
+        let old = (vec![named("Original"), named("Moved")], vec![moved, rest]);
+        let links = [("cannot_link".to_owned(), [0, 3_000, 4_000, 9_000])];
+        let mut result = ArchiveResult {
+            call_id: call.clone(),
+            backend: AsrBackend::WhisperTurbo,
+            segments: vec![
+                seg(AudioChannel::Sys, "same", 100, 3_100, "moved"),
+                seg(AudioChannel::Sys, "same", 4_000, 9_000, "rest"),
+            ],
+        };
+        let rows =
+            rerun::replacement_rows(&call, &result, (vec![], vec![]), old.clone(), &links).unwrap();
+        let installed = rows
+            .iter()
+            .filter(|row| row.table == "segments")
+            .map(|row| {
+                let get = |field| {
+                    row.values
+                        .iter()
+                        .find(|(key, _)| *key == field)
+                        .unwrap()
+                        .1
+                        .clone()
+                };
+                (get("id"), get("speaker_id"))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            installed,
+            vec![
+                (json!("manual_segment"), json!("Moved")),
+                (json!("original_segment"), json!("Original"))
+            ]
+        );
+        result.segments = vec![seg(AudioChannel::Sys, "same", 0, 9_000, "moved and rest")];
+        assert_eq!(
+            rerun::replacement_rows(&call, &result, (vec![], vec![]), old, &links)
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
+    }
+
+    #[test]
+    fn rerun_only_names_the_dominant_voice_when_an_old_speaker_splits() {
+        let call = CallId::new("c");
+        let old = (
+            vec![LiveSpeaker {
+                id: "old".into(),
+                label: "old".into(),
+                n: Some(1),
+                channel: AudioChannel::Sys,
+                undo_ref: false,
+                named_by: Some("you".into()),
+                person_id: Some("person_1".into()),
+                name: Some("Grace".into()),
+            }],
+            vec![line("old", 0, 10_000, "old")],
+        );
+        let mut result = ArchiveResult {
+            call_id: call.clone(),
+            backend: AsrBackend::WhisperTurbo,
+            segments: vec![
+                seg(AudioChannel::Sys, "a", 0, 7_000, "first"),
+                seg(AudioChannel::Sys, "b", 7_000, 10_000, "second"),
+            ],
+        };
+        let rows =
+            rerun::replacement_rows(&call, &result, (vec![], vec![]), old.clone(), &[]).unwrap();
+        assert_eq!(
+            rows.iter()
+                .filter(|row| row.values.contains(&("named_by", json!("you"))))
+                .count(),
+            1
+        );
+        assert_eq!(rows.iter().filter(|row| row.table == "speakers").count(), 2);
+        result.segments[0].t1_ms = OffsetMs(5_000);
+        result.segments[1].t0_ms = OffsetMs(5_000);
+        assert_eq!(
+            rerun::replacement_rows(&call, &result, (vec![], vec![]), old, &[])
+                .unwrap_err()
+                .code,
+            ErrorCode::Conflict
+        );
     }
 
     /// cpt-noter-seq-call-page-name-speakers — #1273: the live pass labels the whole system
@@ -953,6 +1120,7 @@ mod tests {
                 label: "spk_1".into(),
                 n: Some(1),
                 channel: AudioChannel::Sys,
+                undo_ref: false,
                 named_by: Some("you".into()),
                 person_id: Some("per_anna".into()),
                 name: Some("Anna Lee".into()),
@@ -962,6 +1130,7 @@ mod tests {
                 label: "spk_2".into(),
                 n: Some(2),
                 channel: AudioChannel::Sys,
+                undo_ref: false,
                 named_by: None,
                 person_id: None,
                 name: None,

@@ -195,6 +195,20 @@ test.describe("cpt-noter-seq-call-screen-name-speaker", () => {
 });
 
 test.describe("cpt-noter-seq-call-page-name-speakers", () => {
+  test("Re-run archive pass reports a conflict and keeps the transcript on screen", async ({ page }) => {
+    const steer = await openWindow(page, "main", { world: W.idle });
+    await navigate(page, "transcript", "call_backend");
+    const body = page.locator('[data-region="PC-R5"]');
+    await expect(body.getByText(/serving reads/i).first()).toBeVisible();
+    const before = await body.innerText();
+    await steer.failNext("archive_rerun", "conflict");
+    await page.getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Re-run archive pass" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "The archive could not be updated safely." })).toBeVisible();
+    await expect.poll(() => body.innerText()).toBe(before);
+    expect(await sent(page, "archive_rerun")).toEqual([expect.objectContaining({ call_id: "call_backend", expected_rev: expect.any(Number) })]);
+  });
+
   const pick = async (row: Locator, q = "Pav") => {
     await row.getByRole("combobox", { name: "Name…" }).fill(q);
     await row.getByRole("option", { name: /^Pavel/ }).click();

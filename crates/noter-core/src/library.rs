@@ -671,6 +671,7 @@ impl Core {
             Ok(Some((
                 CallDetail {
                     call,
+                    archive_rerun: None,
                     calendar_event: None,
                     speakers,
                     marks,
@@ -692,6 +693,7 @@ impl Core {
             self.start_event(None, Some(&CalendarEventId(id)), detail.call.started_at.0)
         });
         detail.call = self.live_length(detail.call);
+        detail.archive_rerun = self.jobs.archive_rerun_run(&detail.call.id)?;
         Ok(detail)
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-return
         // @cpt-end:cpt-noter-flow-core-library-calls-get:p1:inst-get-missing

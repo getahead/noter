@@ -65,6 +65,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   outputs_get: {"call_id": "call_backend"},
   output_edit: {"call_id": "call_backend", "summary_id": "noter", "rev": 1, "body_md": "noter"},
   outputs_regenerate: {"call_id": "call_backend", "sections": [], "local": false},
+  archive_rerun: {"call_id": "call_backend", "expected_rev": 1},
   output_versions: {"summary_id": "noter"},
   output_version_get: {"summary_id": "noter", "version_id": "noter"},
   share_copy: {"call_id": "call_backend", "scope": {"sections": [], "item_ids": [], "include_unreviewed": false}, "format": "slack"},

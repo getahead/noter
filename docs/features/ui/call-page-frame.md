@@ -110,6 +110,7 @@ It implements the frame of `cpt-noter-component-screen-call-page` (PC-R1, PC-R2,
 - **Rename…** and **Call Type ▸** change the title and type in place
 - **Mark as Sensitive** turns the call sensitive; the menu then shows a checked **Sensitive**
 - **Show in Finder** reveals the call's folder
+- **Re-run archive pass** queues a new pass for a completed archive with retained audio. Show the run state and report a conflict while the existing transcript remains available.
 - **Delete Call…** (⌘⌫) opens the delete alert; after **Delete** the Library's **Calls** list shows
 
 **Error Scenarios**:

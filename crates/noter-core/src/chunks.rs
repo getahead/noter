@@ -3,7 +3,7 @@
 //! under a call header and with speaker prefixes, embedded by the engine's bge-m3 for M3's
 //! retrieval. The chunks are a derived index: one logged, non-undoable change per write.
 
-use noter_db::rusqlite::params;
+use noter_db::rusqlite::{params, Connection, OptionalExtension, Transaction};
 use noter_db::Logged;
 use noter_jobs::{RunCtx, Stop};
 use noter_protocol::*;
@@ -77,40 +77,85 @@ fn blob(v: &[f32]) -> Vec<u8> {
     v.iter().flat_map(|x| x.to_le_bytes()).collect()
 }
 
+pub(crate) fn current_chunks(
+    c: &Connection,
+    id: &CallId,
+) -> noter_db::rusqlite::Result<Vec<Chunk>> {
+    let header = c
+        .query_row(
+            "SELECT title, call_type, started_at FROM calls WHERE id = ?1",
+            [id.as_str()],
+            |r| {
+                Ok(format!(
+                    "Call: {} · {} · {}",
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, i64>(2)?
+                ))
+            },
+        )
+        .optional()?;
+    let Some(header) = header else {
+        return Ok(Vec::new());
+    };
+    let lines = crate::transcript::segments_of(c, id, None)?
+        .into_iter()
+        .map(|s| {
+            let who = crate::speakers::speaker_name(&s.speaker.label);
+            (
+                i64::from(s.t0_ms.0),
+                i64::from(s.t1_ms.0),
+                format!("{who}: {}", s.text),
+            )
+        })
+        .collect::<Vec<_>>();
+    Ok(group(&header, &lines))
+}
+
+fn insert_chunk(
+    tx: &Transaction<'_>,
+    call: &str,
+    chunk: &Chunk,
+    embedding: Option<&[u8]>,
+) -> noter_db::rusqlite::Result<()> {
+    tx.execute(
+        "INSERT INTO chunks (id, call_id, t0_ms, t1_ms, text, text_norm, token_count, embedding)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        params![
+            format!("chk_{}", ulid::Ulid::generate()),
+            call,
+            chunk.t0_ms,
+            chunk.t1_ms,
+            chunk.text,
+            crate::transcript::shadow(&chunk.text),
+            chunk.token_count as i64,
+            embedding
+        ],
+    )?;
+    Ok(())
+}
+
+pub(crate) fn replace_chunks(
+    tx: &Transaction<'_>,
+    call: &CallId,
+    chunks: &[Chunk],
+    vectors: &[Vec<f32>],
+) -> noter_db::rusqlite::Result<()> {
+    tx.execute("DELETE FROM chunks WHERE call_id = ?1", [call.as_str()])?;
+    for (index, chunk) in chunks.iter().enumerate() {
+        let embedding = vectors.get(index).map(|v| blob(v));
+        insert_chunk(tx, call.as_str(), chunk, embedding.as_deref())?;
+    }
+    Ok(())
+}
+
 impl Core {
     /// Re-chunks the call's active transcript and embeds the chunks; replaces the call's chunks.
     /// An embedding failure keeps the chunks without vectors, is logged and is not an error of
     /// the run: the transcript and the sections stay usable, and the next pass embeds again.
     pub(crate) async fn rechunk(&self, ctx: &mut RunCtx, call: &CallId) -> Result<Indexed, Stop> {
         let id = call.clone();
-        let (header, lines) = self.store().read(move |c| {
-            let header: Option<(String, String, i64)> = c
-                .query_row(
-                    "SELECT title, call_type, started_at FROM calls WHERE id = ?1",
-                    [id.as_str()],
-                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
-                )
-                .ok();
-            let lines: Vec<(i64, i64, String)> = crate::transcript::segments_of(c, &id, None)?
-                .into_iter()
-                .map(|s| {
-                    let who = crate::speakers::speaker_name(&s.speaker.label);
-                    (
-                        i64::from(s.t0_ms.0),
-                        i64::from(s.t1_ms.0),
-                        format!("{who}: {}", s.text),
-                    )
-                })
-                .collect();
-            Ok((header, lines))
-        })?;
-        let Some((title, call_type, started)) = header else {
-            return Ok(Indexed {
-                chunks: 0,
-                embedded: true,
-            });
-        };
-        let chunks = group(&format!("Call: {title} · {call_type} · {started}"), &lines);
+        let chunks = self.store().read(move |c| current_chunks(c, &id))?;
         ctx.checkpoint().await?;
         // @cpt-begin:cpt-noter-algo-core-postcall-chunks:p1:inst-chunk-embed
         let vectors = self.embed(call, &chunks).await;
@@ -141,28 +186,15 @@ impl Core {
             let call_id = call.as_str().to_owned();
             let replace = std::mem::take(&mut first);
             self.store().write_with(meta, move |tx| {
-                let internal =
-                    |e: noter_db::rusqlite::Error| CoreError::new(ErrorCode::Internal, e.to_string());
+                let internal = |e: noter_db::rusqlite::Error| {
+                    CoreError::new(ErrorCode::Internal, e.to_string())
+                };
                 if replace {
                     tx.execute("DELETE FROM chunks WHERE call_id = ?1", [&call_id])
                         .map_err(internal)?;
                 }
                 for (c, embedding) in &batch {
-                    tx.execute(
-                        "INSERT INTO chunks (id, call_id, t0_ms, t1_ms, text, text_norm, token_count,
-                             embedding) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                        params![
-                            format!("chk_{}", ulid::Ulid::generate()),
-                            call_id,
-                            c.t0_ms,
-                            c.t1_ms,
-                            c.text,
-                            crate::transcript::shadow(&c.text),
-                            c.token_count as i64,
-                            embedding
-                        ],
-                    )
-                    .map_err(internal)?;
+                    insert_chunk(tx, &call_id, c, embedding.as_deref()).map_err(internal)?;
                 }
                 let logged = Logged {
                     entity_type: "call",
@@ -185,7 +217,11 @@ impl Core {
     }
 
     /// One finite 1024-value vector per chunk, in order, in batches through the engine.
-    async fn embed(&self, call: &CallId, chunks: &[Chunk]) -> Result<Vec<Vec<f32>>, String> {
+    pub(crate) async fn embed(
+        &self,
+        call: &CallId,
+        chunks: &[Chunk],
+    ) -> Result<Vec<Vec<f32>>, String> {
         let mut out = Vec::with_capacity(chunks.len());
         for batch in chunks.chunks(EMBED_BATCH) {
             let id = ulid::Ulid::generate();

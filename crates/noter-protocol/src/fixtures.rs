@@ -1736,6 +1736,7 @@ pub fn world() -> FakeWorld {
             .into_iter()
             .map(|(call, t)| CallDetail {
                 call: call.clone(),
+                archive_rerun: None,
                 calendar_event: None,
                 speakers: t.speakers.clone(),
                 marks: t.marks.clone(),

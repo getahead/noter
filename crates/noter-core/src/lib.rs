@@ -270,6 +270,8 @@ pub struct Core {
     held: Mutex<Vec<Notification>>,
     /// Per-call audio folders (`audio/<call_id>/` beside `models/` in the data folder).
     audio_dir: std::path::PathBuf,
+    /// Orders audio deletion against the publication of a replacement archive.
+    archive_audio_guard: Mutex<()>,
     /// Replay state, `playback:state`.
     playback: playback::Playback,
     /// The live transcript: batching, streams, speakers.
@@ -389,6 +391,12 @@ pub const MIGRATIONS: &[Migration] = &[
         version: 14,
         name: "the built-in Retro type becomes Presentation/Demo",
         sql: include_str!("../migrations/0014_presentation_demo.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 15,
+        name: "pending archive transcript file",
+        sql: include_str!("../migrations/0015_archive_file_pending.sql"),
     },
 ];
 
@@ -526,6 +534,7 @@ impl Core {
             capture_stamp: std::sync::atomic::AtomicI64::new(0),
             viewed: Mutex::new(None),
             held: Mutex::new(Vec::new()),
+            archive_audio_guard: Mutex::new(()),
             audio_dir,
             playback: playback::Playback::new(),
             transcript: transcript::Transcript::new(),
@@ -561,10 +570,6 @@ impl Core {
     /// The store, for the services the core composes.
     pub fn store(&self) -> &Store {
         &self.store
-    }
-
-    pub(crate) fn store_handle(&self) -> Arc<Store> {
-        Arc::clone(&self.store)
     }
 
     /// The LLM router: every model call goes through it and its egress gate.

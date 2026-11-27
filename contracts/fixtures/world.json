@@ -322,7 +322,7 @@
       "title": "Planning: VHI 8.0 drawer redesign",
       "version": 1
     },
-    "contract_version": "2.37",
+    "contract_version": "2.38",
     "copilot": {
       "agents": [
         {
@@ -716,6 +716,7 @@
   ],
   "call_details": [
     {
+      "archive_rerun": null,
       "audio_not_stored": false,
       "calendar_event": null,
       "call": {
@@ -908,6 +909,7 @@
       ]
     },
     {
+      "archive_rerun": null,
       "audio_not_stored": false,
       "calendar_event": null,
       "call": {

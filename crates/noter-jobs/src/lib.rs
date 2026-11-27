@@ -134,6 +134,7 @@ struct Entry {
     subject: Option<String>,
     cancel: bool,
     run_on_battery: bool,
+    archive_rerun_rev: Option<u32>,
 }
 
 impl Entry {
@@ -253,6 +254,11 @@ impl Scheduler {
         self.trigger_with_request(req, Some(json!(args).to_string()))
     }
 
+    pub fn rerun_archive(&self, call: &CallId, rev: u32) -> Result<Option<JobRunId>, CoreError> {
+        let req = Request::for_call(JobKind::ArchivePass, Trigger::OnDemand, call);
+        self.trigger_with_request(req, Some(rev.to_string()))
+    }
+
     fn trigger_with_request(
         &self,
         req: Request,
@@ -338,14 +344,21 @@ impl Scheduler {
 
     /// The run whose state belongs in this call's Processing inspector.
     pub fn output_run(&self, call: &CallId) -> Result<Option<JobRunRow>, CoreError> {
-        Ok(rows::runs(&self.0.deps.store, Some(call))?
+        Ok(rows::runs(&self.0.deps.store, Some(call), false)?
             .pop()
             .map(|r| r.row))
     }
 
     /// Every run, oldest first.
+    pub fn archive_rerun_run(&self, call: &CallId) -> Result<Option<JobRunRow>, CoreError> {
+        Ok(rows::runs(&self.0.deps.store, Some(call), true)?
+            .into_iter()
+            .next()
+            .map(|e| e.row))
+    }
+
     pub fn runs(&self) -> Result<Vec<JobRunRow>, CoreError> {
-        Ok(rows::runs(&self.0.deps.store, None)?
+        Ok(rows::runs(&self.0.deps.store, None, false)?
             .into_iter()
             .map(|s| s.row)
             .collect())
@@ -413,11 +426,25 @@ impl Inner {
         let now = self.deps.clock.now();
         let defs = rows::defs(&self.deps.store)?;
         let mut retries = vec![];
-        for Stored { mut row, subject } in rows::runs(&self.deps.store, None)? {
+        for Stored { mut row, subject } in rows::runs(&self.deps.store, None, false)? {
             let active = matches!(
                 row.status,
                 JobRunStatus::Queued | JobRunStatus::Running | JobRunStatus::Paused
             );
+            let archive_rerun_rev = if row.kind == JobKind::ArchivePass && active {
+                let (rev, committed) = rows::archive_rerun(&self.deps.store, &row.id)?;
+                if committed {
+                    row.status = JobRunStatus::Succeeded;
+                    row.finished_at = Some(now);
+                    row.progress = Some(1.0);
+                    rows::save(&self.deps.store, &row, &subject)?;
+                    self.deps.sink.publish(&row);
+                    continue;
+                }
+                rev
+            } else {
+                None
+            };
             let request = if row.kind == JobKind::Regeneration && subject.is_some() && active {
                 let request = rows::regeneration_request(&self.deps.store, &row.id)?;
                 if request.is_none() {
@@ -431,7 +458,7 @@ impl Inner {
                 }
                 request
             } else {
-                None
+                archive_rerun_rev.map(|rev| rev.to_string())
             };
             match row.status {
                 JobRunStatus::Queued => {
@@ -442,6 +469,7 @@ impl Inner {
                             subject,
                             cancel: false,
                             run_on_battery: false,
+                            archive_rerun_rev,
                         },
                     );
                 }
@@ -502,6 +530,11 @@ impl Inner {
         replace_pending: bool,
     ) -> Result<JobRunId, CoreError> {
         let now = self.deps.clock.now();
+        let archive_rerun_rev = if def.kind == JobKind::ArchivePass {
+            selections.and_then(|rev| rev.parse::<u32>().ok())
+        } else {
+            None
+        };
         let row = {
             let mut open = lock(&self.open);
             let same = open.values().find(|e| {
@@ -513,7 +546,14 @@ impl Inner {
                         || def.kind != JobKind::Regeneration)
             });
             if let Some(e) = same {
-                if let Some(request) = selections.filter(|_| replace_pending) {
+                if def.kind == JobKind::ArchivePass {
+                    if archive_rerun_rev.is_some() && archive_rerun_rev != e.archive_rerun_rev {
+                        return Err(CoreError::new(
+                            ErrorCode::JobBlocked,
+                            "another archive pass is active",
+                        ));
+                    }
+                } else if let Some(request) = selections.filter(|_| replace_pending) {
                     let mut mutation = rows::run_mutation(&e.row, &subject);
                     mutation
                         .values
@@ -525,7 +565,7 @@ impl Inner {
                 return Ok(e.row.id.clone());
             }
             let row = JobRunRow {
-                call_id: rows::output_call(def.kind, subject.as_deref()),
+                call_id: rows::run_call(def.kind, subject.as_deref(), archive_rerun_rev.is_some()),
                 id: JobRunId::new(format!("run_{}", ulid::Ulid::generate())),
                 job_id: def.id.clone(),
                 kind: def.kind,
@@ -538,6 +578,9 @@ impl Inner {
                 progress: None,
             };
             let mut run = rows::run_mutation(&row, &subject);
+            if let Some(rev) = archive_rerun_rev {
+                run.values.push(("archive_rerun_rev", json!(rev)));
+            }
             if def.kind == JobKind::Regeneration {
                 if let Some(call) = &subject {
                     let request = selections.map(str::to_owned).unwrap_or_else(|| {
@@ -573,6 +616,7 @@ impl Inner {
                     subject: subject.clone(),
                     cancel: false,
                     run_on_battery: false,
+                    archive_rerun_rev,
                 },
             );
             row
@@ -659,9 +703,34 @@ impl Inner {
         let started: Vec<(JobRunRow, Option<String>)> = {
             let mut open = lock(&self.open);
             // @cpt-begin:cpt-noter-algo-core-jobs-scheduler-admit:p1:inst-admit-priority
+            let reruns: std::collections::HashSet<_> = open
+                .values()
+                .filter(|e| !e.cancel && e.archive_rerun_rev.is_some())
+                .filter_map(|e| e.subject.clone())
+                .collect();
+            let writing: std::collections::HashSet<_> = open
+                .values()
+                .filter(|e| {
+                    !e.cancel
+                        && matches!(e.row.kind, JobKind::PostCall | JobKind::Regeneration)
+                        && matches!(e.row.status, JobRunStatus::Running | JobRunStatus::Paused)
+                })
+                .filter_map(|e| e.subject.clone())
+                .collect();
             let mut ready: Vec<&mut Entry> = open
                 .values_mut()
                 .filter(|e| e.row.status == JobRunStatus::Queued && !e.cancel)
+                .filter(|e| {
+                    e.subject.as_ref().map_or(true, |call| {
+                        if e.archive_rerun_rev.is_some() {
+                            !writing.contains(call)
+                        } else if matches!(e.row.kind, JobKind::PostCall | JobKind::Regeneration) {
+                            !reruns.contains(call)
+                        } else {
+                            true
+                        }
+                    })
+                })
                 .filter(|e| {
                     defs.iter()
                         .find(|d| d.kind == e.row.kind)
@@ -777,6 +846,12 @@ pub struct RunCtx {
 }
 
 impl RunCtx {
+    pub fn archive_rerun_rev(&self) -> Option<u32> {
+        lock(&self.inner.open)
+            .get(&self.id)
+            .and_then(|entry| entry.archive_rerun_rev)
+    }
+
     // @cpt-begin:cpt-noter-flow-core-postcall-regenerate:p1:inst-regen-restore
     /// The durable settings for this exact run, including after a restart.
     pub fn regeneration_request(&self) -> Result<RegenerateArgs, CoreError> {

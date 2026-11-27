@@ -615,6 +615,14 @@ impl Core {
     /// The constraints file the archive pass reads: what the user named and linked, with the
     /// call's languages and glossary.
     pub(crate) fn write_constraints_file(&self, call_id: &CallId) -> Result<(), CoreError> {
+        self.write_constraints_file_named(call_id, "constraints.json")
+    }
+
+    pub(crate) fn write_constraints_file_named(
+        &self,
+        call_id: &CallId,
+        name: &str,
+    ) -> Result<(), CoreError> {
         let id = call_id.as_str().to_string();
         let (languages, links, names) = self.store().read(move |c| {
             let mut stmt = c.prepare(
@@ -699,7 +707,7 @@ impl Core {
         let dir = self.call_dir(call_id);
         std::fs::create_dir_all(&dir).map_err(internal)?;
         let body = serde_json::to_vec(&file).map_err(internal)?;
-        crate::util::write_private(&dir.join("constraints.json"), &body)
+        crate::util::write_private(&dir.join(name), &body)
     }
 
     /// The batch a naming or term fix wrote when `change_id` is one of its rows: undo and redo

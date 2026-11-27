@@ -51,6 +51,12 @@ pub const MIGRATIONS: &[Migration] = &[
         name: "durable regeneration request",
         sql: include_str!("../migrations/0005_regeneration_request.sql"),
     },
+    Migration {
+        owner: "noter-db",
+        version: 6,
+        name: "durable archive rerun request",
+        sql: include_str!("../migrations/0006_archive_rerun_request.sql"),
+    },
 ];
 
 const HISTORY: &str = "CREATE TABLE IF NOT EXISTS schema_migrations (

@@ -59,7 +59,7 @@ commands = [
   "item_edit", "item_reopen", "item_create", "item_answer_handoff_landed",
   "today_get",
   # Contract 2.33: outputs_get identifies a power-held run; outputs_regenerate can release it once.
-  "outputs_get", "output_edit", "outputs_regenerate", "output_versions", "output_version_get",
+  "outputs_get", "output_edit", "outputs_regenerate", "output_versions", "output_version_get", "archive_rerun",
   "share_copy", "calls_export",
   "handoff_get", "handoff_generate", "handoff_edit", "handoff_set_target", "handoff_open", "handoff_copy", "handoff_cancel",
   "history_list", "change_undo", "change_redo", "history_export",
