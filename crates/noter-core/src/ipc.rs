@@ -320,6 +320,14 @@ impl CoreApi for Core {
         self.edit_output(ctx, args)
     }
 
+    async fn archive_rerun(
+        &self,
+        _ctx: &CommandCtx,
+        args: ArchiveRerunArgs,
+    ) -> Result<JobAccepted, CoreError> {
+        self.queue_archive_rerun(args)
+    }
+
     async fn outputs_regenerate(
         &self,
         _ctx: &CommandCtx,

@@ -835,6 +835,213 @@ async fn the_builtin_archive_installs_live_segments_through_the_core() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn cpt_noter_seq_call_page_name_speakers_rerun_preserves_archive_edits() {
+    let r = open("", true).await;
+    seed_call(&r.core, CALL, 2);
+    let dir = r.dir.path().join(format!("audio/{CALL}"));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("mic.wav"), b"audio").unwrap();
+    let input = ["We agree on step 0.", "We agree on step 1."]
+        .into_iter()
+        .enumerate()
+        .map(|(i, text)| {
+            json!({
+                "id": format!("input_{i}"), "call_id": CALL, "channel": "sys",
+                "speaker": { "speaker_id": "input_spk", "label": { "type": "unnamed", "n": 1 } },
+                "crosstalk_with": [], "t0_ms": i * 10_000, "t1_ms": i * 10_000 + 5_000,
+                "text": text, "lang": "en", "lang_p": 0.9, "confidence": 0.8,
+                "state": "confirmed", "pass": "live", "corrections": []
+            })
+            .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(dir.join("transcript.jsonl"), &input).unwrap();
+    let first = trigger(&r.core, JobKind::ArchivePass, CALL);
+    assert_eq!(
+        settle(&r.core, &first).await.status,
+        JobRunStatus::Succeeded
+    );
+    let segment = rows(
+        &r.core,
+        "SELECT id, speaker_id FROM segments WHERE pass = 'archive' ORDER BY t0_ms",
+    );
+    let segment_id = SegmentId::new(segment[0][0].as_str().unwrap());
+    let speaker_id = SpeakerId::new(segment[0][1].as_str().unwrap());
+    r.core
+        .transcript_rename_speaker(
+            &main_window(),
+            RenameSpeakerArgs {
+                call_id: CallId::new(CALL),
+                speaker_id: speaker_id.clone(),
+                scope: RenameScope::WholeCall,
+                person: PersonRef::New {
+                    display_name: "Grace Hopper".into(),
+                    email: None,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    r.core
+        .transcript_fix_term(
+            &main_window(),
+            FixTermArgs {
+                call_id: CallId::new(CALL),
+                segment_id: segment_id.clone(),
+                range: TextRange { start: 3, end: 8 },
+                replacement: "concur".into(),
+                add_to_glossary: false,
+            },
+        )
+        .await
+        .unwrap();
+    for run in r
+        .core
+        .scheduler()
+        .runs()
+        .unwrap()
+        .into_iter()
+        .filter(|run| run.kind == JobKind::Regeneration)
+    {
+        settle(&r.core, &run.id).await;
+    }
+    let before = r.core.scheduler().runs().unwrap().len();
+    let request = || ArchiveRerunArgs {
+        call_id: CallId::new(CALL),
+        expected_rev: Rev(rows(&r.core, "SELECT rev FROM calls")[0][0]
+            .as_u64()
+            .unwrap() as u32),
+    };
+    std::fs::write(
+        dir.join("transcript.jsonl"),
+        input.replace("step 1", "milestone 1"),
+    )
+    .unwrap();
+    let run = r
+        .core
+        .archive_rerun(&main_window(), request())
+        .await
+        .unwrap();
+    assert_eq!(
+        settle(&r.core, &run.job_run_id).await.status,
+        JobRunStatus::Succeeded
+    );
+    assert_eq!(r.core.scheduler().runs().unwrap().len(), before + 1);
+    assert_eq!(
+        rows(
+            &r.core,
+            "SELECT id, speaker_id, text FROM segments WHERE pass = 'archive' ORDER BY t0_ms"
+        ),
+        vec![
+            vec![
+                json!(segment_id),
+                json!(speaker_id),
+                json!("We concur on step 0.")
+            ],
+            vec![
+                segment[1][0].clone(),
+                json!(speaker_id),
+                json!("We agree on milestone 1.")
+            ],
+        ]
+    );
+    assert_eq!(
+        rows(
+            &r.core,
+            "SELECT name, named_by FROM speakers WHERE pass = 'archive'"
+        ),
+        vec![vec![json!("Grace Hopper"), json!("you")]]
+    );
+    assert_eq!(
+        rows(
+            &r.core,
+            "SELECT count(*) FROM segments_fts WHERE segments_fts MATCH 'milestone'"
+        ),
+        vec![vec![json!(1)]]
+    );
+
+    let archive = rows(&r.core, "SELECT id, speaker_id, text, corrections FROM segments WHERE pass = 'archive' ORDER BY t0_ms");
+    std::fs::write(
+        dir.join("transcript.jsonl"),
+        input.replace("agree on step 0", "said hello"),
+    )
+    .unwrap();
+    let run = r
+        .core
+        .archive_rerun(&main_window(), request())
+        .await
+        .unwrap();
+    let failed = settle(&r.core, &run.job_run_id).await;
+    assert_eq!(failed.error, Some(ErrorCode::Conflict));
+    assert_eq!(rows(&r.core, "SELECT id, speaker_id, text, corrections FROM segments WHERE pass = 'archive' ORDER BY t0_ms"), archive);
+    assert_eq!(
+        rows(&r.core, "SELECT archive_status FROM calls"),
+        vec![vec![json!("done")]]
+    );
+
+    let index = rows(
+        &r.core,
+        "SELECT id, text, embedding FROM chunks ORDER BY id",
+    );
+    let current_rev = request().expected_rev;
+    let meta = noter_db::ChangeMeta {
+        actor: Actor::You,
+        summary: "Install a test trigger".into(),
+        reason: "test".into(),
+        evidence_ids: vec![],
+        batch_id: None,
+        undoable: false,
+        surface: None,
+    };
+    r.core
+        .store()
+        .write_with(meta, |tx| {
+            tx.execute_batch(
+                "CREATE TRIGGER fail_rerun BEFORE INSERT ON segments
+            WHEN new.pass = 'archive' BEGIN SELECT RAISE(ABORT, 'injected insert failure'); END;",
+            )
+            .map_err(|e| CoreError::new(ErrorCode::Internal, e.to_string()))?;
+            Ok((
+                (),
+                vec![noter_db::Logged {
+                    entity_type: "call",
+                    entity_id: CALL.into(),
+                    field: None,
+                    before: None,
+                    after: None,
+                    delta: None,
+                }],
+            ))
+        })
+        .unwrap();
+    std::fs::write(dir.join("transcript.jsonl"), &input).unwrap();
+    let run = r
+        .core
+        .archive_rerun(&main_window(), request())
+        .await
+        .unwrap();
+    let failed = settle(&r.core, &run.job_run_id).await;
+    assert_eq!(failed.error, Some(ErrorCode::Internal));
+    assert_eq!(request().expected_rev, current_rev);
+    assert_eq!(
+        rows(
+            &r.core,
+            "SELECT id, text, embedding FROM chunks ORDER BY id"
+        ),
+        index
+    );
+    assert_eq!(rows(&r.core, "SELECT id, speaker_id, text, corrections FROM segments WHERE pass = 'archive' ORDER BY t0_ms"), archive);
+    assert_eq!(
+        rows(
+            &r.core,
+            "SELECT count(*) FROM segments_fts WHERE segments_fts MATCH 'milestone'"
+        ),
+        vec![vec![json!(1)]]
+    );
+}
+
+#[tokio::test(start_paused = true)]
 async fn an_archive_of_a_silent_call_is_done_and_queues_the_regeneration() {
     let r = open("", true).await;
     seed_call(&r.core, CALL, 0);

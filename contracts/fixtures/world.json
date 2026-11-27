@@ -323,7 +323,7 @@
       "transcription_language": null,
       "version": 1
     },
-    "contract_version": "2.38",
+    "contract_version": "2.39",
     "copilot": {
       "agents": [
         {
@@ -717,6 +717,7 @@
   ],
   "call_details": [
     {
+      "archive_rerun": null,
       "audio_not_stored": false,
       "calendar_event": null,
       "call": {
@@ -909,6 +910,7 @@
       ]
     },
     {
+      "archive_rerun": null,
       "audio_not_stored": false,
       "calendar_event": null,
       "call": {

@@ -10,7 +10,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -476,19 +476,13 @@ impl Core {
     // @cpt-algo:cpt-noter-algo-core-live-transcript-file:p2
     pub(crate) fn write_transcript_file(&self, call_id: &CallId) -> Result<(), CoreError> {
         // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
-        let segments = self.store.read(|c| segments_of(c, call_id, None))?;
+        let _archive = lock(&self.archive_audio_guard);
         let dir = self.call_dir(call_id);
-        std::fs::create_dir_all(&dir).map_err(internal)?;
-        let mut bytes = Vec::new();
-        for segment in &segments {
-            writeln!(&mut bytes, "{}", to_json(segment)).map_err(internal)?;
-        }
-        // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
-        crate::util::write_private(&dir.join("transcript.jsonl"), &bytes)
-        // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
+        self.store
+            .read(|c| segments_of(c, call_id, None))
+            .and_then(|segments| write_transcript_snapshot(&segments, &dir))
         // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-write
     }
-
     /// The call's folder beside the configured models directory, shared with the engine.
     pub(crate) fn call_dir(&self, call_id: &CallId) -> PathBuf {
         self.audio_dir.join(call_id.as_str())
@@ -755,6 +749,20 @@ fn call_state(c: &Connection, id: &CallId) -> noter_db::rusqlite::Result<Option<
         },
     )
     .optional()
+}
+
+pub(crate) fn write_transcript_snapshot(
+    segments: &[SegmentView],
+    dir: &Path,
+) -> Result<(), CoreError> {
+    std::fs::create_dir_all(dir).map_err(internal)?;
+    let mut bytes = Vec::new();
+    for segment in segments {
+        writeln!(&mut bytes, "{}", to_json(segment)).map_err(internal)?;
+    }
+    // @cpt-begin:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
+    crate::util::write_private(&dir.join("transcript.jsonl"), &bytes)
+    // @cpt-end:cpt-noter-algo-core-live-transcript-file:p2:inst-file-return
 }
 
 fn call_ref(c: &Connection, id: &CallId) -> noter_db::rusqlite::Result<Option<CallRef>> {

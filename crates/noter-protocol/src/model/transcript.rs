@@ -136,6 +136,12 @@ pub enum ArchiveStatus {
     Failed,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct ArchiveRerunArgs {
+    pub call_id: CallId,
+    pub expected_rev: crate::Rev,
+}
+
 /// `transcript_subscribe` result: everything up to `last_seq`. The Channel then
 /// delivers strictly after `last_seq` (snapshot, then stream; DESIGN 3.3).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

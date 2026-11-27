@@ -16,7 +16,7 @@ import type { PageToolbarProps } from "../shell/pages";
 import { MainToolbar } from "../shell/toolbar";
 import type { Bridge } from "../../app/bridge/bridge";
 import type { CallRow, CallTypeInfo, CallPageTab } from "../../core/bindings";
-import { menuActs, saveTitle } from "./actions";
+import { archiveRerunKey, menuActs, readCall, saveTitle } from "./actions";
 import { review, reviewAll } from "../items/actions";
 import { focusNext } from "../items/ActionItemRow";
 import { useExtras } from "./cache";
@@ -97,8 +97,16 @@ export function runNativeReviewMenuAction(key: string, bridge: Bridge, callId: s
   return true;
 }
 
+// @cpt-flow:cpt-noter-flow-ui-call-page-frame-more-menu:p1
+export async function rerunArchive(bridge: Bridge, call: CallRow) {
+  const result = await bridge.act(archiveRerunKey(call.id), "archive_rerun", () =>
+    bridge.core.archiveRerun({ call_id: call.id, expected_rev: call.rev }));
+  if (result.status === "error" && result.error.code === "conflict") await readCall(bridge, call.id);
+  return result;
+}
+
 /** The ⋯ menu's items for a call (the later items join with their features). */
-export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; deleteAudio?: (() => void) | null; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void }): MenuItem[] {
+export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: () => void; deleteAudio?: (() => void) | null; type: (id: string) => void; sensitive: () => void; finder: () => void; remove: (() => void) | null; regenerate?: () => void; rerun?: (() => void) | null }): MenuItem[] {
   const sensitive = call.privacy === "sensitive";
   return [
     // @cpt-begin:cpt-noter-flow-ui-library-calls-edit:p2:inst-user-edit
@@ -108,6 +116,7 @@ export function moreItems(call: CallRow, types: CallTypeInfo[], act: { rename: (
     { label: sensitive ? t("callpage.sensitive") : t("callpage.mark_sensitive"), checked: sensitive, onSelect: act.sensitive },
     { divider: true },
     ...(act.regenerate ? [{ label: t("outputs.menu.regenerate"), onSelect: act.regenerate }] : []),
+    ...(act.rerun === undefined ? [] : [{ label: t("callpage.archive_rerun"), disabled: act.rerun === null, onSelect: act.rerun ?? undefined }]),
     { label: t("callpage.show_in_finder"), onSelect: act.finder },
     ...(act.deleteAudio ? [{ label: t("audio.delete"), onSelect: act.deleteAudio }] : []),
     { divider: true },
@@ -126,6 +135,12 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
   const [renaming, setRenaming] = useState(false);
   const [exported, setExported] = useState<string | null>(null);
   const audioKept = !!call && keepsAudio(call, extras?.audio_not_stored ?? false);
+  const archiveRun = useWindow(bridge, (s) => Object.values(s.jobs).reverse().find((run) => run.call_id === at.callId && run.kind === "archive_pass")) ?? extras?.archive_rerun;
+  const rerunWaiting = useWindow(bridge, (s) => s.commands[archiveRerunKey(at.callId)]?.state === "WAITING"
+    || archiveRun?.status === "queued" || archiveRun?.status === "running" || archiveRun?.status === "paused");
+  const rerun = call?.archive === "done" && audioKept && call.status !== "recording" && call.status !== "paused"
+    ? (rerunWaiting ? null : () => void rerunArchive(bridge, call))
+    : undefined;
   const openExport = useExport(bridge, at.callId, audioKept, setExported);
   // the status stays 8 s
   useEffect(() => {
@@ -183,7 +198,7 @@ export function CallToolbar({ route, bridge, base, inspectorOpen, onToggleInspec
           {menu && call && (
             <Popover variant="item-menu" anchor={menu} align="end" label={t("callpage.more")} onClose={() => setMenu(null)}>
               <Menu
-                items={moreItems(call, types, { ...menuActs(bridge, call, () => setRenaming(true)), regenerate: () => openRegenerate(["summary", "decisions", "action_items", "open_questions"]), deleteAudio: audioKept ? () => void deleteAudio(bridge, at.callId) : null })}
+                items={moreItems(call, types, { ...menuActs(bridge, call, () => setRenaming(true)), regenerate: () => openRegenerate(["summary", "decisions", "action_items", "open_questions"]), deleteAudio: audioKept ? () => void deleteAudio(bridge, at.callId) : null, rerun })}
                 onClose={() => setMenu(null)}
               />
             </Popover>

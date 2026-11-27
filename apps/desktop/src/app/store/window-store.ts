@@ -375,7 +375,7 @@ export function applyEvent(s: WindowState, e: AnyEvent): WindowState {
       const changed = s.jobs[run.id]?.status !== run.status;
       return {
         ...s, jobs: { ...s.jobs, [run.id]: run },
-        outputJobChanges: changed && run.call_id ? { ...s.outputJobChanges, [run.call_id]: run } : s.outputJobChanges,
+        outputJobChanges: changed && run.call_id && run.kind !== "archive_pass" ? { ...s.outputJobChanges, [run.call_id]: run } : s.outputJobChanges,
       };
     }
     // @cpt-end:cpt-noter-flow-ui-call-page-frame-open:p1:inst-processing

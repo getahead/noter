@@ -299,23 +299,7 @@ impl Store {
             // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-begin
             // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-for-row
             for row in &rows {
-                // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
-                check(row.table, &row.values)?;
-                // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
-                // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
-                let names: Vec<&str> = row.values.iter().map(|(c, _)| *c).collect();
-                let sql = format!(
-                    "INSERT INTO {} ({}) VALUES ({})",
-                    row.table,
-                    names.join(", "),
-                    vec!["?"; names.len()].join(", ")
-                );
-                tx.execute(
-                    &sql,
-                    params_from_iter(row.values.iter().map(|(_, v)| to_sql(v))),
-                )
-                .map_err(internal)?;
-                // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
+                row.execute(&tx)?;
             }
             // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-for-row
             // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-commit
@@ -379,6 +363,29 @@ impl Store {
             Ok(deleted)
             // @cpt-end:cpt-noter-algo-core-storage-delete:p1:inst-return-deleted
         })
+    }
+}
+
+impl Insert {
+    pub fn execute(&self, tx: &Transaction<'_>) -> Result<(), CoreError> {
+        // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
+        check(self.table, &self.values)?;
+        // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-if-invalid
+        // @cpt-begin:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
+        let names: Vec<&str> = self.values.iter().map(|(column, _)| *column).collect();
+        let sql = format!(
+            "INSERT INTO {} ({}) VALUES ({})",
+            self.table,
+            names.join(", "),
+            vec!["?"; names.len()].join(", ")
+        );
+        tx.execute(
+            &sql,
+            params_from_iter(self.values.iter().map(|(_, value)| to_sql(value))),
+        )
+        .map_err(internal)?;
+        // @cpt-end:cpt-noter-algo-core-storage-insert-batch:p1:inst-insert-row
+        Ok(())
     }
 }
 

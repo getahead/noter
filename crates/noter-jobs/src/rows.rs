@@ -168,15 +168,35 @@ pub(crate) fn regeneration_request(
     })
 }
 
-pub(crate) fn output_call(kind: JobKind, subject: Option<&str>) -> Option<CallId> {
+pub(crate) fn run_call(kind: JobKind, subject: Option<&str>, rerun: bool) -> Option<CallId> {
     subject
-        .filter(|_| matches!(kind, JobKind::Regeneration | JobKind::PostCall))
+        .filter(|_| rerun || matches!(kind, JobKind::Regeneration | JobKind::PostCall))
         .map(CallId::new)
 }
 
-pub(crate) fn runs(store: &Store, call: Option<&CallId>) -> Result<Vec<Stored>, CoreError> {
+pub(crate) fn archive_rerun(
+    store: &Store,
+    run: &JobRunId,
+) -> Result<(Option<u32>, bool), CoreError> {
+    store.read(|c| {
+        c.query_row(
+            "SELECT archive_rerun_rev, archive_rerun_committed FROM job_runs WHERE id = ?1",
+            [run.as_str()],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+    })
+}
+
+pub(crate) fn runs(
+    store: &Store,
+    call: Option<&CallId>,
+    archive: bool,
+) -> Result<Vec<Stored>, CoreError> {
     let raw = store.read(|c| {
-        let selection = if call.is_some() {
+        let selection = if archive {
+            "WHERE r.subject = ?1 AND r.archive_rerun_rev IS NOT NULL
+             ORDER BY (r.status IN ('queued', 'running', 'paused')) DESC, r.rowid DESC LIMIT 1"
+        } else if call.is_some() {
             "WHERE r.subject = ?1 AND j.kind IN ('regeneration', 'post_call')
              ORDER BY (r.status IN ('queued', 'running', 'paused')) DESC, r.finished_at DESC, r.rowid DESC LIMIT 1"
         } else {
@@ -184,7 +204,7 @@ pub(crate) fn runs(store: &Store, call: Option<&CallId>) -> Result<Vec<Stored>, 
         };
         let mut st = c.prepare(&format!(
             "SELECT r.id, r.job_id, j.kind, r.subject, r.started_at, r.finished_at, r.status,
-                    r.counts, r.error_code, r.progress
+                    r.counts, r.error_code, r.progress, r.archive_rerun_rev IS NOT NULL
              FROM job_runs r JOIN jobs j ON j.id = r.job_id {selection}",
         ))?;
         let rows = st.query_map(
@@ -202,7 +222,7 @@ pub(crate) fn runs(store: &Store, call: Option<&CallId>) -> Result<Vec<Stored>, 
                         r.get::<_, Option<i64>>(5)?,
                     ),
                     (r.get::<_, String>(6)?, r.get::<_, String>(7)?),
-                    (r.get::<_, Option<String>>(8)?, r.get::<_, Option<f64>>(9)?),
+                    (r.get::<_, Option<String>>(8)?, r.get::<_, Option<f64>>(9)?, r.get::<_, bool>(10)?),
                 ))
             },
         )?;
@@ -215,10 +235,10 @@ pub(crate) fn runs(store: &Store, call: Option<&CallId>) -> Result<Vec<Stored>, 
                 (id, job, kind),
                 (subject, started, finished),
                 (status, counts),
-                (error, progress),
+                (error, progress, archive_rerun),
             )| {
                 let kind: JobKind = parse(kind)?;
-                let call_id = output_call(kind, subject.as_deref());
+                let call_id = run_call(kind, subject.as_deref(), archive_rerun);
                 Some(Stored {
                     subject,
                     row: JobRunRow {

@@ -427,6 +427,8 @@ commands! {
 
     // ── Outputs and sharing ───────────────────────────────────────────────
     outputs_get(CallIdArgs) -> CallOutputs [OutputsAndSharing, Frozen, Main];
+    /// Replace an installed archive after reprocessing retained audio and reconciling edits.
+    archive_rerun(ArchiveRerunArgs) -> JobAccepted [OutputsAndSharing, Frozen, Main];
     output_edit(OutputEditArgs) -> OutputMutation [OutputsAndSharing, Frozen, Main];
     /// Regenerate sections with another runtime, model or skill; edits are kept and diffed.
     outputs_regenerate(RegenerateArgs) -> JobAccepted [OutputsAndSharing, Frozen, Main];

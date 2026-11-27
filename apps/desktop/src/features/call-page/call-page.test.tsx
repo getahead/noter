@@ -14,7 +14,7 @@ import { holdOutputs, resetOutputsCache } from "./outputs-cache";
 import { CallBanners } from "./CallBanners";
 import { CallInfo } from "./CallInfo";
 import { CallPage } from "./CallPage";
-import { CallToolbar, moreItems, nativeItemReviewMenuState, runNativeReviewMenuAction, watchNativeMenuContext } from "./CallToolbar";
+import { CallToolbar, moreItems, nativeItemReviewMenuState, rerunArchive, runNativeReviewMenuAction, watchNativeMenuContext } from "./CallToolbar";
 import { registeredViews } from "./views";
 import { loadCall, loadTypes } from "./actions";
 import { loadItems } from "../items/actions";
@@ -232,9 +232,34 @@ describe("CallToolbar", () => {
     (items.find((i) => "label" in i && i.label === "Delete Call…") as { onSelect: () => void }).onSelect();
     expect(removed).toBe(1);
   });
+
+  it("offers a separate archive rerun action and disables it while the job is active", async () => {
+    await ready();
+    const call = fake.world.calls.find((c) => c.id === id)!;
+    const rerun = vi.fn();
+    const act = { rename() {}, type() {}, sensitive() {}, finder() {}, remove: null, rerun };
+    const item = moreItems(call, [], act).find((i) => "label" in i && i.label === "Re-run archive pass");
+    expect(item).toMatchObject({ onSelect: rerun });
+    expect(moreItems(call, [], { ...act, rerun: null })).toContainEqual(
+      expect.objectContaining({ label: "Re-run archive pass", disabled: true }),
+    );
+  });
 });
 
 describe("CallBanners", () => {
+  it("reports a rerun conflict, then shows progress for an accepted retry", async () => {
+    await ready();
+    const call = bridge.store.getState().entities.call[id]!;
+    const seen = sent();
+    fake.failNext("archive_rerun", "conflict");
+    await rerunArchive(bridge, call);
+    expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toContain("The previous transcript and edits are still available.");
+    expect(seen).toContainEqual(["call_get", { call_id: id }]);
+
+    expect(await rerunArchive(bridge, call)).toMatchObject({ status: "ok" });
+    expect(renderToString(<CallBanners route={route()} bridge={bridge} appBanners={0} />)).toContain("Reprocessing the call audio");
+  });
+
   it("offers the notification prompt after the first recorded call, and Notify Me asks for the permission", async () => {
     await ready();
     holdExtras(id, { first_recorded_call: true, audio_not_stored: false, mode_used: "cloud", folder: "/calls/x" });

@@ -9,7 +9,7 @@ import { BannerSlot, type Banner } from "../../ui/feedback/inline-banner";
 import { useReviewBanner } from "../items/review-banner";
 import { permissionState } from "../notifications/notifications";
 import type { Route } from "../shell/history";
-import { requestNotifications } from "./actions";
+import { archiveRerunKey, requestNotifications } from "./actions";
 import { dismissed as closed, useExtras } from "./cache";
 import { parseCallKey } from "./logic";
 import { useOutputs } from "./outputs-cache";
@@ -24,6 +24,8 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   const callId = parseCallKey(route.key)!.callId;
   const extras = useExtras(callId);
   const call = useWindow(bridge, (s) => s.entities.call[callId]);
+  const archiveRun = useWindow(bridge, (s) => Object.values(s.jobs).reverse().find((run) => run.call_id === callId && run.kind === "archive_pass")) ?? extras?.archive_rerun;
+  const archiveRequest = useWindow(bridge, (s) => s.commands[archiveRerunKey(callId)]);
   const live = useWindow(bridge, (s) => s.whole.capture?.call_id === callId && (s.whole.capture.phase === "recording" || s.whole.capture.phase === "paused"));
   // only while macOS has never been asked: once answered (Allow, Don't Allow, or set in System Settings) the offer is moot
   const notAsked = useWindow(bridge, (s) => permissionState(s.whole.environment?.notifications) === "NOT_ASKED");
@@ -47,6 +49,15 @@ export function CallBanners({ route, bridge, appBanners }: { route: Route; bridg
   const openRegenerate = useRegenerate(bridge, callId);
   const tab = parseCallKey(route.key)!.tab;
   const list: Banner[] = [];
+  if (archiveRequest?.state === "ERROR" || archiveRun?.status === "failed") {
+    const code = archiveRequest?.error?.code ?? archiveRun?.error;
+    const message = code === "conflict" ? "callpage.archive_conflict" : code === "audio_deleted" ? "callpage.archive_audio_missing" : "callpage.archive_failed";
+    list.push({ id: archiveRun?.id ?? "archive-rerun-error", severity: "error", text: t(message), dismissible: true });
+  } else if (archiveRun?.status === "queued" || archiveRun?.status === "running" || archiveRun?.status === "paused") {
+    list.push({ id: archiveRun.id, severity: "info", text: t(archiveRun.status === "running" ? "callpage.archive_running" : "callpage.archive_waiting"), dismissible: false });
+  } else if (archiveRun?.status === "cancelled") {
+    list.push({ id: archiveRun.id, severity: "info", text: t("callpage.archive_cancelled") });
+  }
   // @cpt-begin:cpt-noter-flow-ui-call-page-outputs-tags-audio:p1:inst-delete-error
   if (audioDeleteError)
     list.push({ id: "audio-delete-error", severity: "error", text: t("audio.failed"), actions: audioDeleteError.tryAgain ? [{ label: t("action.try_again"), onAction: () => void bridge.retry(deleteKey) }] : [] });

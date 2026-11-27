@@ -385,8 +385,8 @@ enum ExportPayload {
     /// `transcript.md`, `transcript.srt` and `transcript.json`.
     Transcript {
         dir: String,
-        call_id: CallId,
         header: String,
+        segments: Vec<SegmentView>,
     },
     Audio {
         dir: String,
@@ -507,11 +507,7 @@ fn srt(segments: &[SegmentView]) -> String {
         .collect()
 }
 
-fn write_payload(
-    store: &noter_db::Store,
-    folder: &Path,
-    payload: ExportPayload,
-) -> Result<u32, CoreError> {
+fn write_payload(folder: &Path, payload: ExportPayload) -> Result<u32, CoreError> {
     let into = |dir: &str| {
         let dir = folder.join(dir);
         std::fs::create_dir_all(&dir).map_err(export_io_error)?;
@@ -535,10 +531,9 @@ fn write_payload(
         }
         ExportPayload::Transcript {
             dir,
-            call_id,
             header,
+            segments,
         } => {
-            let segments = store.read(|c| segments_of(c, &call_id, None))?;
             let json = serde_json::to_string_pretty(&segments).map_err(internal)?;
             let dir = into(&dir)?;
             for (name, text) in [
@@ -755,13 +750,12 @@ impl Core {
         // Bounded queue: only one call's content is rendered and written at a time.
         let (tx, mut rx) = tokio::sync::mpsc::channel(1);
         let destination = folder.clone();
-        let store = self.store_handle();
         let created = !folder.exists();
         let writer = tokio::task::spawn_blocking(move || {
             std::fs::create_dir_all(&destination).map_err(export_io_error)?;
             let mut count = 0;
             while let Some(payload) = rx.blocking_recv() {
-                count += write_payload(&store, &destination, payload)?;
+                count += write_payload(&destination, payload)?;
             }
             Ok::<_, CoreError>(count)
         });
@@ -770,9 +764,16 @@ impl Core {
             let send = async {
                 let stopped = |_| internal("the export writer stopped");
                 let outputs = self.outputs_for_share(&call.id)?;
-                let header = self
-                    .store()
-                    .read(|c| markdown_header(self.local_time(), c, call.id.as_str()))?;
+                let (header, transcript) = self.store().read(|c| {
+                    let snapshot = c.unchecked_transaction()?;
+                    let header = markdown_header(self.local_time(), &snapshot, call.id.as_str())?;
+                    let transcript = call
+                        .transcript
+                        .then(|| segments_of(&snapshot, &call.id, None))
+                        .transpose()?;
+                    snapshot.commit()?;
+                    Ok((header, transcript))
+                })?;
                 let row = self.call_row(call.id.as_str())?.ok_or_else(not_found)?;
                 let items = if call.markdown {
                     scoped_items(&outputs, &scope)
@@ -797,11 +798,11 @@ impl Core {
                     .await
                     .map_err(stopped)?;
                 }
-                if call.transcript {
+                if let Some(segments) = transcript {
                     tx.send(ExportPayload::Transcript {
                         dir: call.dir.clone(),
-                        call_id: call.id.clone(),
                         header,
+                        segments,
                     })
                     .await
                     .map_err(stopped)?;

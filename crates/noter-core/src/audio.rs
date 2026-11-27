@@ -112,6 +112,7 @@ impl Core {
     ) -> Result<DeleteAudioResult, CoreError> {
         let (mut calls, mut bytes) = (0u32, 0u64);
         for id in ids {
+            let _archive = crate::lock(&self.archive_audio_guard);
             let call_id = CallId::new(id.clone());
             // @cpt-begin:cpt-noter-flow-core-speakers-audio-delete:p1:inst-delete-lock
             self.stop_playback_of(&call_id);

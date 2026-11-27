@@ -6,6 +6,7 @@ import * as shared from "./shared";
 
 export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
   const heldRequests = new Map<string, Bindings.RegenerateArgs>();
+  const reruns = new Map<string, string>();
   const newId = (prefix: string) => shared.nextId(fake, prefix);
   return {
   // ── Outputs and sharing ──────────────────────────────────────────────
@@ -32,6 +33,32 @@ export function outputsHandlers(fake: Core.FakeCore): Core.Handlers {
     const change_id = shared.logChange(fake, world, { entity: { kind: "summary", id: a.summary_id, label: "Summary" }, field: "body", before, after: a.body_md, summary: "Edited the summary" });
     emit("entity:changed", { type: "section", call_id: a.call_id, section: s });
     return { section: s, change_id };
+  },
+  archive_rerun: (a, { world, emit }) => {
+    const call = shared.call(world, a.call_id);
+    const detail = world.call_details.find((d) => d.call.id === call.id);
+    if (call.audio_deleted || detail?.audio_not_stored) throw coreError("audio_deleted");
+    if (call.archive !== "done" || call.status === "recording" || call.status === "paused") throw coreError("job_blocked");
+    shared.checkRev(call.rev, a.expected_rev);
+    const active = reruns.get(call.id);
+    if (active) return { job_run_id: active };
+    const id = newId("run");
+    reruns.set(call.id, id);
+    const run: Bindings.JobRunRow = {
+      id, call_id: call.id, job_id: "job_archive_pass", kind: "archive_pass", name: "Archive pass", status: "running",
+      started_at: world.now, finished_at: null, counts: [], error: null, progress: null,
+    };
+    if (detail) detail.archive_rerun = run;
+    emit("jobs:progress", { run });
+    fake.later(300, () => {
+      reruns.delete(call.id);
+      call.rev += 1;
+      emit("entity:changed", { type: "call", call });
+      const done: Bindings.JobRunRow = { ...run, status: "succeeded", finished_at: world.now, progress: 1 };
+      if (detail) detail.archive_rerun = done;
+      emit("jobs:progress", { run: done });
+    });
+    return { job_run_id: id };
   },
   // D2: post-call analysis may run during a live call; regeneration waits.
   outputs_regenerate: (a, { world, fake, emit }) => {

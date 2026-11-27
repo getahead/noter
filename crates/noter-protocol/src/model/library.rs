@@ -5,8 +5,8 @@ use specta::Type;
 
 use crate::common::*;
 use crate::model::{
-    ArchiveStatus, CalendarEventRef, GapView, ItemView, MarkView, OutputsStatus, SpeakerView,
-    StreamEndReason,
+    ArchiveStatus, CalendarEventRef, GapView, ItemView, JobRunRow, MarkView, OutputsStatus,
+    SpeakerView, StreamEndReason,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Type)]
@@ -58,6 +58,10 @@ pub struct CallRow {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct CallDetail {
     pub call: CallRow,
+    /// Latest requested archive replacement, including a queued run restored on startup.
+    #[serde(default)]
+    #[specta(optional)]
+    pub archive_rerun: Option<JobRunRow>,
     pub calendar_event: Option<CalendarEventRef>,
     pub speakers: Vec<SpeakerView>,
     pub marks: Vec<MarkView>,

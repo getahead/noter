@@ -1,0 +1,1 @@
+ALTER TABLE calls ADD COLUMN archive_file_pending INTEGER NOT NULL DEFAULT 0;

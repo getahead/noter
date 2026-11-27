@@ -23,6 +23,8 @@ export function openCallPage(bridge: Bridge, callId: string) {
 
 export const readKey = (callId: string) => `call:get:${callId}`;
 
+export const archiveRerunKey = (callId: string) => `call:archive-rerun:${callId}`;
+
 /** `window_report_view`: the call this window shows, so the core sends no notification for it; `null` when the page closes. */
 export function reportView(bridge: Bridge, callId: string | null) {
   // @cpt-begin:cpt-noter-flow-ui-call-page-frame-open:p1:inst-api-report

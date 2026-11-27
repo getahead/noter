@@ -9,6 +9,7 @@ export interface Extras {
   audio_not_stored: boolean;
   mode_used: CallDetail["mode_used"];
   folder: string;
+  archive_rerun?: CallDetail["archive_rerun"];
 }
 
 /** Banners the user closed with × (view state for this window's lifetime). */
@@ -29,8 +30,8 @@ const emit = () => {
 };
 const subscribe = (l: () => void) => (listeners.add(l), () => void listeners.delete(l));
 
-export const holdExtras = (callId: string, d: Pick<CallDetail, "first_recorded_call" | "audio_not_stored" | "mode_used" | "folder">) => {
-  held.extras.set(callId, { first_recorded_call: d.first_recorded_call, audio_not_stored: d.audio_not_stored, mode_used: d.mode_used, folder: d.folder });
+export const holdExtras = (callId: string, d: Extras) => {
+  held.extras.set(callId, d);
   emit();
 };
 export const holdTypes = (types: CallTypeInfo[]) => {
