@@ -145,9 +145,9 @@ Capture is the release-blocking function, and its rules must live in one machine
 1. [x] - `p1` - API: `capture_start { source, sensitive, detection_id?, calendar_event_id? }` - `inst-start-call`
 2. [x] - `p1` - Run `cpt-noter-algo-core-capture-session-start-guard`; **RETURN** its error if any - `inst-start-guard`
 3. [x] - `p1` - **IF** the phase is `stopped`, close that call's Continue window (it goes to `idle` for it) - `inst-close-continue`
-4. [x] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, matched Calendar event ID and title, friendly platform, `started_at`) through the change-log write path. Show **Untitled call** for an unmatched call. Import attendees from a matched event as **Invited** until a speaker is identified. Link existing People and keep unknown invitees on the call at every invitation size. Use **Guest** when Calendar supplies only an address (#1256, #1267) - `inst-insert-call`
+4. [x] - `p1` - DB: INSERT `calls` (status `recording`, sensitive, matched Calendar event ID and title, friendly platform, detected app bundle ID, `started_at`) through the change-log write path. Show **Untitled call** for an unmatched call. Import attendees from a matched event as **Invited** until a speaker is identified. Link existing People and keep unknown invitees on the call at every invitation size. Use **Guest** when Calendar supplies only an address (#1256, #1267) - `inst-insert-call`
 5. [x] - `p1` - Phase `starting`; emit `capture:state` - `inst-phase-starting`
-6. [x] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary - `inst-start-engine`
+6. [x] - `p1` - Ask the supervisor to start the engine session (`cpt-noter-flow-core-engine-capture-session`) with audio storage from settings and the glossary. When a detected app is known, scope system audio to that app and its helpers. Keep that scope on Continue or recovery - `inst-start-engine`
 7. [x] - `p1` - On `session_started`, phase `recording`; ask the native layer to open the call window on the call display without focus - `inst-phase-recording`
 8. [x] - `p1` - While the phase is `recording` or `paused`, subscribe to settings' glossary-changed hook and send `set_glossary` to the engine on each change, so a glossary edit reaches the live call (this meets the settings glossary DoD in M1); unsubscribe when the call stops - `inst-live-glossary`
 9. [x] - `p1` - **RETURN** `CaptureState` with its `version` - `inst-return-started`
@@ -172,6 +172,8 @@ Capture is the release-blocking function, and its rules must live in one machine
 4. [x] - `p1` - For pause: tell the engine `pause`, open a `paused` gap, phase `paused`; for resume: tell the engine `resume`, close the gap, phase `recording` - `inst-apply-pause`
 5. [x] - `p1` - For a mark: DB: INSERT `marks { call_id, at_ms, note }`; publish a `mark` message on the transcript stream - `inst-insert-mark`
 6. [x] - `p1` - **RETURN** `CaptureState` (or `MarkView` for a mark); emit `capture:state` - `inst-return-pause`
+
+While recording or paused, `capture_set_language { call_id, language }` can override recognition for this call, including continued capture and the archive pass. Automatic clears the override. Confirmed live lines stay as decoded until the archive pass.
 
 ### Stop at call end
 
@@ -226,9 +228,10 @@ Capture is the release-blocking function, and its rules must live in one machine
 **Actor**: Primary user (call window or record prompt)
 
 **Success Scenarios**:
-- A new meeting is about to start (next calendar event, or the meeting app reports a new meeting): **Start as New Call** (the default, applied at 60 s) splits the call at `detected_at` and offers the saved call Continue for 5 minutes; **Keep in This Call** keeps one call.
+- During system-wide recording, a meeting app is detected. **Start as New Call** (the default, applied at 60 s) splits the call at `detected_at` using the matching next calendar event when available. **Keep in This Call** keeps one call.
 - Nothing heard for 5 minutes: **Keep Recording** resets the timer; **Discard Recording** discards.
-- A second audio source appears: **Keep** hides the banner for that app in this call; **Exclude** removes it from the tap.
+- During system-wide recording, a second audio source appears. **Keep** hides the banner for that app in this call. **Exclude** removes it from the tap.
+- During recording scoped to a detected app, other apps cannot add a new-meeting notice or second-source banner.
 
 **Error Scenarios**:
 - An answer for a notice that has gone: `notice_expired`.
@@ -325,8 +328,8 @@ Capture is the release-blocking function, and its rules must live in one machine
 1. [x] - `p1` - Audio released for 20 s → `CallEnded { stops_at: now + 10 s }`; while hidden for presenting → `CallSeemsEnded { stops_at: now + 10 min }` - `inst-timer-call-end`
 2. [x] - `p1` - While the notice is held, clear `stops_at`; on release set it to now plus 10 s - `inst-timer-hold`
 3. [x] - `p1` - Silence for 5 minutes while recording → `NothingHeard { since }`; pause defers the notice and resume re-arms it from the last-heard time, while another notice defers and re-arms it; **Keep Recording** restarts the 5 minutes - `inst-timer-nothing-heard`
-4. [x] - `p1` - Next calendar event starting, or the meeting app reporting a new meeting → `NewMeeting { detected_at, expires_at: +60 s, default_choice: start_as_new_call }`; at `expires_at` apply the default - `inst-timer-new-meeting`
-5. [x] - `p1` - A second source → the `SecondAudioSource` degraded state until kept or excluded - `inst-timer-second-source`
+4. [x] - `p1` - During system-wide capture, a detected meeting app → `NewMeeting { detected_at, expires_at: +60 s, default_choice: start_as_new_call }` with the next matching calendar event when available. At `expires_at` apply the default. During app-scoped capture, ignore detections - `inst-timer-new-meeting`
+5. [x] - `p1` - During system-wide capture, a second source → the `SecondAudioSource` degraded state until kept or excluded. During app-scoped capture, ignore second sources - `inst-timer-second-source`
 6. [x] - `p1` - `continue_until` passes or another capture starts → the stopped call leaves Continue, phase `idle` - `inst-timer-continue`
 7. [x] - `p1` - **RETURN** the new state; each change emits `capture:state` - `inst-timer-return`
 

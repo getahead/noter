@@ -118,21 +118,25 @@ describe("CallStatusStrip (cpt-noter-component-ui-call-status-strip)", () => {
     }
   });
 
-  it("compact: Mark Moment and a ⋯ menu with Pause or Resume, Stop Recording, or Try Again", () => {
+  it("compact: Stop Recording is a direct control and ⋯ holds Pause or Resume", () => {
     const p = stripProps({ variant: "compact", feedback: { text: "Saved", variant: "blind" } });
     const tree = rendered(CallStatusStrip, p);
     expect(renderToString(<CallStatusStrip {...p} />)).toContain("Saved");
     const items = byType(tree, MoreMenu).items as { label: string; onSelect: () => void }[];
     items.forEach((i) => i.onSelect());
-    expect(items.map((i) => i.label)).toEqual(["Pause", "Stop Recording"]);
+    expect(items.map((i) => i.label)).toEqual(["Pause"]);
+    button(tree, "Stop Recording").onAction();
     expect(p.onPause).toHaveBeenCalledWith(true);
     expect(p.onStop).toHaveBeenCalled();
-    const paused = byType(rendered(CallStatusStrip, stripProps({ variant: "compact", status: "paused" })), MoreMenu).items as { label: string }[];
-    expect(paused[0]!.label).toBe("Resume");
+    const paused = stripProps({ variant: "compact", status: "paused", busy: { ...p.busy, stop: true } });
+    expect(byType(rendered(CallStatusStrip, paused), MoreMenu).items).toMatchObject([{ label: "Resume" }]);
+    const pausedHtml = renderToString(<CallStatusStrip {...paused} />);
+    expect(pausedHtml).toMatch(/aria-busy="true"[^>]*>.*?Stop Recording/);
     const failed = stripProps({ variant: "compact", status: "not-recording" });
     const retry = byType(rendered(CallStatusStrip, failed), MoreMenu).items as { label: string; onSelect: () => void }[];
     retry[0]!.onSelect();
     expect(failed.onRetry).toHaveBeenCalled();
+    expect(renderToString(<CallStatusStrip {...failed} />)).not.toContain("Stop Recording");
     expect(renderToString(<CallStatusStrip {...stripProps({ variant: "compact", status: "stopped" })} />)).not.toContain("Mark Moment");
   });
 });
@@ -149,9 +153,12 @@ describe("MoreMenu", () => {
 describe("CollapsedCallStrip (cpt-noter-component-ui-collapsed-call-strip)", () => {
   it("shows the dot and clock, or Paused N min, and expands on Return, Space or Expand Panel", () => {
     const onExpand = vi.fn();
-    expect(renderToString(<CollapsedCallStrip status="recording" clock="00:21:08" pausedFor={null} mode={mode} onExpand={onExpand} />)).toContain("00:21:08");
-    expect(renderToString(<CollapsedCallStrip status="paused" clock="00:21:08" pausedFor={3} mode={mode} onExpand={onExpand} />)).toContain("Paused 3 min");
-    const tree = rendered(CollapsedCallStrip, { status: "recording", clock: "", pausedFor: null, mode, onExpand });
+    const onStop = vi.fn();
+    const props = { status: "recording" as const, clock: "00:21:08", pausedFor: null, mode, onExpand, onStop, stopKey: "⌃⌥⌘R", stopping: false };
+    expect(renderToString(<CollapsedCallStrip {...props} />)).toContain("00:21:08");
+    expect(renderToString(<CollapsedCallStrip {...props} status="paused" pausedFor={3} />)).toContain("Paused 3 min");
+    expect(renderToString(<CollapsedCallStrip {...props} status="not-recording" />)).not.toContain("Stop Recording");
+    const tree = rendered(CollapsedCallStrip, props);
     const key = tree.props.onKeyDown as (e: unknown) => void;
     const strip = {};
     const e = (k: string, target: unknown = strip) => ({ key: k, target, currentTarget: strip, preventDefault: vi.fn() });
@@ -161,6 +168,8 @@ describe("CollapsedCallStrip (cpt-noter-component-ui-collapsed-call-strip)", () 
     key(e("Enter", {}));
     button(tree, "Expand Panel").onAction();
     expect(onExpand).toHaveBeenCalledTimes(3);
+    button(tree, "Stop Recording").onAction();
+    expect(onStop).toHaveBeenCalledOnce();
   });
 });
 

@@ -2534,7 +2534,7 @@ async fn a_heard_segment_means_no_nothing_heard_notice() {
 async fn a_new_meeting_splits_the_call_unless_kept() {
     let r = rig();
     r.detection_on().await;
-    let first = r.recording_detected(ZOOM, "Zoom").await;
+    let first = r.recording().await;
     r.pass(30_000).await;
     r.call_detected(TEAMS, "Microsoft Teams");
     let s = r.notice_becomes(|n| n.is_some()).await;
@@ -2621,7 +2621,109 @@ async fn a_new_meeting_splits_the_call_unless_kept() {
     );
 }
 
+#[tokio::test(start_paused = true)]
+async fn transcription_language_is_local_to_the_active_call() {
+    let r = rig();
+    let call_id = r.recording().await;
+    let args = |language| CaptureLanguageArgs {
+        call_id: call_id.clone(),
+        language,
+    };
+    let corrected = r
+        .core
+        .capture_set_language(&main_window(), args(Some(Lang::De)))
+        .await
+        .unwrap();
+    assert_eq!(corrected.transcription_language, Some(Lang::De));
+    assert!(matches!(
+        r.sent(|c| matches!(c, EngineCommand::SetLanguages { .. })).await,
+        EngineCommand::SetLanguages { languages } if languages == vec![Lang::De]
+    ));
+    assert_eq!(
+        r.core
+            .capture_set_language(&main_window(), args(Some(Lang::De)))
+            .await
+            .unwrap(),
+        corrected
+    );
+    assert_eq!(
+        code(
+            r.core
+                .capture_set_language(
+                    &main_window(),
+                    args(Some(Lang::Other { code: "xx".into() })),
+                )
+                .await
+        ),
+        ErrorCode::InvalidInput
+    );
+    let automatic = r
+        .core
+        .capture_set_language(&main_window(), args(None))
+        .await
+        .unwrap();
+    assert_eq!(automatic.transcription_language, None);
+    assert!(matches!(
+        r.sent_n(2, |c| matches!(c, EngineCommand::SetLanguages { .. })).await,
+        EngineCommand::SetLanguages { languages } if languages == default_languages()
+    ));
+    r.core
+        .capture_set_language(&main_window(), args(Some(Lang::Ru)))
+        .await
+        .unwrap();
+    r.stop(&main_window(), &call_id).await;
+    assert_eq!(
+        code(
+            r.core
+                .capture_set_language(&main_window(), args(Some(Lang::En)))
+                .await
+        ),
+        ErrorCode::NotRecording
+    );
+    r.core
+        .capture_continue(
+            &main_window(),
+            CallIdArgs {
+                call_id: call_id.clone(),
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(r.sessions()[1].languages, vec![Lang::Ru]);
+}
+
 // --- Second audio source -------------------------------------------------------------
+
+#[tokio::test(start_paused = true)]
+async fn a_detected_call_ignores_other_meeting_apps_and_sound_sources() {
+    let r = rig();
+    r.detection_on().await;
+    let call_id = r.recording_detected(ZOOM, "Zoom").await;
+    assert_eq!(r.sessions()[0].capture_bundle_id.as_deref(), Some(ZOOM));
+    r.call_detected(TEAMS, "Microsoft Teams");
+    r.fact(EngineEvent::AudioSourceAdded {
+        call_id: call_id.clone(),
+        bundle_id: "ru.keepcoder.Telegram".into(),
+        app_name: "Telegram".into(),
+    });
+    r.pass(30_000).await;
+    let state = r.state().await;
+    assert_eq!(state.call_id.as_ref(), Some(&call_id));
+    assert_eq!(state.phase, CapturePhase::Recording);
+    assert_eq!(state.notice, None);
+    assert!(r.detection().await.is_none());
+    assert!(!r
+        .degraded()
+        .await
+        .iter()
+        .any(|state| matches!(state, DegradedState::SecondAudioSource { .. })));
+    r.stop(&main_window(), &call_id).await;
+    r.core
+        .capture_continue(&main_window(), CallIdArgs { call_id })
+        .await
+        .unwrap();
+    assert_eq!(r.sessions()[1].capture_bundle_id.as_deref(), Some(ZOOM));
+}
 
 #[tokio::test(start_paused = true)]
 async fn a_second_audio_source_is_kept_or_excluded() {
@@ -2749,7 +2851,8 @@ impl Rig {
     /// A call recorded until a mark at 60 s, then cut by a crash at 600 s.
     async fn interrupted() -> (Rig, CallId) {
         let r = rig();
-        let call_id = r.recording().await;
+        r.detection_on().await;
+        let call_id = r.recording_detected(ZOOM, "Zoom").await;
         r.pass(60_000).await;
         r.core
             .capture_mark_moment(
@@ -2806,6 +2909,7 @@ async fn a_call_cut_by_a_quit_is_offered_resume_with_an_interrupted_gap() {
     };
     assert_eq!(session.call_id, call_id);
     assert_eq!(session.resume_from_ms, Some(OffsetMs(631_000)));
+    assert_eq!(session.capture_bundle_id.as_deref(), Some(ZOOM));
     assert_eq!(
         r.query::<String>("SELECT t0_ms || '-' || t1_ms FROM gaps WHERE reason = 'interrupted'"),
         "61000-631000"
@@ -3559,7 +3663,7 @@ impl Rig {
             From::NewMeeting => {
                 let r = rig();
                 r.detection_on().await;
-                let call_id = r.recording_detected(ZOOM, "Zoom").await;
+                let call_id = r.recording().await;
                 r.pass(30_000).await;
                 r.call_detected(TEAMS, "Microsoft Teams");
                 r.notice_becomes(|n| matches!(n, Some(CaptureNotice::NewMeeting { .. })))
@@ -4248,7 +4352,7 @@ async fn cpt_noter_seq_call_screen_stop_at_call_end_split_uses_the_next_invitati
             email: None,
         };
         *r.mac.calendar.lock().unwrap() = Some(invitation("First", vec![guest("First attendee")]));
-        let first = r.recording_detected(ZOOM, "Zoom").await;
+        let first = r.recording().await;
         r.pass(30_000).await;
         let mut next = invitation("Next", vec![guest("Next attendee")]);
         next.event.starts_at = TimestampMs(r.now() + 1_000);

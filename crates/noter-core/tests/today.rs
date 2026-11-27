@@ -76,6 +76,24 @@ fn open(dir: &Path) -> (Core, Arc<Events>) {
     open_with(dir, None)
 }
 
+#[tokio::test]
+async fn a_calendar_change_invalidates_today_even_when_environment_facts_stay_the_same() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, events) = open(dir.path());
+    let before = core
+        .app_snapshot(&ctx(), NoArgs {})
+        .await
+        .unwrap()
+        .environment;
+    core.calendar_changed();
+    let changed = events.named(event_names::ENV_CHANGED);
+    assert_eq!(changed.len(), 1);
+    let mut after: EnvironmentState = serde_json::from_value(changed[0].clone()).unwrap();
+    assert_eq!(after.version.0, before.version.0 + 1);
+    after.version = before.version;
+    assert_eq!(after, before);
+}
+
 fn window(label: WindowLabel) -> CommandCtx {
     CommandCtx {
         caller: Caller::Window { label },

@@ -1,6 +1,7 @@
 /* Ported from the prototype's 30-c.css (.it-*): the action item row in its full, compact and editing forms. */
 .it-row { min-width: 0; }
-.it-row--full { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 4px 8px; padding: 9px 4px; border-bottom: 1px solid var(--sep); align-items: start; border-radius: var(--r-tag); }
+/* the controls column takes at most 40 % of the row and wraps, so the text never squeezes to a sliver (Call info open, Narrow) */
+.it-row--full { display: grid; grid-template-columns: 22px minmax(0, 1fr) fit-content(40%); gap: 4px 8px; padding: 9px 4px; border-bottom: 1px solid var(--sep); align-items: start; border-radius: var(--r-tag); }
 .it-row--full:focus-visible, .it-row--full.is-focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 .it-row__check { padding-top: 2px; }
 .it-row__main { min-width: 0; display: grid; gap: 3px; }
@@ -10,7 +11,7 @@
 .it-row--full .it-row__text { overflow-wrap: anywhere; }
 .it-row__line2 { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 12px; color: var(--label-2); }
 .it-row__actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.it-row__review { display: flex; gap: 4px; }
+.it-row__review { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; }
 .it-row__review .np-btn .np-kbd { display: none; }
 .it-row__due.is-overdue { color: var(--warning); display: inline-flex; gap: 3px; align-items: center; }
 .it-row__closed { color: var(--success); font-size: 12px; }

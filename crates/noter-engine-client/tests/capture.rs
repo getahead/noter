@@ -37,6 +37,7 @@ fn start() -> StartSession {
         store_audio: true,
         mic_device_uid: None,
         exclude_bundle_ids: vec![],
+        capture_bundle_id: None,
         languages: vec![],
         backend: AsrBackend::WhisperTurbo,
         glossary: vec![],
@@ -154,6 +155,7 @@ async fn start_session_sends_the_engine_everything_the_session_manager_gave() {
         store_audio: false,
         mic_device_uid: Some("BuiltInMicrophoneDevice".into()),
         exclude_bundle_ids: vec!["com.apple.Music".into()],
+        capture_bundle_id: Some("us.zoom.xos".into()),
         languages: vec![Lang::En, Lang::Ru, Lang::De],
         glossary: vec![GlossaryEntry {
             term: "Noter".into(),

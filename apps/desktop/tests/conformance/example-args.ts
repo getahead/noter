@@ -15,6 +15,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   capture_start: {"source": "record_prompt", "sensitive": false},
   capture_stop: {"call_id": "call_backend"},
   capture_set_paused: {"call_id": "call_backend", "paused": false},
+  capture_set_language: {"call_id": "call_live", "language": "de"},
   capture_mark_moment: {"call_id": "call_backend"},
   capture_answer_call_end: {"call_id": "call_backend", "choice": "keep_recording"},
   capture_hold_notice: {"call_id": "call_backend", "held": false},

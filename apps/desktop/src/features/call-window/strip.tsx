@@ -174,11 +174,6 @@ export function CallStatusStrip(p: StripProps) {
             kbd: p.keys.pause || undefined,
             onSelect: () => p.onPause(!paused),
           },
-          {
-            label: t("cw.stop"),
-            kbd: p.keys.stop || undefined,
-            onSelect: p.onStop,
-          },
         ];
     return (
       <div data-component="cpt-noter-component-ui-call-status-strip" data-variant="copilot-off" data-state={state} className="cw-strip cw-strip--compact">
@@ -196,6 +191,9 @@ export function CallStatusStrip(p: StripProps) {
             />
           )}
           {!stopped && <MoreMenu items={items} size="inline" />}
+          {!stopped && !failed && (
+            <PushButton label={t("cw.stop")} size="small" icon="stop" cls="cw-stop" help={p.keys.stop ? t("cw.stop_help", { key: p.keys.stop }) : undefined} loading={p.busy.stop} onAction={p.onStop} />
+          )}
           {stopped && <RecordingIndicator variant="dot-text" status={p.status} />}
           <span className="np-tb__spacer" />
           {mode}
@@ -232,8 +230,17 @@ export function CallStatusStrip(p: StripProps) {
 }
 
 // @cpt-component:cpt-noter-component-ui-collapsed-call-strip:p1
-/** FP-C1 (dot, clock or **Paused 3 min**, mode glyph) and FP-C3 (**Expand Panel**); copilot off: no FP-C2 and no count badge. */
-export function CollapsedCallStrip({ status, clock, pausedFor, mode, onExpand }: { status: IndicatorStatus; clock: string; pausedFor: number | null; mode: ModeView; onExpand: () => void }) {
+/** FP-C1 (dot, clock or **Paused 3 min**, mode glyph) and FP-C3 (**Stop Recording**, **Expand Panel**). */
+export function CollapsedCallStrip({ status, clock, pausedFor, mode, stopKey, stopping, onStop, onExpand }: {
+  status: IndicatorStatus;
+  clock: string;
+  pausedFor: number | null;
+  mode: ModeView;
+  stopKey: string;
+  stopping: boolean;
+  onStop: () => void;
+  onExpand: () => void;
+}) {
   // Return or Space on the strip expands it, like the button
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.target !== e.currentTarget || (e.key !== "Enter" && e.key !== " ")) return;
@@ -265,6 +272,9 @@ export function CollapsedCallStrip({ status, clock, pausedFor, mode, onExpand }:
         <ModeIndicator view={mode} variant="glyph" />
       </div>
       <div className="cw-cstrip__ctl" data-region="FP-C3">
+        {status !== "stopped" && status !== "not-recording" && (
+          <PushButton label={t("cw.stop")} size="small" icon="stop" cls="cw-stop" help={stopKey ? t("cw.stop_help", { key: stopKey }) : undefined} loading={stopping} onAction={onStop} />
+        )}
         <IconButton icon="chevronDown" label={t("cw.expand")} onAction={onExpand} />
       </div>
     </div>

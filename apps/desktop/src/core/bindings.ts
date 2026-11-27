@@ -811,6 +811,12 @@ export type CallsListArgs = {
 	page: PageRequest,
 };
 
+export type CaptureLanguageArgs = {
+	call_id: CallId,
+	/**  A single spoken language, or automatic selection when null. */
+	language?: Lang | null,
+};
+
 /**
  *  Notices shown in the call window's notice slot or, when it is hidden, in the record prompt (PM-39).
  *  While Noter is hidden for presenting, the menu bar shows the notice as one line instead.
@@ -876,6 +882,8 @@ export type CaptureState = {
 	version: StateVersion,
 	phase: CapturePhase,
 	call_id: CallId | null,
+	/**  Language explicitly selected for this call, or automatic when absent. */
+	transcription_language?: Lang | null,
 	title: string | null,
 	started_at: TimestampMs | null,
 	/**  Audio time recorded so far (pauses excluded). */
@@ -3889,7 +3897,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.38";
+export const CONTRACT_VERSION = "2.39";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3903,6 +3911,7 @@ export const COMMANDS = {
   capture_start: { group: "capture_control", stability: "frozen", windows: ["record-prompt", "call-screen", "main"], channel: false },
   capture_stop: { group: "capture_control", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   capture_set_paused: { group: "capture_control", stability: "frozen", windows: ["call-screen", "main"], channel: false },
+  capture_set_language: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_mark_moment: { group: "capture_control", stability: "frozen", windows: ["call-screen"], channel: false },
   capture_answer_call_end: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
   capture_hold_notice: { group: "capture_control", stability: "frozen", windows: ["call-screen", "record-prompt"], channel: false },
@@ -4089,6 +4098,7 @@ export interface CommandArgs {
   capture_start: CaptureStartArgs;
   capture_stop: CallIdArgs;
   capture_set_paused: CapturePauseArgs;
+  capture_set_language: CaptureLanguageArgs;
   capture_mark_moment: MarkMomentArgs;
   capture_answer_call_end: CallEndAnswerArgs;
   capture_hold_notice: NoticeHoldArgs;
@@ -4273,6 +4283,7 @@ export interface CommandResults {
   capture_start: CaptureState;
   capture_stop: CaptureState;
   capture_set_paused: CaptureState;
+  capture_set_language: CaptureState;
   capture_mark_moment: MarkView;
   capture_answer_call_end: CaptureState;
   capture_hold_notice: CaptureState;
@@ -4698,6 +4709,10 @@ export function createCore(transport: Transport) {
      * refused with `not_recording` (use `capture_continue`).
      */
     captureSetPaused: (args: CapturePauseArgs) => call("capture_set_paused", args),
+    /**
+     * Change the recognition language for the live call and its eventual archive pass.
+     */
+    captureSetLanguage: (args: CaptureLanguageArgs) => call("capture_set_language", args),
     /**
      * Mark a moment.
      */

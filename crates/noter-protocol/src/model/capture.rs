@@ -13,6 +13,9 @@ pub struct CaptureState {
     pub version: StateVersion,
     pub phase: CapturePhase,
     pub call_id: Option<CallId>,
+    /// Language explicitly selected for this call, or automatic when absent.
+    #[serde(default)]
+    pub transcription_language: Option<Lang>,
     pub title: Option<String>,
     pub started_at: Option<TimestampMs>,
     /// Audio time recorded so far (pauses excluded).
@@ -155,6 +158,14 @@ pub struct CapturePauseArgs {
     pub call_id: CallId,
     /// Wanted state, never a toggle.
     pub paused: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct CaptureLanguageArgs {
+    pub call_id: CallId,
+    /// A single spoken language, or automatic selection when null.
+    #[serde(default)]
+    pub language: Option<Lang>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

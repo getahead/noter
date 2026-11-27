@@ -395,8 +395,20 @@ pub const MIGRATIONS: &[Migration] = &[
     Migration {
         owner: "noter-core",
         version: 15,
+        name: "selected call capture application",
+        sql: include_str!("../migrations/0015_capture_bundle.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 16,
+        name: "per-call transcription language selection",
+        sql: include_str!("../migrations/0016_transcription_language.sql"),
+    },
+    Migration {
+        owner: "noter-core",
+        version: 17,
         name: "pending archive transcript file",
-        sql: include_str!("../migrations/0015_archive_file_pending.sql"),
+        sql: include_str!("../migrations/0017_archive_file_pending.sql"),
     },
 ];
 

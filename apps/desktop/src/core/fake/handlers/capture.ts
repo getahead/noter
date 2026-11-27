@@ -54,6 +54,7 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
     const audioNotStored = world.settings.audio.retention === "never_store";
     return shared.setCapture(fake, {
       phase: "recording",
+      transcription_language: null,
       call_id: id,
       title,
       started_at,
@@ -88,6 +89,10 @@ export function captureHandlers(fake: Core.FakeCore): Core.Handlers {
       emit("entity:changed", { type: "call", call: row });
     }
     return shared.setCapture(fake, { phase: a.paused ? "paused" : "recording", pause: a.paused ? { since: shared.now(), remind_at: shared.now() + 5 * shared.MIN } : null });
+  },
+  capture_set_language: (a, { world, fake }) => {
+    shared.requireLive(world.app.capture, a.call_id);
+    return shared.setCapture(fake, { transcription_language: a.language ?? null });
   },
   capture_mark_moment: (a, { world, fake }) => {
     shared.requireLive(world.app.capture, a.call_id);

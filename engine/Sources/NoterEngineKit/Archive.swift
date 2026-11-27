@@ -276,20 +276,30 @@ enum Archive {
             for (i, (channel, url)) in channels.enumerated() {
                 // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
                 let samples = try SessionAudio.read(url)
-                let utterances = utterances(samples, cuts: time.cuts.map { $0 * rate / 1000 })
                 // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-timeline
+                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
+                let utterances: [(range: Range<Int>, voice: Int?)]
+                if channel == .sys, let diarizer {
+                    utterances = try Diarization.utterances(
+                        samples, time: time, constraints: c, diarizer, yieldIfNeeded: yieldIfNeeded)
+                } else {
+                    utterances = Self.utterances(samples, cuts: time.cuts.map { $0 * rate / 1000 }).map { ($0, nil) }
+                }
+                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
                 // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-channel
                 // The two channels stay apart: the microphone is the user, the system channel starts as
                 // its live label. Who else spoke into the user's microphone is the core's (M3).
-                let label = channel == .mic ? "you" : "spk_1"
+                let liveLabel = channel == .mic ? "you" : "spk_1"
                 // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-channel
                 var last: String?
-                for (k, range) in utterances.enumerated() {
+                var names: [Int: String] = [:]
+                for (k, utterance) in utterances.enumerated() {
+                    let (range, voice) = utterance
                     defer { progress((Float(i) + Float(k + 1) / Float(utterances.count)) / Float(channels.count)) }
                     yieldIfNeeded()
                     let audio = Array(samples[range])
                     // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
-                    let (allowed, order) = languages(c, label: label, last: last)
+                    let (allowed, order) = languages(c, label: liveLabel, last: last)
                     let (best, bestLang, bestP) = try decode(
                         audio, allowed: allowed, order: order, decoder: decoder)
                     // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-language
@@ -307,6 +317,8 @@ enum Archive {
                     }
                     let id = "aseg_\(segments.count + 1)"
                     try JSONEncoder().encode(words).write(to: wordsDir.appendingPathComponent("\(id).json"), options: .atomic)
+                    let label = voice.map { names[$0, default: "spk_\(names.count + 1)"] } ?? liveLabel
+                    if let voice { names[voice] = label }
                     segments.append(
                         Segment(
                             id: id, callId: pass.callId, channel: channel, t0Ms: time.call(fromMs), t1Ms: time.call(toMs, end: true),
@@ -315,12 +327,6 @@ enum Archive {
                             avgLogprob: best.avgLogprob, noSpeechP: best.noSpeechP, corrections: corrections, crosstalkLabels: []))
                     // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-asr
                 }
-                // @cpt-begin:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
-                if channel == .sys, let diarizer {
-                    try Diarization.label(
-                        &segments, samples: samples, time: time, constraints: c, diarizer, yieldIfNeeded: yieldIfNeeded)
-                }
-                // @cpt-end:cpt-noter-algo-core-engine-offline-decode:p1:inst-decode-cluster
             }
             segments.sort { ($0.t0Ms, $0.channel == .mic ? 0 : 1) < ($1.t0Ms, $1.channel == .mic ? 0 : 1) }
             voices(&segments, c)

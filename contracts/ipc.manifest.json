@@ -117,6 +117,18 @@
       ]
     },
     {
+      "args": "CaptureLanguageArgs",
+      "channel": null,
+      "doc": "Change the recognition language for the live call and its eventual archive pass.",
+      "group": "capture_control",
+      "name": "capture_set_language",
+      "result": "CaptureState",
+      "stability": "frozen",
+      "windows": [
+        "call-screen"
+      ]
+    },
+    {
       "args": "MarkMomentArgs",
       "channel": null,
       "doc": "Mark a moment.",
@@ -2286,7 +2298,7 @@
       ]
     }
   ],
-  "contract_version": "2.38",
+  "contract_version": "2.39",
   "default_retryable": [
     "not_ready",
     "internal",

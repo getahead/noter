@@ -88,6 +88,8 @@ pub struct StartSession {
     pub mic_device_uid: Option<String>,
     /// Processes left out of the system tap, besides the engine and the app themselves.
     pub exclude_bundle_ids: Vec<String>,
+    /// Scope the system tap to this meeting app and its helpers. None taps system-wide.
+    pub capture_bundle_id: Option<String>,
     pub languages: Vec<Lang>,
     pub backend: AsrBackend,
     pub glossary: Vec<GlossaryEntry>,

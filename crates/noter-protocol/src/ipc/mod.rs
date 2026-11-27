@@ -329,6 +329,8 @@ commands! {
     /// Pause or resume (wanted state). Pause drops audio entirely. Resume of a stopped call is
     /// refused with `not_recording` (use `capture_continue`).
     capture_set_paused(CapturePauseArgs) -> CaptureState [CaptureControl, Frozen, CallScreen | Main];
+    /// Change the recognition language for the live call and its eventual archive pass.
+    capture_set_language(CaptureLanguageArgs) -> CaptureState [CaptureControl, Frozen, CallScreen];
     /// Mark a moment.
     capture_mark_moment(MarkMomentArgs) -> MarkView [CaptureControl, Frozen, CallScreen];
     /// Answer the call-ended notice: Keep Recording or Stop Now.

@@ -62,6 +62,7 @@
       "cmd": {
         "backend": "parakeet_tdt_v3",
         "call_id": "call_1",
+        "capture_bundle_id": "us.zoom.xos",
         "enrolled_embeddings_path": "engine-io/enrolled.f32",
         "exclude_bundle_ids": [
           "com.apple.Music"

@@ -321,6 +321,17 @@ struct Window {
     week_end: i64,
 }
 
+impl Core {
+    // @cpt-state:cpt-noter-state-ui-today-calendar:p1
+    /// Invalidate an open Today when EventKit changes, including when permission stays granted.
+    pub fn calendar_changed(&self) {
+        self.publish(
+            noter_protocol::ipc::event_names::ENV_CHANGED,
+            &mut self.app().environment,
+        );
+    }
+}
+
 fn sections(c: &Connection, events: &[CalendarEvent], w: &Window) -> Db<Sections> {
     let day_end = w.day_end;
     let week_end = w.week_end;

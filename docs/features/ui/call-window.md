@@ -212,7 +212,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 **Steps**:
 1. [x] - `p1` - User clicks **Collapse Panel**, double-clicks FP-R1, or later **Expand Panel**, Return or Space on the strip, or ⌃⌥⌘N - `inst-user-collapse`
 2. [x] - `p1` - API: `window_set_collapsed` (true or false); the core resizes the panel and keeps the snapped edge - `inst-api-collapse`
-3. [x] - `p1` - UI: render FP-C1 (dot, clock, mode glyph), FP-C2 (the card line from M4; nothing with the copilot off) and FP-C3 (**Expand**) - `inst-render-strip`
+3. [x] - `p1` - UI: render FP-C1 (dot, clock, mode glyph), FP-C2 (the card line from M4; nothing with the copilot off) and FP-C3 (**Stop Recording** while recording or paused, **Expand**) - `inst-render-strip`
 4. [x] - `p1` - **IF** a capture notice arrives while collapsed - `inst-if-notice-collapsed`
    1. [x] - `p1` - UI: expand for the notice and collapse again after the choice - `inst-expand-notice`
 5. [x] - `p1` - **RETURN** the strip or the expanded panel - `inst-return-collapse`
@@ -250,7 +250,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 **Success Scenarios**:
 - **Mark Moment** adds a mark row and the button reads ✓ **Marked 00:21:08** for 2 s
 - **Pause** drops audio; **Resume** becomes primary while paused and the transcript gets the gap row **Paused 00:21:08–00:23:40**
-- **Stop Recording** (16 pt after **Pause**) ends capture with the closing state
+- **Stop Recording** is visible in the dedicated and floating footers and the collapsed strip. It ends capture with the closing state. In the dedicated footer it sits 16 pt after **Pause**.
 - ⋯ › **Make This Call Sensitive** shows **From now on, nothing from this call leaves this Mac.** and the mode **Sensitive · local**; the item is then disabled
 - ⋯ › **Open in Noter** brings the main window forward at the call's page
 
@@ -258,16 +258,18 @@ Success criteria: no click or key on the call window ever moves focus from the c
 - A command fails: the button leaves its loading state and the strip shows the error notice; `not_recording` after a stop shows the closing state
 
 **Steps**:
-1. [x] - `p1` - User clicks a strip button or a ⋯ item (in the floating layout ⋯ holds **Pause** or **Resume**, **Stop Recording**), or presses its global hotkey (handled by the core) - `inst-user-control`
+1. [x] - `p1` - User clicks a strip button or a ⋯ item (in the floating layout ⋯ holds **Pause** or **Resume**), or presses its global hotkey (handled by the core) - `inst-user-control`
 2. [x] - `p1` - **MATCH** the control - `inst-match-control`
    - [x] - `p1` - **CASE** **Mark Moment**: `capture_mark_moment`; inline status on the button - `inst-case-mark`
    - [x] - `p1` - **CASE** **Pause** or **Resume**: `capture_set_paused` (wanted state) - `inst-case-pause`
-   - [x] - `p1` - **CASE** **Stop Recording**: `capture_stop` - `inst-case-stop`
+   - [x] - `p1` - **CASE** **Stop Recording**: `capture_stop`; when requested from the collapsed strip, expand the panel for the closing actions or the command's error - `inst-case-stop`
    - [x] - `p1` - **CASE** **Make This Call Sensitive**: `capture_set_sensitive` (true) - `inst-case-sensitive`
    - [x] - `p1` - **CASE** **Open in Noter**: `window_navigate` (call page) - `inst-case-open-noter`
    - [x] - `p1` - **CASE** **Use Floating Panel**, **Move to Display 2**: `window_set_call_layout` - `inst-case-layout`
 3. [x] - `p1` - Store: the changed capture state arrives as `capture:state`; the strip and indicator render it; API: `window_announce` "Paused", "Resumed", "Recording stopped, saved 48 minutes" - `inst-store-capture`
 4. [x] - `p1` - **RETURN** the call in its new state - `inst-return-control`
+
+While recording or paused, **Transcription Language** in the call window's More menu offers Automatic or a specific language. The checked choice follows `capture:state`. A refusal appears in the status strip.
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -323,7 +325,7 @@ Success criteria: no click or key on the call window ever moves focus from the c
 
 **Steps**:
 1. [x] - `p1` - **IF** the layout is dedicated - `inst-if-dedicated`
-   1. [x] - `p1` - Render CS-R0 (when a notice is open), CS-R1, CS-R3, CS-R2, CS-R2b (while replaying on headphones) and CS-R5 - `inst-dedicated-regions`
+   1. [x] - `p1` - Render CS-R0 (when a notice is open), CS-R1 with one tag per language in the confirmed transcript, CS-R3, CS-R2, CS-R2b (while replaying on headphones) and CS-R5 - `inst-dedicated-regions`
    2. [x] - `p1` - **IF** the copilot flag is off: no CS-R4 column; the transcript fills the width; CS-R5 has no budget, **Pinned** or **Catch Me Up** - `inst-dedicated-copilot-off`
 2. [x] - `p1` - **ELSE** (floating) - `inst-else-floating`
    1. [x] - `p1` - Render FP-R0 (notice, in place of FP-R2 and FP-R3), FP-R1, FP-R3, FP-R6 - `inst-floating-regions`
@@ -423,7 +425,7 @@ The system **MUST** render the call window as one React tree with the dedicated 
 
 - [x] `p2` - **ID**: `cpt-noter-dod-ui-call-window-capture`
 
-The system **MUST** provide the capture notice (call ended, new meeting, stopped automatically, stopped by you, nothing heard, with the inline discard), the closing state with **Continue Recording** for 5 minutes, the call status strip (dedicated, compact, copilot off) and the recording indicator (four variants, six state words), and call the capture commands with wanted state.
+The system **MUST** provide the capture notice (call ended, new meeting, stopped automatically, stopped by you, nothing heard, with the inline discard), the closing state with **Continue Recording** for 5 minutes, the call status strip (dedicated, compact, copilot off) and the recording indicator (four variants, six state words), and call the capture commands with wanted state. **Stop Recording** is one action away in every visible live-layout variant.
 
 **Implements**:
 - `cpt-noter-flow-ui-call-window-stop-at-call-end`
@@ -435,7 +437,7 @@ The system **MUST** provide the capture notice (call ended, new meeting, stopped
 
 **Touches**:
 - Commands: `capture_stop`, `capture_set_paused`, `capture_mark_moment`, `capture_answer_call_end`, `capture_hold_notice`, `capture_answer_new_meeting`, `capture_continue`, `capture_keep_recording`, `capture_discard`, `capture_set_sensitive`, `window_announce`
-- Tests: E2E `cpt-noter-seq-call-screen-stop-at-call-end` (every path up to the stop; the notification is proven in M2); screenshot specs `call-ended`, `new-meeting`, `nothing-heard`, `closing-manual`, `closing-auto`
+- Tests: unit coverage for the direct stop control and unique header languages; E2E `cpt-noter-seq-call-screen-stop-at-call-end` (including a direct stop from both floating layouts; the notification is proven in M2); screenshot specs `call-ended`, `new-meeting`, `nothing-heard`, `closing-manual`, `closing-auto`
 
 ### Degraded states, presenting and share protection
 

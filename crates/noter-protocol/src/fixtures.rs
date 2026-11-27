@@ -533,6 +533,7 @@ fn capture_recording() -> CaptureState {
         version: V1,
         phase: CapturePhase::Recording,
         call_id: Some(CallId(s(LIVE))),
+        transcription_language: None,
         title: Some(s("Planning: VHI 8.0 drawer redesign")),
         started_at: Some(ts(NOW)),
         recorded_ms: DurationMs(23 * 60_000),

@@ -1,6 +1,6 @@
 // The live channels on one clock: a private aggregate device whose main sub-device is the
-// microphone and whose tap list holds a Core Audio process tap (macOS 14.2+) of everything but
-// this engine, the app that started it and the excluded apps. One IO proc delivers both, so
+// microphone and whose tap list holds a Core Audio process tap (macOS 14.2+) of the meeting app,
+// or system-wide audio with the engine, app and configured exclusions removed. One IO proc delivers both, so
 // microphone and system audio run on the microphone's clock (the tap is drift-compensated into
 // it). The source follows the microphone: unplugged or a new default input, it rebuilds the
 // device on the next one and reports the swap.
@@ -97,6 +97,7 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     private static let watched = [kAudioHardwarePropertyDefaultInputDevice, kAudioHardwarePropertyDevices]
     private let lock = NSLock()
     private let preferredMic: String?
+    private let captureBundleId: String?
     private let listeners = DispatchQueue(label: "ai.noter.engine.devices")
     /// Where chunks are handled: the ring, the files, levels and ASR off the real-time IO thread.
     private let delivery = DispatchQueue(label: "ai.noter.engine.capture", qos: .userInteractive)
@@ -114,9 +115,11 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
 
     /// `micUid` is the microphone the user chose, or nil for the default input, which is also
     /// the fallback while the chosen one is missing. `bundleIds` are left out of the tap.
-    public init(micUid: String? = nil, excluding bundleIds: [String] = []) {
+    /// `captureBundleId` limits what the tap can hear to that app and its helpers.
+    public init(micUid: String? = nil, excluding bundleIds: [String] = [], captureBundleId: String? = nil) {
         preferredMic = micUid
         excluded = Set(bundleIds)
+        self.captureBundleId = captureBundleId
     }
 
     // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
@@ -169,14 +172,7 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
     public func exclude(bundleId: String) throws {
         try lock.withLock {
             excluded.insert(bundleId)
-            guard let description = tapDescription, tap != kAudioObjectUnknown else { return }
-            description.processes = excludedProcesses()
-            var address = Self.address(kAudioTapPropertyDescription)
-            var value = description
-            let size = UInt32(MemoryLayout<CATapDescription>.size)
-            try check(
-                withUnsafeMutablePointer(to: &value) { AudioObjectSetPropertyData(tap, &address, 0, nil, size, $0) },
-                "leave \(bundleId) out of the tap")
+            try updateTapProcesses()
         }
     }
 
@@ -202,9 +198,38 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         return own + Self.processObjects().filter { Exclusion.matches(Self.string($0, kAudioProcessPropertyBundleID) ?? "", excluded) }
     }
 
+    /// Caller holds the lock. Bundle matching includes helpers started after capture opened.
+    private func capturedProcesses(_ bundleId: String) -> [AudioObjectID] {
+        let included: Set<String> = [bundleId]
+        return Self.processObjects().filter { object in
+            let id = Self.string(object, kAudioProcessPropertyBundleID) ?? ""
+            return Exclusion.matches(id, included) && !Exclusion.matches(id, excluded)
+        }
+    }
+
+    /// Caller holds the lock.
+    private func updateTapProcesses() throws {
+        guard let description = tapDescription, tap != kAudioObjectUnknown else { return }
+        let previous = description.processes
+        let processes = captureBundleId.map(capturedProcesses) ?? excludedProcesses()
+        guard Set(previous) != Set(processes) else { return }
+        description.processes = processes
+        var address = Self.address(kAudioTapPropertyDescription)
+        var value = description
+        let size = UInt32(MemoryLayout<CATapDescription>.size)
+        let status = withUnsafeMutablePointer(to: &value) { AudioObjectSetPropertyData(tap, &address, 0, nil, size, $0) }
+        if status != noErr {
+            description.processes = previous
+            try check(status, "update the system audio tap's processes")
+        }
+    }
+
     /// Caller holds the lock.
     private func createTap() throws {
-        let description = CATapDescription(stereoGlobalTapButExcludeProcesses: excludedProcesses())
+        // @cpt-begin:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
+        let description = captureBundleId.map { CATapDescription(stereoMixdownOfProcesses: capturedProcesses($0)) }
+            ?? CATapDescription(stereoGlobalTapButExcludeProcesses: excludedProcesses())
+        // @cpt-end:cpt-noter-flow-core-engine-capture-session:p1:inst-open-streams
         description.uuid = UUID()
         description.isPrivate = true
         description.muteBehavior = .unmuted
@@ -287,13 +312,26 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
         (tap, tapDescription) = (AudioObjectID(kAudioObjectUnknown), nil)
     }
 
+    private var watchedProperties: [AudioObjectPropertySelector] {
+        captureBundleId == nil ? Self.watched : Self.watched + [kAudioHardwarePropertyProcessObjectList]
+    }
+
     private func listen() {
-        let block: AudioObjectPropertyListenerBlock = { [weak self] _, _ in self?.devicesChanged() }
+        let block: AudioObjectPropertyListenerBlock = { [weak self] count, addresses in
+            let properties = UnsafeBufferPointer(start: addresses, count: Int(count))
+            if properties.contains(where: { $0.mSelector == kAudioHardwarePropertyProcessObjectList }) {
+                self?.processesChanged()
+            }
+            if properties.contains(where: { Self.watched.contains($0.mSelector) }) {
+                self?.devicesChanged()
+            }
+        }
         lock.withLock { listener = block }
-        for selector in Self.watched {
+        for selector in watchedProperties {
             var address = Self.address(selector)
             AudioObjectAddPropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, listeners, block)
         }
+        if captureBundleId != nil { processesChanged() }
     }
 
     private func unlisten() {
@@ -302,9 +340,22 @@ public final class LiveAudioSource: AudioSource, @unchecked Sendable {
             return listener
         }
         guard let block else { return }
-        for selector in Self.watched {
+        for selector in watchedProperties {
             var address = Self.address(selector)
             AudioObjectRemovePropertyListenerBlock(AudioObjectID(kAudioObjectSystemObject), &address, listeners, block)
+        }
+    }
+
+    private func processesChanged() {
+        lock.withLock {
+            guard recovery.running else { return }
+            do {
+                try updateTapProcesses()
+            } catch {
+                let message = "capture process change failed: \(error)"
+                if let onFailure { delivery.async { onFailure(message) } }
+                FileHandle.standardError.write(Data("noter-engine: \(message)\n".utf8))
+            }
         }
     }
 

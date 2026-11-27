@@ -1,5 +1,38 @@
 # Changelog
 
+## [0.27.1](https://github.com/getahead/noter/compare/v0.27.0...v0.27.1) (2026-11-27)
+
+
+### Bug fixes
+
+* address exploratory call workflow regressions ([#1287](https://github.com/getahead/noter/issues/1287)) ([cdbbfc1](https://github.com/getahead/noter/commit/cdbbfc1ce3eb71109b487beb4719928fc5d8ee70))
+
+## [0.27.0](https://github.com/getahead/noter/compare/v0.26.3...v0.27.0) (2026-11-26)
+
+
+### Features
+
+* **people:** find a voice profile's voice in past calls ([#1284](https://github.com/getahead/noter/issues/1284)) ([8a8d39f](https://github.com/getahead/noter/commit/8a8d39f5a1a6eac19c1dafd278728e8a2bde7b44))
+
+
+### Bug fixes
+
+* **accounts:** a failed account check names its tool and what the provider answered in the log ([#1252](https://github.com/getahead/noter/issues/1252)) ([c54c0f1](https://github.com/getahead/noter/commit/c54c0f1aea083711071b9f1044ba4016cac8aad4))
+* **accounts:** send Codex the output schema in OpenAI strict form ([#1283](https://github.com/getahead/noter/issues/1283)) ([bb193b5](https://github.com/getahead/noter/commit/bb193b5555aef650aebc73d20980a1df0aaf849a))
+* **call-page:** the item rows follow the prototype's full row layout ([#1276](https://github.com/getahead/noter/issues/1276)) ([4e75580](https://github.com/getahead/noter/commit/4e7558068c5b6731224219d3283b2cd01e8de97c))
+* **calls:** keep unconfirmed calendar guests on their call ([#1268](https://github.com/getahead/noter/issues/1268)) ([eed2269](https://github.com/getahead/noter/commit/eed22695bd9d95871744a51940b059821f2b79d4))
+* **calls:** model call-type suggestion and Presentation/Demo instead of Retro ([#1275](https://github.com/getahead/noter/issues/1275)) ([86049b1](https://github.com/getahead/noter/commit/86049b173a65a5ceb0b55bb61966cffcaf72f354))
+* **calls:** use calendar invitations and topic titles for recordings ([#1262](https://github.com/getahead/noter/issues/1262)) ([575688a](https://github.com/getahead/noter/commit/575688a00e948b16e14566951588bb8b537fb44d))
+* **core:** detect call types locally when recording stops ([#1261](https://github.com/getahead/noter/issues/1261)) ([617ab38](https://github.com/getahead/noter/commit/617ab389b7676b5d9c7a23eaa4e32045a249e4a0))
+* **diarization:** keep every archive voice its own speaker ([#1280](https://github.com/getahead/noter/issues/1280)) ([b13ca13](https://github.com/getahead/noter/commit/b13ca133d277fa7ec0d2ba1c9fbd04d0b0be20c6))
+* **handoff:** explain the terminal launch when a repository is unmapped ([#1266](https://github.com/getahead/noter/issues/1266)) ([623ce25](https://github.com/getahead/noter/commit/623ce25198dd3bdb96539637404f0123cc69c0a4))
+* **library:** show local call times and the languages actually spoken ([#1260](https://github.com/getahead/noter/issues/1260)) ([9c29d93](https://github.com/getahead/noter/commit/9c29d93309567a8a4050cb0a04c0ca2b0a02e800))
+* **outputs:** explain regeneration holds and run once on battery ([#1253](https://github.com/getahead/noter/issues/1253)) ([115f5ac](https://github.com/getahead/noter/commit/115f5ac6ba5a44b6b1b376b2c7a514c39158056b))
+* **outputs:** preserve regeneration choices and show the current run ([#1279](https://github.com/getahead/noter/issues/1279)) ([61f667b](https://github.com/getahead/noter/commit/61f667b6fcd13487b4cf3c37b044ad6788d85135))
+* **settings:** the untested CLI version warning suggests a Noter update or the tested version, not the API key ([#1264](https://github.com/getahead/noter/issues/1264)) ([88ad670](https://github.com/getahead/noter/commit/88ad670ec36a199335c79092a56556bfe4ed7bfa))
+* **shell:** open a section's root page on every section switch ([#1274](https://github.com/getahead/noter/issues/1274)) ([1402409](https://github.com/getahead/noter/commit/1402409ddaa102eda4e22e6d9f49694998939363))
+* **ui:** refresh open views after a speaker rename ([#1250](https://github.com/getahead/noter/issues/1250)) ([f817f45](https://github.com/getahead/noter/commit/f817f459c60892072a52740e26eb9af26f74c91b))
+
 ## [0.26.3](https://github.com/getahead/noter/compare/v0.26.2...v0.26.3) (2026-11-25)
 
 
