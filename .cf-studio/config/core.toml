@@ -242,10 +242,19 @@ user_modifiable = false
 path = "config/kits/sdlc/workflows/implement.md"
 kind = "skill"
 public = true
-description = "CODE implementation preset workflow (wraps cf-coding)"
+description = "Noter FEATURE implementation with authoring, validation, and review gates"
 origin = "legacy-workflow"
 generated_targets = ["installed"]
 user_modifiable = false
+
+[kits.sdlc.resources.workflow_code_review]
+path = "config/kits/sdlc/workflows/code-review.md"
+kind = "skill"
+public = true
+description = "Standalone Noter code review with a read-only findings exit"
+origin = "legacy-workflow"
+generated_targets = ["installed"]
+user_modifiable = true
 
 [kits.sdlc.resources.workflow_change_impact_analysis]
 path = "config/kits/sdlc/workflows/change-impact-analysis.md"
