@@ -4,6 +4,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+mod split;
+pub(crate) use split::{word_starts, REASON as SPLIT_REASON};
+
 use noter_db::rusqlite::{Connection, OptionalExtension};
 use noter_db::Mutation;
 use noter_protocol::engine::{EngineSpan, GlossaryEntry, OfflineConstraints, SpanLink};
@@ -19,12 +22,13 @@ use crate::{internal, object, Core};
 
 /// Change rows with these reasons (people and topic merges too) are one action: the `change_id`
 /// the commands return undoes every row of their batch.
-const ACTION_REASONS: [&str; 5] = [
+const ACTION_REASONS: [&str; 6] = [
     "speaker_name",
     "term_fix",
     "people_merge",
     "topics_merge",
     "voice_rematch",
+    split::REASON,
 ];
 
 /// One speaker to name, with the lines it covers.

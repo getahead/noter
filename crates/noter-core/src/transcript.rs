@@ -557,7 +557,15 @@ impl Core {
         unpublished: &HashSet<SegmentId>,
     ) -> Result<TranscriptSnapshot, CoreError> {
         let id = call_id.clone();
-        let (mut segments, mut speakers, marks, gaps) = self.store.read_snapshot(move |c| {
+        let stored = !call.live;
+        let dir = self.call_dir(call_id);
+        let (mut segments, mut speakers, marks, gaps, paths) = self.store.read_snapshot(move |c| {
+            let mut paths = HashMap::new();
+            if stored {
+                let mut q = c.prepare("SELECT id, words_path FROM segments WHERE call_id = ?1 AND words_path IS NOT NULL")?;
+                paths = q.query_map([id.as_str()], |r| Ok((SegmentId::new(r.get::<_, String>(0)?), r.get::<_, String>(1)?)))?
+                    .collect::<Result<_, _>>()?;
+            }
             Ok((
                 segments_of(c, &id, None)?,
                 speakers_of(c, &id)?
@@ -566,6 +574,7 @@ impl Core {
                     .collect::<Vec<_>>(),
                 marks_of(c, &id)?,
                 gaps_of(c, &id)?,
+                paths,
             ))
         })?;
         segments.retain(|s| !unpublished.contains(&s.id));
@@ -596,6 +605,20 @@ impl Core {
                     t1_ms: g.t1_ms,
                 });
         }
+        let split_times = segments
+            .iter()
+            .filter_map(|segment| {
+                let path = paths.get(&segment.id)?;
+                let times = crate::speakers::word_starts(
+                    &dir,
+                    Some(path),
+                    &segment.text,
+                    segment.t0_ms,
+                    segment.t1_ms,
+                )?;
+                (!times.is_empty()).then(|| (segment.id.clone(), times))
+            })
+            .collect();
         Ok(TranscriptSnapshot {
             subscription_id: None,
             call_id: call_id.clone(),
@@ -611,6 +634,7 @@ impl Core {
             audio_available: call.audio_available,
             hypothesis_lag,
             confirmed_lag,
+            split_times,
         })
     }
 
@@ -1127,7 +1151,7 @@ fn speaker_label_of(
     c: &Connection,
     row: SpeakerRow<'_>,
 ) -> noter_db::rusqlite::Result<SpeakerLabel> {
-    let fallback = if row.pass == "archive"
+    let fallback = if (row.pass == "archive" || row.label.starts_with("split:"))
         && row.channel == AudioChannel::Mic
         && row.person_id.is_none()
         && row.named_by != Some("you")

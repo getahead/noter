@@ -3379,6 +3379,24 @@ export type SpeakerView = {
 	named_by: NamedBy | null,
 };
 
+export type SplitSegmentArgs = {
+	call_id: CallId,
+	segment_id: SegmentId,
+	/**  UTF-16 offset of a word start in the stored line. */
+	at: number,
+	speaker: SplitSpeaker,
+	/**  The text being previewed, to reject edits made while the popover is open. */
+	expected_text?: string | null,
+};
+
+export type SplitSegmentResult = {
+	segments: [SegmentView, SegmentView],
+	speakers: SpeakerView[],
+	change_id: ChangeId,
+};
+
+export type SplitSpeaker = { type: "existing"; speaker_id: SpeakerId } | { type: "person"; person: PersonRef } | { type: "new" };
+
 /**  Whether the UI may build on a surface as final. */
 export type Stability = 
 /**
@@ -3707,6 +3725,8 @@ export type TranscriptSnapshot = {
 	 */
 	hypothesis_lag?: Lag | null,
 	confirmed_lag?: Lag | null,
+	/**  Measured word starts for stored segments, indexed by the UTF-16 offset into the line. */
+	split_times?: { [key in SegmentId]: { [key in number]: OffsetMs } },
 };
 
 export type TranscriptSubscribeArgs = {
@@ -3897,7 +3917,7 @@ export type WriterInfo = {
 // ───────────────────────── contract surface ─────────────────────────
 
 // @cpt-interface:cpt-noter-interface-ui-core-ipc:p1
-export const CONTRACT_VERSION = "2.39";
+export const CONTRACT_VERSION = "2.40";
 
 export type Result<T, E = CoreError> = { status: "ok"; data: T } | { status: "error"; error: E };
 
@@ -3928,6 +3948,7 @@ export const COMMANDS = {
   transcript_subscribe: { group: "transcript", stability: "frozen", windows: ["call-screen", "main"], channel: true },
   levels_subscribe: { group: "transcript", stability: "frozen", windows: ["call-screen", "main", "settings", "first-run"], channel: true },
   transcript_rename_speaker: { group: "transcript", stability: "frozen", windows: ["call-screen", "main"], channel: false },
+  transcript_split_segment: { group: "transcript", stability: "frozen", windows: ["main"], channel: false },
   transcript_fix_term: { group: "transcript", stability: "frozen", windows: ["call-screen", "main"], channel: false },
   transcript_name_speakers: { group: "transcript", stability: "frozen", windows: ["main"], channel: false },
   transcript_span: { group: "transcript", stability: "frozen", windows: ["call-screen", "main"], channel: false },
@@ -4115,6 +4136,7 @@ export interface CommandArgs {
   transcript_subscribe: TranscriptSubscribeArgs;
   levels_subscribe: SubscribeLevelsArgs;
   transcript_rename_speaker: RenameSpeakerArgs;
+  transcript_split_segment: SplitSegmentArgs;
   transcript_fix_term: FixTermArgs;
   transcript_name_speakers: NameSpeakersArgs;
   transcript_span: SpanArgs;
@@ -4300,6 +4322,7 @@ export interface CommandResults {
   transcript_subscribe: TranscriptSnapshot;
   levels_subscribe: SubscriptionHandle;
   transcript_rename_speaker: SpeakerMutation;
+  transcript_split_segment: SplitSegmentResult;
   transcript_fix_term: FixTermResult;
   transcript_name_speakers: SpeakerMutation;
   transcript_span: SpanPreview;
@@ -4781,6 +4804,10 @@ export function createCore(transport: Transport) {
      * Rename a speaker for the whole call or one line.
      */
     transcriptRenameSpeaker: (args: RenameSpeakerArgs) => call("transcript_rename_speaker", args),
+    /**
+     * Split a stored transcript line before a word.
+     */
+    transcriptSplitSegment: (args: SplitSegmentArgs) => call("transcript_split_segment", args),
     /**
      * Fix a term; optionally add it to the glossary.
      */

@@ -369,6 +369,8 @@ commands! {
     levels_subscribe(SubscribeLevelsArgs, channel: LevelsMsg) -> SubscriptionHandle [Transcript, Frozen, CallScreen | Main | Settings | FirstRun];
     /// Rename a speaker for the whole call or one line.
     transcript_rename_speaker(RenameSpeakerArgs) -> SpeakerMutation [Transcript, Frozen, CallScreen | Main];
+    /// Split a stored transcript line before a word.
+    transcript_split_segment(SplitSegmentArgs) -> SplitSegmentResult [Transcript, Frozen, Main];
     /// Fix a term; optionally add it to the glossary.
     transcript_fix_term(FixTermArgs) -> FixTermResult [Transcript, Frozen, CallScreen | Main];
     /// Name the speakers after the call (speaker naming panel), skip allowed.

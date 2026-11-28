@@ -11,7 +11,7 @@ use crate::people::{db, logged, new_id};
 use crate::today::CARRY_CALLS;
 use crate::{internal, lock, Core};
 
-fn add_participant(
+pub(crate) fn add_participant(
     tx: &Transaction<'_>,
     call: &str,
     person: &str,

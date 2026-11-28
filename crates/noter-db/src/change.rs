@@ -134,40 +134,8 @@ fn change_tx(
     // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-begin
     let mut out = Vec::with_capacity(mutations.len());
     for m in mutations {
-        check(m.table, &m.values)?;
-        // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
-        let before = select_row(&tx, m).map_err(internal)?;
-        let stored_rev = before.as_ref().and_then(rev_of);
-        // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
-        // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
-        if m.base_rev.is_some_and(|base| Some(base) != stored_rev) {
-            // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-return-stale
-            tx.rollback().map_err(internal)?;
-            let current_rev = stored_rev.unwrap_or(Rev(0));
-            return Err(CoreError::new(
-                ErrorCode::Conflict,
-                format!("{} {} changed since its rev", m.entity_type, m.id),
-            )
-            .with_detail(ErrorDetail::Conflict { current_rev }));
-            // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-return-stale
-        }
-        // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
-        // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
-        let new_rev = m.bump_rev.then(|| Rev(stored_rev.map_or(1, |r| r.0 + 1)));
-        write_row(&tx, m, new_rev, before.is_some()).map_err(|e| write_error(m, e))?;
-        let after = select_row(&tx, m).map_err(internal)?.unwrap_or(Value::Null);
-        let rev = rev_of(&after).unwrap_or(Rev(0));
-        // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
+        let (after, rev, change) = apply_mutation(&tx, m)?;
         // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
-        let (field, old, new, delta) = what_changed(m, before.as_ref(), &after);
-        let change = Logged {
-            entity_type: m.entity_type,
-            entity_id: m.id.clone(),
-            field: field.map(String::from),
-            before: old,
-            after: new,
-            delta,
-        };
         let change_id = insert_change(&tx, meta, &change, None)?;
         // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-insert-change
         out.push(Committed {
@@ -182,6 +150,46 @@ fn change_tx(
     // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-return-tx
     Ok(out)
     // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-return-tx
+}
+
+/// Apply a row mutation inside an existing logged write. Return its change for `write_with`.
+pub fn apply_mutation(
+    tx: &Transaction<'_>,
+    m: &Mutation,
+) -> Result<(Value, Rev, Logged), CoreError> {
+    check(m.table, &m.values)?;
+    // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
+    let before = select_row(tx, m).map_err(internal)?;
+    let stored_rev = before.as_ref().and_then(rev_of);
+    // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-select-current
+    // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
+    if m.base_rev.is_some_and(|base| Some(base) != stored_rev) {
+        // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-return-stale
+        let current_rev = stored_rev.unwrap_or(Rev(0));
+        return Err(CoreError::new(
+            ErrorCode::Conflict,
+            format!("{} {} changed since its rev", m.entity_type, m.id),
+        )
+        .with_detail(ErrorDetail::Conflict { current_rev }));
+        // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-return-stale
+    }
+    // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-if-stale
+    // @cpt-begin:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
+    let new_rev = m.bump_rev.then(|| Rev(stored_rev.map_or(1, |r| r.0 + 1)));
+    write_row(tx, m, new_rev, before.is_some()).map_err(|e| write_error(m, e))?;
+    let after = select_row(tx, m).map_err(internal)?.unwrap_or(Value::Null);
+    let rev = rev_of(&after).unwrap_or(Rev(0));
+    // @cpt-end:cpt-noter-algo-core-storage-change-tx:p1:inst-write-row
+    let (field, old, new, delta) = what_changed(m, before.as_ref(), &after);
+    let change = Logged {
+        entity_type: m.entity_type,
+        entity_id: m.id.clone(),
+        field: field.map(String::from),
+        before: old,
+        after: new,
+        delta,
+    };
+    Ok((after, rev, change))
 }
 
 /// What a custom write changed, for its change row (DESIGN-core 3.7, table `changes`): one
@@ -224,6 +232,17 @@ impl Store {
         meta: ChangeMeta,
         f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
     ) -> Result<Custom<T>, CoreError> {
+        self.write_with_meta(meta, move |tx, _| f(tx))
+    }
+
+    /// Like `write_with`, with the change metadata available to the writer transaction.
+    pub fn write_with_meta<T: Send + 'static>(
+        &self,
+        meta: ChangeMeta,
+        f: impl FnOnce(&Transaction<'_>, &mut ChangeMeta) -> Result<(T, Vec<Logged>), CoreError>
+            + Send
+            + 'static,
+    ) -> Result<Custom<T>, CoreError> {
         self.write_logged(meta, None, f)
     }
 
@@ -236,14 +255,16 @@ impl Store {
         proposal_kind: &'static str,
         f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
     ) -> Result<Custom<T>, CoreError> {
-        self.write_logged(meta, Some(proposal_kind), f)
+        self.write_logged(meta, Some(proposal_kind), move |tx, _| f(tx))
     }
 
     fn write_logged<T: Send + 'static>(
         &self,
         mut meta: ChangeMeta,
         proposal: Option<&'static str>,
-        f: impl FnOnce(&Transaction<'_>) -> Result<(T, Vec<Logged>), CoreError> + Send + 'static,
+        f: impl FnOnce(&Transaction<'_>, &mut ChangeMeta) -> Result<(T, Vec<Logged>), CoreError>
+            + Send
+            + 'static,
     ) -> Result<Custom<T>, CoreError> {
         self.on_writer(move |conn| {
             // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
@@ -252,7 +273,7 @@ impl Store {
                 .map_err(internal)?;
             // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-begin
             // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
-            let (value, logged) = f(&tx)?;
+            let (value, logged) = f(&tx, &mut meta)?;
             // @cpt-end:cpt-noter-algo-core-storage-custom-write:p1:inst-run-write
             // @cpt-begin:cpt-noter-algo-core-storage-custom-write:p1:inst-if-unlogged
             if logged.is_empty() {

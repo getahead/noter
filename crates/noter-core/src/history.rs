@@ -111,7 +111,7 @@ impl Core {
 
     // @cpt-flow:cpt-noter-flow-core-history-undo-reverse:p1
     // @cpt-dod:cpt-noter-dod-core-history-undo-reversal:p1
-    pub(crate) fn reverse_change(
+    pub(crate) async fn reverse_change(
         &self,
         dir: Direction,
         target: UndoTarget,
@@ -133,7 +133,47 @@ impl Core {
         let item_calls = self
             .store()
             .read(move |c| crate::items::calls_of_target(c, &noted))?;
-        let reversed = self.store().reverse(dir, handle, self.deps.clock.now().0)?;
+        let split_call = match &handle {
+            Handle::Batch(batch) => self.store().read(|c| {
+                c.query_row(
+                    "SELECT s.call_id FROM changes ch LEFT JOIN segments s ON s.id = ch.entity_id
+                     WHERE ch.batch_id = ?1 AND ch.reason = ?2 AND ch.entity_type = 'segment'
+                     ORDER BY s.call_id IS NULL LIMIT 1",
+                    (batch.as_str(), crate::speakers::SPLIT_REASON),
+                    |r| r.get::<_, Option<String>>(0),
+                )
+                .optional()
+            })?,
+            Handle::Change(_) => None,
+        };
+        let split_call = match split_call {
+            Some(Some(call)) => Some(CallId::new(call)),
+            Some(None) => {
+                return Err(CoreError::new(
+                    ErrorCode::Conflict,
+                    "the split lines were replaced",
+                ))
+            }
+            None => None,
+        };
+        let index_call = split_call.clone();
+        let reversed = self.store().reverse_with(
+            dir,
+            handle,
+            self.deps.clock.now().0,
+            move |tx, reversed| {
+                if let Some(call) = split_call {
+                    if reversed.skipped > 0 {
+                        return Err(CoreError::new(
+                            ErrorCode::Conflict,
+                            "a split line was edited later",
+                        ));
+                    }
+                    crate::chunks::reindex_split(tx, &call).map_err(crate::internal)?;
+                }
+                Ok(())
+            },
+        )?;
         // @cpt-end:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-apply
         // @cpt-begin:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-publish
         if let Err(e) = self.publish_reversed(&reversed.touched, item_calls) {
@@ -141,6 +181,9 @@ impl Core {
             self.log(object(json!({
                 "level": "error", "module": "history", "code": "publish", "message_len": e.message.len()
             })));
+        }
+        if let Some(call) = index_call {
+            self.embed_split_chunks(&call).await;
         }
         // @cpt-end:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-publish
         // @cpt-begin:cpt-noter-flow-core-history-undo-reverse:p1:inst-reverse-return

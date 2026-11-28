@@ -17,6 +17,17 @@ describe("listenNativeMenuAction", () => {
     expect(listen).not.toHaveBeenCalled();
     expect(unlisten).toBeTypeOf("function");
   });
+
+  it("does not use the event API when only the native dialog bridge is present", async () => {
+    vi.stubGlobal("window", { __TAURI_INTERNALS__: {} });
+    try {
+      const unlisten = await listenNativeMenuAction(vi.fn());
+      unlisten();
+      expect(listen).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });
 
 describe("nativeAsk (cpt-noter-seq-dialogs-delete-call)", () => {

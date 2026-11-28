@@ -323,7 +323,7 @@
       "transcription_language": null,
       "version": 1
     },
-    "contract_version": "2.39",
+    "contract_version": "2.40",
     "copilot": {
       "agents": [
         {
@@ -3360,6 +3360,7 @@
           "talk_ms": null
         }
       ],
+      "split_times": {},
       "subscription_id": null
     },
     {
@@ -3479,6 +3480,7 @@
           "talk_ms": null
         }
       ],
+      "split_times": {},
       "subscription_id": null
     }
   ]

@@ -24,6 +24,7 @@ design: docs/DESIGN-core.md
   - [1.4 References](#14-references)
 - [2. Actor Flows (CDSL)](#2-actor-flows-cdsl)
   - [Name a speaker live or after the call](#name-a-speaker-live-or-after-the-call)
+  - [Split a stored line](#split-a-stored-line)
   - [Correct a term and teach future decoding](#correct-a-term-and-teach-future-decoding)
   - [Delete audio permanently](#delete-audio-permanently)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
@@ -33,6 +34,7 @@ design: docs/DESIGN-core.md
 - [5. Definitions of Done](#5-definitions-of-done)
   - [Corrections and naming](#corrections-and-naming)
   - [Delete audio for good](#delete-audio-for-good)
+  - [Stored line splitting](#stored-line-splitting)
   - [Tests and gate](#tests-and-gate)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 
@@ -63,7 +65,7 @@ A name or term corrected once stays corrected after offline transcription, and d
 **Delivers**:
 - Frozen commands (M2): `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`, `audio_delete`, `audio_delete_older`.
 - Events: `entity:changed`; transcript `segments_updated` and `speakers_updated` after committed corrections.
-- DESIGN.md stories (M2): `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers`.
+- DESIGN.md stories (M2): `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers`, `cpt-noter-seq-call-page-split-line`.
 
 ### 1.3 Actors
 
@@ -103,6 +105,24 @@ A name or term corrected once stays corrected after offline transcription, and d
 4. [x] - `p1` - Commit one logged batch, then publish changed speakers and segments and whole affected entities; return `SpeakerMutation` with its undo handle; fake handlers keep transcript and call-detail speaker snapshots in sync - `inst-name-publish`
 5. [x] - `p1` - Keep text-only naming available when audio is gone; sample replay uses existing `audio_play` when available - `inst-name-no-audio`
 6. [x] - `p1` - **RETURN** names and counts through the existing view models; undo uses `change_undo` - `inst-name-return`
+
+### Split a stored line
+
+- [x] `p1` - **ID**: `cpt-noter-flow-core-speakers-audio-split`
+
+**Actor**: Primary user (main window)
+
+**Success Scenarios**:
+- Split a stored line before an interior word, keeping the first id and speaker. Use the word time when available and proportional character timing otherwise.
+- Assign the second part to a speaker on the same side, a person, or the next unnamed speaker. Offer a matching voice profile as a suggestion for a new speaker.
+
+**Error Scenarios**:
+- An invalid word offset or speaker is refused. A stale line or active call is refused. No writes are made.
+
+**Steps**:
+1. [x] - `p1` - Validate the line, UTF-16 word start, and second speaker; calculate the split time - `inst-split-validate`
+2. [x] - `p1` - Commit both parts, speaker creation when needed, a cannot-link constraint, and the summary notice in one undoable batch; refresh keyword search - `inst-split-write`
+3. [x] - `p1` - Publish the stored transcript and speaker views, refresh the affected chunk vectors locally, return both parts and the change id, and surface a voice match solely as a suggestion - `inst-split-return`
 
 ### Correct a term and teach future decoding
 
@@ -213,6 +233,13 @@ The system **MUST** delete stored audio explicitly or by age through a non-undoa
 - API: `audio_delete`, `audio_delete_older`
 - DB: `calls`, `changes`
 - Entities: `DeleteAudioResult`, audio files
+
+### Stored line splitting
+
+- [x] `p1` - **ID**: `cpt-noter-dod-core-speakers-audio-split`
+- Unit and integration tests cover timing, speaker choices, invalid and stale requests, undo, constraints and search.
+- Conformance exercises `transcript_split_segment`. Real-core E2E covers `cpt-noter-seq-call-page-split-line`.
+- `just gate` passes.
 
 ### Tests and gate
 

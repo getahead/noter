@@ -440,7 +440,7 @@ fn folder_name(title: &str, id: &str, local_ms: i64) -> String {
 }
 
 /// `00:01:02` of a call time.
-fn clock(ms: u32) -> String {
+pub(crate) fn clock(ms: u32) -> String {
     format!(
         "{:02}:{:02}:{:02}",
         ms / 3_600_000,

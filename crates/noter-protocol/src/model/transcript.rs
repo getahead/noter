@@ -168,6 +168,11 @@ pub struct TranscriptSnapshot {
     #[serde(default)]
     #[specta(optional)]
     pub confirmed_lag: Option<Lag>,
+    /// Measured word starts for stored segments, indexed by the UTF-16 offset into the line.
+    #[serde(default)]
+    #[specta(optional)]
+    pub split_times:
+        std::collections::BTreeMap<SegmentId, std::collections::BTreeMap<u32, OffsetMs>>,
 }
 
 /// How far a live line trails the speech it shows: call time when the core took the line from
@@ -301,6 +306,34 @@ pub struct RenameSpeakerArgs {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
 pub struct SpeakerMutation {
+    pub speakers: Vec<SpeakerView>,
+    pub change_id: ChangeId,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct SplitSegmentArgs {
+    pub call_id: CallId,
+    pub segment_id: SegmentId,
+    /// UTF-16 offset of a word start in the stored line.
+    pub at: u32,
+    pub speaker: SplitSpeaker,
+    /// The text being previewed, to reject edits made while the popover is open.
+    #[serde(default)]
+    #[specta(optional)]
+    pub expected_text: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SplitSpeaker {
+    Existing { speaker_id: SpeakerId },
+    Person { person: PersonRef },
+    New,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]
+pub struct SplitSegmentResult {
+    pub segments: [SegmentView; 2],
     pub speakers: Vec<SpeakerView>,
     pub change_id: ChangeId,
 }

@@ -152,7 +152,7 @@ export function namingState(world: World, callId: string) {
 }
 
 export function isSpeakerChange(row: ChangeRow): boolean {
-  return row.entity.kind === "speaker" || row.field === "speakers" || (row.entity.kind === "call" && row.summary.startsWith("Named "));
+  return row.reason === "segment_split" || row.entity.kind === "speaker" || row.field === "speakers" || (row.entity.kind === "call" && row.summary.startsWith("Named "));
 }
 
 // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
@@ -187,9 +187,13 @@ export function replayChanges(world: World, rows: ChangeRow[], value: "before" |
         }
       }
       const transcript = world.transcripts.find((t) => t.call_id === state.callId);
-      for (const restored of state.segments ?? []) {
-        const segment = transcript?.segments.find((s) => s.id === restored.id);
-        if (segment) segment.speaker = restored.speaker;
+      if (r.reason === "segment_split" && transcript) {
+        transcript.segments = state.segments;
+      } else {
+        for (const restored of state.segments ?? []) {
+          const segment = transcript?.segments.find((s) => s.id === restored.id);
+          if (segment) segment.speaker = restored.speaker;
+        }
       }
       emit("entity:changed", { type: "speakers", call_id: state.callId, speakers: state.speakers });
       for (const restored of state.sections) {

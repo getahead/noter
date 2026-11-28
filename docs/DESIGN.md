@@ -2153,6 +2153,7 @@ The Call page is where the user confirms and shares what came out of a call with
 | PC-R9 Naming panel | First block of **Summary** and **Transcript**, above PC-R3 or PC-R5, while any speaker is unnamed | `cpt-noter-component-ui-speaker-naming-panel` | D88 |
 | PC-R3 Reading column | At most 760, left-aligned in the content | `cpt-noter-component-ui-output-section` per output, in PRD order, with `cpt-noter-component-ui-action-item-row` and `cpt-noter-component-ui-output-item-row` | PRD › Feature specification › 4. Post-call outputs |
 | PC-R4 Inspector slot | MW-R4, trailing: 280, 320 or 400 | Call info (280, the default in Wide, with its **Tags** row after **Call**), `cpt-noter-component-ui-item-inspector` (320) or `cpt-noter-component-ui-handoff-drawer` (400), one at a time | D18, D90 |
+| **Split Line Here** in PC-R5 | Context menu on a word after the first word of a stored line | `cpt-noter-component-ui-split-line-popover` | Split before the chosen word and assign the second part |
 | PC-R5 Transcript view | Replaces PC-R3, at most 960 | `cpt-noter-component-ui-transcript-view` with a find bar, rows with a play control, speaker rename, **Fix Term…**, **Show Archive Changes** | PRD › Feature specification › 2. Live transcript |
 | PC-R6 Playback bar | 44 high at the bottom of the content, from the first play | `cpt-noter-component-ui-playback-bar` | D85 |
 | PC-R7 Agent Reviews view | Replaces PC-R3 | One `cpt-noter-component-ui-output-section` per enabled agent with `cpt-noter-component-ui-agent-badge`, the meta line (runtime, model, skill and version, time), its review, versions and the thumbs **Useful** and **Not useful**; then **Cards from this call** with read-only compact cards and their outcome (**Pinned**, **Dismissed**, **Expired**) | PRD › Feature specification › 8. Role council |
@@ -4957,6 +4958,12 @@ In rows the tag is not focusable on its own; it is read with the row.
 **Motion and appearance.** No motion. Dark mode uses the Control border pair; Increase contrast gives the outline 60 %.
 
 **Accessibility checks.** Contrast (WCAG 1.4.3, 1.4.11): code text and the outline reach 4.5:1 and 3:1. Use of colour (1.4.1): low confidence uses the dash and the question mark.
+
+#### Component — Split line popover
+
+**ID**: `cpt-noter-component-ui-split-line-popover`
+
+Anchored to a confirmed, stored transcript line in PC-R5. The title shows the split time. **First part** shows the first text and its speaker. **Second part** shows the remaining text and a choice of **New Speaker**, a speaker on the same side, or a person from the person picker. **Split** applies the correction. Escape returns focus to the line.
 
 #### Component — Term fix popover
 
@@ -10677,6 +10684,38 @@ User:
 1. Clicks **Hide ▴**
 2. Sees one line, **3 speakers not named**, with **Show**
 3. Gets the summary higher on the page, and the full panel back with **Show**
+#### Call page — Split a transcript line
+
+**ID**: `cpt-noter-seq-call-page-split-line`
+
+**Use cases**: PRD › Problem, users and jobs to be done › Jobs to be done › Right after a call
+
+**Actors**: Primary user (PRD › Problem, users and jobs to be done)
+
+**Components**: `cpt-noter-component-screen-call-page`, `cpt-noter-component-ui-split-line-popover`, `cpt-noter-component-ui-person-picker`
+
+**Description**: Split one stored line covering two voices and assign the second voice.
+
+**Preconditions**: The call ended and the transcript contains a line with multiple words.
+
+**Happy path**
+
+1. Right-click a word after the first in PC-R5 and choose **Split Line Here**, beside **Copy** and **Fix Term…**.
+2. In **Split line at 00:05:31**, review **First part** with its original speaker and **Second part** with **New Speaker** selected.
+3. Click **Split**. The rows meet at the split time, the second gets the next **Speaker N**, and the call History records the change.
+4. Use **Split a line at 00:05:31 · Undo** to restore the original line and speaker list.
+
+**Other path — Choose the second speaker**
+
+1. Place the caret or start a selection at the word and choose Edit › **Split Line**.
+2. Choose an existing speaker on that side of the call, including a speaker identified by a voice profile, or choose a person in the person picker.
+3. If a **New Speaker** matches an existing profile, the naming panel suggests that person for review.
+
+**Error path — Invalid split point or stale line**
+
+1. An invalid caret disables **Split Line**. A stale line is refused if the transcript changes before the split is saved.
+2. The original transcript and History remain intact. Reopen from the current line to try again.
+
 #### Call page — Share the outputs in one action
 
 **ID**: `cpt-noter-seq-call-page-share-outputs`

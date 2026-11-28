@@ -354,6 +354,52 @@ impl Core {
             .filter(|v| usable(v))
     }
 
+    /// Look up a voice from the new part's own audio. This never changes the speaker's name.
+    pub(crate) async fn split_voice_suggestion(&self, line: &SegmentView) -> Option<PersonChip> {
+        let voice = Voice {
+            call: line.call_id.as_str().to_owned(),
+            id: line.speaker.speaker_id.as_str().to_owned(),
+            channel: line.channel,
+            blob: None,
+        };
+        let call = voice.call.clone();
+        let now = self.deps.clock.now().0;
+        let profiles = self
+            .store()
+            .read(move |c| {
+                let audio = c.query_row(
+                    "SELECT NOT (audio_deleted OR audio_not_stored) FROM calls WHERE id = ?1",
+                    [call],
+                    |r| r.get::<_, bool>(0),
+                )?;
+                if audio {
+                    live_profiles(c, now)
+                } else {
+                    Ok(vec![])
+                }
+            })
+            .ok()?;
+        if profiles.is_empty() {
+            return None;
+        }
+        let key = self.voice_key(false).ok()??;
+        let vector = Wiped(vec![self.embed_voice(&voice).await?]);
+        let blob = Self::seal(&key, &vector.0[0]).ok()?;
+        let (_, score) = Self::verdicts(&key, &profiles, &[(voice.id, blob)], &[])
+            .into_iter()
+            .next()?;
+        // A profile may have been forgotten while the engine extracted the sample.
+        self.store()
+            .read(move |c| {
+                if !live_profiles(c, now)?.iter().any(|r| r.id == score.profile) {
+                    return Ok(None);
+                }
+                crate::people::chip_of(c, &score.person)
+            })
+            .ok()
+            .flatten()
+    }
+
     // @cpt-flow:cpt-noter-flow-core-people-profile:p1
     // @cpt-state:cpt-noter-state-core-people-profile:p1
     pub(crate) async fn create_voice_profile(

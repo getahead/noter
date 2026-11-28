@@ -73,6 +73,17 @@ impl Store {
     // @cpt-algo:cpt-noter-algo-core-history-undo-replay:p1
     // @cpt-state:cpt-noter-state-core-history-undo-change:p1
     pub fn reverse(&self, dir: Direction, handle: Handle, now: i64) -> Result<Reversed, CoreError> {
+        self.reverse_with(dir, handle, now, |_, _| Ok(()))
+    }
+
+    /// Reverse changes and update dependent data within the same writer transaction.
+    pub fn reverse_with(
+        &self,
+        dir: Direction,
+        handle: Handle,
+        now: i64,
+        finish: impl FnOnce(&Transaction<'_>, &Reversed) -> Result<(), CoreError> + Send + 'static,
+    ) -> Result<Reversed, CoreError> {
         self.on_writer(move |conn| {
             // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-try
             let tx = conn
@@ -82,6 +93,7 @@ impl Store {
             // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-rollback
             // Any error drops the transaction: nothing is restored and no row is appended.
             let reversed = reverse_tx(&tx, dir, &handle, now)?;
+            finish(&tx, &reversed)?;
             // @cpt-end:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-rollback
             // @cpt-begin:cpt-noter-algo-core-history-undo-replay:p1:inst-replay-commit
             tx.commit().map_err(internal)?;

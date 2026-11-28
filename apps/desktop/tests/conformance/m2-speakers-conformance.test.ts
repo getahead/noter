@@ -148,3 +148,21 @@ describe("window_set_fix_term_enabled", () => {
     expect(refused(await s.core("settings").windowSetFixTermEnabled({ enabled: true })).code).toBe("window_not_allowed");
   });
 });
+
+describe("transcript_split_segment", () => {
+  it("splits before an interior word and refuses a stale preview", async () => {
+    const snapshot = ok(await main.transcriptSubscribe({ call_id: PAST_CALL }, () => {}));
+    const line = snapshot.segments.find((segment) => /\S+\s+\S+/.test(segment.text))!;
+    const at = /\s+(?=\S)/.exec(line.text)!;
+    const args = { call_id: PAST_CALL, segment_id: line.id, at: at.index + at[0].length, speaker: { type: "new" as const }, expected_text: line.text };
+    expect(refused(await main.transcriptSplitSegment({ ...args, at: 0 })).code).toBe("invalid_input");
+    const result = ok(await main.transcriptSplitSegment(args));
+    const [first, second] = result.segments;
+    expect(first).toMatchObject({ id: line.id, speaker: line.speaker, text: line.text.slice(0, args.at).trimEnd() });
+    expect(second).toMatchObject({ t0_ms: first.t1_ms, text: line.text.slice(args.at), speaker: { label: { type: "unnamed" } } });
+    expect(refused(await main.transcriptSplitSegment(args)).code).toBe("conflict");
+    expect(ok(await main.changeUndo({ target: { type: "change", change_id: result.change_id } })).undone).toBeGreaterThan(0);
+    const restored = ok(await main.transcriptSubscribe({ call_id: PAST_CALL }, () => {}));
+    expect(restored.segments.map((segment) => segment.id)).toEqual(snapshot.segments.map((segment) => segment.id));
+  });
+});

@@ -750,19 +750,15 @@ async fn rematch_without_a_profile_names_no_one_and_an_unknown_person_is_not_fou
     assert_eq!(err.code, ErrorCode::NotFound);
 }
 
-#[tokio::test]
-async fn a_first_profile_finds_voices_archived_before_enrollment() {
-    let dir = tempfile::tempdir().unwrap();
+fn retained_voices(dir: &Path) -> Arc<Core> {
     let deps = CoreDeps {
-        engine: Arc::new(
-            noter_engine_client::scripted::ScriptedEngine::new().with_container(dir.path()),
-        ),
+        engine: Arc::new(noter_engine_client::scripted::ScriptedEngine::new().with_container(dir)),
         ..CoreDeps::new(
             Arc::new(Moving(AtomicI64::new(NOW))),
             Arc::new(Events::default()),
         )
     };
-    let core = Arc::new(Core::open(dir.path(), deps).unwrap());
+    let core = Arc::new(Core::open(dir, deps).unwrap());
     core.start_first_run();
     core.store()
         .insert_batch(vec![
@@ -800,6 +796,13 @@ async fn a_first_profile_finds_voices_archived_before_enrollment() {
             ),
         ])
         .unwrap();
+    core
+}
+
+#[tokio::test]
+async fn a_first_profile_finds_voices_archived_before_enrollment() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = retained_voices(dir.path());
     // The scripted engine returns the same vector for both spans of this call.
     enable(&core, "per_anna", "old_anna").await;
     let result = core.voice_profile_rematch(&ctx(), anna()).await.unwrap();
@@ -814,5 +817,37 @@ async fn a_first_profile_finds_voices_archived_before_enrollment() {
             "SELECT count(*) FROM speakers WHERE centroid IS NOT NULL"
         ),
         0
+    );
+}
+
+#[tokio::test]
+async fn splitting_suggests_a_matching_profile_without_naming_the_speaker() {
+    let dir = tempfile::tempdir().unwrap();
+    let core = retained_voices(dir.path());
+    enable(&core, "per_anna", "old_anna").await;
+    let result = core
+        .transcript_split_segment(
+            &ctx(),
+            SplitSegmentArgs {
+                call_id: CallId::new("call_retained"),
+                segment_id: SegmentId::new("sg_past"),
+                at: 7,
+                speaker: SplitSpeaker::New,
+                expected_text: Some("second sample".into()),
+            },
+        )
+        .await
+        .unwrap();
+    let speaker = result
+        .speakers
+        .iter()
+        .find(|s| s.id == result.segments[1].speaker.speaker_id)
+        .unwrap();
+    assert_eq!(speaker.suggestion.as_ref().unwrap().id.as_str(), "per_anna");
+    assert_eq!(speaker.label, SpeakerLabel::Unnamed { n: 3 });
+    assert_eq!(speaker.named_by, None);
+    assert_eq!(
+        named(&core, speaker.id.as_str(), dir.path()).await,
+        (None, None)
     );
 }

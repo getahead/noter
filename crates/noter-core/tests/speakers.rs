@@ -99,9 +99,20 @@ fn segment(id: &str, call_id: &str, speaker: &str, t0: i64, text: &str) -> Inser
 
 /// `call_a`: Speaker 1 says three lines, Speaker 2 two; `call_b` has a speaker of its own.
 fn seed(core: &Core) {
+    seed_with_status(core, "recording");
+}
+
+fn seed_with_status(core: &Core, status: &str) {
+    let mut first_call = call("call_a");
+    first_call
+        .values
+        .iter_mut()
+        .find(|(col, _)| *col == "status")
+        .unwrap()
+        .1 = json!(status);
     core.store()
         .insert_batch(vec![
-            call("call_a"),
+            first_call,
             call("call_b"),
             speaker("spk_1", "call_a", "SPEAKER_00", Some(1), "sys"),
             speaker("spk_2", "call_a", "SPEAKER_01", Some(2), "sys"),
@@ -467,7 +478,7 @@ fn fix(segment: &str, start: u32, end: u32, to: &str, teach: bool) -> FixTermArg
     }
 }
 
-fn text_of(core: &Core, id: &'static str) -> (String, String, String) {
+fn text_of(core: &Core, id: &str) -> (String, String, String) {
     core.store()
         .read(move |c| {
             c.query_row(
@@ -821,4 +832,320 @@ async fn undoing_a_naming_removes_the_participant_it_added() {
             .is_some_and(|n| !n.contains(&"Dana".to_string())),
         "{sent:?}"
     );
+}
+
+#[tokio::test]
+async fn splitting_a_stored_line_keeps_the_citation_and_undo_restores_the_index() {
+    let dir = tempfile::tempdir().unwrap();
+    let deps = CoreDeps {
+        engine: Arc::new(
+            noter_engine_client::scripted::ScriptedEngine::new().with_container(dir.path()),
+        ),
+        ..CoreDeps::new(Arc::new(FixedClock::at(NOW)), Arc::new(Events::default()))
+    };
+    let core = Core::open(dir.path(), deps).unwrap();
+    seed_with_status(&core, "ready");
+    core.store()
+        .insert_batch(vec![
+            row(
+                "summaries",
+                &[
+                    ("id", json!("sum_split")),
+                    ("rev", json!(1)),
+                    ("call_id", json!("call_a")),
+                    ("kind", json!("summary")),
+                    ("current_version_id", json!("ver_split")),
+                ],
+            ),
+            row(
+                "summary_versions",
+                &[
+                    ("id", json!("ver_split")),
+                    ("summary_id", json!("sum_split")),
+                    ("n", json!(1)),
+                    ("kind", json!("generated")),
+                    ("body_md", json!("Unchanged summary.")),
+                    ("lang", json!("en")),
+                    ("from_pass", json!("live")),
+                    ("created_at", json!(NOW)),
+                ],
+            ),
+        ])
+        .unwrap();
+    let args = SplitSegmentArgs {
+        call_id: CallId::new("call_a"),
+        segment_id: SegmentId::new("seg_u"),
+        at: 20,
+        speaker: SplitSpeaker::New,
+        expected_text: Some("Привет kubernets 😀 ok".into()),
+    };
+    assert_eq!(
+        core.transcript_split_segment(
+            &ctx(),
+            SplitSegmentArgs {
+                at: 18,
+                ..args.clone()
+            }
+        )
+        .await
+        .unwrap_err()
+        .code,
+        ErrorCode::InvalidInput
+    );
+    let done = core
+        .transcript_split_segment(&ctx(), args.clone())
+        .await
+        .unwrap();
+    let [first, second] = &done.segments;
+    assert_eq!(first.id, args.segment_id);
+    assert_eq!(first.text, "Привет kubernets 😀");
+    assert_eq!(first.speaker.speaker_id.as_str(), "spk_2");
+    assert_eq!(second.text, "ok");
+    assert_ne!(second.id, first.id);
+    assert_eq!(first.t1_ms, second.t0_ms);
+    assert_eq!(second.speaker.label, SpeakerLabel::Unnamed { n: 3 });
+    assert_eq!(
+        constraints(dir.path())["cannot_link"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(text_of(&core, second.id.as_str()).1, "ok");
+    let indexed: i64 = core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT count(*) FROM segments_fts JOIN segments s ON s.rowid = segments_fts.rowid
+             WHERE segments_fts MATCH ?1 AND s.id = ?2",
+                [r#"" ok""#, second.id.as_str()],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(indexed, 1);
+    let snapshot =
+        std::fs::read_to_string(dir.path().join("audio/call_a/transcript.jsonl")).unwrap();
+    assert!(snapshot.lines().any(|row| row.contains(second.id.as_str())));
+    let output = || {
+        core.store().read(|c| c.query_row(
+        "SELECT names_updated, body_md FROM summaries s JOIN summary_versions v ON v.id = s.current_version_id
+         WHERE s.id = 'sum_split'", [], |r| Ok((r.get::<_, bool>(0)?, r.get::<_, String>(1)?)),
+    )).unwrap()
+    };
+    assert_eq!(output(), (true, "Unchanged summary.".into()));
+    let indexed_chunk = || {
+        core.store()
+            .read(|c| {
+                c.query_row(
+                    "SELECT c.text, length(v.embedding) FROM chunks c
+                     LEFT JOIN chunk_vec v ON c.id = v.chunk_id WHERE c.call_id = 'call_a'",
+                    [],
+                    |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?)),
+                )
+            })
+            .unwrap()
+    };
+    let (chunk, embedding_bytes) = indexed_chunk();
+    assert!(chunk.contains("Speaker 3: ok"));
+    assert_eq!(embedding_bytes, Some(4096));
+    assert_eq!(
+        core.transcript_split_segment(&ctx(), args)
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::Conflict
+    );
+    undo(&core, &done.change_id).await;
+    assert_eq!(output(), (false, "Unchanged summary.".into()));
+    let snapshot =
+        std::fs::read_to_string(dir.path().join("audio/call_a/transcript.jsonl")).unwrap();
+    assert!(!snapshot.lines().any(|row| row.contains(second.id.as_str())));
+    assert_eq!(
+        text_of(&core, first.id.as_str()).0,
+        "Привет kubernets 😀 ok"
+    );
+    assert_eq!(speaker_count(&core), 3);
+    assert!(constraints(dir.path())["cannot_link"]
+        .as_array()
+        .unwrap()
+        .is_empty());
+    let (chunk, embedding_bytes) = indexed_chunk();
+    assert!(chunk.contains("Speaker 2: Привет kubernets 😀 ok"));
+    assert_eq!(embedding_bytes, Some(4096));
+}
+
+#[tokio::test]
+async fn splitting_uses_word_times_and_keeps_the_corrected_text_and_speaker_choices() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed_with_status(&core, "ready");
+    let call = CallId::new("call_a");
+    let id = SegmentId::new("seg_timed");
+    let mut line = segment(
+        id.as_str(),
+        call.as_str(),
+        "spk_1",
+        10_000,
+        "first second third fourth",
+    );
+    line.values.extend([
+        ("words_path", json!("audio/call_a/words/line.json")),
+        (
+            "corrections",
+            json!(r#"[{"range":{"start":0,"end":12},"original":"misheard phrase"}]"#),
+        ),
+    ]);
+    let words = [
+        ("first", 10_040),
+        ("second", 10_320),
+        ("third", 10_620),
+        ("fourth", 10_700),
+    ]
+    .map(|(text, t0)| json!({"t0_ms": t0, "t1_ms": t0 + 50, "text": text, "p": 0.98}));
+    let folder = dir.path().join("audio/call_a/words");
+    std::fs::create_dir_all(&folder).unwrap();
+    std::fs::write(
+        folder.join("line.json"),
+        serde_json::to_vec(&words).unwrap(),
+    )
+    .unwrap();
+    core.store()
+        .insert_batch(vec![
+            line,
+            speaker("mic", call.as_str(), "you", None, "mic"),
+        ])
+        .unwrap();
+    let (sink, _) = collecting();
+    let snapshot = core
+        .transcript_subscribe(
+            &ctx(),
+            TranscriptSubscribeArgs {
+                call_id: call.clone(),
+            },
+            sink,
+        )
+        .await
+        .unwrap();
+    assert_eq!(snapshot.split_times[&id][&6], OffsetMs(10_320));
+
+    let base = SplitSegmentArgs {
+        call_id: call.clone(),
+        segment_id: id,
+        at: 6,
+        speaker: SplitSpeaker::Existing {
+            speaker_id: SpeakerId::new("spk_2"),
+        },
+        expected_text: None,
+    };
+    for wrong in ["mic", "spk_x"] {
+        let bad = core
+            .transcript_split_segment(
+                &ctx(),
+                SplitSegmentArgs {
+                    speaker: SplitSpeaker::Existing {
+                        speaker_id: SpeakerId::new(wrong),
+                    },
+                    ..base.clone()
+                },
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(bad.code, ErrorCode::InvalidInput);
+    }
+    let done = core.transcript_split_segment(&ctx(), base).await.unwrap();
+    let [first, second] = done.segments;
+    assert_eq!(second.speaker.speaker_id.as_str(), "spk_2");
+    assert_eq!(second.t0_ms, OffsetMs(10_320));
+    assert_eq!(first.corrections[0].range, TextRange { start: 0, end: 5 });
+    assert_eq!(second.corrections[0].range, TextRange { start: 0, end: 6 });
+
+    let assignment = SplitSegmentArgs {
+        call_id: call,
+        segment_id: second.id,
+        at: 6 + 1,
+        speaker: SplitSpeaker::Person {
+            person: PersonRef::New {
+                display_name: "Dana Lee".into(),
+                email: None,
+            },
+        },
+        expected_text: Some(second.text),
+    };
+    let assigned = core
+        .transcript_split_segment(&ctx(), assignment.clone())
+        .await
+        .unwrap();
+    assert_eq!(assigned.segments[1].t0_ms, OffsetMs(10_620));
+    let SpeakerLabel::Person { person } = &assigned.segments[1].speaker.label else {
+        panic!("second part has no person")
+    };
+    assert_eq!(person.display_name, "Dana Lee");
+    let participants: i64 = core
+        .store()
+        .read(|c| {
+            c.query_row(
+                "SELECT count(*) FROM call_participants WHERE person_id = ?1",
+                [person.id.as_str()],
+                |r| r.get(0),
+            )
+        })
+        .unwrap();
+    assert_eq!(participants, 1);
+
+    let prior = core
+        .change_undo(
+            &ctx(),
+            UndoArgs {
+                target: UndoTarget::Change {
+                    change_id: done.change_id.clone(),
+                },
+            },
+        )
+        .await;
+    assert_eq!(prior.unwrap_err().code, ErrorCode::Conflict);
+    undo(&core, &assigned.change_id).await;
+    assert_eq!(
+        text_of(&core, assignment.segment_id.as_str()).0,
+        "second third fourth"
+    );
+    undo(&core, &done.change_id).await;
+    let result = core
+        .change_redo(
+            &ctx(),
+            RedoArgs {
+                target: UndoTarget::Change {
+                    change_id: done.change_id,
+                },
+            },
+        )
+        .await
+        .unwrap();
+    assert!(result.undone > 0);
+    assert_eq!(
+        text_of(&core, assignment.segment_id.as_str()).0,
+        "second third fourth"
+    );
+}
+
+#[tokio::test]
+async fn splitting_is_post_call_only() {
+    let dir = tempfile::tempdir().unwrap();
+    let (core, _) = open(dir.path());
+    seed(&core);
+    let args = SplitSegmentArgs {
+        call_id: CallId::new("call_a"),
+        segment_id: SegmentId::new("seg_1"),
+        at: 10,
+        speaker: SplitSpeaker::New,
+        expected_text: None,
+    };
+    assert_eq!(
+        core.transcript_split_segment(&ctx(), args)
+            .await
+            .unwrap_err()
+            .code,
+        ErrorCode::InvalidInput
+    );
+    assert_eq!(text_of(&core, "seg_1").0, "kubernets is down");
 }

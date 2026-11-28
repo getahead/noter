@@ -23,4 +23,12 @@ final class SpeakersTests: NoterTestCase {
         XCTAssertTrue(fixTerm.exists, "the Edit menu has Fix Term…")
         XCTAssertFalse(fixTerm.isEnabled, "no selection, no Fix Term…")
     }
+
+    func test_cpt_noter_seq_call_page_split_line__requires_a_word_selection() {
+        launch()
+        XCTAssertTrue(window("Noter").waitForExistence(timeout: 10))
+        let splitLine = app.menuBars.menuItems["Split Line"]
+        XCTAssertTrue(splitLine.exists)
+        XCTAssertFalse(splitLine.isEnabled)
+    }
 }

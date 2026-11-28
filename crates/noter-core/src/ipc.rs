@@ -140,6 +140,14 @@ impl CoreApi for Core {
         self.name_speakers(ctx, args)
     }
 
+    async fn transcript_split_segment(
+        &self,
+        ctx: &CommandCtx,
+        args: SplitSegmentArgs,
+    ) -> Result<SplitSegmentResult, CoreError> {
+        self.split_segment(ctx, args).await
+    }
+
     async fn transcript_fix_term(
         &self,
         ctx: &CommandCtx,
@@ -373,7 +381,7 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: UndoArgs,
     ) -> Result<UndoResult, CoreError> {
-        self.reverse_change(Direction::Undo, args.target)
+        self.reverse_change(Direction::Undo, args.target).await
     }
 
     async fn change_redo(
@@ -381,7 +389,7 @@ impl CoreApi for Core {
         _ctx: &CommandCtx,
         args: RedoArgs,
     ) -> Result<UndoResult, CoreError> {
-        self.reverse_change(Direction::Redo, args.target)
+        self.reverse_change(Direction::Redo, args.target).await
     }
 
     async fn items_list(

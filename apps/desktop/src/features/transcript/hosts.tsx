@@ -3,7 +3,8 @@
 // view and the playback bar in the host's regions. Hosts pass the call id and the variant; nothing else.
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import type { CallDetail, SegmentView, SpeakerView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
+import type { CallDetail, PersonChip, SegmentView, SpeakerView, TextRange, TimeSpan, UiPrefs } from "../../core/bindings";
+import { listenNativeMenuAction, updateNativeMenuContext } from "../../core/native-menu";
 import type { Bridge } from "../../app/bridge/bridge";
 import { useIdentityRevision, useWindow } from "../../app/use-window";
 import { duration, shortDay, t } from "../../i18n/format";
@@ -11,16 +12,18 @@ import { InlineBanner } from "../../ui/feedback/inline-banner";
 import { Menu } from "../../ui/primitives/menu";
 import { Popover } from "../../ui/primitives/popover";
 import { holdUndo } from "../history/undo";
+import { SplitLinePopover } from "../speakers/SplitLinePopover";
 import { SpeakerRenamePopover } from "../speakers/SpeakerRenamePopover";
 import { SpeakerNamingPanel } from "../speakers/SpeakerNamingPanel";
 import { rereadSegment, TermFixPopover } from "../speakers/TermFixPopover";
-import { buildRows, holdFollowForRename, speakerColumn, spanKeys, type Row, type Variant } from "./model";
+import { buildRows, clock, holdFollowForRename, speakerColumn, spanKeys, type Row, type Variant } from "./model";
 import { barState, ROUTE_STOP_MS, type Replay } from "./playback";
 import { PlaybackBar, type BarVariant } from "./playback-bar";
 import { playControl, REFUSED } from "./play-control";
 import { ArchiveNotice, type ArchiveNote } from "./ArchiveNotice";
 import { followFixTermChoice, watchFixTermMenu } from "./fix-term-menu";
 import { selectedFixTerm } from "./segment-row";
+import { selectedSplit, watchSplitMenu, type SplitPoint } from "./split-point";
 import { TranscriptView } from "./transcript-view";
 
 const HIGHLIGHT_MS = 3000;
@@ -251,16 +254,20 @@ export interface TranscriptLogProps {
   header?: string | null;
   /** A speaker was named from a label: by default the undo strip carries the result; the call window shows it in its strip. */
   onNamed?: (text: string, change_id: string) => void;
+  onSplitSuggestion?: (speakerId: string, person: PersonChip) => void;
 }
 
 /** The Undo strip of a term fix; Undo re-reads the line, which no Channel event restores. */
 export const holdFix = (bridge: Bridge, seg: SegmentView) => (message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message, refresh: () => rereadSegment(bridge, seg) });
 
 /** The transcript view of `useTranscript`'s call, in the host's region (CS-R2, FP-R5 or PC-R5). */
-export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: TranscriptLogProps) {
+// @cpt-flow:cpt-noter-flow-ui-speakers-split:p1
+export function TranscriptLog({ tr, variant, tailLines, header, onNamed, onSplitSuggestion }: TranscriptLogProps) {
   const [renaming, setRenaming] = useState<{ speakerId: string; segmentId: string; anchor: HTMLElement } | null>(null);
   // a selection on a stored line: first the Copy / Fix Term… menu, then the popover
-  const [fixing, setFixing] = useState<{ seg: SegmentView; range: TextRange; anchor: HTMLElement; menu: boolean } | null>(null);
+  const [fixing, setFixing] = useState<{ seg: SegmentView; range: TextRange; anchor: HTMLElement; menu: boolean; splitAt?: number } | null>(null);
+  const [splitting, setSplitting] = useState<SplitPoint | null>(null);
+  const [splitStale, setSplitStale] = useState(false);
   const call = useWindow(tr.bridge, (s) => s.entities.call[tr.callId]);
   const prefs = useWindow(tr.bridge, (s) => s.app?.prefs);
   const rows = useMemo(() => (tr.data ? buildRows(tr.data, variant === "tail" ? "tail" : "stored", tailLines) : []), [variant, tr.data, tailLines]);
@@ -280,6 +287,22 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
   // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
   useEffect(() => followFixTermChoice(handled, chosen, () => (variant !== "tail" ? selectedFixTerm(globalThis.getSelection(), segmentsRef.current ?? []) : null), (picked) => setFixing({ ...picked, menu: false })), [chosen, variant]);
   // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
+  // @cpt-begin:cpt-noter-flow-ui-speakers-split:p1:inst-split-open
+  const canSplit = variant === "stored" && tr.data?.live === false;
+  const openSplit = (point: SplitPoint) => {
+    point.anchor.closest<HTMLElement>("[data-segment-id]")?.focus();
+    setSplitStale(false);
+    setFixing(null);
+    setSplitting(point);
+  };
+  useEffect(() => canSplit ? watchSplitMenu(document, globalThis,
+    () => selectedSplit(globalThis.getSelection(), segmentsRef.current ?? []),
+    (enabled) => void updateNativeMenuContext({ splitLineEnabled: enabled }),
+    listenNativeMenuAction,
+    openSplit,
+  ) : undefined, [canSplit]);
+  // @cpt-end:cpt-noter-flow-ui-speakers-split:p1:inst-split-open
+  const menuSplit = fixing?.splitAt === undefined ? null : { seg: fixing.seg, at: fixing.splitAt, anchor: fixing.anchor };
   const renamed = renaming && speakers.find((x) => x.id === renaming.speakerId);
   const named = onNamed ?? ((message: string, change_id: string) => holdUndo({ target: { type: "change", change_id }, message }));
   // @cpt-begin:cpt-noter-algo-ui-live-transcript-follow-output:p1:inst-return-renamed-speaker
@@ -315,6 +338,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
       }}
       // @cpt-begin:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
       onFixTerm={variant !== "tail" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: true }) : undefined}
+      onSplitMenu={canSplit ? (seg, range, anchor, splitAt) => setFixing({ seg, range, anchor, menu: true, splitAt }) : undefined}
       onReopenFixTerm={variant !== "tail" ? (seg, range, anchor) => setFixing({ seg, range, anchor, menu: false }) : undefined}
       // @cpt-end:cpt-noter-flow-ui-speakers-fix-term:p1:inst-open
     />
@@ -326,6 +350,7 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
           items={[
             { label: t("speakers.fix.copy"), onSelect: () => void globalThis.navigator?.clipboard?.writeText(fixing.seg.text.slice(fixing.range.start, fixing.range.end)) },
             { label: t("speakers.fix.menu"), onSelect: () => setFixing({ ...fixing, menu: false }) },
+            ...(menuSplit ? [{ label: t("speakers.split.menu"), onSelect: () => openSplit(menuSplit) }] : []),
           ]}
           onClose={() => setFixing((f) => (f?.menu ? null : f))}
         />
@@ -333,6 +358,24 @@ export function TranscriptLog({ tr, variant, tailLines, header, onNamed }: Trans
     )}
     {fixing && !fixing.menu && (
       <TermFixPopover bridge={tr.bridge} segment={fixing.seg} range={fixing.range} anchor={fixing.anchor} onClose={() => setFixing(null)} onFixed={onNamed ?? holdFix(tr.bridge, fixing.seg)} />
+    )}
+    {splitStale && <p role="alert">{t("speakers.split.stale")}</p>}
+    {canSplit && splitting && (
+      <SplitLinePopover
+        bridge={tr.bridge}
+        point={splitting}
+        measured={tr.data?.split_times?.[splitting.seg.id]?.[splitting.at]}
+        participants={tr.detail?.call.participants ?? call?.participants ?? []}
+        speakers={speakers}
+        onClose={() => setSplitting(null)}
+        onStale={() => { setSplitting(null); setSplitStale(true); tr.retry(); }}
+        onSplit={({ segments, speakers, change_id }) => {
+          const second = segments[1];
+          const match = speakers.find((s) => s.id === second.speaker.speaker_id)?.suggestion;
+          if (match) onSplitSuggestion?.(second.speaker.speaker_id, match);
+          holdUndo({ target: { type: "change", change_id }, message: t("speakers.split.undo", { time: clock(second.t0_ms) }) });
+        }}
+      />
     )}
     {renamed && (
       <SpeakerRenamePopover
@@ -379,27 +422,29 @@ export function TranscriptBar({ tr, variant }: { tr: TranscriptHandle; variant: 
  * the view with its play controls, and the playback bar in PC-R6. It reads the call's details for the audio line unless
  * the host passes them (`detail`); `header={null}` leaves the line to a host that draws it in its own heading.
  */
+// @cpt-seq:cpt-noter-seq-call-page-split-line:p1
 export function StoredTranscript({ bridge, callId, audioKept, span, detail, header }: { bridge: Bridge; callId: string; audioKept?: boolean; span?: TimeSpan | null; detail?: AudioFacts | null; header?: string | null }) {
   const [read, setRead] = useState<CallDetail | null>(null);
   const given = detail !== undefined;
   useEffect(() => void (!given && bridge.core.callGet({ call_id: callId }).then((r) => r.status === "ok" && setRead(r.data))), [bridge, callId, given]);
   const tr = useTranscript(bridge, callId, { detail: given ? detail : read, audioKept, span });
+  const [suggestions, setSuggestions] = useState<Record<string, PersonChip>>({});
   return (
     <>
-      <NamingPanel tr={tr} audioKept={audioKept} />
+      <NamingPanel tr={tr} audioKept={audioKept} suggestions={suggestions} />
       {tr.archive && <ArchiveNotice note={tr.archive} />}
-      <TranscriptLog tr={tr} variant="stored" header={header} />
+      <TranscriptLog key={callId} tr={tr} variant="stored" header={header} onSplitSuggestion={(id, person) => setSuggestions((old) => ({ ...old, [id]: person }))} />
       <TranscriptBar tr={tr} variant="stored" />
     </>
   );
 }
 
-function NamingPanel({ tr, audioKept }: { tr: ReturnType<typeof useTranscript>; audioKept?: boolean }) {
+function NamingPanel({ tr, audioKept, suggestions }: { tr: ReturnType<typeof useTranscript>; audioKept?: boolean; suggestions: Record<string, PersonChip> }) {
   return tr.data ? (
     <SpeakerNamingPanel
       bridge={tr.bridge}
       callId={tr.callId}
-      speakers={tr.data.speakers}
+      speakers={tr.data.speakers.map((s) => suggestions[s.id] ? { ...s, suggestion: suggestions[s.id] } : s)}
       segments={tr.data.segments}
       participants={tr.detail?.call.participants ?? []}
       audio={audioKept !== false && !!tr.data.audio_available && !tr.detail?.call.audio_deleted && !tr.detail?.audio_not_stored}

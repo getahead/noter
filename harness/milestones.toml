@@ -53,6 +53,7 @@ stories = [
 [M2]
 why = "Speakers, post-call outputs, items, handoff, Today, undo"
 commands = [
+  "transcript_split_segment",
   "transcript_rename_speaker", "transcript_fix_term", "transcript_name_speakers", "window_set_fix_term_enabled",
   "audio_delete", "audio_delete_older",
   "items_list", "item_get", "item_set_done", "item_review", "items_review_all",
@@ -75,6 +76,7 @@ stories = [
   "cpt-noter-seq-call-page-review-outputs",
   "cpt-noter-seq-call-page-review-suggested-items",
   "cpt-noter-seq-call-page-name-speakers",
+  "cpt-noter-seq-call-page-split-line",
   "cpt-noter-seq-call-page-share-outputs",
   "cpt-noter-seq-call-page-hand-off-item",
   "cpt-noter-seq-call-page-check-evidence",

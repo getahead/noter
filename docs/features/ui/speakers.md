@@ -21,6 +21,7 @@ milestone: M2
   - [Name a speaker during the call](#name-a-speaker-during-the-call)
   - [Name speakers after the call](#name-speakers-after-the-call)
   - [Correct a transcript term](#correct-a-transcript-term)
+  - [Split a stored line](#split-a-stored-line)
 - [3. Processes / Business Logic (CDSL)](#3-processes--business-logic-cdsl)
   - [Person picker matching and validation](#person-picker-matching-and-validation)
 - [4. States (CDSL)](#4-states-cdsl)
@@ -29,6 +30,7 @@ milestone: M2
 - [5. Definitions of Done](#5-definitions-of-done)
   - [Shared identity and post-call naming](#shared-identity-and-post-call-naming)
   - [Correct terms with glossary intent](#correct-terms-with-glossary-intent)
+  - [Split stored transcript lines](#split-stored-transcript-lines)
 - [6. Acceptance Criteria](#6-acceptance-criteria)
 - [7. Additional Context](#7-additional-context)
 
@@ -66,7 +68,7 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 - **Design**: [DESIGN.md](../../DESIGN.md) › Call screen; Call page PC-R9; Speaker label; Speaker naming panel; Term fix popover; Person picker; D88, D89, D92, D93
 - **Decomposition**: [DECOMPOSITION.md](../../DECOMPOSITION.md) › 2.19, M2, IMPLEMENTED
 - **Design elements**: `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-component-ui-term-fix-popover`, `cpt-noter-component-ui-person-picker`
-- **Stories**: `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers` (M2, every path)
+- **Stories**: `cpt-noter-seq-call-screen-name-speaker`, `cpt-noter-seq-call-page-name-speakers`, `cpt-noter-seq-call-page-split-line` (M2, every path)
 - **Frozen commands it delivers (M2)**: `transcript_rename_speaker`, `transcript_fix_term`, `transcript_name_speakers`
 - **Other commands it calls**: `audio_play`, `audio_stop`, `glossary_list`, `change_undo`; `people_list`, `person_create` are frozen but placed in M3, fake-backed in M2
 - **Events**: `entity:changed` (speakers, item, outputs), transcript `segments_updated`; existing window focus handling
@@ -146,6 +148,25 @@ It implements `cpt-noter-component-ui-speaker-naming-panel`, `cpt-noter-componen
 5. [x] - `p1` - **IF** segment changed, range is stale or command fails: retain the replacement, refresh the segment and require reselection/explicit retry; never replace text by a stale offset - `inst-error`
 6. [x] - `p1` - **ELSE** apply returned segment/corrections, close the popover, show **Fixed “notification service” · added to the glossary** only when glossary_term_id is present and retain change_id - `inst-result`
 7. [x] - `p1` - **RETURN** corrected text; older-call changes remain proposals, and Undo is available through History - `inst-return`
+
+### Split a stored line
+
+- [x] `p1` - **ID**: `cpt-noter-flow-ui-speakers-split`
+
+**Actor**: Primary user (main window)
+
+**Success Scenarios**:
+- The context menu at an interior word and the Edit menu at an interior word start open the same split popover.
+- The first part keeps its speaker. Choose **New Speaker**, a speaker on the same side, or a person, then confirm and get Undo.
+- A new speaker's profile match appears as a suggestion in the naming panel.
+
+**Error Scenarios**:
+- Invalid caret positions disable the action. A stale line is refused and the transcript is refreshed.
+
+**Steps**:
+1. [x] - `p1` - Resolve a stored line and word start from the pointer or selection and open the anchored split popover - `inst-split-open`
+2. [x] - `p1` - Preview the text and timestamp and choose the speaker of the second part - `inst-split-preview`
+3. [x] - `p1` - Apply the split, refresh both rows and show the Undo strip; refresh on refusal for stale text - `inst-split-save`
 
 ## 3. Processes / Business Logic (CDSL)
 
@@ -243,6 +264,12 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 **Completion gate.** Write failing tests first; unit and changed-line coverage meet 80% per side. Conformance runs fake and real; successful frozen commands and named real-core stories count toward 60%, M3 fake commands do not. Native tests use underscore story ids. Screenshots meet 98%; due performance scenarios meet 60% coverage and stay within 10% of base instructions. Trace never falls. `just gate-fast` stays green; `just gate` passes.
 
+### Split stored transcript lines
+
+- [x] `p1` - **ID**: `cpt-noter-dod-ui-speakers-split`
+- Tests cover UTF-16 word selection, native Edit menu availability, speaker choice and error handling. Conformance exercises `transcript_split_segment`. Real-core E2E covers `cpt-noter-seq-call-page-split-line`.
+- `just gate` passes.
+
 ## 6. Acceptance Criteria
 
 - [x] Live rename defaults to Whole call; Only this line uses the selected segment id
@@ -260,7 +287,7 @@ The system **MUST** preserve the selected range and original wording, apply only
 
 **DESIGN versus prototype.** README calls out missing Return/arrow selection in the name picker and Fix Term as a row hover button instead of a selection context menu. Add the DESIGN keyboard/context-menu behaviour while retaining the prototype look. Prototype Play Sample flashes for 2 s rather than playing the specified 5-s clip; use real audio state. Prototype skip and rename alter local fixture maps; production uses the typed commands and store events. Its voice-profile checkbox has no backing effect.
 
-**Milestone and contract limits.** Decomposition discrepancy 7 places `people_list`/`person_create` in M3 although the live naming story uses them. M2 builds those controls with the fake; real M2 rename can use existing PersonRef or new PersonRef directly. PersonRef has name/email but no role, and separate person_create plus rename is not an atomic create-and-name with one Undo: Role persistence and atomic undo for that full form need owner contract work. RenameSpeakerArgs and SpeakerAssignment have no update-voice-profile option; FixTermArgs has no language. Owner decision (7 Nov): the Fix Term Language popup stays disabled and displays the transcript language until FixTermArgs carries a language; it must not imply that a different language can be selected or persisted. The update-voice-profile checkbox likewise cannot claim a persisted effect yet. SpeakerMutation lacks affected-item counts; SpeakerView supplies segment_count, sample and one suggestion, but not grouped invite/recent suggestions, invite-source captions or the first quote. Use its real sample and count, resolve the first quote from the transcript and request owner contract support for missing suggestion metadata. The fake ignores one_segment scope, does not propagate every derived view, and null assignments do not persist skip: conformance must cover these against real core. No frozen command or generated binding is changed by this spec.
+**Milestone and contract limits.** Decomposition discrepancy 7 places `people_list`/`person_create` in M3 although the live naming story uses them. M2 builds those controls with the fake; real M2 rename can use existing PersonRef or new PersonRef directly. PersonRef has name/email but no role, and separate person_create plus rename is not an atomic create-and-name with one Undo: Role persistence and atomic undo for that full form need owner contract work. RenameSpeakerArgs and SpeakerAssignment have no update-voice-profile option; FixTermArgs has no language. Owner decision (7 Nov): the Fix Term Language popup stays disabled and displays the transcript language until FixTermArgs carries a language; it must not imply that a different language can be selected or persisted. The update-voice-profile checkbox likewise cannot claim a persisted effect yet. SpeakerMutation lacks affected-item counts; SpeakerView supplies segment_count, sample and one suggestion, but not grouped invite/recent suggestions, invite-source captions or the first quote. Use its real sample and count, resolve the first quote from the transcript and request owner contract support for missing suggestion metadata. The fake ignores one_segment scope, does not propagate every derived view, and null assignments do not persist skip: conformance must cover these against real core. The stored split uses the frozen `transcript_split_segment` command.
 
 **Data and non-applicability.** The UI owns no tables. Identity, glossary writes and undo are core responsibilities; no voice profile is created here. Network calls, credential handling, migrations, deployment and earlier-call reconciliation are not applicable to this UI feature. Bridge logs omit names, selected text and replacements.
 
