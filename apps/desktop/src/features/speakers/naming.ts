@@ -81,3 +81,4 @@ export const staleFix = (code: ErrorCode) =>
 /** The command keys of the panel's rows and the fix popover (bridge.act). */
 export const nameKey = (speakerId: string) => `speaker:name:${speakerId}`;
 export const fixKey = (segmentId: string) => `term:fix:${segmentId}`;
+export const splitKey = (segmentId: string) => `segment:split:${segmentId}`;

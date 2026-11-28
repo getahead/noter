@@ -1196,7 +1196,7 @@ Every state in a screen's or component's States table must match a prototype sta
 
 - **Scope**:
   - `speaker-naming-panel`, `term-fix-popover`, `person-picker` with the New person form
-  - Rename popover of the speaker label
+  - Rename popover of the speaker label and `cpt-noter-component-ui-split-line-popover` in the stored transcript
 
 - **Out of scope**:
   - People pages (`cpt-noter-feature-ui-people`, M3)

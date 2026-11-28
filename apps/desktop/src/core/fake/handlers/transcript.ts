@@ -1,6 +1,7 @@
 import * as Bindings from "../../bindings";
 import * as Core from "../fake-core";
 import { coreError } from "../fake-core";
+import { callTime } from "../../../i18n/format";
 import * as shared from "./shared";
 
 export function transcriptHandlers(fake: Core.FakeCore): Core.Handlers {
@@ -91,6 +92,80 @@ export function transcriptHandlers(fake: Core.FakeCore): Core.Handlers {
     }
     const change_id = shared.logChange(fake, world, { entity: { kind: "speaker", id: spk.id, label: name }, before, after: JSON.stringify(shared.namingState(world, a.call_id)), summary: `Named a speaker as ${name}` });
     return { speakers: t.speakers, change_id };
+  },
+  transcript_split_segment: (a, { world, emit }) => {
+    const call = shared.call(world, a.call_id);
+    if (call.status === "recording" || call.status === "paused") {
+      throw coreError("invalid_input", "call_id", { type: "validation", field: "call_id", rule: "out_of_range" });
+    }
+    const snapshot = world.transcripts.find((x) => x.call_id === a.call_id);
+    const line = snapshot?.segments.find((s) => s.id === a.segment_id && s.state === "confirmed");
+    if (snapshot?.archive === "running" || !line || (a.expected_text != null && a.expected_text !== line.text)) throw coreError("conflict");
+    const duration = line.t1_ms - line.t0_ms;
+    const at = [...line.text.matchAll(/[^\p{White_Space}]+/gu)].slice(1).some((w) => w.index === a.at);
+    if (!at || duration < 2) throw coreError("invalid_input", "at", { type: "validation", field: "at", rule: "out_of_range" });
+    const t = snapshot!;
+    const before = JSON.stringify(shared.namingState(world, a.call_id));
+    const left = line.text.slice(0, a.at).trimEnd();
+    const right = line.text.slice(a.at);
+    const elapsed = Math.floor([...line.text.slice(0, a.at)].length * duration / [...line.text].length);
+    const time = t.split_times?.[line.id]?.[a.at] ?? line.t0_ms + Math.max(1, Math.min(elapsed, duration - 1));
+    const selected = a.speaker;
+    let secondSpeaker: Bindings.SpeakerView | undefined;
+    let label: Bindings.SpeakerLabel;
+    if (selected.type === "existing") {
+      secondSpeaker = t.speakers.find((s) => s.id === selected.speaker_id && s.channel === line.channel);
+      if (!secondSpeaker) throw coreError("invalid_input", "speaker_id", { type: "validation", field: "speaker_id", rule: "out_of_range" });
+      label = secondSpeaker.label;
+    } else if (selected.type === "person") {
+      const ref = selected.person;
+      const person = ref.type === "existing" ? shared.personRef(shared.person(world, ref.person_id)) : {
+        id: newId("per"), display_name: ref.display_name.trim(), short_name: ref.display_name.trim(),
+        initials: ref.display_name.trim().slice(0, 2).toUpperCase(), is_you: false,
+      };
+      if (!person.display_name) throw coreError("invalid_input", "display_name", { type: "validation", field: "display_name", rule: "required" });
+      secondSpeaker = t.speakers.find((s) => s.channel === line.channel && s.label.type === "person" && s.label.person.id === person.id);
+      label = { type: "person", person };
+    } else {
+      label = { type: "unnamed", n: 1 + Math.max(0, ...t.speakers.map((s) => s.label.type === "unnamed" ? s.label.n : 0)) };
+    }
+    const secondId = newId("seg");
+    if (!secondSpeaker) {
+      secondSpeaker = {
+        id: newId("spk"), call_id: a.call_id, channel: line.channel, label, segment_count: 0,
+        talk_ms: null, suggestion: null, named_by: label.type === "person" ? "you" : null,
+        sample: { call_id: a.call_id, t0_ms: time, t1_ms: line.t1_ms },
+      };
+      for (const list of new Set(shared.speakerLists(world, a.call_id))) list.push({ ...secondSpeaker });
+    }
+    for (const list of new Set(shared.speakerLists(world, a.call_id))) {
+      const row = list.find((s) => s.id === secondSpeaker!.id);
+      if (row) row.segment_count++;
+    }
+    const second: Bindings.SegmentView = {
+      ...line, id: secondId, t0_ms: time, text: right,
+      speaker: { speaker_id: secondSpeaker.id, label },
+      corrections: line.corrections.filter((c) => c.range.end > a.at).map((c) => ({
+        ...c, range: { start: Math.max(0, c.range.start - a.at), end: c.range.end - a.at },
+      })),
+    };
+    line.corrections = line.corrections.filter((c) => c.range.start < left.length).map((c) => ({
+      ...c, range: { start: c.range.start, end: Math.min(c.range.end, left.length) },
+    }));
+    line.t1_ms = time;
+    line.text = left;
+    t.segments.splice(t.segments.indexOf(line) + 1, 0, second);
+    const summary = world.outputs.find((o) => o.call_id === a.call_id)?.sections.find((s) => s.kind === "summary" && s.summary_id);
+    if (summary) {
+      summary.names_updated = true;
+      emit("entity:changed", { type: "section", call_id: a.call_id, section: summary });
+    }
+    const change_id = shared.logChange(fake, world, {
+      entity: { kind: "call", id: a.call_id, label: "Transcript" }, reason: "segment_split", before,
+      after: JSON.stringify(shared.namingState(world, a.call_id)), summary: `Split a line at ${callTime(time / 1000)}`,
+    });
+    emit("entity:changed", { type: "speakers", call_id: a.call_id, speakers: t.speakers });
+    return { segments: [line, second], speakers: t.speakers, change_id };
   },
   transcript_fix_term: (a, { world, fake }) => {
     const seg = world.transcripts.find((t) => t.call_id === a.call_id)?.segments.find((s) => s.id === a.segment_id);

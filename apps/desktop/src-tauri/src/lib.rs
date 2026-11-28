@@ -206,6 +206,7 @@ pub fn run() {
                     event.id().as_ref(),
                     "menu.export"
                         | "menu.select_all"
+                        | "menu.split_line"
                         | "menu.delete"
                         | "menu.copy_for_slack"
                         | "menu.copy_for_jira"

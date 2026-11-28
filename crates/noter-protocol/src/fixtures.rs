@@ -926,6 +926,7 @@ pub fn world() -> FakeWorld {
         // DESIGN CS-R1: **Hypothesis 1.4 s · confirmed 3.1 s**.
         hypothesis_lag: Some(lag(1_400, 2_000)),
         confirmed_lag: Some(lag(3_100, 4_000)),
+        split_times: Default::default(),
     };
 
     // The past call as the Library and the call page read it back: an archive-pass transcript,
@@ -1013,6 +1014,7 @@ pub fn world() -> FakeWorld {
         audio_available: true,
         hypothesis_lag: None,
         confirmed_lag: None,
+        split_times: Default::default(),
     };
 
     let mut confirmed = hypothesis.clone();

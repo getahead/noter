@@ -47,6 +47,7 @@ export interface TranscriptViewProps {
   onPlay?: (seg: SegmentView) => void;
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
   onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
+  onSplitMenu?: (seg: SegmentView, range: TextRange, anchor: HTMLElement, at: number) => void;
   onReopenFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
 }
 
@@ -239,6 +240,7 @@ export function TranscriptView(p: TranscriptViewProps) {
               onPlay={p.onPlay}
               onRename={p.onRename}
               onFixTerm={p.onFixTerm}
+              onSplitMenu={p.onSplitMenu}
               onReopenFixTerm={p.onReopenFixTerm}
               onReason={(key, text) => setStatus({ key, text })}
               onStatusDone={() => (setStatus(null), p.onRefusedDone?.())}
@@ -247,7 +249,7 @@ export function TranscriptView(p: TranscriptViewProps) {
         </div>
         {pinned?.kind === "segment" && (
           <div className="cw-tv__pinned" style={{ top: pinnedTop }}>
-            <SegmentRow row={pinned} variant={variant} speakers={p.speakers} control={p.control?.(pinned)} playing={p.playingKey === pinned.key} highlighted={p.highlight?.includes(pinned.key)} find={find?.query} current={current === pinned.key} stop timeHelp={p.timeHelp} onPlay={p.onPlay} onRename={p.onRename} onFixTerm={p.onFixTerm} onReopenFixTerm={p.onReopenFixTerm} />
+            <SegmentRow row={pinned} variant={variant} speakers={p.speakers} control={p.control?.(pinned)} playing={p.playingKey === pinned.key} highlighted={p.highlight?.includes(pinned.key)} find={find?.query} current={current === pinned.key} stop timeHelp={p.timeHelp} onPlay={p.onPlay} onRename={p.onRename} onFixTerm={p.onFixTerm} onSplitMenu={p.onSplitMenu} onReopenFixTerm={p.onReopenFixTerm} />
           </div>
         )}
       </div>

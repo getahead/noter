@@ -238,6 +238,13 @@ pub fn app_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         false,
         None::<&str>,
     )?)?;
+    edit.append(&MenuItem::with_id(
+        app,
+        "menu.split_line",
+        catalogue("menu.split_line"),
+        false,
+        None::<&str>,
+    )?)?;
     let view = submenu(&menu, "View");
     clear_submenu(&view)?;
     append_model_items(app, &view, &model, "menu.title.view", 0)?;
@@ -395,6 +402,9 @@ pub fn update_context_menu<R: Runtime>(app: &AppHandle<R>, payload: &str) {
                 if let Err(error) = select_all_context(&handle, &menu, calls) {
                     eprintln!("noter: Select All menu context: {error}");
                 }
+            }
+            if let Some(enabled) = state["splitLineEnabled"].as_bool() {
+                set_enabled_by_id(&menu, "menu.split_line", enabled);
             }
             for (field, id) in [
                 ("exportEnabled", "menu.export"),

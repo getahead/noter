@@ -780,7 +780,7 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Depends On**: `cpt-noter-feature-core-live-transcript`, `cpt-noter-feature-core-history-undo`
 
 - **Scope**:
-  - Renames, term fixes, post-call naming, must-link and cannot-link constraints
+  - Renames, term fixes, post-call naming, stored line splits, must-link and cannot-link constraints
   - Audio deletion now and by age
 
 - **Out of scope**:

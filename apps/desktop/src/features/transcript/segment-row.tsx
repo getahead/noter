@@ -12,6 +12,7 @@ import { IconButton } from "../../ui/primitives/icon-button";
 import { LanguageTag, SpeakerLabel } from "./labels";
 import { clock, gapText, langAttr, LOW_CONFIDENCE, markText, rowVariant, speakerColumn, splitMatch, UI_LANG, type Row, type Variant } from "./model";
 import type { PlayControl } from "./play-control";
+import { pointedWord, selectedSplit, splitAt, wordAt } from "./split-point";
 
 const COMPONENT = "cpt-noter-component-ui-transcript-segment-row";
 
@@ -38,6 +39,7 @@ export interface SegmentRowProps {
   onRename?: (speakerId: string, seg: SegmentView, anchor: HTMLElement) => void;
   /** Fix Term… on the selected words of this line (context menu): the range is in UTF-16 units of the line's text. */
   onFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
+  onSplitMenu?: (seg: SegmentView, range: TextRange, anchor: HTMLElement, at: number) => void;
   onReopenFixTerm?: (seg: SegmentView, range: TextRange, anchor: HTMLElement) => void;
   onReason?: (key: string, text: string) => void;
   onStatusDone?: () => void;
@@ -96,7 +98,7 @@ function CorrectedText({ seg, find, onReopen }: { seg: SegmentView; find?: strin
 }
 
 // @cpt-component:cpt-noter-component-ui-transcript-segment-row:p1
-export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, stop, status, timeHelp, onPlay, onRename, onFixTerm, onReopenFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
+export function SegmentRow({ row, variant, speakers, control, playing, highlighted, find, current, stop, status, timeHelp, onPlay, onRename, onFixTerm, onSplitMenu, onReopenFixTerm, onReason, onStatusDone, ref }: SegmentRowProps) {
   const tail = variant === "tail";
   if (row.kind === "gap") {
     return (
@@ -133,11 +135,18 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
     );
   }
   // a selection in the line opens the Copy / Fix Term… menu; without one the native menu stays
-  const openFixMenu = (e: { preventDefault: () => void }, el: HTMLElement) => {
-    const range = selectedRange(el, globalThis.getSelection());
-    if (!range) return;
-    e.preventDefault();
-    onFixTerm?.(seg, range, el);
+  const openFixMenu = (e: { preventDefault: () => void }, el: HTMLElement, word?: TextRange | null) => {
+    const selection = globalThis.getSelection();
+    const selected = selectedRange(el, selection);
+    const at = word?.start ?? (word === undefined ? selectedSplit(selection, [seg])?.at : undefined);
+    if (onSplitMenu && at !== undefined && splitAt(seg.text, at)) {
+      const range = selected ?? word ?? wordAt(seg.text, at)!;
+      e.preventDefault();
+      onSplitMenu(seg, range, el, at);
+    } else if (selected) {
+      e.preventDefault();
+      onFixTerm?.(seg, selected, el);
+    }
   };
   const v = rowVariant(seg, variant, speakers);
   const low = seg.confidence != null && seg.confidence < LOW_CONFIDENCE;
@@ -178,7 +187,8 @@ export function SegmentRow({ row, variant, speakers, control, playing, highlight
       <span
         className={cx("cw-seg__text", low && "is-lowconf")}
         title={low ? t("transcript.low_confidence") : undefined}
-        onContextMenu={onFixTerm && !tail ? (e) => openFixMenu(e, e.currentTarget) : undefined}
+        onContextMenu={onFixTerm && !tail ? (e) => openFixMenu(e, e.currentTarget,
+          onSplitMenu ? pointedWord(e.currentTarget, seg.text, e.clientX, e.clientY) : undefined) : undefined}
       >
         <CorrectedText seg={seg} find={find} onReopen={onReopenFixTerm} />
       </span>

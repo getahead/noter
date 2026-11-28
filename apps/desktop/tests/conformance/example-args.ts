@@ -32,6 +32,7 @@ export const EXAMPLE_ARGS: { [K in CommandName]: CommandArgs[K] } = {
   transcript_subscribe: {"call_id": "call_backend"},
   levels_subscribe: {},
   transcript_rename_speaker: {"call_id": "call_backend", "speaker_id": "noter", "person": {"type": "existing", "person_id": "per_anna"}, "scope": {"type": "whole_call"}},
+  transcript_split_segment: {"call_id": "call_backend", "segment_id": "seg_backend_001", "at": 8, "speaker": {"type": "new"}},
   transcript_fix_term: {"call_id": "call_live", "segment_id": "seg_live_001", "range": {"start": 4, "end": 9}, "replacement": "blank", "add_to_glossary": false},
   transcript_name_speakers: {"call_id": "call_backend", "assignments": []},
   transcript_span: {"span": {"call_id": "call_backend", "t0_ms": 1, "t1_ms": 1}},

@@ -4,12 +4,14 @@
 //! retrieval. The chunks are a derived index: one logged, non-undoable change per write.
 
 use noter_db::rusqlite::{params, Connection, OptionalExtension, Transaction};
-use noter_db::Logged;
+use noter_db::{ChangeMeta, Logged};
 use noter_jobs::{RunCtx, Stop};
+use noter_protocol::model::Actor;
 use noter_protocol::*;
 use serde_json::json;
+use std::collections::HashMap;
 
-use crate::{object, Core};
+use crate::{internal, object, Core};
 
 const MIN_TOKENS: usize = 200;
 const MAX_TOKENS: usize = 300;
@@ -149,7 +151,107 @@ pub(crate) fn replace_chunks(
     Ok(())
 }
 
+/// Refresh keyword search immediately and reuse vectors for exactly matching chunk text.
+pub(crate) fn reindex_split(tx: &Transaction<'_>, call: &CallId) -> noter_db::rusqlite::Result<()> {
+    let chunks = current_chunks(tx, call)?;
+    let mut query = tx.prepare(
+        "SELECT text, embedding FROM chunks WHERE call_id = ?1 AND embedding IS NOT NULL",
+    )?;
+    let embeddings = query
+        .query_map([call.as_str()], |r| {
+            Ok((r.get::<_, String>(0)?, r.get::<_, Vec<u8>>(1)?))
+        })?
+        .collect::<Result<HashMap<_, _>, _>>()?;
+    tx.execute("DELETE FROM chunks WHERE call_id = ?1", [call.as_str()])?;
+    for chunk in chunks {
+        let embedding = embeddings.get(&chunk.text).map(Vec::as_slice);
+        insert_chunk(tx, call.as_str(), &chunk, embedding)?;
+    }
+    Ok(())
+}
+
 impl Core {
+    /// Fill missing semantic vectors after a split or its reversal, using the same local model
+    /// as the archive pass. A later edit that replaced a row invalidates its pending vector.
+    pub(crate) async fn embed_split_chunks(&self, call: &CallId) {
+        let pending = self.store().read(|c| {
+            c.prepare(
+                "SELECT id, t0_ms, t1_ms, text, token_count FROM chunks
+                 WHERE call_id = ?1 AND embedding IS NULL ORDER BY t0_ms",
+            )?
+            .query_map([call.as_str()], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    Chunk {
+                        t0_ms: r.get(1)?,
+                        t1_ms: r.get(2)?,
+                        text: r.get(3)?,
+                        token_count: r.get::<_, u32>(4)? as usize,
+                    },
+                ))
+            })?
+            .collect::<Result<Vec<_>, _>>()
+        });
+        let Ok(pending) = pending else { return };
+        if pending.is_empty() {
+            return;
+        }
+        let (ids, chunks): (Vec<_>, Vec<_>) = pending.into_iter().unzip();
+        let Ok(vectors) = self.embed(call, &chunks).await else {
+            return;
+        };
+        let call = call.clone();
+        let meta = ChangeMeta {
+            actor: Actor::Job {
+                job_id: JobId::new("job_index_rebuild"),
+                name: "Index rebuild".into(),
+            },
+            summary: "Indexed the edited transcript".into(),
+            reason: "chunks".into(),
+            evidence_ids: vec![],
+            batch_id: None,
+            undoable: false,
+            surface: None,
+        };
+        let result = self.store().write_with(meta, move |tx| {
+            let mut written = 0;
+            for ((id, chunk), vector) in ids.into_iter().zip(chunks).zip(vectors) {
+                // Insert/delete triggers keep both FTS and the vector index in sync.
+                if tx
+                    .execute("DELETE FROM chunks WHERE id = ?1", [id])
+                    .map_err(internal)?
+                    > 0
+                {
+                    insert_chunk(tx, call.as_str(), &chunk, Some(&blob(&vector)))
+                        .map_err(internal)?;
+                    written += 1;
+                }
+            }
+            if written == 0 {
+                return Err(CoreError::new(
+                    ErrorCode::Conflict,
+                    "the edited chunks were replaced",
+                ));
+            }
+            Ok((
+                (),
+                vec![Logged {
+                    entity_type: "call",
+                    entity_id: call.0,
+                    field: Some("chunks".into()),
+                    before: None,
+                    after: Some(written.to_string()),
+                    delta: None,
+                }],
+            ))
+        });
+        if let Err(e) = result {
+            self.log(object(json!({
+                "level": "warn", "module": "postcall", "code": "split_embeddings", "error": e.code
+            })));
+        }
+    }
+
     /// Re-chunks the call's active transcript and embeds the chunks; replaces the call's chunks.
     /// An embedding failure keeps the chunks without vectors, is logged and is not an error of
     /// the run: the transcript and the sections stay usable, and the next pass embeds again.

@@ -25,7 +25,7 @@ use std::time::Duration;
 use noter_protocol::CoreError;
 use rusqlite::{Connection, ErrorCode as SqliteCode, OpenFlags};
 
-pub use change::{to_sql, ChangeMeta, Custom, Insert, Logged, Mutation, Written};
+pub use change::{apply_mutation, to_sql, ChangeMeta, Custom, Insert, Logged, Mutation, Written};
 pub use migrate::{Migration, MIGRATIONS};
 pub use replay::{call_tags_text, redoable, replayable, Direction, Handle, Reversed};
 pub use rusqlite;

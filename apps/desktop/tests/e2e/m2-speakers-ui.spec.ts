@@ -506,3 +506,55 @@ test("cpt-noter-seq-call-page-name-speakers — stale Fix Term refreshes the spa
   await expect(fix).toContainText("Select the words again");
   expect(await sent(page, "transcript_fix_term")).toHaveLength(1);
 });
+
+test("cpt-noter-seq-call-page-split-line — split a stored line, read History, then undo", async ({ page }) => {
+  await openWindow(page, "main");
+  await navigate(page, "transcript", W.PAST_CALL);
+  const row = page.locator('[data-segment-id="seg_backend_001"]');
+  const text = row.locator(".cw-seg__text");
+  const original = "Давайте начнём с ostor: что с бакетами после рестарта?";
+  await expect(text).toHaveText(original);
+  const word = await text.evaluate((el) => {
+    const word = document.createRange();
+    word.setStart(el.firstChild!, 8);
+    word.setEnd(el.firstChild!, 14);
+    const box = word.getBoundingClientRect();
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  });
+  await page.mouse.click(word.x, word.y, { button: "right" });
+  await page.getByRole("menuitem", { name: "Split Line Here", exact: true }).click();
+  const split = popover(page, /^Split line at /);
+  await expect(split.getByRole("combobox", { name: "Second part" })).toHaveValue("new");
+  await split.getByRole("button", { name: "Split", exact: true }).click();
+  await expect(text).toHaveText("Давайте");
+  await expect(page.locator('[data-region="PC-R5"] .cw-seg__text').getByText(original.slice(8), { exact: true })).toBeVisible();
+  await expect.poll(async () => (await sent(page, "transcript_split_segment")).length).toBe(1);
+  const undo = page.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toBeVisible();
+  await undo.click();
+  await expect(text).toHaveText(original);
+  await navigate(page, "history", W.PAST_CALL);
+  await expect(page.getByText(/Split a line at/).first()).toBeVisible();
+});
+
+
+test("cpt-noter-seq-call-page-split-line — a stale preview asks the user to pick a word again", async ({ page }) => {
+  const core = await openWindow(page, "main");
+  await navigate(page, "transcript", W.PAST_CALL);
+  const row = page.locator('[data-segment-id="seg_backend_001"]');
+  const text = row.locator(".cw-seg__text");
+  await expect(text).toContainText("Давайте начнём");
+  await row.focus();
+  await text.evaluate((el) => getSelection()!.setBaseAndExtent(el.firstChild!, 8, el.firstChild!, 14));
+  await page.keyboard.press("Shift+F10");
+  await page.getByRole("menuitem", { name: "Split Line Here", exact: true }).click();
+  const split = popover(page, /^Split line at /);
+  await expect(split).toBeVisible();
+  await core.invoke("transcript_fix_term", {
+    call_id: W.PAST_CALL, segment_id: "seg_backend_001", range: { start: 0, end: 7 },
+    replacement: "Сначала", add_to_glossary: false,
+  });
+  await split.getByRole("button", { name: "Split", exact: true }).click();
+  await expect(page.getByRole("alert").getByText(/Choose a word in the current transcript/)).toBeVisible();
+  await expect(text).toContainText("Сначала начнём");
+});
