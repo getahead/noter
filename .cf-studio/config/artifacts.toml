@@ -17,6 +17,7 @@ artifacts = [
   { path = "docs/features/core/core-storage.md", kind = "FEATURE", traceability = "FULL" },
   { path = "docs/features/core/core-ipc-host.md", kind = "FEATURE", traceability = "FULL" },
   { path = "docs/features/core/core-harness.md", kind = "FEATURE", traceability = "FULL" },
+  { path = "docs/features/core/developer-workflow-skills.md", kind = "FEATURE", traceability = "FULL" },
   { path = "docs/features/core/core-settings.md", kind = "FEATURE", traceability = "FULL" },
   { path = "docs/features/core/core-engine-foundation.md", kind = "FEATURE", traceability = "FULL" },
   { path = "docs/features/core/core-first-run.md", kind = "FEATURE", traceability = "FULL" },

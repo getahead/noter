@@ -46,6 +46,7 @@ milestones: harness/milestones.toml
   - [2.29 Maintenance jobs, retention and recovery - LOW](#229-maintenance-jobs-retention-and-recovery---low)
   - [2.30 Evidence, proposals and Activity - LOW](#230-evidence-proposals-and-activity---low)
   - [2.31 Metrics and Performance - LOW](#231-metrics-and-performance---low)
+  - [2.32 Developer workflow skills - MEDIUM](#232-developer-workflow-skills---medium)
 - [3. Feature Dependencies](#3-feature-dependencies)
 
 <!-- /toc -->
@@ -1740,6 +1741,24 @@ This decomposition breaks `docs/DESIGN-core.md` (v0.4) into backend features: th
 - **Data**:
 
   - `cpt-noter-dbtable-metrics`
+
+### 2.32 [Developer workflow skills](features/core/developer-workflow-skills.md) - MEDIUM
+
+- [ ] `p2` - **ID**: `cpt-noter-feature-developer-workflow-skills`
+
+- **Milestone**: M3 · **Lane**: owner · **Status**: NOT_STARTED. FEATURE spec: [features/core/developer-workflow-skills.md](features/core/developer-workflow-skills.md)
+- **Purpose**: Apply scoped macOS and Ponytail guidance to Constructor Studio code generation and review while preserving feature traceability and local PR self-review.
+- **Depends On**: The pinned Constructor Studio runtime and local skill sources for Codex and Claude Code.
+- **Scope**: Code generation, semantic code review and local PR code review.
+- **Out of scope**: Application behavior, CI changes and quality threshold changes.
+- **Requirements Covered**: PRD › Developer loop and ADR-0003 › Decision Outcome.
+- **Design Principles Covered**: None specific to the application.
+- **Design Constraints Covered**: DESIGN-core › Quality bars.
+- **Domain Model Entities**: None.
+- **Design Components**: None.
+- **API**: None.
+- **Sequences**: None.
+- **Data**: None.
 
 ---
 

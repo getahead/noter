@@ -18,7 +18,8 @@ data_dir = ".prs"
 description = "Code Review"
 prompt_file = "{scripts}/prompts/pr/code-review.md"
 checklist   = "{codebase_checklist}"
-# coding_guidelines = "docs/coding-guidelines.md"
+# @cpt-flow:cpt-noter-flow-developer-workflow-skills-pr-review:p2
+coding_guidelines = "{cf-studio-path}/config/rules/code-skills.md"
 # security_guidelines = "docs/security-guidelines.md"
 
 [[prompts]]
